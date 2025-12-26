@@ -1,36 +1,38 @@
 # Santafé
 
-*A Portuguese-friendly programming language inspired by Lua — designed to feel natural for Portuguese speakers while staying lightweight, fast, and embeddable.*
+*Uma linguagem de programação inspirada em Lua, pensada para ser natural para falantes de português — leve, rápida e embutível.*
 
-> **Status:** Work in progress / evolving project. Expect changes as the language and standard library grow.
+> **Status:** em desenvolvimento (WIP). Mudanças podem acontecer com frequência.
 
----
-
-## What is Santafé?
-
-**Santafé** is a Lua-based language/runtime that focuses on:
-
-- **Portuguese-first syntax and naming**
-- **Small footprint** (great for CLI tools, embedded scripting, and servers)
-- **Practical tooling** (native build, and optional WebAssembly builds for the browser)
-
-Santafé aims to keep the spirit of Lua (simplicity + portability) while making the surface language more welcoming to Portuguese speakers.
+[English version → README.en.md](README.en.md)
 
 ---
 
-## Highlights
+## O que é o Santafé?
 
-- ✅ Lua-inspired runtime in C (fast, embeddable)
-- ✅ Portuguese keywords and a more “local” standard library naming style
-- ✅ **Template literals** with backticks and interpolation using `Ⓡ{ ... }`
-- ✅ Works well for scripting, web, automation, and building higher-level libraries
-- ✅ Optional **WebAssembly** workflow for running in the browser (when built with Emscripten)
+**Santafé** é uma linguagem/runtime baseada no núcleo do Lua, com foco em:
+
+- **Sintaxe e nomes em português (lusófono-friendly)**
+- **Pegada pequena** (ótimo para scripts, CLI, automação e servidores)
+- **Ferramentas práticas** (build nativo e, opcionalmente, WebAssembly para rodar no navegador)
+
+A ideia é manter o espírito do Lua (simplicidade + portabilidade), mas com uma “cara” mais natural em português.
 
 ---
 
-## Quick taste
+## Destaques
 
-### Hello world
+- ✅ Runtime em C (rápido e embutível)
+- ✅ Palavras-chave e bibliotecas com **nomenclatura em português**
+- ✅ **Gabarito literal** com crases + interpolação `®{ ... }`
+- ✅ Bom para scripts, automação e criação de bibliotecas
+- ✅ Workflow opcional com **WebAssembly** (quando compilado com Emscripten)
+
+---
+
+## Exemplos rápidos
+
+### Olá mundo
 
 ```santafe
 
