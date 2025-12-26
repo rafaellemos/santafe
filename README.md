@@ -13,7 +13,7 @@
 **Santafé** é uma linguagem/runtime baseada no núcleo do Lua, com foco em:
 
 - **Sintaxe e nomes em português (lusófono-friendly)**
-- **Web no DNA** (Já nasce com duas ótimas biblitecas para desenvolver páginas da internet)
+- **Web no DNA** (Já nasce com duas ótimas bibliotecas para desenvolver páginas da internet)
 - **Ferramentas práticas** (build nativo e, opcionalmente, WebAssembly para rodar no navegador)
 
 A ideia é manter o espírito do Lua (simplicidade + portabilidade), mas com uma “cara” mais natural em português.
