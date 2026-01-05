@@ -3,9 +3,9 @@
 *A Portuguese-friendly programming language inspired by Lua — designed to feel natural for Portuguese speakers while staying lightweight, fast, and embeddable.*
 
 > **Status:** Work in progress / evolving project. Expect changes as the language and standard library grow.
-## ▶️ Test on browser (WASM)
+## ▶️ Test in browser (WASM)
 
-[![Open Santafé WASM](https://img.shields.io/badge/Abrir%20no%20Navegador-Santaf%C3%A9%20WASM-2ea44f?style=for-the-badge)](https://xn--santaf-gva.dev.br/estático/wasm)
+[![Open Santafé WASM](https://img.shields.io/badge/Open%20in%20Browser-Santaf%C3%A9%20WASM-2ea44f?style=for-the-badge)](https://xn--santaf-gva.dev.br/estático/wasm)
 
 ---
 
