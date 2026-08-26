@@ -1,0 +1,7 @@
+local frutas = { "maçã", "banana", "uva" }
+
+para posição, fruta em ipares(frutas) início
+    mostre(posição, fruta)
+fim
+
+mostre("Total:", #frutas)

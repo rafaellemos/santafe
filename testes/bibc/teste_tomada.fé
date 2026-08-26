@@ -1,0 +1,23 @@
+-- Regressão das proteções herdadas do LuaSocket e traduzidas pela Tomada.
+
+local tomada = importe "tomada"
+local finalizou = falso
+
+local verifique = tomada.verifique(função()
+    finalizou = verdadeiro
+fim)
+
+local protegida = tomada.proteja(função()
+    retorne verifique(nulo, "falha prevista")
+fim)
+
+local valor, falha = protegida()
+garanta(valor == nulo e falha == "falha prevista")
+garanta(finalizou)
+
+local identidade = tomada.proteja(função(valorRecebido)
+    retorne valorRecebido
+fim)
+garanta(identidade("ok") == "ok")
+
+mostre("tomada proteção: ok")

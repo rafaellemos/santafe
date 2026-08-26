@@ -1,0 +1,74 @@
+local imagem = importe "imagem"
+
+local largura, altura = 300, 50
+local escala = 5
+local intervalo = 5
+
+-- Cada algarismo da matriz representa um ponto apagado (0) ou aceso (1).
+-- Todos os glifos medem 5 × 8 pontos antes da ampliação.
+local palavra = {
+    { -- S
+        "01110", "10001", "10000", "01110",
+        "00001", "00001", "11110", "00000"
+    },
+    { -- a
+        "00000", "00000", "01110", "00001",
+        "01111", "10001", "01111", "00000"
+    },
+    { -- n
+        "00000", "00000", "10110", "11001",
+        "10001", "10001", "10001", "00000"
+    },
+    { -- t
+        "00100", "00100", "11110", "00100",
+        "00100", "00101", "00010", "00000"
+    },
+    { -- a
+        "00000", "00000", "01110", "00001",
+        "01111", "10001", "01111", "00000"
+    },
+    { -- f
+        "00110", "01001", "01000", "11100",
+        "01000", "01000", "01000", "00000"
+    },
+    { -- é
+        "00100", "01000", "01110", "10001",
+        "11111", "10000", "01110", "00000"
+    }
+}
+
+local larguraDoGlifo = 5 * escala
+local alturaDoGlifo = 8 * escala
+local larguraDaPalavra = #palavra * larguraDoGlifo +
+                         (#palavra - 1) * intervalo
+local começoX = (largura - larguraDaPalavra) // 2 + 1
+local começoY = (altura - alturaDoGlifo) // 2 + 1
+local passo = larguraDoGlifo + intervalo
+
+local função corDoPonto(x, y)
+    -- Fundo azul-escuro.
+    local fundoR, fundoG, fundoB = 38, 50, 56
+
+    local relativoX = x - começoX
+    local relativoY = y - começoY
+    se relativoX < 0 ou relativoY < 0 ou relativoY >= alturaDoGlifo então
+        retorne fundoR, fundoG, fundoB, 255
+    fim
+
+    local posição = relativoX // passo + 1
+    local xNoPasso = relativoX % passo
+    se posição > #palavra ou xNoPasso >= larguraDoGlifo então
+        retorne fundoR, fundoG, fundoB, 255
+    fim
+
+    local coluna = xNoPasso // escala + 1
+    local linha = relativoY // escala + 1
+    se palavra[posição][linha]:corte(coluna, coluna) == "1" então
+        -- Verde Santafé.
+        retorne 46, 188, 136, 255
+    fim
+    retorne fundoR, fundoG, fundoB, 255
+fim
+
+imagem.salve("santafe-300x50.png", "png", largura, altura, corDoPonto)
+mostre("Imagem criada: santafe-300x50.png (300 × 50)")

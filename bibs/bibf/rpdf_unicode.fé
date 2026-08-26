@@ -1,0 +1,219 @@
+-- Núcleo Unicode do RPDF.
+-- Lê apenas as tabelas TrueType necessárias para incorporar uma fonte no PDF.
+
+local unicodePdf = {}
+
+local função u16(dados, posição)
+    local a, b = dados:byte(posição, posição + 1)
+    garanta(a e b, "fonte TrueType truncada")
+    retorne a * 256 + b
+fim
+
+local função s16(dados, posição)
+    local valor = u16(dados, posição)
+    se valor >= 0x8000 então valor = valor - 0x10000 fim
+    retorne valor
+fim
+
+local função u32(dados, posição)
+    local a, b, c, d = dados:byte(posição, posição + 3)
+    garanta(a e b e c e d, "fonte TrueType truncada")
+    retorne ((a * 256 + b) * 256 + c) * 256 + d
+fim
+
+local função inteiro16(dados, posição)
+    local parteInteira = s16(dados, posição)
+    local fração = u16(dados, posição + 2) / 65536
+    se parteInteira < 0 então retorne parteInteira - fração fim
+    retorne parteInteira + fração
+fim
+
+local função leiaTudo(caminho)
+    local arquivo, falha = es.abra(caminho, "leiturabin")
+    garanta(arquivo, falha)
+    local dados = arquivo:leia("*tudo")
+    arquivo:feche()
+    retorne dados
+fim
+
+local função tabelasTrueType(dados)
+    local quantidade = u16(dados, 5)
+    local tabelas = {}
+    para i = 0, quantidade - 1 início
+        local posição = 13 + i * 16
+        local nome = dados:corte(posição, posição + 3)
+        tabelas[nome] = {
+            posição = u32(dados, posição + 8) + 1,
+            tamanho = u32(dados, posição + 12)
+        }
+    fim
+    retorne tabelas
+fim
+
+local função escolhaCmap(dados, tabela)
+    local base = tabela.posição
+    local quantidade = u16(dados, base + 2)
+    local melhor, prioridade
+    para i = 0, quantidade - 1 início
+        local registro = base + 4 + i * 8
+        local plataforma = u16(dados, registro)
+        local codificação = u16(dados, registro + 2)
+        local posição = base + u32(dados, registro + 4)
+        local formato = u16(dados, posição)
+        local nota = 0
+        se formato == 12 e plataforma == 3 e codificação == 10 então nota = 100
+        senãose formato == 12 e plataforma == 0 então nota = 90
+        senãose formato == 4 e plataforma == 3 e codificação == 1 então nota = 80
+        senãose formato == 4 e plataforma == 0 então nota = 70
+        fim
+        se nota > (prioridade ou 0) então
+            melhor = { formato = formato, posição = posição }
+            prioridade = nota
+        fim
+    fim
+    garanta(melhor, "a fonte não contém um cmap Unicode compatível")
+    retorne melhor
+fim
+
+local função prepareCmap12(fonte, posição)
+    local grupos = {}
+    local quantidade = u32(fonte.dados, posição + 12)
+    para i = 0, quantidade - 1 início
+        local p = posição + 16 + i * 12
+        grupos[#grupos + 1] = {
+            primeiro = u32(fonte.dados, p),
+            último = u32(fonte.dados, p + 4),
+            glifo = u32(fonte.dados, p + 8)
+        }
+    fim
+    fonte.gruposCmap = grupos
+fim
+
+local função glifoCmap12(fonte, código)
+    local primeiroDaBusca, fimDaBusca = 1, #fonte.gruposCmap
+    enquanto primeiroDaBusca <= fimDaBusca início
+        local meio = (primeiroDaBusca + fimDaBusca) // 2
+        local grupo = fonte.gruposCmap[meio]
+        se código < grupo.primeiro então fimDaBusca = meio - 1
+        senãose código > grupo.último então primeiroDaBusca = meio + 1
+        senão retorne grupo.glifo + código - grupo.primeiro
+        fim
+    fim
+    retorne 0
+fim
+
+local função glifoCmap4(fonte, código)
+    se código > 0xFFFF então retorne 0 fim
+    local dados, posição = fonte.dados, fonte.cmap.posição
+    local segmentos = u16(dados, posição + 6) // 2
+    local finais = posição + 14
+    local iniciais = finais + segmentos * 2 + 2
+    local diferenças = iniciais + segmentos * 2
+    local alcances = diferenças + segmentos * 2
+    para i = 0, segmentos - 1 início
+        local último = u16(dados, finais + i * 2)
+        se código <= último então
+            local primeiro = u16(dados, iniciais + i * 2)
+            se código < primeiro então retorne 0 fim
+            local diferença = s16(dados, diferenças + i * 2)
+            local alcance = u16(dados, alcances + i * 2)
+            se alcance == 0 então retorne (código + diferença) % 65536 fim
+            local endereço = alcances + i * 2 + alcance + (código - primeiro) * 2
+            local glifo = u16(dados, endereço)
+            se glifo ~= 0 então glifo = (glifo + diferença) % 65536 fim
+            retorne glifo
+        fim
+    fim
+    retorne 0
+fim
+
+local métodosDaFonte = {}
+
+função métodosDaFonte:glifo(código)
+    se este.cmap.formato == 12 então retorne glifoCmap12(este, código) fim
+    retorne glifoCmap4(este, código)
+fim
+
+função métodosDaFonte:larguraDoGlifo(glifo)
+    local índice = glifo
+    se índice >= este.quantidadeDeMétricas então índice = este.quantidadeDeMétricas - 1 fim
+    retorne u16(este.dados, este.hmtx.posição + índice * 4)
+fim
+
+função unicodePdf.carregueFonte(caminho)
+    local dados = leiaTudo(caminho)
+    local tabelas = tabelasTrueType(dados)
+    para _, nome em ipares({"cmap", "head", "hhea", "hmtx", "maxp"}) início
+        garanta(tabelas[nome], "fonte TrueType sem a tabela obrigatória " .. nome)
+    fim
+
+    local fonte = {
+        dados = dados,
+        caminho = caminho,
+        tabelas = tabelas,
+        cmap = escolhaCmap(dados, tabelas.cmap),
+        unidadesPorEm = u16(dados, tabelas.head.posição + 18),
+        xMínimo = s16(dados, tabelas.head.posição + 36),
+        yMínimo = s16(dados, tabelas.head.posição + 38),
+        xMáximo = s16(dados, tabelas.head.posição + 40),
+        yMáximo = s16(dados, tabelas.head.posição + 42),
+        ascendente = s16(dados, tabelas.hhea.posição + 4),
+        descendente = s16(dados, tabelas.hhea.posição + 6),
+        quantidadeDeMétricas = u16(dados, tabelas.hhea.posição + 34),
+        quantidadeDeGlifos = u16(dados, tabelas.maxp.posição + 4),
+        hmtx = tabelas.hmtx,
+        ânguloItálico = tabelas.post e inteiro16(dados, tabelas.post.posição + 4) ou 0,
+        nomePdf = "NotoSans-Regular"
+    }
+    definaMetatabela(fonte, { __índice = métodosDaFonte })
+    se fonte.cmap.formato == 12 então prepareCmap12(fonte, fonte.cmap.posição) fim
+    retorne fonte
+fim
+
+função unicodePdf.escala(fonte, valor)
+    retorne mat.arredonde(valor * 1000 / fonte.unidadesPorEm)
+fim
+
+função unicodePdf.hex(dados)
+    retorne (dados:troque(".", função(caractere)
+        retorne colar.formate("%02X", caractere:byte())
+    fim))
+fim
+
+função unicodePdf.u16be(valor)
+    retorne colar.caractere((valor // 256) % 256, valor % 256)
+fim
+
+função unicodePdf.utf16beHex(código)
+    se código <= 0xFFFF então retorne colar.formate("%04X", código) fim
+    local valor = código - 0x10000
+    local alto = 0xD800 + (valor // 0x400)
+    local baixo = 0xDC00 + (valor % 0x400)
+    retorne colar.formate("%04X%04X", alto, baixo)
+fim
+
+função unicodePdf.textoUtf8(texto)
+    -- Em PDF 2.0, um colar textual UTF-8 é identificado pelo BOM EF BB BF.
+    retorne "<EFBBBF" .. unicodePdf.hex(texto) .. ">"
+fim
+
+função unicodePdf.localizeFonte()
+    local configurada = so.obterVariável("RPDF_FONTE")
+    se configurada então
+        local arquivo = es.abra(configurada, "leiturabin")
+        se arquivo então arquivo:feche(); retorne configurada fim
+    fim
+    local candidatos = {
+        "fonte/bibs/bibf/rpdf/fontes/NotoSans-Regular.ttf",
+        "bibs/bibf/rpdf/fontes/NotoSans-Regular.ttf",
+        "/usr/local/share/santafé/1.0/bibf/rpdf/fontes/NotoSans-Regular.ttf",
+        "/usr/share/santafé/1.0/bibf/rpdf/fontes/NotoSans-Regular.ttf"
+    }
+    para _, caminho em ipares(candidatos) início
+        local arquivo = caminho e es.abra(caminho, "leiturabin")
+        se arquivo então arquivo:feche(); retorne caminho fim
+    fim
+    erro("fonte Unicode padrão do RPDF não encontrada")
+fim
+
+retorne unicodePdf

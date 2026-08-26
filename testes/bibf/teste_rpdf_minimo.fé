@@ -1,0 +1,14 @@
+módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
+local RPDF = importe "rpdf"
+
+local documento = RPDF:novo()
+documento:AdicionePágina()
+documento:DefinaFonte("helvetica", "", 12)
+documento:Célula(0, 10, "Olá, Santafé!", 0, 1)
+documento:Saída("/tmp/santafe-rpdf-minimo.pdf", "arquivo")
+
+local arquivo = garanta(es.abra("/tmp/santafe-rpdf-minimo.pdf", "leiturabin"))
+local assinatura = arquivo:leia(8)
+arquivo:feche()
+garanta(assinatura:corte(1, 5) == "%PDF-", "assinatura PDF inválida")
+mostre("RPDF mínimo:", assinatura)

@@ -1,122 +1,68 @@
 # Santafé
 
-*A Portuguese-friendly programming language inspired by Lua — designed to feel natural for Portuguese speakers while staying lightweight, fast, and embeddable.*
+**Think naturally, program naturally.**
 
-> **Status:** Work in progress / evolving project. Expect changes as the language and standard library grow.
-## ▶️ Test in browser (WASM)
+Santafé is a Portuguese programming language derived from the Lua 5.3.6 core. It keeps the small, portable runtime while presenting syntax, standard libraries, diagnostics, and concepts designed for Portuguese speakers.
 
-[![Open Santafé WASM](https://img.shields.io/badge/Open%20in%20Browser-Santaf%C3%A9%20WASM-2ea44f?style=for-the-badge)](https://xn--santaf-gva.dev.br/estático/wasm)
+[Versão em português → README.md](README.md)
 
----
+## Try it in the browser
 
-## What is Santafé?
+[Open the Santafé WebAssembly playground](https://xn--santaf-gva.dev.br/est%C3%A1tico/wasm/)
 
-**Santafé** is a Lua-based language/runtime that focuses on:
+## Supported platforms
 
-- **Portuguese-first syntax and naming**
-- **Small footprint** (great for CLI tools, embedded scripting, and servers)
-- **Practical tooling** (native build, and optional WebAssembly builds for the browser)
+Version 1.0.0 is validated on macOS with Clang and Debian GNU/Linux with GCC. Windows is not part of the validated 1.0.0 matrix yet.
 
-Santafé aims to keep the spirit of Lua (simplicity + portability) while making the surface language more welcoming to Portuguese speakers.
+## Install
 
----
+The installer detects the environment and offers to install the required dependencies:
 
-## Highlights
-
-- ✅ Lua-inspired runtime in C (fast, embeddable)
-- ✅ Portuguese keywords and a more “local” standard library naming style
-- ✅ **Template literals** with backticks and interpolation using `®{ ... }`
-- ✅ Works well for scripting, automation, and building higher-level libraries
-- ✅ Optional **WebAssembly** workflow for running in the browser (when built with Emscripten)
-
----
-
-## Quick taste
-
-### Hello world
-
-```santafe
-mostre("Hello from Santafé")
-```
-### Conditionals
-```santafe
-se idade >= 18 então
-  mostre("adulto")
-senão
-  mostre("menor")
-fim
-```
-### Template literal (backticks + Ⓡ{...})
-```santafe
-nome = "Rafael"
-mostrar(`Bem-vindo, Ⓡ{nome}!`)
-```
----
-
-## Getting started
-### Build from source (native)
-
-#### Requirements
-
-* A C toolchain (GCC/Clang)
-* make
-
-#### Build
 ```bash
-make
+chmod +x instalar.sh
+./instalar.sh
 ```
-#### Install
+
+Compile without installing:
+
 ```bash
-sudo make install
+make cbin
+make cbibc
+make test
 ```
-> Tip: If your Makefile supports platform presets (like Lua’s), you may be able to use:
-> 
-> make PLAT=linux, make PLAT=macosx, etc.
 
+Run an example:
 
-#### Run
 ```bash
-santafe path/script.fé
+santafé exemplos/01-ola.fé
 ```
 
-## WebAssembly (optional)
-If you ship a browser build (e.g. static/wasm/santafe.wasm + santafe.js), a typical integration looks like:
-```html
-<script src="static/wasm/santafe.js"></script>
-<script>
-  // Example: call into the runtime once Module is ready
-  Module.onRuntimeInitialized = () => {
-    // your bridge code here (cwrap / exported functions)
-  };
-</script>
+## Documentation
+
+- [Full manual](https://xn--santaf-gva.dev.br/est%C3%A1tico/manual/)
+- [Practical introduction](https://xn--santaf-gva.dev.br/documenta%C3%A7%C3%A3o)
+- [Community](https://xn--santaf-gva.dev.br/comunidade)
+
+## Repository layout
+
+```text
+src/       C runtime and standard library
+bibs/bibc/ optional C libraries
+bibs/bibf/ libraries written in Santafé
+exemplos/  short programs
+testes/    runtime and library checks
 ```
-> The exact API depends on what you export in your WASM build (e.g. _sf_init, _sf_run_code, etc.).
 
-## Project layout (suggested)
-Typical folders you might have in this repo:
-* ```src/``` — C source (runtime / VM / libraries)
-* ```include/``` — headers
-* ```bibf/ or libs/``` — Santafé libraries/modules
-* ```static/wasm/``` — browser build artifacts (.wasm, JS glue, assets)
-* ```examples/``` — Santafé examples (.fé)
-* ```docs/``` — documentation
+## Branches and releases
 
-## Goals / Roadmap
-Santafé is built with a long-term vision, including:
-* Expand “Portuguese-native” naming across the whole ecosystem
-* Improve the standard library surface (consistent modules and docs)
-* Strengthen the web runtime (DOM integration / SSR helpers, tooling)
-* Build higher-level educational content (examples → cookbook → reference)
-* Enable advanced experimentation (e.g., neural networks training fully in Santafé)
+- `main`: stable line;
+- `desenvolvimento`: next version;
+- `vX.Y.Z` tags: immutable published releases.
 
-## Contributing
-Contributions are welcome!
-* Open an issue to discuss ideas/bugs
-* Send a PR with clear description and test notes
-* Keep changes focused and consistent with Santafé’s naming/style goals
+## Licensing
 
-## Contact
+Original Santafé code is released under the MIT License. The project derives from Lua and incorporates permissively licensed third-party components. See [TERCEIROS.md](TERCEIROS.md) and the notices retained in the source files.
 
-* Maintainer: Rafael Lemos
-* Project website: https://santafé.dev.br -- https://xn--santaf-gva.dev.br
-* Discussion/Issues: use GitHub Issues in this repository
+## Author
+
+Rafael Alves Lemos — [santafé.dev.br](https://xn--santaf-gva.dev.br/)

@@ -1,0 +1,141 @@
+-- Leitor SVG vetorial da biblioteca imagem.
+-- Primeira versão: svg, g, rect, circle, ellipse, line, polyline,
+-- polygon e path (M/L/H/V/C/S/Q/T/Z), com cores, opacidade e traço.
+
+local svg = { versão = "1.0.0" }
+
+local função leiaTudo(caminho)
+    local arquivo, falha = es.abra(caminho, "leiturabin"); garanta(arquivo, falha)
+    local dados = arquivo:leia("*tudo"); arquivo:feche(); retorne dados
+fim
+
+local função apare(s) retorne (s ou ""):apare() fim
+
+local função atributos(texto)
+    local r, p, n = {}, 1, #texto
+    enquanto p <= n início
+        enquanto p <= n e texto:corte(p,p):procure("[ \t\r\n/]" ) início p=p+1 fim
+        local i=p
+        enquanto p<=n e texto:corte(p,p):procure("[A-Za-z0-9_:%-]") início p=p+1 fim
+        local nome=texto:corte(i,p-1)
+        enquanto p<=n e texto:corte(p,p):procure("[ \t\r\n]") início p=p+1 fim
+        se nome=="" então p=p+1
+        senãose texto:corte(p,p)=="=" então
+            p=p+1; enquanto p<=n e texto:corte(p,p):procure("[ \t\r\n]") início p=p+1 fim
+            local aspas=texto:corte(p,p)
+            se aspas=="\"" ou aspas=="'" então
+                local fimValor=texto:procure(aspas,p+1,verdadeiro); garanta(fimValor,"atributo SVG não terminado")
+                r[nome]=texto:corte(p+1,fimValor-1); p=fimValor+1
+            senão
+                local j=p; enquanto p<=n e não texto:corte(p,p):procure("[ \t\r\n>]" ) início p=p+1 fim
+                r[nome]=texto:corte(j,p-1)
+            fim
+        senão r[nome]=verdadeiro fim
+    fim
+    retorne r
+fim
+
+local função número(v, padrão)
+    se v==nulo então retorne padrão fim
+    local limpo=(v..""):troque("px$",""):troque("pt$","")
+    retorne paraNúmero(limpo) ou padrão
+fim
+
+local cores = {black={0,0,0},white={255,255,255},red={255,0,0},green={0,128,0},blue={0,0,255},
+    yellow={255,255,0},gray={128,128,128},grey={128,128,128},orange={255,165,0},purple={128,0,128},
+    transparent={0,0,0,0}}
+
+local função cor(v)
+    se não v ou v=="none" então retorne nulo fim
+    v=apare(v):minúscula()
+    local pronta=cores[v]; se pronta então retorne {pronta[1],pronta[2],pronta[3],pronta[4]} fim
+    se v:corte(1,1)=="#" então
+        local h=v:corte(2)
+        se #h==3 então retorne {paraNúmero(h:corte(1,1)..h:corte(1,1),16),paraNúmero(h:corte(2,2)..h:corte(2,2),16),paraNúmero(h:corte(3,3)..h:corte(3,3),16)} fim
+        se #h==6 então retorne {paraNúmero(h:corte(1,2),16),paraNúmero(h:corte(3,4),16),paraNúmero(h:corte(5,6),16)} fim
+    fim
+    local r,g,b=v:separe("rgb%((%n+),%e*(%n+),%e*(%n+)%)")
+    se r então retorne {paraNúmero(r),paraNúmero(g),paraNúmero(b)} fim
+    erro("cor SVG não aceita: "..v)
+fim
+
+local função estilo(a, herdado)
+    local resultado={}; para k,v em pares(herdado ou {}) início resultado[k]=v fim
+    se a.style então
+        para item em a.style:capture("[^;]+") início
+            local k,v=item:separe("^%e*([^:]+):%e*(.-)%e*$"); se k então a[k]=v fim
+        fim
+    fim
+    se a.fill~=nulo então resultado.preenchimento=cor(a.fill) fim
+    se a.stroke~=nulo então resultado.traço=cor(a.stroke) fim
+    resultado.espessura=número(a["stroke-width"],resultado.espessura ou 1)
+    resultado.opacidade=número(a.opacity,resultado.opacidade ou 1)
+    resultado.opacidadeDoPreenchimento=número(a["fill-opacity"],resultado.opacidadeDoPreenchimento ou 1)
+    resultado.opacidadeDoTraço=número(a["stroke-opacity"],resultado.opacidadeDoTraço ou 1)
+    retorne resultado
+fim
+
+local função pontos(v)
+    local r={}; para x em (v ou ""):capture("[-+]?%n*%.?%n+") início r[#r+1]=paraNúmero(x) fim
+    retorne r
+fim
+
+local função caminho(d)
+    local t={}; local i=1
+    local função éDígito(c) local b=c:byte(); retorne b e b>=48 e b<=57 fim
+    local comandos={M=verdadeiro,m=verdadeiro,L=verdadeiro,l=verdadeiro,H=verdadeiro,h=verdadeiro,
+        V=verdadeiro,v=verdadeiro,C=verdadeiro,c=verdadeiro,S=verdadeiro,s=verdadeiro,
+        Q=verdadeiro,q=verdadeiro,T=verdadeiro,t=verdadeiro,A=verdadeiro,a=verdadeiro,
+        Z=verdadeiro,z=verdadeiro}
+    enquanto i<=#d início
+        local c=d:corte(i,i)
+        se comandos[c] então t[#t+1]=c; i=i+1
+        senão
+            enquanto i<=#d e (d:corte(i,i)=="," ou d:corte(i,i):procure("%e")) início i=i+1 fim
+            local começo=i
+            se d:corte(i,i)=="+" ou d:corte(i,i)=="-" então i=i+1 fim
+            enquanto i<=#d e (éDígito(d:corte(i,i)) ou d:corte(i,i)==".") início i=i+1 fim
+            se d:corte(i,i)=="e" ou d:corte(i,i)=="E" então
+                i=i+1; se d:corte(i,i)=="+" ou d:corte(i,i)=="-" então i=i+1 fim
+                enquanto i<=#d e éDígito(d:corte(i,i)) início i=i+1 fim
+            fim
+            se i>começo então t[#t+1]=paraNúmero(d:corte(começo,i-1)) senão i=i+1 fim
+        fim
+    fim
+    retorne t
+fim
+
+local aceitos={svg=verdadeiro,g=verdadeiro,rect=verdadeiro,circle=verdadeiro,ellipse=verdadeiro,
+    line=verdadeiro,polyline=verdadeiro,polygon=verdadeiro,path=verdadeiro}
+
+função svg.leia(fonte, binário)
+    local dados=binário e fonte ou leiaTudo(fonte)
+    dados=dados:troque("<!%-%-.-%-%->","")
+    local documento={formato="svg",tipo="vetor",elementos={}}
+    local pilha={{estilo={preenchimento={0,0,0},traço=nulo,espessura=1}}}
+    para fechamento,nome,corpo em dados:capture("<%e*(/?)%e*([A-Za-z][A-Za-z0-9:_%-]*)%e*([^>]*)>") início
+        nome=nome:minúscula():troque("^svg:","")
+        se fechamento=="/" então se nome=="g" ou nome=="svg" então tabela.remova(pilha) fim
+        senãose aceitos[nome] então
+            local a=atributos(corpo); local pai=pilha[#pilha]
+            local transformação=a.transform ou pai.transformação
+            local elemento={espécie=nome,estilo=estilo(a,pai.estilo), transformação=transformação}
+            se nome=="svg" então
+                documento.largura=número(a.width,300); documento.altura=número(a.height,150)
+                local vb=pontos(a.viewBox); documento.vista=#vb==4 e vb ou {0,0,documento.largura,documento.altura}
+                pilha[#pilha+1]={estilo=elemento.estilo,transformação=transformação}
+            senãose nome=="g" então pilha[#pilha+1]={estilo=elemento.estilo,transformação=transformação}
+            senão
+                elemento.x=número(a.x,0); elemento.y=número(a.y,0); elemento.largura=número(a.width,0); elemento.altura=número(a.height,0)
+                elemento.cx=número(a.cx,0); elemento.cy=número(a.cy,0); elemento.r=número(a.r,0); elemento.rx=número(a.rx,0); elemento.ry=número(a.ry,0)
+                elemento.x1=número(a.x1,0); elemento.y1=número(a.y1,0); elemento.x2=número(a.x2,0); elemento.y2=número(a.y2,0)
+                elemento.pontos=pontos(a.points); se nome=="path" então elemento.caminho=caminho(a.d ou "") fim
+                documento.elementos[#documento.elementos+1]=elemento
+            fim
+        senãose nome~="?xml" e nome~="!doctype" então erro("elemento SVG ainda não aceito: "..nome) fim
+    fim
+    garanta(documento.largura e documento.altura,"SVG sem elemento raiz válido")
+    retorne documento
+fim
+
+retorne svg

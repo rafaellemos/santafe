@@ -1,0 +1,110 @@
+-- Teste de integração das consultas preparadas assíncronas.
+--
+-- O teste é optativo porque precisa de um servidor MariaDB real. Defina:
+--   SANTAFE_MARIADB_HOST, SANTAFE_MARIADB_USUARIO,
+--   SANTAFE_MARIADB_SENHA, SANTAFE_MARIADB_BANCO
+-- e, opcionalmente, SANTAFE_MARIADB_PORTA.
+
+local mariadb = importe "mariadb"
+local rede = importe "rede"
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local nomeDaTabela = "santafe_teste_preparado"
+
+local função falhe(conexão, mensagem)
+    mostre("FALHOU:", mensagem)
+    se conexão então conexão:feche() fim
+    so.saia(1)
+fim
+
+local função executeSQL(conexão, sql, depois)
+    local retorno, falha = conexão:executeAssíncrono(sql,
+        função(con, resultado, erro)
+            se erro então falhe(con, erro); retorne fim
+            resultado:feche()
+            depois(con)
+        fim)
+    se falha então falhe(conexão, falha) fim
+fim
+
+local função finalize(conexão)
+    executeSQL(conexão, "DROP TABLE " .. nomeDaTabela, função(con)
+        con:feche()
+        mostre("OK: consultas preparadas assíncronas")
+        so.saia(0)
+    fim)
+fim
+
+local função testeConsultaReutilizável(conexão)
+    local sql = "SELECT nome, ativo FROM " .. nomeDaTabela .. " WHERE nome = ?"
+    conexão:prepareConsultaAssíncrona(sql,
+        função(con, consulta, falha)
+            se falha então falhe(con, falha); retorne fim
+            garanta(consulta:númeroDeParâmetros() == 1)
+
+            consulta:executeAssíncrono({ "Ana" },
+                função(preparada, resultado, erro)
+                    se erro então falhe(con, erro); retorne fim
+                    local linha = resultado:obterLinha()
+                    garanta(linha e linha[1] == "Ana" e linha[2] == "1")
+                    resultado:feche()
+
+                    preparada:executeAssíncrono({ "Maria" },
+                        função(mesmaConsulta, segundoResultado, segundaFalha)
+                            se segundaFalha então falhe(con, segundaFalha); retorne fim
+                            local segundaLinha = segundoResultado:obterLinha()
+                            garanta(segundaLinha e segundaLinha[1] == "Maria" e
+                                    segundaLinha[2] == "0")
+                            segundoResultado:feche()
+                            mesmaConsulta:feche()
+                            finalize(con)
+                        fim)
+                fim)
+        fim)
+fim
+
+local função insiraMaria(conexão)
+    local sql = "INSERT INTO " .. nomeDaTabela .. " (nome, ativo) VALUES (?, ?)"
+    conexão:executePreparadoAssíncrono(sql, { "Maria", falso },
+        função(con, resultado, falha)
+            se falha então falhe(con, falha); retorne fim
+            garanta(resultado:linhasAfetadas() == 1)
+            resultado:feche()
+            testeConsultaReutilizável(con)
+        fim)
+fim
+
+local função insiraAna(conexão)
+    local sql = "INSERT INTO " .. nomeDaTabela .. " (nome, ativo) VALUES (?, ?)"
+    conexão:executePreparadoAssíncrono(sql, { "Ana", verdadeiro },
+        função(con, resultado, falha)
+            se falha então falhe(con, falha); retorne fim
+            garanta(resultado:linhasAfetadas() == 1)
+            resultado:feche()
+            insiraMaria(con)
+        fim)
+fim
+
+mariadb.conecteAssíncrono(endereço, usuário, senha, banco, porta,
+    função(conexão, falha)
+        se falha então falhe(conexão, falha); retorne fim
+        executeSQL(conexão, "DROP TABLE IF EXISTS " .. nomeDaTabela,
+            função(con)
+                executeSQL(con,
+                    "CREATE TABLE " .. nomeDaTabela ..
+                    " (id BIGINT PRIMARY KEY AUTO_INCREMENT, nome VARCHAR(80), ativo BOOLEAN)",
+                    insiraAna)
+            fim)
+    fim)
+
+rede.laço()

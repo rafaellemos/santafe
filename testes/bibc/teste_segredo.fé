@@ -1,0 +1,54 @@
+-- Teste funcional da biblioteca segredo (Argon2id + bilhetes opacos).
+módulo.caminhoC = "./bibs/bibc/segredo/?.so;" ..
+                  "./bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local segredo = importe "segredo"
+local rede = importe "rede"
+
+local bilhete = segredo.novoBilhete()
+garanta(tipo(bilhete) == "colar" e #bilhete >= 40)
+garanta(segredo.resumaBilhete(bilhete) == segredo.resumaBilhete(bilhete))
+garanta(#segredo.resumaBilhete(bilhete) == 64)
+garanta(segredo.confiraBilhete(bilhete, bilhete))
+garanta(não segredo.confiraBilhete(bilhete, bilhete .. "x"))
+garanta(segredo.algoritmo == "Argon2id")
+
+local função falhe(mensagem)
+    mostre("FALHOU:", mensagem)
+    rede.pareLaço()
+    so.saia(1)
+fim
+
+local iniciou, falha = segredo.protejaSenhaAssíncrono(
+    "uma senha longa de teste",
+    função(resumo, erro)
+        se erro ou não resumo então falhe(erro ou "resumo ausente"); retorne fim
+        garanta(resumo:procure("$argon2id$", 1, verdadeiro) == 1)
+        garanta(segredo.precisaAtualizarSenha(resumo) == falso)
+
+        segredo.confiraSenhaAssíncrono(
+            resumo,
+            "uma senha longa de teste",
+            função(confere, erroDaConferência)
+                se erroDaConferência ou não confere então
+                    falhe(erroDaConferência ou "senha correta recusada")
+                    retorne
+                fim
+
+                segredo.confiraSenhaAssíncrono(
+                    resumo,
+                    "senha errada",
+                    função(confereErrada, erroFinal)
+                        se erroFinal então falhe(erroFinal); retorne fim
+                        garanta(confereErrada == falso)
+                        mostre("OK: segredo Argon2id assíncrono")
+                        rede.pareLaço()
+                    fim
+                )
+            fim
+        )
+    fim
+)
+
+garanta(iniciou, falha)
+rede.laço()

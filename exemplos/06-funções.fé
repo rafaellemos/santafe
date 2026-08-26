@@ -1,0 +1,5 @@
+local função some(a, b)
+    retorne a + b
+fim
+
+mostre("2 + 3 =", some(2, 3))

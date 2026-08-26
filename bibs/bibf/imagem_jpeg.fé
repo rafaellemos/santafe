@@ -1,0 +1,63 @@
+-- Implementação JPEG privada da biblioteca imagem.
+
+local jpeg = { versão = "1.0.0" }
+
+local função leiaTudo(caminho)
+    local arquivo, falha = es.abra(caminho, "leiturabin")
+    garanta(arquivo, falha)
+    local dados = arquivo:leia("*tudo")
+    arquivo:feche()
+    retorne dados
+fim
+
+local função u16(dados, posição)
+    local a, b = dados:byte(posição, posição + 1)
+    garanta(b ~= nulo, "JPEG truncado")
+    retorne a * 256 + b
+fim
+
+local marcadoresDeQuadro = {
+    [0xC0]=verdadeiro,[0xC1]=verdadeiro,[0xC2]=verdadeiro,[0xC3]=verdadeiro,
+    [0xC5]=verdadeiro,[0xC6]=verdadeiro,[0xC7]=verdadeiro,
+    [0xC9]=verdadeiro,[0xCA]=verdadeiro,[0xCB]=verdadeiro,
+    [0xCD]=verdadeiro,[0xCE]=verdadeiro,[0xCF]=verdadeiro
+}
+
+função jpeg.leia(fonte, binário)
+    local dados = binário e fonte ou leiaTudo(fonte)
+    garanta(tipo(dados)=="colar" e dados:byte(1)==0xFF e dados:byte(2)==0xD8, "arquivo não é um JPEG válido")
+    local posição = 3
+    enquanto posição <= #dados início
+        enquanto posição <= #dados e dados:byte(posição) ~= 0xFF início posição = posição + 1 fim
+        enquanto posição <= #dados e dados:byte(posição) == 0xFF início posição = posição + 1 fim
+        local marcador = dados:byte(posição); posição = posição + 1
+        garanta(marcador, "JPEG truncado antes do marcador de quadro")
+        se marcador == 0xD9 ou marcador == 0xDA então pare fim
+        se marcador ~= 0x01 e não (marcador >= 0xD0 e marcador <= 0xD8) então
+            local tamanho = u16(dados, posição)
+            garanta(tamanho >= 2 e posição + tamanho - 1 <= #dados, "segmento JPEG inválido ou truncado")
+            se marcadoresDeQuadro[marcador] então
+                garanta(tamanho >= 8, "quadro JPEG inválido")
+                local bits = dados:byte(posição + 2)
+                local altura = u16(dados, posição + 3)
+                local largura = u16(dados, posição + 5)
+                local canais = dados:byte(posição + 7)
+                local espaço = ({[1]="DeviceGray",[3]="DeviceRGB",[4]="DeviceCMYK"})[canais]
+                garanta(espaço, "JPEG com "..canais.." componentes não é aceito pelo PDF")
+                retorne {formato="jpeg", tipo="matricial", largura=largura, altura=altura,
+                    canais=canais, profundidade=bits, espaçoDeCor=espaço, dados=dados}
+            fim
+            posição = posição + tamanho
+        fim
+    fim
+    erro("JPEG sem marcador de quadro reconhecido")
+fim
+
+função jpeg.paraPDF(fonte, binário)
+    local imagem = jpeg.leia(fonte, binário)
+    retorne {largura=imagem.largura,altura=imagem.altura,
+        bitsPorComponente=imagem.profundidade,ticosPorComponente=imagem.profundidade,
+        espaçoDeCor=imagem.espaçoDeCor,filtro="DCTDecode",dados=imagem.dados}
+fim
+
+retorne jpeg

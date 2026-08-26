@@ -1,0 +1,21 @@
+módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
+local RPDF = importe "rpdf"
+
+local documento = RPDF:novo()
+documento:DefinaTítulo("Relatório de ações")
+documento:DefinaAutor("Santafé")
+documento:AdicionePágina()
+documento:DefinaFonte("helvetica", "b", 16)
+documento:DefinaCorDoTexto(0, 120, 100)
+documento:Célula(0, 12, "Relatório", 0, 1)
+documento:DefinaCorDaLinha(20, 20, 20)
+documento:Linha(10, 30, 100, 30)
+documento:Retângulo(10, 35, 40, 20)
+documento:Círculo(75, 45, 10)
+
+local conteúdo = documento:Saída("memória.pdf", "colar")
+garanta(tipo(conteúdo) == "colar")
+garanta(conteúdo:corte(1, 5) == "%PDF-")
+garanta(conteúdo:procure("/Title", 1, verdadeiro) ~= nulo)
+garanta(conteúdo:procure("/Author", 1, verdadeiro) ~= nulo)
+mostre("RPDF recursos:", #conteúdo, "bytes")

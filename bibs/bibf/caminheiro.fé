@@ -1,0 +1,916 @@
+-- caminheiro.fé
+-- Mini arcabouço HTTP assíncrono em cima da bib 'rede'
+-- O caminheiro percorre rotas, fazendo paradas pelo caminho antes de
+-- chegar ao destino (o tratador final da rota).
+-- Versão simples: sem metatabela, sem 'este', só closures.
+
+local rede = importe "rede"
+
+local caminheiro = {}
+
+-- Decodifica uma parte codificada de URL. O sinal "+" só representa espaço
+-- em formulários; num caminho como /C++ ele precisa continuar sendo "+".
+local função decodificarComponenteURL(txt, maisComoEspaço)
+    se maisComoEspaço então
+        txt = txt:troque("+", " ")
+    fim
+
+    -- converte %XX em taco
+    txt = txt:troque("%%%h%h", função(hex)
+        local num = paraNúmero(hex:corte(2), 16)
+        retorne colar.caractere(num)
+    fim)
+
+    retorne txt
+fim
+
+-- ---------- DECODIFICAR FORM (application/x-www-form-urlencoded) ----------
+-- Obs: o navegador só envia campos que têm atributo name="..."
+local função form(corpo)
+    local campos = {}
+    se não corpo ou corpo == "" então
+        retorne campos
+    fim
+
+    local i = 1
+    local n = #corpo
+
+    enquanto i <= n início
+        -- chave
+        local iniK = i
+        enquanto i <= n e corpo:corte(i,i) ~= "=" e corpo:corte(i,i) ~= "&" início
+            i = i + 1
+        fim
+        local k = corpo:corte(iniK, i - 1)
+
+        -- valor
+        local v = ""
+        se i <= n e corpo:corte(i,i) == "=" então
+            i = i + 1
+            local iniV = i
+            enquanto i <= n e corpo:corte(i,i) ~= "&" início
+                i = i + 1
+            fim
+            v = corpo:corte(iniV, i - 1)
+        fim
+
+        -- separador &
+        se i <= n e corpo:corte(i,i) == "&" então
+            i = i + 1
+        fim
+
+        k = decodificarComponenteURL(k, verdadeiro)
+        v = decodificarComponenteURL(v, verdadeiro)
+
+        se k ~= "" então
+            campos[k] = v
+        fim
+    fim
+
+    retorne campos
+fim
+
+-- ---------- DECODIFICAR FORM (multipart/form-data) -----------------------
+-- Conserva os dados dos arquivos como colares binários. A aplicação que
+-- recebe o arquivo continua responsável por validar formato, tamanho e destino.
+local função parâmetroDaDisposição(disposição, nome)
+    local marcador = nome:minúscula() .. '="'
+    local começo, fimDoMarcador = disposição:minúscula():procure(
+        marcador, 1, verdadeiro
+    )
+    se não começo então retorne nulo fim
+    local começoDoValor = fimDoMarcador + 1
+    local fimDoValor = disposição:procure('"', começoDoValor, verdadeiro)
+    se não fimDoValor então retorne nulo fim
+    retorne disposição:corte(começoDoValor, fimDoValor - 1)
+fim
+
+local função limiteMultipart(tipoConteúdo)
+    local começo, fimDoNome = tipoConteúdo:minúscula():procure(
+        "boundary=", 1, verdadeiro
+    )
+    se não começo então retorne nulo, "limite multipart ausente" fim
+    local posição = fimDoNome + 1
+    local limite
+    se tipoConteúdo:corte(posição, posição) == '"' então
+        local fimDasAspas = tipoConteúdo:procure('"', posição + 1, verdadeiro)
+        se não fimDasAspas então retorne nulo, "limite multipart inválido" fim
+        limite = tipoConteúdo:corte(posição + 1, fimDasAspas - 1)
+    senão
+        local pontoEVírgula = tipoConteúdo:procure(";", posição, verdadeiro)
+        limite = tipoConteúdo:corte(
+            posição,
+            pontoEVírgula e pontoEVírgula - 1 ou #tipoConteúdo
+        ):apare()
+    fim
+    se #limite < 1 ou #limite > 70 ou
+       limite:procure("\r", 1, verdadeiro) ou limite:procure("\n", 1, verdadeiro) então
+        retorne nulo, "limite multipart inválido"
+    fim
+    retorne limite
+fim
+
+local função cabeçalhosDaParte(texto)
+    local cabeçalhos = {}
+    local posição = 1
+    enquanto posição <= #texto início
+        local fimDaLinha = texto:procure("\r\n", posição, verdadeiro)
+        local linha = texto:corte(
+            posição,
+            fimDaLinha e fimDaLinha - 1 ou #texto
+        )
+        local separador = linha:procure(":", 1, verdadeiro)
+        se separador então
+            local nome = linha:corte(1, separador - 1):apare():minúscula()
+            se nome ~= "" então
+                cabeçalhos[nome] = linha:corte(separador + 1):apare()
+            fim
+        fim
+        se não fimDaLinha então pare fim
+        posição = fimDaLinha + 2
+    fim
+    retorne cabeçalhos
+fim
+
+local função formulárioEmPartes(corpo, tipoConteúdo)
+    local limite, falha = limiteMultipart(tipoConteúdo ou "")
+    se não limite então retorne nulo, nulo, falha fim
+    local marcador = "--" .. limite
+    se corpo:corte(1, #marcador) ~= marcador então
+        retorne nulo, nulo, "corpo multipart não começa pelo limite declarado"
+    fim
+
+    local campos, arquivos = {}, {}
+    local posição = 1
+    enquanto verdadeiro início
+        se corpo:corte(posição, posição + #marcador - 1) ~= marcador então
+            retorne nulo, nulo, "separador multipart inválido"
+        fim
+        posição = posição + #marcador
+        se corpo:corte(posição, posição + 1) == "--" então pare fim
+        se corpo:corte(posição, posição + 1) ~= "\r\n" então
+            retorne nulo, nulo, "quebra de linha multipart ausente"
+        fim
+        posição = posição + 2
+
+        local fimDosCabeçalhos = corpo:procure("\r\n\r\n", posição, verdadeiro)
+        se não fimDosCabeçalhos então
+            retorne nulo, nulo, "cabeçalhos multipart incompletos"
+        fim
+        local cabeçalhos = cabeçalhosDaParte(
+            corpo:corte(posição, fimDosCabeçalhos - 1)
+        )
+        local disposição = cabeçalhos["content-disposition"] ou ""
+        local nome = parâmetroDaDisposição(disposição, "name")
+        se não nome ou nome == "" então
+            retorne nulo, nulo, "campo multipart sem nome"
+        fim
+
+        local começoDosDados = fimDosCabeçalhos + 4
+        local próximoLimite = corpo:procure(
+            "\r\n" .. marcador, começoDosDados, verdadeiro
+        )
+        se não próximoLimite então
+            retorne nulo, nulo, "parte multipart sem fechamento"
+        fim
+        local dados = corpo:corte(começoDosDados, próximoLimite - 1)
+        local nomeDoArquivo = parâmetroDaDisposição(disposição, "filename")
+        se nomeDoArquivo ~= nulo então
+            se nomeDoArquivo ~= "" então
+                arquivos[nome] = {
+                    nome = nomeDoArquivo,
+                    tipo = cabeçalhos["content-type"] ou "application/octet-stream",
+                    dados = dados,
+                    tamanho = #dados
+                }
+            fim
+        senão
+            campos[nome] = dados
+        fim
+        posição = próximoLimite + 2
+    fim
+    retorne campos, arquivos
+fim
+
+
+-- ---------- RESPOSTA HTTP (objeto res) ----------
+
+-- Se for uma requisição HEAD, corta a resposta logo após o \r\n\r\n:
+-- mantém os cabeçalhos (Content-Length inclusive, calculado sobre o corpo
+-- real) mas não envia o corpo — é assim que o protocolo HTTP define HEAD.
+local função cortarCorpoSeHEAD(resp, método)
+    se método ~= "HEAD" então
+        retorne resp
+    fim
+
+    local i = resp:procure("\r\n\r\n", 1, verdadeiro)
+    se não i então
+        retorne resp
+    fim
+
+    retorne resp:corte(1, i + 3)
+fim
+
+local função retirarConexãoDoAplicativo(res, conexão)
+    se res._ap e res._ap._conexões e conexão então
+        res._ap._conexões[conexão] = nulo
+    fim
+fim
+
+local função enviarResposta(res, corpo, formato)
+    se não res._conexão então
+        retorne nulo, "conexão indisponível"
+    fim
+    se res._enviado então
+        retorne nulo, "resposta já enviada"
+    fim
+
+    local resposta, falha
+    se formato == "html" então
+        resposta, falha = res._respostaRede:html(corpo ou "")
+    senão se formato == "json" então
+        resposta, falha = res._respostaRede:json(corpo ou "")
+    senão
+        resposta, falha = res._respostaRede:texto(corpo ou "")
+    fim fim
+    se não resposta então
+        retorne nulo, falha
+    fim
+
+    resposta = cortarCorpoSeHEAD(resposta, res._método)
+
+    local vazio, falhaDoInício = res._conexão:envieAssíncrono(
+        resposta,
+        função(conexão, enviados, falhaDoEnvio, dado)
+            se falhaDoEnvio então
+                mostre("[Caminheiro] falha ao enviar resposta:", falhaDoEnvio)
+            fim
+            se conexão então
+                retirarConexãoDoAplicativo(res, conexão)
+                conexão:feche()
+            fim
+        fim,
+        nulo
+    )
+    se falhaDoInício então
+        retorne nulo, falhaDoInício
+    fim
+
+    res._enviado = verdadeiro
+    retorne verdadeiro
+fim
+
+local função criarResposta(ap, conexaoHTTP, método)
+    local respostaRede, falha = rede.novaResposta(conexaoHTTP)
+    garanta(respostaRede, falha)
+
+    local res = {
+        _ap           = ap,
+        _código     = 200,
+        _conexão    = conexaoHTTP,
+        _método     = método ou "GET",
+        _enviado      = falso,
+        _respostaRede = respostaRede
+    }
+
+    função res.código(este, número)
+        se este._enviado então
+            retorne nulo, "resposta já enviada"
+        fim
+        se tipo(número) ~= "número" ou número ~= número ou
+           número % 1 ~= 0 ou
+           número < 100 ou número > 599 então
+            retorne nulo, "código HTTP deve ser um inteiro entre 100 e 599"
+        fim
+        local ajustada, falha = este._respostaRede:código(número)
+        se não ajustada então
+            retorne nulo, falha
+        fim
+        este._código = número
+        retorne este
+    fim
+
+    função res.definaCabeçalho(este, nome, valor)
+        se este._enviado então
+            retorne nulo, "resposta já enviada"
+        fim
+        se tipo(nome) ~= "colar" ou tipo(valor) ~= "colar" então
+            retorne nulo, "nome e valor do cabeçalho devem ser colares"
+        fim
+        local definiu, falha = este._respostaRede:definaCabeçalho(nome, valor)
+        se não definiu então
+            retorne nulo, falha
+        fim
+        retorne este
+    fim
+
+    função res.texto(este, corpo)
+        retorne enviarResposta(
+            este,
+            corpo,
+            "texto"
+        )
+    fim
+
+    função res.html(este, corpo)
+        retorne enviarResposta(
+            este,
+            corpo,
+            "html"
+        )
+    fim
+
+    função res.json(este, valor)
+        local corpo = valor
+        se tipo(valor) ~= "colar" então
+            local codificou, resultado, falhaDaCodificação = proteja(json.cod, valor)
+            se não codificou então
+                retorne nulo, resultado
+            fim
+            se resultado == nulo então
+                retorne nulo, falhaDaCodificação ou "não foi possível codificar o JSON"
+            fim
+            corpo = resultado
+        fim
+        retorne enviarResposta(este, corpo, "json")
+    fim
+
+    retorne res
+fim
+
+-- ---------- PIPELINE DE PARADAS + ROTAS ----------
+
+local métodosHTTP = {
+    GET = verdadeiro,
+    HEAD = verdadeiro,
+    POST = verdadeiro,
+    PUT = verdadeiro,
+    PATCH = verdadeiro,
+    DELETE = verdadeiro,
+    OPTIONS = verdadeiro,
+    CONNECT = verdadeiro,
+    TRACE = verdadeiro
+}
+
+local ordemDosMétodosHTTP = {
+    "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE"
+}
+
+local função normalizarMétodo(método)
+    se tipo(método) ~= "colar" ou método == "" então
+        retorne nulo, "método HTTP deve ser um colar não vazio"
+    fim
+    método = método:maiúscula()
+    se não métodosHTTP[método] então
+        retorne nulo, "método HTTP não aceito: " .. método
+    fim
+    retorne método
+fim
+
+local função separarCaminho(caminho)
+    local partes = {}
+    se caminho == "/" então
+        retorne partes
+    fim
+
+    local inícioDaParte = 2
+    enquanto verdadeiro início
+        local separador = caminho:procure("/", inícioDaParte, verdadeiro)
+        se separador então
+            partes[#partes + 1] = caminho:corte(inícioDaParte, separador - 1)
+            inícioDaParte = separador + 1
+        senão
+            partes[#partes + 1] = caminho:corte(inícioDaParte)
+            pare
+        fim
+    fim
+    retorne partes
+fim
+
+local função compilarCaminho(caminho)
+    local partes = separarCaminho(caminho)
+    local temParâmetro = falso
+    local nomes = {}
+    local assinatura = {}
+
+    para i = 1, #partes início
+        local parte = partes[i]
+        local marcador = parte:corte(1, 1)
+        se marcador == ":" ou marcador == "*" então
+            local nome = parte:corte(2)
+            se nome == "" então
+                retorne nulo, "parâmetro de rota precisa de nome"
+            fim
+            se nomes[nome] então
+                retorne nulo, "parâmetro de rota repetido: " .. nome
+            fim
+            se marcador == "*" e i ~= #partes então
+                retorne nulo, "curinga de rota deve ser o último segmento"
+            fim
+            nomes[nome] = verdadeiro
+            temParâmetro = verdadeiro
+            assinatura[#assinatura + 1] = marcador
+        senão
+            assinatura[#assinatura + 1] = parte
+        fim
+    fim
+
+    retorne {
+        original = caminho,
+        partes = partes,
+        assinatura = tabela.concatene(assinatura, "/"),
+        temParâmetro = temParâmetro
+    }
+fim
+
+local função combinarRota(rota, caminho)
+    local recebidas = separarCaminho(caminho)
+    local parâmetros = {}
+
+    para i = 1, #rota.partes início
+        local esperada = rota.partes[i]
+        local marcador = esperada:corte(1, 1)
+        se marcador == "*" então
+            local restantes = {}
+            para j = i, #recebidas início
+                restantes[#restantes + 1] = recebidas[j]
+            fim
+            parâmetros[esperada:corte(2)] = tabela.concatene(restantes, "/")
+            retorne parâmetros
+        fim
+
+        local recebida = recebidas[i]
+        se não recebida então
+            retorne nulo
+        fim
+        se marcador == ":" então
+            se recebida == "" então
+                retorne nulo
+            fim
+            parâmetros[esperada:corte(2)] = recebida
+        senão se esperada ~= recebida então
+            retorne nulo
+        fim fim
+    fim
+
+    se #recebidas ~= #rota.partes então
+        retorne nulo
+    fim
+    retorne parâmetros
+fim
+
+local função encontrarNoMétodo(ap, método, caminho)
+    local exatas = ap.rotas[método]
+    se exatas e exatas[caminho] então
+        retorne exatas[caminho], {}
+    fim
+
+    local variáveis = ap.rotasVariáveis[método] ou {}
+    para i = 1, #variáveis início
+        local rota = variáveis[i]
+        local parâmetros = combinarRota(rota, caminho)
+        se parâmetros então
+            retorne rota.tratador, parâmetros
+        fim
+    fim
+    retorne nulo
+fim
+
+local função encontrarTratador(ap, req)
+    local método = req.método ou "GET"
+    local caminho = req.caminho ou "/"
+    local tratador, parâmetros = encontrarNoMétodo(ap, método, caminho)
+
+    -- HEAD sem rota própria cai no tratador de GET: mesmos cabeçalhos,
+    -- sem corpo na resposta.
+    se não tratador e método == "HEAD" então
+        tratador, parâmetros = encontrarNoMétodo(ap, "GET", caminho)
+    fim
+
+    retorne tratador, parâmetros
+fim
+
+local função métodosDoCaminho(ap, caminho)
+    local encontrados = {}
+    local vistos = {}
+    para i = 1, #ordemDosMétodosHTTP início
+        local método = ordemDosMétodosHTTP[i]
+        local tratador = encontrarNoMétodo(ap, método, caminho)
+        se tratador então
+            se não vistos[método] então
+                encontrados[#encontrados + 1] = método
+                vistos[método] = verdadeiro
+            fim
+            se método == "GET" e não encontrarNoMétodo(ap, "HEAD", caminho) então
+                encontrados[#encontrados + 1] = "HEAD"
+                vistos.HEAD = verdadeiro
+            fim
+        fim
+    fim
+    se #encontrados > 0 e não vistos.OPTIONS então
+        encontrados[#encontrados + 1] = "OPTIONS"
+    fim
+    retorne encontrados
+fim
+
+local função executarCadeia(ap, índice, req, res)
+    local paradas = ap.paradas ou {}
+    local parada = paradas[índice]
+
+    se parada então
+        local avançou = falso
+        parada(req, res, função()
+            se avançou então
+                retorne nulo, "próximo já foi chamado nesta parada"
+            fim
+            se res._enviado então
+                retorne nulo, "a resposta já foi enviada"
+            fim
+            avançou = verdadeiro
+            executarCadeia(ap, índice + 1, req, res)
+            retorne verdadeiro
+        fim)
+    senão
+        local tratador, parâmetros = encontrarTratador(ap, req)
+        se tratador então
+            req.parâmetros = parâmetros ou {}
+            tratador(req, res)
+        senão
+            local permitidos = métodosDoCaminho(ap, req.caminho)
+            se #permitidos > 0 então
+                local cabeçalho = tabela.concatene(permitidos, ", ")
+                res:definaCabeçalho("Allow", cabeçalho)
+                se req.método == "OPTIONS" então
+                    res:código(204):texto("")
+                senão
+                    res:código(405):texto("método não permitido para esta rota")
+                fim
+            senão
+                res:código(404):texto("rota não encontrada")
+            fim
+        fim
+    fim
+fim
+
+local função responderFalha(ap, falha, req, res)
+    mostre("[Caminheiro] falha ao tratar requisição:", falha)
+    se res._enviado então
+        retorne falso
+    fim
+
+    se ap._tratadorDeFalha então
+        local funcionou, assumiuResposta = proteja(
+            ap._tratadorDeFalha,
+            falha,
+            req,
+            res
+        )
+        se não funcionou então
+            mostre("[Caminheiro] o tratador de falha também falhou:", assumiuResposta)
+        senão se res._enviado ou assumiuResposta == verdadeiro então
+            retorne verdadeiro
+        fim fim
+    fim
+
+    local ajustou, falhaDoCódigo = res:código(500)
+    se ajustou então
+        local enviou, falhaDaResposta = res:texto("erro interno do servidor")
+        se enviou então
+            retorne verdadeiro
+        fim
+        mostre("[Caminheiro] falha ao enviar erro HTTP 500:", falhaDaResposta)
+    senão
+        mostre("[Caminheiro] falha ao definir HTTP 500:", falhaDoCódigo)
+    fim
+
+    retirarConexãoDoAplicativo(res, res._conexão)
+    res._conexão:feche()
+    retorne falso
+fim
+
+-- ---------- FÁBRICA DO 'ap' ----------
+
+função caminheiro.novo()
+    local ap = {}
+
+    ap.rotas = {}
+    ap.rotasVariáveis = {}
+    ap.paradas = {}
+    ap._conexões = {}
+    ap._servidor = nulo
+    ap._ativo = falso
+    ap._tratadorDeFalha = nulo
+
+    -- registra uma parada no caminho: roda em toda
+    -- requisição, na ordem cadastrada, antes do tratador final da rota
+    função ap.parada(tratadorDeParada)
+        se tipo(tratadorDeParada) ~= "função" então
+            retorne nulo, "tratador da parada deve ser uma função"
+        fim
+        ap.paradas[#ap.paradas + 1] = tratadorDeParada
+        retorne ap
+    fim
+
+    função ap.rota(método, caminho, tratador)
+        local normalizado, falha = normalizarMétodo(método)
+        se não normalizado então
+            retorne nulo, falha
+        fim
+        se tipo(caminho) ~= "colar" ou caminho:corte(1, 1) ~= "/" então
+            retorne nulo, "caminho da rota deve ser um colar iniciado por /"
+        fim
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador da rota deve ser uma função"
+        fim
+
+        local compilada, falhaDoCaminho = compilarCaminho(caminho)
+        se não compilada então
+            retorne nulo, falhaDoCaminho
+        fim
+        compilada.tratador = tratador
+
+        ap.rotas[normalizado] = ap.rotas[normalizado] ou {}
+        ap.rotasVariáveis[normalizado] = ap.rotasVariáveis[normalizado] ou {}
+
+        se compilada.temParâmetro então
+            local cadastradas = ap.rotasVariáveis[normalizado]
+            para i = 1, #cadastradas início
+                se cadastradas[i].assinatura == compilada.assinatura então
+                    retorne nulo, "rota já cadastrada: " .. normalizado .. " " .. caminho
+                fim
+            fim
+            cadastradas[#cadastradas + 1] = compilada
+        senão
+            se ap.rotas[normalizado][caminho] então
+                retorne nulo, "rota já cadastrada: " .. normalizado .. " " .. caminho
+            fim
+            ap.rotas[normalizado][caminho] = tratador
+        fim
+
+        retorne ap
+    fim
+
+    função ap.aoFalhar(tratador)
+        se tratador ~= nulo e tipo(tratador) ~= "função" então
+            retorne nulo, "tratador de falha deve ser uma função ou nulo"
+        fim
+        ap._tratadorDeFalha = tratador
+        retorne ap
+    fim
+
+    função ap.depure()
+        local totalParadas = #ap.paradas
+        mostre("paradas:", totalParadas)
+        para i = 1, #ordemDosMétodosHTTP início
+            local método = ordemDosMétodosHTTP[i]
+            local exatas = ap.rotas[método] ou {}
+            local variáveis = ap.rotasVariáveis[método] ou {}
+            local total = 0
+            para caminho, tratador em pares(exatas) início
+                total = total + 1
+            fim
+            total = total + #variáveis
+            se total > 0 então
+                mostre(método .. ":", total)
+            fim
+        fim
+    fim
+
+    função ap.encerre()
+        local estavaAtivo = ap._ativo
+        ap._ativo = falso
+
+        se ap._servidor então
+            ap._servidor:cancele()
+            ap._servidor:feche()
+            ap._servidor = nulo
+        fim
+
+        para conexão, presente em pares(ap._conexões) início
+            conexão:cancele()
+            conexão:feche()
+        fim
+        ap._conexões = {}
+
+        local parouLaço = rede.pareLaço()
+        retorne estavaAtivo ou parouLaço
+    fim
+
+    função ap.escute(porta, opções, retorno)
+        se ap._ativo então
+            retorne nulo, "o Caminheiro já está escutando"
+        fim
+
+        se tipo(opções) == "função" então
+            retorno = opções
+            opções = {}
+        senão se opções == nulo então
+            opções = {}
+        senão se tipo(opções) ~= "tabela" então
+            retorne nulo, "opções de escuta devem ser uma tabela"
+        fim fim fim
+
+        se retorno ~= nulo e tipo(retorno) ~= "função" então
+            retorne nulo, "retorno de escuta deve ser uma função"
+        fim
+        se tipo(porta) ~= "número" ou porta ~= porta ou porta % 1 ~= 0 ou
+           porta < 0 ou porta > 65535 então
+            retorne nulo, "porta deve ser um inteiro entre 0 e 65535"
+        fim
+
+        local endereço = opções.endereço ou "0.0.0.0"
+        local tempoLimite = opções.tempoLimite ou 30000
+        local limiteCabeçalhos = opções.limiteCabeçalhos ou 32768
+        local limiteCorpo = opções.limiteCorpo ou 8 * 1024 * 1024
+
+        se tipo(endereço) ~= "colar" então
+            retorne nulo, "endereço de escuta deve ser um colar"
+        fim
+        se tipo(tempoLimite) ~= "número" ou tempoLimite % 1 ~= 0 ou
+           tempoLimite < 0 então
+            retorne nulo, "tempoLimite deve ser um inteiro não negativo"
+        fim
+        se tipo(limiteCabeçalhos) ~= "número" ou limiteCabeçalhos % 1 ~= 0 ou
+           limiteCabeçalhos < 1024 então
+            retorne nulo, "limiteCabeçalhos deve ser um inteiro de pelo menos 1024"
+        fim
+        se tipo(limiteCorpo) ~= "número" ou limiteCorpo % 1 ~= 0 ou
+           limiteCorpo < 0 então
+            retorne nulo, "limiteCorpo deve ser um inteiro não negativo"
+        fim
+
+        -- retorno do analisador HTTP
+        local função tratarRequisição(conexaoHTTP, req, erroHTTP, dado)
+            -- DEBUG opcional:
+            -- mostre("[tratarRequisição] conn:", conexaoHTTP, "req:", req, "erro:", erroHTTP)
+
+            se não conexaoHTTP então
+                retorne
+            fim
+
+            se não req então
+                local res = criarResposta(ap, conexaoHTTP, "GET")
+                local código = 400
+                local mensagem = "requisição inválida"
+                se erroHTTP == "tempo limite excedido" então
+                    código = 408
+                    mensagem = "tempo limite da requisição excedido"
+                senão se erroHTTP e erroHTTP:procure(
+                    "cabeçalho HTTP excede", 1, verdadeiro
+                ) então
+                    código = 431
+                    mensagem = "cabeçalhos da requisição muito grandes"
+                senão se erroHTTP e (
+                    erroHTTP:procure("corpo HTTP excede", 1, verdadeiro) ou
+                    erroHTTP:procure("requisição HTTP excede", 1, verdadeiro)
+                ) então
+                    código = 413
+                    mensagem = "corpo da requisição muito grande"
+                fim fim fim
+                res:código(código):texto(mensagem)
+                retorne
+            fim
+
+            req.caminhoOriginal = req.caminho ou "/"
+            req.caminho = decodificarComponenteURL(
+                req.caminhoOriginal,
+                falso
+            )
+
+            -- Só interpreta o corpo como formulário quando o tipo declara isso.
+            -- Um corpo text/plain pode conter "=" e "&" sem ser formulário.
+            se req.corpo e #req.corpo > 0 então
+                local s = req.corpo
+                local tipoConteúdo = req.cabeçalho e req.cabeçalho["content-type"] ou ""
+                local éForm = tipoConteúdo:minúscula():procure(
+                    "application/x-www-form-urlencoded", 1, verdadeiro
+                ) ~= nulo
+                local éMultipart = tipoConteúdo:minúscula():procure(
+                    "multipart/form-data", 1, verdadeiro
+                ) ~= nulo
+                se éForm então
+                    req.form = form(s)
+                senãose éMultipart então
+                    local campos, arquivos, falhaDoForm = formulárioEmPartes(
+                        s, tipoConteúdo
+                    )
+                    req.form = campos ou {}
+                    req.arquivos = arquivos ou {}
+                    req.falhaDoForm = falhaDoForm
+                fim
+            fim
+
+            req.método  = (req.método ou "GET"):maiúscula()
+            req.caminho = req.caminho ou "/"
+
+            local res = criarResposta(ap, conexaoHTTP, req.método)
+            local funcionou, falha = proteja(executarCadeia, ap, 1, req, res)
+            se não funcionou então
+                responderFalha(ap, falha, req, res)
+            fim
+        fim
+
+        -- cria o servidor TCP e aceita endereços numéricos IPv4 ou IPv6
+        local servidor = rede.servidorTCP()
+        local amarrou, falhaDaAmarração = servidor:amarre(endereço, porta)
+        se não amarrou então
+            servidor:feche()
+            retorne nulo, falhaDaAmarração
+        fim
+        ap._servidor = servidor
+        ap._ativo = verdadeiro
+
+        -- retorno do aceite: assinatura ALINHADA ao C:
+        -- retorno(este, conn_obj ou nil, err_msg ou nil, dado)
+        local aceitarConexões
+
+        local função armarAceite(servidorLocal)
+            se não ap._ativo então
+                retorne falso
+            fim
+            local vazio, falha = servidorLocal:aceiteAssíncrono(aceitarConexões)
+            se falha então
+                ap._ativo = falso
+                mostre("[Caminheiro] não foi possível aguardar conexões:", falha)
+                rede.pareLaço()
+                retorne nulo, falha
+            fim
+            retorne verdadeiro
+        fim
+
+        aceitarConexões = função(servidorLocal, conexaoHTTP, erroAceite, dado)
+            -- DEBUG opcional:
+            -- mostre("[aceitarConexões] srv:", servidorLocal, "conn:", conexaoHTTP, "erro:", erroAceite)
+
+            se não conexaoHTTP então
+                se erroAceite e erroAceite ~= "operação cancelada" então
+                    mostre("[Caminheiro] aceite falhou:", erroAceite)
+                fim
+                armarAceite(servidorLocal)
+                retorne
+            fim
+
+            -- aqui temos uma conexão válida: inicia leitura HTTP
+            ap._conexões[conexaoHTTP] = verdadeiro
+            local definiuTempo, falhaDoTempo = conexaoHTTP:definaTempoLimite(tempoLimite)
+            local definiuLimites, falhaDosLimites = conexaoHTTP:definaLimitesHTTP(
+                limiteCabeçalhos,
+                limiteCorpo
+            )
+            se não definiuTempo ou não definiuLimites então
+                mostre(
+                    "[Caminheiro] falha ao configurar conexão:",
+                    falhaDoTempo ou falhaDosLimites
+                )
+                ap._conexões[conexaoHTTP] = nulo
+                conexaoHTTP:feche()
+                armarAceite(servidorLocal)
+                retorne
+            fim
+
+            local vazio, falhaDaLeitura = conexaoHTTP:recebaHTTPAssíncrono(
+                limiteCabeçalhos + limiteCorpo,
+                tratarRequisição
+            )
+            se falhaDaLeitura então
+                mostre("[Caminheiro] não foi possível ler a requisição:", falhaDaLeitura)
+                ap._conexões[conexaoHTTP] = nulo
+                conexaoHTTP:feche()
+            fim
+
+            -- rearmar accept no MESMO servidor que veio da retorno
+            armarAceite(servidorLocal)
+        fim
+
+        -- inicia o loop de aceite
+        local armou, falhaDoAceite = armarAceite(servidor)
+        se não armou então
+            ap.encerre()
+            retorne nulo, falhaDoAceite
+        fim
+
+        se retorno então
+            local chamou, falhaDoRetorno = proteja(retorno)
+            se não chamou então
+                ap.encerre()
+                erro(falhaDoRetorno)
+            fim
+        fim
+
+        -- entra no laço principal da GMainLoop
+        se ap._ativo então
+            rede.laço()
+        fim
+        ap.encerre()
+        retorne verdadeiro
+    fim
+
+
+    retorne ap
+fim
+
+
+caminheiro.form = form
+caminheiro.formulárioEmPartes = formulárioEmPartes
+
+retorne caminheiro

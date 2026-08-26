@@ -1,0 +1,4 @@
+local nome = "Rafael"
+local linguagem = "Santafé"
+
+mostre(nome .. " programa em " .. linguagem)

@@ -1,0 +1,72 @@
+-- Biblioteca pública unificada de imagens do Santafé.
+-- PNG é decodificado/codificado; JPEG é mapeado sem recompressão;
+-- SVG é interpretado como desenho vetorial.
+
+local imagem = { versão = "1.0.0" }
+
+local função carregue(nome)
+    local ok, módulo = proteja(executeArquivo, "fonte/bibs/bibf/" .. nome .. ".fé")
+    se ok então retorne módulo fim
+    retorne importe(nome)
+fim
+
+local png = carregue("imagem_png")
+local jpeg = carregue("imagem_jpeg")
+local svg = carregue("imagem_svg")
+
+local função leiaTudo(caminho)
+    local arquivo, falha = es.abra(caminho, "leiturabin")
+    garanta(arquivo, falha)
+    local dados = arquivo:leia("*tudo")
+    arquivo:feche()
+    retorne dados
+fim
+
+função imagem.identifique(fonte, binário)
+    local dados = binário e fonte ou leiaTudo(fonte)
+    garanta(tipo(dados) == "colar", "a imagem deve ser um caminho ou um colar binário")
+    se dados:corte(1, 8) == "\137PNG\13\10\26\10" então retorne "png" fim
+    se dados:byte(1) == 0xFF e dados:byte(2) == 0xD8 então retorne "jpeg" fim
+    local amostra = dados:corte(1, 4096):minúscula()
+    se amostra:procure("<svg", 1, verdadeiro) então retorne "svg" fim
+    retorne nulo
+fim
+
+função imagem.leia(fonte, binário)
+    local dados = binário e fonte ou leiaTudo(fonte)
+    local formato = imagem.identifique(dados, verdadeiro)
+    garanta(formato, "formato de imagem desconhecido; use PNG, JPEG ou SVG")
+    se formato == "png" então
+        local resultado = png.leia(dados, verdadeiro)
+        resultado.formato, resultado.tipo = "png", "matricial"
+        retorne resultado
+    senãose formato == "jpeg" então retorne jpeg.leia(dados, verdadeiro)
+    fim
+    retorne svg.leia(dados, verdadeiro)
+fim
+
+função imagem.paraPDF(fonte, binário)
+    local dados = binário e fonte ou leiaTudo(fonte)
+    local formato = imagem.identifique(dados, verdadeiro)
+    garanta(formato, "formato de imagem desconhecido; use PNG, JPEG ou SVG")
+    se formato == "png" então retorne png.paraPDF(dados, verdadeiro) fim
+    se formato == "jpeg" então retorne jpeg.paraPDF(dados, verdadeiro) fim
+    retorne svg.leia(dados, verdadeiro)
+fim
+
+função imagem.codifique(formato, largura, altura, pixels)
+    formato = (formato ou ""):minúscula()
+    garanta(formato == "png", "a codificação inicial aceita somente PNG")
+    retorne png.codifique(largura, altura, pixels)
+fim
+
+função imagem.salve(caminho, formato, largura, altura, pixels)
+    formato = formato ou "png"
+    local arquivo, falha = es.abra(caminho, "escritabin")
+    garanta(arquivo, falha)
+    arquivo:escreva(imagem.codifique(formato, largura, altura, pixels))
+    arquivo:feche()
+    retorne verdadeiro
+fim
+
+retorne imagem

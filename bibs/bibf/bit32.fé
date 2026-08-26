@@ -1,0 +1,159 @@
+-- bit32.fé
+-- Operações bit a bit com semântica fixa de 32 bits.
+--
+-- Os inteiros do Santafé têm 64 bits. Esta biblioteca apara cada resultado
+-- para os 32 bits inferiores, preservando o comportamento da antiga
+-- biblioteca C bit32 sem mantê-la dentro do núcleo.
+
+local bit32 = {}
+
+local MÁSCARA = 0xFFFFFFFF
+local BIT_DE_SINAL = 0x80000000
+local QUANTIDADE_DE_BITS = 32
+
+local função exijaInteiro(valor, posição)
+    local inteiro = mat.paraInteiro(valor)
+    se inteiro == nulo então
+        erro("argumento #" .. posição .. " deve ser um inteiro", 3)
+    fim
+    retorne inteiro
+fim
+
+local função apare(valor)
+    retorne valor & MÁSCARA
+fim
+
+local função máscara(largura)
+    -- largura já foi validada entre 1 e 32.
+    retorne (1 << largura) - 1
+fim
+
+local função campoELargura(campo, largura, posiçãoDoCampo)
+    campo = exijaInteiro(campo, posiçãoDoCampo)
+    se largura == nulo então largura = 1 fim
+    largura = exijaInteiro(largura, posiçãoDoCampo + 1)
+
+    se campo < 0 então
+        erro("o campo não pode ser negativo", 3)
+    fim
+    se largura <= 0 então
+        erro("a largura deve ser positiva", 3)
+    fim
+    se campo + largura > QUANTIDADE_DE_BITS então
+        erro("tentativa de acessar bits inexistentes", 3)
+    fim
+
+    retorne campo, largura
+fim
+
+função bit32.be(...)
+    local resultado = MÁSCARA
+    local quantidade = selecione("#", ...)
+    para i = 1, quantidade início
+        resultado = resultado & exijaInteiro(selecione(i, ...), i)
+    fim
+    retorne apare(resultado)
+fim
+
+função bit32.bou(...)
+    local resultado = 0
+    local quantidade = selecione("#", ...)
+    para i = 1, quantidade início
+        resultado = resultado | exijaInteiro(selecione(i, ...), i)
+    fim
+    retorne apare(resultado)
+fim
+
+função bit32.boux(...)
+    local resultado = 0
+    local quantidade = selecione("#", ...)
+    para i = 1, quantidade início
+        resultado = resultado ~ exijaInteiro(selecione(i, ...), i)
+    fim
+    retorne apare(resultado)
+fim
+
+função bit32.bnão(valor)
+    retorne apare(~exijaInteiro(valor, 1))
+fim
+
+função bit32.bTeste(...)
+    retorne bit32.be(...) ~= 0
+fim
+
+local função desloque(valor, distância)
+    valor = apare(exijaInteiro(valor, 1))
+    distância = exijaInteiro(distância, 2)
+
+    se distância >= QUANTIDADE_DE_BITS ou distância <= -QUANTIDADE_DE_BITS então
+        retorne 0
+    fim
+    se distância < 0 então
+        retorne valor >> -distância
+    fim
+    retorne apare(valor << distância)
+fim
+
+função bit32.desloqueEsquerda(valor, distância)
+    retorne desloque(valor, distância)
+fim
+
+função bit32.desloqueDireita(valor, distância)
+    retorne desloque(valor, -exijaInteiro(distância, 2))
+fim
+
+função bit32.desloqueAritméticoDireita(valor, distância)
+    valor = apare(exijaInteiro(valor, 1))
+    distância = exijaInteiro(distância, 2)
+
+    se distância < 0 então
+        se distância <= -QUANTIDADE_DE_BITS então retorne 0 fim
+        retorne desloque(valor, -distância)
+    fim
+
+    se (valor & BIT_DE_SINAL) == 0 então
+        retorne desloque(valor, -distância)
+    fim
+
+    se distância >= QUANTIDADE_DE_BITS então
+        retorne MÁSCARA
+    fim
+    se distância == 0 então
+        retorne valor
+    fim
+
+    local preenchimento = apare(MÁSCARA << (QUANTIDADE_DE_BITS - distância))
+    retorne apare((valor >> distância) | preenchimento)
+fim
+
+local função gire(valor, distância)
+    valor = apare(exijaInteiro(valor, 1))
+    distância = exijaInteiro(distância, 2) & 31
+    se distância == 0 então retorne valor fim
+    retorne apare((valor << distância) | (valor >> (QUANTIDADE_DE_BITS - distância)))
+fim
+
+função bit32.gireEsquerda(valor, distância)
+    retorne gire(valor, distância)
+fim
+
+função bit32.gireDireita(valor, distância)
+    retorne gire(valor, -exijaInteiro(distância, 2))
+fim
+
+função bit32.extraia(valor, campo, largura)
+    valor = apare(exijaInteiro(valor, 1))
+    campo, largura = campoELargura(campo, largura, 2)
+    retorne (valor >> campo) & máscara(largura)
+fim
+
+função bit32.substitua(valor, substituto, campo, largura)
+    valor = apare(exijaInteiro(valor, 1))
+    substituto = apare(exijaInteiro(substituto, 2))
+    campo, largura = campoELargura(campo, largura, 3)
+
+    local m = máscara(largura)
+    retorne apare((valor & ~(m << campo)) | ((substituto & m) << campo))
+fim
+
+retorne bit32

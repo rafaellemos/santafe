@@ -1,0 +1,36 @@
+-- Regressão do enquadramento e endurecimento HTTP.
+
+local rede = importe "rede"
+
+local função deveFalhar(bruto, trecho)
+    local req, falha = rede.analiseHTTP(bruto)
+    garanta(req == nulo, "a requisição deveria ser recusada")
+    garanta(tipo(falha) == "colar" e falha:procure(trecho, 1, verdadeiro),
+            falha ou "falha ausente")
+fim
+
+local req, falha = rede.analiseHTTP(
+    "POST /olá?nome=Jo%C3%A3o+Silva HTTP/1.1\r\n" ..
+    "Host: local\r\nContent-Length: 4\r\n\r\nabcd"
+)
+garanta(req, falha)
+garanta(req.consulta.nome == "João Silva")
+garanta(req.corpo == "abcd")
+
+deveFalhar("POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 4\r\n\r\nab",
+           "incompleta")
+deveFalhar("GET / HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\nContent-Length: 0\r\n\r\n",
+           "repetido")
+deveFalhar("GET / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n",
+           "Transfer-Encoding")
+deveFalhar("GET / HTTP/1.1\r\n\r\n", "Host")
+deveFalhar("GET / HTTP/1.1\r\nHost: x\r\nHost: y\r\n\r\n", "Host repetido")
+deveFalhar("GET / HTTP/1.1\r\nHost x\r\n\r\n", "dois-pontos")
+deveFalhar("GET /?nome=%ZZ HTTP/1.1\r\nHost: x\r\n\r\n", "percentual")
+
+local resposta, erroResposta = rede.respostaHTTP(
+    200, "ok", "text/plain\r\nX-Injetado: sim"
+)
+garanta(resposta == nulo e erroResposta ~= nulo)
+
+mostre("rede HTTP: ok")

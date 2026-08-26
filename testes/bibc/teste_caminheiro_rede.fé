@@ -1,0 +1,274 @@
+-- Regressão Caminheiro + rede: formulário, caminho, respostas e falhas.
+
+-- Prioriza o módulo do fonte em teste, sem depender da cópia instalada.
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local rede = importe "rede"
+local caminheiro = importe "caminheiro"
+local ap = caminheiro.novo()
+local porta = 18746
+local cliente = rede.clienteTCP()
+local conexãoCliente
+local terminou = falso
+local sucesso = falso
+local mensagem = "teste Caminheiro + rede não terminou"
+local chamadasDuplo = 0
+local bloqueouSegundoPróximo = falso
+local bloqueouSegundaResposta = falso
+
+local função concluir(funcionou, detalhe)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = funcionou
+    mensagem = detalhe ou ""
+    se conexãoCliente então conexãoCliente:feche() fim
+    cliente:feche()
+    ap.encerre()
+fim
+
+ap.aoFalhar(função(falha, req, res)
+    res:definaCabeçalho("X-Falha", "tratada")
+    res:código(500):json({ erro = "interno" })
+fim)
+
+ap.parada(função(req, res, próximo)
+    local avançou, falha = próximo()
+    se não avançou então erro(falha) fim
+
+    se req.caminho == "/duplo" então
+        local repetiu, falhaDaRepetição = próximo()
+        bloqueouSegundoPróximo = não repetiu e
+            falhaDaRepetição == "próximo já foi chamado nesta parada"
+    fim
+fim)
+
+ap.rota("POST", "/form", função(req, res)
+    se não req.form ou req.form.nome ~= "João Silva" então
+        res:código(400):texto("formulário incorreto")
+        retorne
+    fim
+    se req.ip ~= "127.0.0.1" ou tipo(req.portaRemota) ~= "número" então
+        res:código(400):texto("endereço remoto incorreto")
+        retorne
+    fim
+    res:texto("formulário ok")
+fim)
+
+ap.rota("POST", "/texto", função(req, res)
+    se req.form ~= nulo ou req.corpo ~= "nome=texto&valor=livre" então
+        res:código(400):texto("texto simples interpretado como formulário")
+        retorne
+    fim
+    res:texto("texto ok")
+fim)
+
+ap.rota("GET", "/mais+literal", função(req, res)
+    res:texto("mais ok")
+fim)
+
+ap.rota("GET", "/duplo", função(req, res)
+    chamadasDuplo = chamadasDuplo + 1
+    res:texto("duplo ok")
+fim)
+
+ap.rota("GET", "/resposta", função(req, res)
+    local ajustou, falhaDoCódigo = res:código(99)
+    se ajustou ou não falhaDoCódigo então
+        erro("código HTTP inválido foi aceito")
+    fim
+    local enviou, falhaDoEnvio = res:texto("resposta ok")
+    se não enviou então erro(falhaDoEnvio) fim
+    local repetiu, falhaDaRepetição = res:texto("não pode")
+    bloqueouSegundaResposta = não repetiu e
+        falhaDaRepetição == "resposta já enviada"
+fim)
+
+ap.rota("GET", "/falha", função(req, res)
+    erro("falha prevista no teste")
+fim)
+
+ap.rota("GET", "/cabeca", função(req, res)
+    res:texto("corpo")
+fim)
+
+ap.rota("GET", "/pessoa/:id", função(req, res)
+    res:json({ id = req.parâmetros.id })
+fim)
+
+ap.rota("GET", "/arquivos/*caminho", função(req, res)
+    res:texto(req.parâmetros.caminho)
+fim)
+
+ap.rota("get", "/json", função(req, res)
+    res:definaCabeçalho("X-Teste", "cabeçalho"):json({ nome = "Ana" })
+fim)
+
+ap.rota("GET", "/somente-get", função(req, res)
+    res:texto("get ok")
+fim)
+
+local duplicada, falhaDuplicada = ap.rota("GET", "/somente-get", função() fim)
+garanta(não duplicada e falhaDuplicada:procure("já cadastrada", 1, verdadeiro))
+
+local padrãoDuplicado, falhaDoPadrão = ap.rota(
+    "GET", "/pessoa/:nome", função() fim
+)
+garanta(
+    não padrãoDuplicado e
+    falhaDoPadrão:procure("já cadastrada", 1, verdadeiro)
+)
+
+local inválida, falhaInválida = ap.rota("BUSCAR", "/x", função() fim)
+garanta(não inválida e falhaInválida:procure("não aceito", 1, verdadeiro))
+
+local função pedido(método, caminho, corpo, tipoConteúdo)
+    corpo = corpo ou ""
+    local cabeçalhos = método .. " " .. caminho .. " HTTP/1.1\r\n" ..
+        "Host: local\r\n"
+    se tipoConteúdo então
+        cabeçalhos = cabeçalhos .. "Content-Type: " .. tipoConteúdo .. "\r\n"
+    fim
+    se #corpo > 0 então
+        cabeçalhos = cabeçalhos .. "Content-Length: " .. #corpo .. "\r\n"
+    fim
+    retorne cabeçalhos .. "\r\n" .. corpo
+fim
+
+local testes = {
+    {
+        nome = "formulário declarado",
+        pedido = pedido(
+            "POST", "/form", "nome=Jo%C3%A3o+Silva",
+            "application/x-www-form-urlencoded; charset=utf-8"
+        ),
+        trecho = "\r\n\r\nformulário ok"
+    },
+    {
+        nome = "texto simples",
+        pedido = pedido("POST", "/texto", "nome=texto&valor=livre", "text/plain"),
+        trecho = "\r\n\r\ntexto ok"
+    },
+    {
+        nome = "mais literal no caminho",
+        pedido = pedido("GET", "/mais+literal"),
+        trecho = "\r\n\r\nmais ok"
+    },
+    {
+        nome = "próximo único",
+        pedido = pedido("GET", "/duplo"),
+        trecho = "\r\n\r\nduplo ok"
+    },
+    {
+        nome = "resposta única",
+        pedido = pedido("GET", "/resposta"),
+        trecho = "\r\n\r\nresposta ok"
+    },
+    {
+        nome = "falha vira HTTP 500",
+        pedido = pedido("GET", "/falha"),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 500", 1, verdadeiro) ~= nulo e
+                resposta:procure("X-Falha: tratada", 1, verdadeiro) ~= nulo e
+                resposta:procure("{\"erro\":\"interno\"}", 1, verdadeiro) ~= nulo
+        fim
+    },
+    {
+        nome = "HEAD sem corpo",
+        pedido = pedido("HEAD", "/cabeca"),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) ~= nulo e
+                resposta:procure("Content-Length: 5", 1, verdadeiro) ~= nulo e
+                resposta:procure("\r\n\r\ncorpo", 1, verdadeiro) == nulo
+        fim
+    },
+    {
+        nome = "parâmetro de rota",
+        pedido = pedido("GET", "/pessoa/42"),
+        trecho = "{\"id\":\"42\"}"
+    },
+    {
+        nome = "curinga de rota",
+        pedido = pedido("GET", "/arquivos/imagens/capa.png"),
+        trecho = "\r\n\r\nimagens/capa.png"
+    },
+    {
+        nome = "JSON e cabeçalho personalizado",
+        pedido = pedido("GET", "/json"),
+        verificar = função(resposta)
+            retorne resposta:procure("Content-Type: application/json", 1, verdadeiro) ~= nulo e
+                resposta:procure("X-Teste: cabeçalho", 1, verdadeiro) ~= nulo e
+                resposta:procure("{\"nome\":\"Ana\"}", 1, verdadeiro) ~= nulo
+        fim
+    },
+    {
+        nome = "método não permitido",
+        pedido = pedido("POST", "/somente-get"),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 405", 1, verdadeiro) ~= nulo e
+                resposta:procure("Allow: GET, HEAD, OPTIONS", 1, verdadeiro) ~= nulo
+        fim
+    },
+    {
+        nome = "OPTIONS automático",
+        pedido = pedido("OPTIONS", "/somente-get"),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 204", 1, verdadeiro) ~= nulo e
+                resposta:procure("Allow: GET, HEAD, OPTIONS", 1, verdadeiro) ~= nulo
+        fim
+    }
+}
+
+local índice = 0
+local executarPróximoTeste
+
+executarPróximoTeste = função()
+    índice = índice + 1
+    local teste = testes[índice]
+    se não teste então
+        concluir(
+            chamadasDuplo == 1 e bloqueouSegundoPróximo e
+            bloqueouSegundaResposta,
+            "as proteções de execução única falharam"
+        )
+        retorne
+    fim
+
+    cliente:definaTempoLimite(3000)
+    cliente:conecteAssíncrono("127.0.0.1", porta, função(_, conexão, falha)
+        se falha então concluir(falso, teste.nome .. ": " .. falha); retorne fim
+        conexãoCliente = conexão
+        conexão:definaTempoLimite(3000)
+        conexão:envieAssíncrono(teste.pedido, função(c, enviados, falhaDoEnvio)
+            se falhaDoEnvio então
+                concluir(falso, teste.nome .. ": " .. falhaDoEnvio)
+                retorne
+            fim
+            c:recebaDadosAssíncrono(8192, função(_, resposta, falhaDaLeitura)
+                se falhaDaLeitura então
+                    concluir(falso, teste.nome .. ": " .. falhaDaLeitura)
+                    retorne
+                fim
+                local passou = teste.verificar e teste.verificar(resposta) ou
+                    resposta:procure(teste.trecho, 1, verdadeiro) ~= nulo
+                se não passou então
+                    concluir(falso, teste.nome .. ": " .. resposta)
+                    retorne
+                fim
+                conexãoCliente:feche()
+                conexãoCliente = nulo
+                executarPróximoTeste()
+            fim)
+        fim)
+    fim)
+fim
+
+ap.escute(porta, {
+    endereço = "127.0.0.1",
+    tempoLimite = 3000,
+    limiteCabeçalhos = 8192,
+    limiteCorpo = 1024 * 1024
+}, executarPróximoTeste)
+
+garanta(terminou e sucesso, mensagem)
+mostre("Caminheiro + rede: ok")

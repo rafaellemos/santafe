@@ -1,0 +1,96 @@
+-- Exemplo de servidor HTTP usando a piscina nativa da biblioteca MariaDB.
+-- As credenciais ficam no ambiente, nunca no código-fonte:
+--   SANTAFE_MARIADB_HOST, SANTAFE_MARIADB_USUARIO,
+--   SANTAFE_MARIADB_SENHA, SANTAFE_MARIADB_BANCO e, opcionalmente,
+--   SANTAFE_MARIADB_PORTA.
+
+local rede = importe "rede"
+local mariadb = importe "mariadb"
+
+local piscina
+
+local função responda(conexão, código, corpo)
+    local resposta = rede.respostaHTTP(código, corpo,
+                                        "text/html; charset=utf-8")
+    conexão:envieAssíncrono(resposta, função(canal, enviados, falha)
+        se falha então mostre("falha ao enviar:", falha) fim
+        canal:feche()
+    fim)
+fim
+
+local função consulteUsuários(conexãoHTTP)
+    local retorno, falha = piscina:executeAssíncrono(
+        "SELECT id, nome FROM usuarios LIMIT 100",
+        função(p, resultado, erro)
+            se erro então
+                responda(conexãoHTTP, 500,
+                         "<h1>Erro no banco</h1><pre>" .. erro .. "</pre>")
+                retorne
+            fim
+            local linhas = ""
+            enquanto verdadeiro início
+                local linha = resultado:obterLinha()
+                se não linha então pare fim
+                linhas = linhas .. "<tr><td>" .. (linha[1] ou "") ..
+                         "</td><td>" .. (linha[2] ou "") .. "</td></tr>\n"
+            fim
+            resultado:feche()
+            responda(conexãoHTTP, 200,
+                "<h1>Usuários</h1><table><tr><th>ID</th><th>Nome</th></tr>" ..
+                linhas .. "</table>")
+        fim)
+    se falha então
+        responda(conexãoHTTP, 503,
+                 "<h1>Piscina indisponível</h1><pre>" .. falha .. "</pre>")
+    fim
+fim
+
+local função trateRequisição(conexão, requisição, falha)
+    se falha então conexão:feche(); retorne fim
+    se requisição.caminho == "/usuarios" então
+        consulteUsuários(conexão)
+    senão
+        responda(conexão, 200,
+            '<h1>Santafé + MariaDB</h1><a href="/usuarios">Usuários</a>')
+    fim
+fim
+
+local função aceite(servidor, conexão, falha)
+    se conexão então
+        conexão:definaTempoLimite(30000)
+        conexão:definaLimitesHTTP(32768, 8 * 1024 * 1024)
+        conexão:recebaHTTPAssíncrono(
+            32768 + 8 * 1024 * 1024,
+            trateRequisição
+        )
+    senão mostre("falha ao aceitar:", falha) fim
+    servidor:aceiteAssíncrono(aceite)
+fim
+
+local configuração = {
+    endereço = so.obterVariável("SANTAFE_MARIADB_HOST") ou "127.0.0.1",
+    usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO"),
+    senha = so.obterVariável("SANTAFE_MARIADB_SENHA") ou "",
+    banco = so.obterVariável("SANTAFE_MARIADB_BANCO"),
+    porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306,
+    mínimo = 2,
+    máximo = 10,
+    máximoDaFila = 100,
+    tempoDeEspera = 5000,
+}
+
+garanta(configuração.usuário e configuração.banco,
+        "defina SANTAFE_MARIADB_USUARIO e SANTAFE_MARIADB_BANCO")
+
+local retorno, falha = mariadb.criePiscinaAssíncrona(configuração,
+    função(novaPiscina, erro)
+        garanta(novaPiscina, erro)
+        piscina = novaPiscina
+        local servidor = rede.servidorTCP()
+        garanta(servidor:amarre("0.0.0.0", 7000))
+        servidor:aceiteAssíncrono(aceite)
+        mostre("Servidor com piscina MariaDB escutando em 0.0.0.0:7000")
+    fim)
+garanta(não falha, falha)
+
+rede.laço()

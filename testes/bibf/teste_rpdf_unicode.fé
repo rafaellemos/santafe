@@ -1,0 +1,21 @@
+módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
+local RPDF = importe "rpdf"
+
+local documento = RPDF:novo()
+documento:DefinaTítulo("Relatório Unicode — Santafé")
+documento:DefinaAutor("Rafael Lemos")
+documento:AdicionePágina()
+documento:DefinaFonte("notoSans", "", 15)
+documento:Célula(0, 10, "Português: ação, coração, Santafé, €", 0, 1)
+documento:Célula(0, 10, "Grego: Καλημέρα κόσμε", 0, 1)
+documento:Célula(0, 10, "Cirilico: Привет, мир", 0, 1)
+local parágrafo = "Quebra Unicode: informação, educação e comunicação permanecem íntegras mesmo quando a linha precisa ser dividida automaticamente."
+garanta(documento:CalculeLinhas(100, parágrafo) > 1)
+documento:MultiCélula(100, 8, parágrafo, 1, "L")
+documento:Saída("/tmp/santafe-rpdf-unicode.pdf", "arquivo")
+
+local arquivo = garanta(es.abra("/tmp/santafe-rpdf-unicode.pdf", "leiturabin"))
+local assinatura = arquivo:leia(8)
+arquivo:feche()
+garanta(assinatura == "%PDF-2.0", "o RPDF não gerou PDF 2.0")
+mostre("RPDF Unicode:", assinatura)

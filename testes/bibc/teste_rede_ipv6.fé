@@ -1,0 +1,65 @@
+-- Regressão de TCP e UDP sobre a pilha IPv6 local.
+
+local rede = importe "rede"
+
+local servidor = rede.servidorTCP()
+local okIPv6, falhaIPv6 = servidor:amarre("::1", 18747)
+se não okIPv6 então
+    mostre("rede IPv6: ignorado (", falhaIPv6, ")")
+    retorne
+fim
+
+local cliente = rede.clienteTCP()
+local conexãoCliente
+local tcpTerminou = falso
+local tcpSucesso = falso
+
+servidor:aceiteAssíncrono(função(_, conexão, falha)
+    se falha então servidor:feche(); rede.pareLaço(); retorne fim
+    conexão:recebaHTTPAssíncrono(4096, função(c, req, falhaHTTP)
+        tcpSucesso = não falhaHTTP e req.ip == "::1"
+        c:envieAssíncrono(rede.respostaHTTP(200, "v6", "text/plain"),
+            função(c2)
+                c2:feche()
+            fim)
+    fim)
+fim)
+
+cliente:conecteAssíncrono("::1", 18747, função(_, conexão, falha)
+    se falha então servidor:feche(); rede.pareLaço(); retorne fim
+    conexãoCliente = conexão
+    conexão:envieAssíncrono("GET / HTTP/1.1\r\nHost: local\r\n\r\n",
+        função(c)
+            c:recebaDadosAssíncrono(4096, função(_, resposta, falhaLeitura)
+                tcpTerminou = verdadeiro
+                tcpSucesso = tcpSucesso e não falhaLeitura e
+                    resposta:procure("\r\n\r\nv6", 1, verdadeiro) ~= nulo
+                conexãoCliente:feche()
+                cliente:feche()
+                servidor:feche()
+                rede.pareLaço()
+            fim)
+        fim)
+fim)
+
+rede.laço()
+garanta(tcpTerminou e tcpSucesso, "TCP IPv6 falhou")
+
+local receptor = rede.udp("IPv6")
+local emissor = rede.udp("IPv6")
+garanta(receptor:amarre("::1", 18748))
+local udpTerminou = falso
+local udpSucesso = falso
+
+receptor:inicieRecepção(1024, função(dados, falha, ip)
+    udpTerminou = verdadeiro
+    udpSucesso = não falha e dados == "v6" e ip == "::1"
+    receptor:feche()
+    emissor:feche()
+    rede.pareLaço()
+fim)
+emissor:envieParaAssíncrono("::1", 18748, "v6", função() fim)
+
+rede.laço()
+garanta(udpTerminou e udpSucesso, "UDP IPv6 falhou")
+mostre("rede IPv6: ok")

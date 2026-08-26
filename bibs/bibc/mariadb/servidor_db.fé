@@ -1,0 +1,226 @@
+-- servidor_db.fé
+-- Servidor HTTP assíncrono usando:
+--   rede        → sockets + HTTP
+--   mariadb → MySQL/MariaDB assíncrono
+
+-- IMPORTANTE: rede e mariadb precisam ser globais,
+-- porque o C faz lua_getglobal("rede") etc.
+rede        = importe "rede"
+mariadb = importe "mariadb"   -- ou "mariadb" se renomear luaopen_*
+
+local função log(...)
+    mostre(...)
+fim
+
+-- Conexão global ao banco
+local db = falso
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST") ou "127.0.0.1"
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA") ou ""
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+garanta(usuário e banco,
+        "defina SANTAFE_MARIADB_USUARIO e SANTAFE_MARIADB_BANCO")
+
+-- Inicia conexão assíncrona com o MariaDB/MySQL
+mariadb.conecteAssíncrono(
+    endereço,
+    usuário,
+    senha,
+    banco,
+    porta,
+    função(con, erro, dado)
+        se não con então
+            log("erro ao conectar ao banco:", erro)
+        senão
+            db = con
+            log("conectado ao banco (mariadb)!")
+        fim
+    fim,
+    nulo
+)
+
+-- Página padrão
+local página_inicial = [[
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Santafé + rede + mariadb</title>
+  </head>
+  <body>
+    <h1>Olá!</h1>
+    <p>Servidor Santafé com rede (HTTP assíncrono) + mariadb (MariaDB/MySQL assíncrono).</p>
+    <p>Veja a hora do banco em <a href="/hora">/hora</a>.</p>
+  </body>
+</html>
+]]
+
+local página_db_indisponível = [[
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>DB indisponível</title></head>
+  <body>
+    <h1>Serviço temporariamente indisponível</h1>
+    <p>O banco de dados ainda não está conectado. Tente novamente em instantes.</p>
+  </body>
+</html>
+]]
+
+-- Handler HTTP para cada requisição
+local função tratarRequisição(conexãoHTTP, req, erroHTTP, dado)
+    se não req então
+        log("erro ao ler requisição:", erroHTTP)
+        conexãoHTTP:feche()
+        retorne
+    fim
+
+    local caminho = req.caminho ou "/"
+    local método  = req.método ou "GET"
+
+    log("HTTP", método, caminho)
+
+    -- Rota simples "/"
+    se caminho == "/" então
+        local resp = rede.respostaHTTP(200, página_inicial, "text/html; charset=utf-8")
+        conexãoHTTP:envieAssíncrono(
+            resp,
+            função(conx, enviados, erroEnvio, dadoEnvio)
+                se erroEnvio então
+                    log("erro ao enviar resposta /:", erroEnvio)
+                fim
+                conx:feche()
+            fim,
+            nil
+        )
+        retorne
+    fim
+
+    -- Rota "/hora" que consulta o banco
+    se caminho == "/hora" então
+        -- Se o banco ainda não conectou, 503
+        se não db então
+            local resp = rede.respostaHTTP(503, página_db_indisponível, "text/html; charset=utf-8")
+            conexãoHTTP:envieAssíncrono(
+                resp,
+                função(conx, enviados, erroEnvio, dadoEnvio)
+                    se erroEnvio então
+                        log("erro ao enviar 503:", erroEnvio)
+                    fim
+                    conx:feche()
+                fim,
+                nil
+            )
+            retorne
+        fim
+
+        -- Faz query assíncrona: SELECT NOW() AS agora
+        db:executeAssíncrono(
+            "SELECT NOW()",
+            função(conDB, resultado, erroSQL, conexaoHTTP_passado)
+                -- Essa função é chamada quando a query termina
+
+                se não resultado então
+                    local corpo = "<h1>Erro no banco</h1><pre>" .. (erroSQL ou "") .. "</pre>"
+                    local resp = rede.respostaHTTP(500, corpo, "text/html; charset=utf-8")
+                    conexaoHTTP_passado:envieAssíncrono(
+                        resp,
+                        função(ch, enviados, erroEnvio, dadoEnvio)
+                            se erroEnvio então
+                                log("erro ao enviar 500:", erroEnvio)
+                            fim
+                            ch:feche()
+                        fim,
+                        nil
+                    )
+                    retorne
+                fim
+
+                -- Lê a primeira linha do resultado
+                local linha = resultado:obterLinha()
+                resultado:feche()  -- sempre fecha o resultado
+
+                local agora = "(sem valor)"
+                se linha então
+                    -- linha[1] é a primeira coluna (NOW())
+                    agora = linha[1] ou agora
+                fim
+
+                local corpo = [[
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>Hora do banco</title></head>
+  <body>
+    <h1>NOW() do MariaDB/MySQL</h1>
+    <p>]] .. agora .. [[</p>
+  </body>
+</html>
+]]
+                local resp = rede.respostaHTTP(200, corpo, "text/html; charset=utf-8")
+
+                conexaoHTTP_passado:envieAssíncrono(
+                    resp,
+                    função(ch, enviados, erroEnvio, dadoEnvio)
+                        se erroEnvio então
+                            log("erro ao enviar resposta /hora:", erroEnvio)
+                        fim
+                        ch:feche()
+                    fim,
+                    nil
+                )
+            fim,
+            conexãoHTTP  -- 'dado' passado para o callback do executeAssíncrono
+        )
+
+        retorne
+    fim
+
+    -- Qualquer outra rota → 404
+    local corpo404 = "<h1>404 - Não encontrado</h1>"
+    local resp404 = rede.respostaHTTP(404, corpo404, "text/html; charset=utf-8")
+    conexãoHTTP:envieAssíncrono(
+        resp404,
+        função(conx, enviados, erroEnvio, dadoEnvio)
+            se erroEnvio então
+                log("erro ao enviar 404:", erroEnvio)
+            fim
+            conx:feche()
+        fim,
+        nil
+    )
+fim
+
+-- Handler do aceite assíncrono (padrão rede.c)
+local função aceitarConexões(servidor, conexãoHTTP, erroAceite, dado)
+    se não conexãoHTTP então
+        log("erro no aceiteAssíncrono:", erroAceite)
+        servidor:aceiteAssíncrono(aceitarConexões)
+        retorne
+    fim
+
+    log("novo cliente conectado")
+    conexãoHTTP:definaTempoLimite(30000)
+    conexãoHTTP:definaLimitesHTTP(32768, 8 * 1024 * 1024)
+    conexãoHTTP:recebaHTTPAssíncrono(
+        32768 + 8 * 1024 * 1024,
+        tratarRequisição
+    )
+    servidor:aceiteAssíncrono(aceitarConexões)
+fim
+
+local função principal()
+    local servidor = rede.servidorTCP()
+    garanta(servidor:amarre("0.0.0.0", 7000))
+
+    log("Servidor Santafé + rede + mariadb escutando em 0.0.0.0:7000")
+
+    servidor:aceiteAssíncrono(aceitarConexões)
+
+    -- Um único laço GLib cuida de:
+    --   - sockets HTTP (rede)
+    --   - eventos do MariaDB/MySQL (mariadb)
+    rede.laço()
+fim
+
+principal()

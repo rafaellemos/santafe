@@ -1,0 +1,7 @@
+local idade = 17
+
+se idade >= 18 então
+    mostre("Maior de idade")
+senão
+    mostre("Menor de idade")
+fim

@@ -1,0 +1,2331 @@
+-- RPDF para Santafé - gerador PDF 2.0 exclusivamente Unicode.
+-- Derivado do FPDF de Olivier Plathey e do porte Lua de Domingo Alvarez Duarte.
+
+local cadeiaformate = colar.formate
+local cadeiaprocure = colar.procure
+local cadeiaembyte = colar.byte
+local tabelainsira = tabela.insira
+
+local carregouUnicode, unicodePdf = proteja(executeArquivo, "fonte/bibs/bibf/rpdf_unicode.fé")
+se não carregouUnicode então unicodePdf = importe("rpdf_unicode") fim
+local carregouImagem, imagemPdf = proteja(executeArquivo, "fonte/bibs/bibf/imagem.fé")
+se não carregouImagem então imagemPdf = importe("imagem") fim
+local fonteUnicodePadrão = unicodePdf.carregueFonte(unicodePdf.localizeFonte())
+
+local PDF_USING_ZLIB = falso
+local FPDF_VERSION = "2.0.0"
+local FPDF_FONTPATH = falso
+
+local pdf_e_orientation_none = 0
+local pdf_e_orientation_portrait = 1
+local pdf_e_orientation_landscape = 2
+
+local pdf_e_units_none = 0
+local pdf_e_units_mm = 1
+local pdf_e_units_pt = 2
+local pdf_e_units_cm = 3
+local pdf_e_units_inch = 4
+
+local pdf_e_page_size_none = 0
+local pdf_e_A3 = 1
+local pdf_e_A4 = 2
+local pdf_e_A5 = 3
+local pdf_e_Letter = 4
+local pdf_e_Legal = 5
+local pdf_e_page_sizes_last = 6
+
+local pdf_e_amplia_padrao = 0
+local pdf_e_amplia_paginainteira = 1
+local pdf_e_amplia_larguratotal = 2
+local pdf_e_amplia_real = 3
+
+local pdf_e_visual_padrao = 0
+local pdf_e_visual_simples = 1
+local pdf_e_visual_continuo = 2
+local pdf_e_visual_duplo = 3
+
+local função escrevaCor(este, cor, operador)
+    se cor então este:_saidaformatada("%.4f %.4f %.4f %s\n",cor[1]/255,cor[2]/255,cor[3]/255,operador) fim
+fim
+
+local função pinteSvg(este, estilo)
+    local temP,temL=estilo.preenchimento~=nulo,estilo.traço~=nulo
+    se temP e temL então retorne "B" fim
+    se temP então retorne "f" fim
+    se temL então retorne "S" fim
+    retorne "n"
+fim
+
+local função caminhoSvg(este, tokens)
+    local i,cmd,x,y,sx,sy,cx,cy=1,nulo,0,0,0,0,nulo,nulo
+    local função n() local v=tokens[i]; garanta(tipo(v)=="número","caminho SVG incompleto"); i=i+1; retorne v fim
+    enquanto i<=#tokens início
+        se tipo(tokens[i])=="colar" então cmd=tokens[i]; i=i+1 fim
+        garanta(cmd,"caminho SVG sem comando")
+        local rel=cmd==cmd:minúscula(); local c=cmd:maiúscula()
+        se c=="Z" então este:_saida("h\n"); x,y=sx,sy; cmd=nulo
+        senãose c=="M" ou c=="L" então
+            local nx,ny=n(),n(); se rel então nx,ny=nx+x,ny+y fim; x,y=nx,ny
+            este:_saidaformatada("%.4f %.4f %s\n",x,y,c=="M" e "m" ou "l")
+            se c=="M" então sx,sy=x,y; cmd=rel e "l" ou "L" fim; cx,cy=nulo,nulo
+        senãose c=="H" então local nx=n(); x=rel e x+nx ou nx; este:_saidaformatada("%.4f %.4f l\n",x,y); cx,cy=nulo,nulo
+        senãose c=="V" então local ny=n(); y=rel e y+ny ou ny; este:_saidaformatada("%.4f %.4f l\n",x,y); cx,cy=nulo,nulo
+        senãose c=="C" então
+            local x1,y1,x2,y2,nx,ny=n(),n(),n(),n(),n(),n()
+            se rel então x1,y1,x2,y2,nx,ny=x1+x,y1+y,x2+x,y2+y,nx+x,ny+y fim
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c\n",x1,y1,x2,y2,nx,ny); x,y,cx,cy=nx,ny,x2,y2
+        senãose c=="S" então
+            local x1,y1=cx e 2*x-cx ou x,cy e 2*y-cy ou y; local x2,y2,nx,ny=n(),n(),n(),n()
+            se rel então x2,y2,nx,ny=x2+x,y2+y,nx+x,ny+y fim
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c\n",x1,y1,x2,y2,nx,ny); x,y,cx,cy=nx,ny,x2,y2
+        senãose c=="Q" ou c=="T" então
+            local qx,qy
+            se c=="Q" então qx,qy=n(),n(); se rel então qx,qy=qx+x,qy+y fim
+            senão qx,qy=cx e 2*x-cx ou x,cy e 2*y-cy ou y fim
+            local nx,ny=n(),n(); se rel então nx,ny=nx+x,ny+y fim
+            local x1,y1=x+2*(qx-x)/3,y+2*(qy-y)/3; local x2,y2=nx+2*(qx-nx)/3,ny+2*(qy-ny)/3
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c\n",x1,y1,x2,y2,nx,ny); x,y,cx,cy=nx,ny,qx,qy
+        senão erro("comando de caminho SVG ainda não aceito: "..c) fim
+    fim
+fim
+
+local função desenheSvg(este, imagem, x, y, w, h)
+    local vista=imagem.vista; local vw,vh=vista[3],vista[4]
+    se w==0 e h==0 então w,h=imagem.largura/96*25.4,imagem.altura/96*25.4
+    senãose w==0 então w=h*vw/vh senãose h==0 então h=w*vh/vw fim
+    x=x==-1 e este.m_x ou x; y=y==-1 e este.m_y ou y
+    local sx,sy=w*este.m_k/vw,h*este.m_k/vh
+    este:_saidaformatada("q %.6f 0 0 %.6f %.4f %.4f cm\n",sx,-sy,x*este.m_k-vista[1]*sx,(este.m_h-y)*este.m_k+vista[2]*sy)
+    para _,elemento em ipares(imagem.elementos) início
+        garanta(não elemento.transformação,"transformações SVG serão aceitas numa próxima versão")
+        garanta((elemento.estilo.opacidadeDoPreenchimento ou 1)==1 e (elemento.estilo.opacidadeDoTraço ou 1)==1,
+            "opacidades separadas de preenchimento e traço SVG serão aceitas numa próxima versão")
+        este:_saida("q\n"); escrevaCor(este,elemento.estilo.preenchimento,"rg"); escrevaCor(este,elemento.estilo.traço,"RG")
+        se (elemento.estilo.opacidade ou 1) ~= 1 então este:DefinaAlfa(elemento.estilo.opacidade) fim
+        este:_saidaformatada("%.4f w\n",elemento.estilo.espessura ou 1)
+        se elemento.espécie=="rect" então este:_saidaformatada("%.4f %.4f %.4f %.4f re\n",elemento.x,elemento.y,elemento.largura,elemento.altura)
+        senãose elemento.espécie=="line" então este:_saidaformatada("%.4f %.4f m %.4f %.4f l\n",elemento.x1,elemento.y1,elemento.x2,elemento.y2)
+        senãose elemento.espécie=="polyline" ou elemento.espécie=="polygon" então
+            para j=1,#elemento.pontos,2 início este:_saidaformatada("%.4f %.4f %s\n",elemento.pontos[j],elemento.pontos[j+1],j==1 e "m" ou "l") fim
+            se elemento.espécie=="polygon" então este:_saida("h\n") fim
+        senãose elemento.espécie=="circle" ou elemento.espécie=="ellipse" então
+            local rx=elemento.espécie=="circle" e elemento.r ou elemento.rx; local ry=elemento.espécie=="circle" e elemento.r ou elemento.ry; local k=.5522847498
+            este:_saidaformatada("%.4f %.4f m\n",elemento.cx+rx,elemento.cy)
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c\n",elemento.cx+rx,elemento.cy+ry*k,elemento.cx+rx*k,elemento.cy+ry,elemento.cx,elemento.cy+ry)
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c\n",elemento.cx-rx*k,elemento.cy+ry,elemento.cx-rx,elemento.cy+ry*k,elemento.cx-rx,elemento.cy)
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c\n",elemento.cx-rx,elemento.cy-ry*k,elemento.cx-rx*k,elemento.cy-ry,elemento.cx,elemento.cy-ry)
+            este:_saidaformatada("%.4f %.4f %.4f %.4f %.4f %.4f c h\n",elemento.cx+rx*k,elemento.cy-ry,elemento.cx+rx,elemento.cy-ry*k,elemento.cx+rx,elemento.cy)
+        senãose elemento.espécie=="path" então caminhoSvg(este,elemento.caminho) fim
+        este:_saida(pinteSvg(este,elemento.estilo).."\nQ\n")
+    fim
+    este:_saida("Q\n")
+    retorne w,h
+fim
+
+local FPDF = {
+    Destrua = função(este)
+    fim,
+
+    reinicie = função(este, page_orientation, measure_unit, page_size)
+	page_orientation = page_orientation ou pdf_e_orientation_portrait
+	measure_unit = measure_unit ou pdf_e_units_mm
+	page_size = page_size ou pdf_e_A4
+
+        -- Scale factor
+        se measure_unit == pdf_e_units_pt então
+            este.m_k = 1
+        senãose measure_unit ==  pdf_e_units_mm então
+            este.m_k = 72/25.4
+        senãose measure_unit ==  pdf_e_units_cm então
+            este.m_k = 72/2.54
+        senãose measure_unit == pdf_e_units_inch então
+            este.m_k = 72
+        senão
+            este:Erro("unidade de medida incorreta: %s", measure_unit)
+        fim
+
+        -- Some checks
+        este:_verifique()
+        -- Initialization of properties
+        este.m_page = 0
+        este.m_paginas = {}
+        este.m_PageSizes = {}
+        este.m_offsets = {}
+        este.m_fonts = {}
+        este.m_cidPorCódigo = {}
+        este.m_códigoPorCid = {}
+        este.m_glifoPorCid = {[0] = 0}
+        este.m_larguraPorCid = {[0] = 0}
+        este.m_próximoCid = 1
+        este.m_FontFiles = {}
+        este.m_diffs = {}
+        este.m_imagens = {}
+        este.m_LigacaoDaPagina = {}
+        este.m_ligacoes = {}
+        este.m_extgstates = {}
+        este.m_offsets = {0,0}
+        este.m_n = 2
+        este.m_buffer = {}
+        este.m_estado = 0
+        este.m_EmCabecalho = falso
+        este.m_EmRodape = falso
+        este.m_lasth = 0
+        este.m_FamiliaDaFonte = ""
+        este.m_EstiloDaFonte = ""
+        este.m_TamanhoDaFontePt = 12
+        este.m_Sublinhado = falso
+        este.m_CorDaLinha = "0 G"
+        este.m_CorDaLinha_rgb = {0,0,0,0}
+        este.m_CorInterna = "0 g"
+        este.m_CorInterna_rgb = {0,0,0,0}
+        este.m_CorDoTexto = "0 g"
+        este.m_CorDoTexto_rgb = {0,0,0,0}
+        este.m_ColorFlag = falso
+        este.m_ws = 0
+        -- Font plib
+
+        este.m_FonteAtual = nulo
+
+        local psize =  este:_pegue_tamanho_da_pagina(page_size)
+        este.m_DefPageSize = psize
+        este.m_CurPageSize = psize
+        -- Page orientation
+        se (page_orientation == pdf_e_orientation_portrait) então
+            este.m_DefOrientation = pdf_e_orientation_portrait
+            este.m_w = psize.w
+            este.m_h = psize.h
+        senãose (page_orientation == pdf_e_orientation_landscape) então
+            este.m_DefOrientation = pdf_e_orientation_landscape
+            este.m_w = psize.h
+            este.m_h = psize.w
+        senão
+            este:Erro("orientação incorreta: %d", page_orientation)
+        fim
+
+        este.m_OrientacaoAtual = este.m_DefOrientation
+        este.m_wPt = este.m_w * este.m_k
+        este.m_hPt = este.m_h * este.m_k
+        este.m_angulo = 0
+        -- Page margems (1 cm)
+        local margem = 28.35/este.m_k
+        este:DefinaMargens(margem,margem)
+        -- Interior cell margem (1 mm)
+        este.m_cMargin = margem/10.0
+        -- Linha width (0.2 mm)
+        este.m_EspessuraDaLinha = .567/este.m_k
+        -- Automatic page pare
+        este:DefinaAutoQuebraDePágina(verdadeiro,2*margem)
+        -- Default display mode
+        este:DefinaModoExibido(pdf_e_amplia_padrao)
+        este.m_AmpliaPersonalizado = pdf_e_amplia_padrao
+        -- Enable compression
+        este:DefinaCompressão(falso)
+        -- Set padrao PDF version number
+        este.m_VersaoPDF = "2.0"
+
+        este.m_duploFaceado=falso -- visual like books?
+        este.m_xDelta=0 -- if double-sided, difference between exterior and interior
+        este.m_margemInterior=10
+        este.m_margemExterior=10
+        este.m_n_js = 0
+	este.m_javascript = nulo
+    fim,
+
+    DefinaDuplaFace = função(este, interior, exterior)
+		exterior = exterior ou 13
+		interior = interior ou 7
+        se (exterior ~= interior) então
+            este.m_duploFaceado=verdadeiro
+            este.m_margemExterior=exterior
+            este.m_margemInterior=interior
+        fim
+    fim,
+
+    DefinaMargens = função(este, left, top, right)
+        -- Set left, top and right margems
+        este.m_lMargin = left
+        este.m_tMargin = top
+		se não right ou right == 0.0 então
+			este.m_rMargin = left
+		senão
+			este.m_rMargin = right
+		fim
+    fim,
+
+    DefinaMargemEsquerda = função(este, margem)
+        -- Set left margem
+        este.m_lMargin = margem
+        se (este.m_page > 0 e este.m_x < margem) então
+            este.m_x = margem
+		fim
+    fim,
+
+    DefinaMargemSuperior = função(este, margem)
+        -- Set top margem
+        este.m_tMargin = margem
+    fim,
+
+    DefinaMargemDireita = função(este, margem)
+        -- Set right margem
+        este.m_rMargin = margem
+    fim,
+
+    PegueMargemEsquerda = função(este)
+        retorne este.m_lMargin
+    fim,
+
+    PegueMargemDireita = função(este)
+        retorne este.m_rMargin
+    fim,
+
+    DefinaAutoQuebraDePágina = função(este, b, margem)
+        -- Set auto page break mode and triggering margem
+        este.m_AutoQuebraDePagina = b
+        este.m_bMargin = margem ou 0.0
+        este.m_GatilhoDeQuebraDePagina = este.m_h-margem
+    fim,
+
+    ConfereQuebraDePágina = função(este, altura)
+        -- Adiciona a página antes do conteúdo quando ele não cabe na atual.
+        se (este:PegueOrdenada()+altura > este.m_GatilhoDeQuebraDePagina) então
+			este:AdicionePágina(este.m_OrientacaoAtual)
+		fim
+    fim,
+
+    DefinaAmpliaçãoPersonalizada = função(este, amplia)
+        este.m_AmpliaPersonalizado = amplia
+    fim,
+
+    PegueAmpliaçãoPersonalizada = função(este)
+        retorne este.m_AmpliaPersonalizado
+    fim,
+
+    DefinaModoExibido = função(este, amplia, visual)
+        -- Define a ampliação e o modo inicial do leitor de PDF.
+        se (amplia==pdf_e_amplia_paginainteira ou amplia==pdf_e_amplia_larguratotal ou
+                amplia==pdf_e_amplia_real ou amplia==pdf_e_amplia_padrao) então
+            este.m_ModoAmpliado = amplia
+        senão
+            este:Erro("modo de ampliação incorreto: %d", amplia)
+		fim
+		visual = visual ou pdf_e_visual_padrao
+        se (visual==pdf_e_visual_simples ou visual==pdf_e_visual_continuo ou
+                visual==pdf_e_visual_duplo ou visual==pdf_e_visual_padrao) então
+            este.m_ModoVisual = visual
+        senão
+            este:Erro("modo de visualização incorreto: %d", visual)
+		fim
+    fim,
+
+    DefinaCompressão = função(este, comprima)
+        este.m_comprima = PDF_USING_ZLIB e comprima
+    fim,
+
+    DefinaTítulo = função(este, titulo)
+        este.m_titulo = titulo
+    fim,
+
+    DefinaAssunto = função(este, assunto)
+        este.m_assunto = assunto
+    fim,
+
+    DefinaAutor = função(este, autor)
+        este.m_autor = autor
+    fim,
+
+    DefinaPalavrasChave = função(este, palavraschave)
+        este.m_palavraschave = palavraschave
+    fim,
+
+    DefinaCriador = função(este, criador)
+        este.m_criador = criador
+    fim,
+
+    PseudoNúmeroDePáginas = função(este, alias)
+        este.m_PseudoNumeroDePaginas = alias ou "{nb}"
+    fim,
+
+    PeguePseudoNúmeroDePáginas = função(este)
+        retorne este.m_PseudoNumeroDePaginas
+    fim,
+
+    Erro = função(este, fmt, ...)
+        -- Erros do documento interrompem a geração.
+        erro( cadeiaformate(fmt, ...) )
+    fim,
+
+    Abra = função(este)
+        -- Início do documento
+        este.m_estado = 1
+    fim,
+
+    Feche = função(este)
+        -- Termina documento
+        se (este.m_estado==3) então retorne fim
+        se (este.m_page==0) então este:AdicionePágina() fim
+        -- Rodapé da página
+        este.m_EmRodape = verdadeiro
+        este:Rodapé()
+        este.m_EmRodape = falso
+        -- Feche pagina
+        este:_fim_da_pagina()
+        -- Feche documento
+        este:_enddoc()
+    fim,
+
+    AdicionePágina = função(este, orientation, psize)
+		orientation = orientation ou pdf_e_orientation_none
+        -- Começa nova pagina
+        se (este.m_estado==0) então este:Abra() fim
+        local familia = este.m_FamiliaDaFonte
+        local estilo = este.m_EstiloDaFonte
+        se (este.m_Sublinhado) então estilo = estilo .. "U" fim
+        local tamanhodafonte = este.m_TamanhoDaFontePt
+        local lw = este.m_EspessuraDaLinha
+        local dc = este.m_CorDaLinha
+        local fc = este.m_CorInterna
+        local tc = este.m_CorDoTexto
+        local cf = este.m_ColorFlag
+        se (este.m_page > 0) então
+            -- Rodapé da página
+            este.m_EmRodape = verdadeiro
+            este:Rodapé()
+            este.m_EmRodape = falso
+            -- Feche página
+            este:_fim_da_pagina()
+        fim
+        -- Inicie nova página
+        este:_inicio_da_pagina(orientation, psize)
+        -- Defina linha do capítulo para quadrado
+        este:_saida("2 J\n")
+        -- Defina tamanho da linha
+        este.m_EspessuraDaLinha = lw
+        este:_saidaformatada("%.2f w\n", lw*este.m_k)
+        -- Defina fonte
+        se (familia e #familia > 0) então este:DefinaFonte(familia,estilo,tamanhodafonte) fim
+        -- Defina cores
+        este.m_CorDaLinha = dc
+        se (dc ~= "0 G") então este:_saidaformatada("%s\n", dc) fim
+        este.m_CorInterna = fc
+        se (fc ~= "0 g") então este:_saidaformatada("%s\n", fc) fim
+        este.m_CorDoTexto = tc
+        este.m_ColorFlag = cf
+        -- Cabeçalho da página
+        este.m_EmCabecalho = verdadeiro
+        este:Cabeçalho()
+        este.m_EmCabecalho = falso
+        -- Restaura largura da página
+        se (este.m_EspessuraDaLinha ~= lw) então
+            este.m_EspessuraDaLinha = lw
+            este:_saidaformatada("%.2f w\n", lw*este.m_k)
+        fim
+        -- Restaura fonte
+        se (familia e #familia > 0) então este:DefinaFonte(familia,estilo,tamanhodafonte) fim
+        -- Restaura cores
+        se (este.m_CorDaLinha ~= dc) então
+            este.m_CorDaLinha = dc
+            este:_saidaformatada("%s\n", dc)
+        fim
+        se (este.m_CorInterna ~= fc) então
+            este.m_CorInterna = fc
+            este:_saidaformatada("%s\n", fc)
+        fim
+        este.m_CorDoTexto = tc
+        este.m_ColorFlag = cf
+    fim,
+
+    --assume a filename when image_blob is null
+    --otherwise a in memory image
+    Imagem = função(este, nome_da_imagem, x, y, w, h,
+                atype, ligacao,image_blob, blob_size,tab)
+        -- Poe uma imagem no arquivo
+        local info = {}
+        x = x ou -1
+        y = y ou -1
+        w = w ou 0.0
+        h = h ou 0.0
+        atype = atype ou ''
+        ligacao = ligacao ou 0
+
+	se (não este.m_imagens[nome_da_imagem]) então
+
+
+
+
+		   local itype
+		   se (atype e #atype > 0) então
+			  itype = atype
+		   senão
+			 se (image_blob) então
+				este:Erro("informe o tipo da imagem recebida em memória: %s", nome_da_imagem)
+			 fim
+			  -- Sem dados em memória, o nome identifica um arquivo.
+			 local pos = cadeiaprocure(nome_da_imagem,'.', 1, verdadeiro)
+			 se (não pos) então
+				   este:Erro("o arquivo de imagem não tem extensão e o tipo não foi informado: %s", nome_da_imagem)
+			 fim
+			 itype = nome_da_imagem:corte(pos+1);
+           fim
+
+		   itype = itype:minúscula();
+		   se (itype=="jpg") então itype = "jpeg" fim
+		   se itype ~= "png" e itype ~= "jpeg" e itype ~= "svg" então
+		       este:Erro("tipo de imagem não aceito: %s; use PNG, JPEG ou SVG", itype)
+		   fim
+		   info = imagemPdf.paraPDF(image_blob ou nome_da_imagem, image_blob ~= nulo)
+		   se info.formato == "svg" então
+		       local larguraDesenhada, alturaDesenhada = desenheSvg(este, info, x, y, w, h)
+		       se y == -1 então este.m_y = este.m_y + alturaDesenhada fim
+		       retorne larguraDesenhada, alturaDesenhada
+		   fim
+
+
+
+
+		este.m_imagens[nome_da_imagem] = info
+
+		info.índice = este._PegueTamanhoDaTabela(este.m_imagens)
+
+
+		se (w==0 e h==0) então
+			-- Put image at 96 dpi
+			w = -96
+			h = -96
+		senão
+			se (w==0) então
+				w = h* info.largura/info.altura
+			senãose (w<0) então
+				w = - info.largura*72/w/este.m_k
+			fim
+			se (h==0) então
+				h = w* info.altura/info.largura
+			senãose(h<0) então
+				h = - info.altura*72/h/este.m_k
+			fim
+		fim
+
+		local _y, _x
+		-- Flowing mode
+		se (y==-1) então
+			se (este.m_y +h > este.m_GatilhoDeQuebraDePagina e não este.m_EmCabecalho e
+						não este.m_EmRodape e este:AceitaQuebraDePágina()) então
+				-- Automatic page pare
+				local x2 = este.m_x
+				este:AdicionePágina(este.m_OrientacaoAtual, este.m_CurPageSize)
+				este.m_x = x2
+			fim
+			_y = este.m_y
+			este.m_y = este.m_y + h
+		senão
+			_y = y
+		fim
+
+		se (x==-1) então
+			_x = este.m_x
+		senão
+			_x = x
+		fim
+
+		este:_saidaformatada("q %.2f 0 0 %.2f %.2f %.2f cm /I%d Do Q\n",
+				w*este.m_k,h*este.m_k,_x*este.m_k,(este.m_h-(_y+h))*este.m_k,info.índice)
+		se (ligacao) então
+			este:Ligação(_x,_y,w,h,ligacao)
+		fim
+	senão
+
+
+
+		info = este.m_imagens[nome_da_imagem]
+
+
+		se (w==0 e h==0) então
+			-- Put image at 96 dpi
+			w = -96
+			h = -96
+		senão
+			se (w==0) então
+				w = h* info.largura/info.altura
+			senãose (w<0) então
+				w = - info.largura*72/w/este.m_k
+			fim
+			se (h==0) então
+				h = w* info.altura/info.largura
+			senãose(h<0) então
+				h = - info.altura*72/h/este.m_k
+			fim
+		fim
+
+		local _y, _x
+		-- Flowing mode
+		se (y==-1) então
+			se (este.m_y +h > este.m_GatilhoDeQuebraDePagina e não este.m_EmCabecalho e
+						não este.m_EmRodape e este:AceitaQuebraDePágina()) então
+				-- Automatic page pare
+				local x2 = este.m_x
+				este:AdicionePágina(este.m_OrientacaoAtual, este.m_CurPageSize)
+				este.m_x = x2
+			fim
+			_y = este.m_y
+			este.m_y = este.m_y + h
+		senão
+			_y = y
+		fim
+
+		se (x==-1) então
+			_x = este.m_x
+		senão
+			_x = x
+		fim
+
+		este:_saidaformatada("q %.2f 0 0 %.2f %.2f %.2f cm /I%d Do Q\n",
+				w*este.m_k,h*este.m_k,_x*este.m_k,(este.m_h-(_y+h))*este.m_k,info.índice)
+		se (ligacao) então
+			este:Ligação(_x,_y,w,h,ligacao)
+		fim
+
+	fim -- se não imagem
+
+    fim,
+
+    Cabeçalho = função(este)
+        -- To be implemented in your own inherited class
+    fim,
+
+    Rodapé = função(este)
+        -- To be implemented in your own inherited class
+    fim,
+
+    NúmeroDaPágina = função(este)
+        -- Get current page number
+        retorne este.m_page
+    fim,
+
+    _peguecorpassada = função(r, g, b)
+		se tipo(r) == 'tabela' então
+			local c = r
+			r = c[1]
+			g = c[2]
+			b = c[3]
+		senãose (g == nulo) então
+			g = r
+			b = r
+		fim
+        retorne r,g,b
+    fim,
+
+    DefinaCorDaLinha = função(este, r, g, b)
+        -- Set cor for all stroking operations
+		r, g, b = este._peguecorpassada(r, g, b)
+        este.m_CorDaLinha_rgb = {r,g,b,0}
+        este.m_CorDaLinha = cadeiaformate("%.3f %.3f %.3f RG", r/255.0, g/255.0, b/255.0)
+        se (este.m_page>0) então este:_saidaformatada("%s\n", este.m_CorDaLinha) fim
+    fim,
+
+    PegueCorDaLinha = função(este)
+        retorne este.m_CorDaLinha_rgb
+    fim,
+
+    DefinaCorInterna = função(este, r, g, b)
+        -- Set cor for all filling operations
+		r, g, b = este._peguecorpassada(r, g, b)
+        este.m_CorInterna_rgb = {r,g,b,0}
+        este.m_CorInterna = cadeiaformate("%.3f %.3f %.3f rg", r/255.0, g/255.0, b/255.0)
+        este.m_ColorFlag = (este.m_CorInterna ~= este.m_CorDoTexto)
+        se (este.m_page>0) então este:_saidaformatada("%s\n", este.m_CorInterna) fim
+    fim,
+
+    PegueCorInterna = função(este)
+        retorne este.m_CorInterna_rgb
+    fim,
+
+    DefinaCorDoTexto = função(este, r, g, b)
+        -- Set cor for text
+		r, g, b = este._peguecorpassada(r, g, b)
+        este.m_CorDoTexto_rgb = {r,g,b,0}
+        este.m_CorDoTexto = cadeiaformate("%.3f %.3f %.3f rg", r/255.0, g/255.0, b/255.0)
+        este.m_ColorFlag = (este.m_CorInterna ~= este.m_CorDoTexto)
+    fim,
+
+    PegueCorDoTexto = função(este)
+        retorne este.m_CorDoTexto_rgb
+    fim,
+
+    -- alfa: real value from 0 (transparent) to 1 (opaque)
+    -- bm:    blend mode, one of the following:
+    --          Normal, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,
+    --          HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity
+    DefinaAlfa = função(este, alfa, bm)
+        -- set alfa for stroking (CA) and non-stroking (ca) operations
+        local gs = {}
+        gs.alfa = alfa
+		se bm então
+			gs.bm = bm
+		senão
+			gs.bm = "Normal"
+		fim
+        tabelainsira(este.m_extgstates, gs)
+        este:_saidaformatada("/GS%d gs\n", #este.m_extgstates)
+    fim,
+
+    PegueLarguraDoColar = função(este, s)
+        local w = 0.0
+        se (s) então
+            para _, código em utf8.caracteres(s) início
+                local glifo = este.m_FonteAtual.fonteUnicode:glifo(código)
+                w = w + este.m_FonteAtual.fonteUnicode:larguraDoGlifo(glifo)
+            fim
+        fim
+        retorne w*este.m_TamanhoDaFonte/1000.0
+    fim,
+
+    DefinaEspessuraDoQuadro = função(este, largura)
+        -- Defina largura da linha
+        este.m_EspessuraDaLinha = largura
+        se (este.m_page>0) então este:_saidaformatada("%.2f w\n", largura*este.m_k) fim
+    fim,
+
+    DefinaTraço = função(este, black, white)
+		black = black ou -1
+		white = white ou -1
+        se (black >= 0.0 e white >= 0.0) então
+            este:_saidaformatada("[%.3f %.3f] 0 d\n", black*este.m_k, white*este.m_k)
+        senão
+            este:_saida("[] 0 d\n")
+		fim
+    fim,
+
+    Linha = função(este, x1, y1, x2, y2)
+        -- Desenha uma linha
+
+		local k = este.m_k
+		local h = este.m_h
+        este:_saidaformatada("%.2f %.2f m %.2f %.2f l S\n", x1*k,(h-y1)*k,x2*k,(h-y2)*k)
+    fim,
+
+    Retângulo = função(este, x, y, w, h, estilo)
+        -- Desenha um retangulo
+        local op = "S"
+        se (estilo) então
+			estilo = estilo:maiúscula()
+            se (estilo == "F") então
+				op = "f"
+            senãose (estilo == "FD" ou estilo == "DF") então
+				op = "B"
+			fim
+        fim
+		local k = este.m_k
+        este:_saidaformatada("%.2f %.2f %.2f %.2f re %s\n", x*k,(este.m_h-y)*k,w*k,-h*k, op);
+    fim,
+
+    _PegueTamanhoDaTabela = função(tbl)
+		local size = 0
+		para k,v em pares(tbl) início
+			size = size + 1
+		fim
+		retorne size;
+    fim,
+
+    AdicioneFonte = função(este, afamilia, aestilo, afile)
+        local fontkey = "notosans"
+        se este.m_fonts[fontkey] então retorne fim
+        local font = {
+            i = 1,
+            name = fonteUnicodePadrão.nomePdf,
+            fonteUnicode = fonteUnicodePadrão,
+            font = {up = -100, ut = 50}
+        }
+        este.m_fonts[fontkey] = font
+
+
+    fim,
+
+    PegueConfiguraçõesDaFonte = função(este)
+		local fs = {}
+        fs.familia = este.m_FamiliaDaFonte
+        fs.estilo = este.m_EstiloDaFonte
+        fs.size = este.m_TamanhoDaFontePt
+		retorne fs
+    fim,
+
+    DefinaConfiguraçõesDaFonte = função(este, fs)
+        este:DefinaFonte(fs.familia, fs.estilo, fs.size)
+    fim,
+
+     DefinaFonte = função(este, afamilia, aestilo, size)
+        local familia, estilo = "notosans", ""
+        se (aestilo e #aestilo > 0) então
+            estilo = aestilo:minúscula()
+		senão
+			estilo = ""
+        fim
+
+        se (estilo:procure("u", 1, verdadeiro)) então
+            este.m_Sublinhado = verdadeiro
+            estilo = estilo:troque("u", "")
+        senão
+            este.m_Sublinhado = falso
+		fim
+        se (estilo=="ib") então estilo = "bi" fim
+        se (não size ou size==0) então size = este.m_TamanhoDaFontePt fim
+        -- Teste se a fonte já foi selecionada
+        se (este.m_FamiliaDaFonte==familia e este.m_EstiloDaFonte==estilo e este.m_TamanhoDaFontePt==size) então
+            retorne
+		fim
+        -- Teste se a fonte já está carregada
+        local fontkey = "notosans"
+        local font = este.m_fonts[fontkey]
+        se (não font) então
+            este:AdicioneFonte(familia, estilo)
+        fim
+        -- Selecione ela
+        este.m_FamiliaDaFonte = familia
+        este.m_EstiloDaFonte = estilo
+        este.m_TamanhoDaFontePt = size
+        este.m_TamanhoDaFonte = size/este.m_k
+        este.m_FonteAtual = este.m_fonts[fontkey]
+        se (este.m_page>0) então
+            este:_saidaformatada("BT /F%d %.2f Tf ET\n", este.m_FonteAtual.i, este.m_TamanhoDaFontePt)
+		fim
+     fim,
+
+    DefinaTamanhoDaFonte = função(este, size)
+        -- Defina tamanho da fonte em pontos
+        se (este.m_TamanhoDaFontePt==size)  então retorne fim
+        este.m_TamanhoDaFontePt = size
+        este.m_TamanhoDaFonte = size/este.m_k
+        se (este.m_page>0) então
+            este:_saidaformatada("BT /F%d %.2f Tf ET\n", este.m_FonteAtual.i, este.m_TamanhoDaFontePt)
+		fim
+    fim,
+
+    PegueTamanhoDaFonte = função(este)
+        retorne este.m_TamanhoDaFontePt
+    fim,
+
+    AdicioneLigação = função(este)
+        -- Cria uma nova ligação interna
+        local ligacao = {0,0}
+        tabelainsira(este.m_ligacoes, ligacao)
+        retorne #este.m_ligacoes
+    fim,
+
+    DefinaLigação = função(este, ligacao, y, page)
+        -- Defina destino da ligação interna
+        local nligacao = este.m_ligacoes[ligacao]
+        se (não y) então nligacao.to = este.m_y fim
+        se (não page) então page = este.m_page fim
+        nligacao.from = page
+    fim,
+
+    Ligação = função(este, x, y, w, h, ligacao)
+        -- Põe uma ligação na página
+        local pl = {}
+		local k = este.m_k
+        pl.x = x*k
+        pl.y = este.m_hPt-y*k
+        pl.w = w*k
+        pl.h = h*k
+        pl.ligacao = ligacao;
+        este.m_LigacaoDaPagina[este.m_page] = pl
+    fim,
+
+--protegido
+    _registreCódigoUnicode = função(este, código)
+        local cid = este.m_cidPorCódigo[código]
+        se cid então retorne cid fim
+        cid = este.m_próximoCid
+        garanta(cid <= 65535, "o documento excedeu 65.535 caracteres Unicode distintos")
+        local glifo = fonteUnicodePadrão:glifo(código)
+        garanta(glifo ~= 0, colar.formate("a fonte Noto Sans não possui U+%04X", código))
+        este.m_próximoCid = cid + 1
+        este.m_cidPorCódigo[código] = cid
+        este.m_códigoPorCid[cid] = código
+        este.m_glifoPorCid[cid] = glifo
+        este.m_larguraPorCid[cid] = unicodePdf.escala(fonteUnicodePadrão, fonteUnicodePadrão:larguraDoGlifo(glifo))
+        retorne cid
+    fim,
+
+    _codifiqueTextoUnicode = função(este, texto)
+        local partes = {}
+        para _, código em utf8.caracteres(texto) início
+            partes[#partes + 1] = unicodePdf.u16be(este:_registreCódigoUnicode(código))
+        fim
+        retorne unicodePdf.hex(tabela.concatene(partes))
+    fim,
+
+    _TextoBase = função(este, x, y, texto)
+	local cor1, cor2, Sublinhado
+        -- Produz um colar com a instrução de texto do PDF.
+        se (este.m_ColorFlag) então
+            cor1 = cadeiaformate("q %s ", este.m_CorDoTexto)
+            cor2 = " Q "
+	senão
+	    cor1 = ''
+	    cor2 = ''
+        fim
+        se (este.m_Sublinhado e texto) então
+            Sublinhado = cadeiaformate(" %s ", este:_Sublinha(x, y, texto))
+	senão
+	   Sublinhado = ''
+        fim
+        retorne cadeiaformate("%sBT %.2f %.2f Td <%s> Tj ET%s%s", cor1, x, y, este:_codifiqueTextoUnicode(texto), Sublinhado, cor2)
+    fim,
+
+--public
+
+    Rotacione = função(este, angulo, x, y)
+        se (não x) então x=este.m_x fim
+        se (não y) então y=este.m_y fim
+        se (este.m_angulo ~= 0) então este:_saida("Q\n") fim
+        este.m_angulo=angulo
+        se (angulo~=0) então
+            angulo = angulo * mat.pi/180.0;
+            local c= mat.cosseno(angulo)
+            local s= mat.seno(angulo)
+            local cx= x*este.m_k
+            local cy=(este.m_h-y)*este.m_k
+            este:_saidaformatada("q %.5f %.5f %.5f %.5f %.2f %.2f cm 1 0 0 1 %.2f %.2f cm\n",
+                    c,s,-s,c,cx,cy,-cx,-cy)
+        fim
+    fim,
+
+    TextoRotacionado = função(este, x, y, texto, angulo)
+        --Texto rotacionado ao redor de sua origem
+        este:Rotacione(angulo,x,y)
+        este:Texto(x,y,texto)
+        este:Rotacione(0)
+    fim,
+
+    TextoCortado = função(este, x, y, texto, borda)
+        local op
+		se borda então
+			op = 5
+		senão
+			op = 7
+		fim
+        este:_saidaformatada("q BT %.2f %.2f Td %d Tr <%s> Tj ET\n", x*este.m_k, (este.m_h-y)*este.m_k, op, este:_codifiqueTextoUnicode(texto));
+    fim,
+
+    Texto = função(este, x, y, texto)
+        local result = este:_TextoBase(x*este.m_k, (este.m_h-y)*este.m_k, texto)
+        este:_saida(result)
+    fim,
+
+    TextoSombreado = função(este, x, y, texto, displacement)
+        local cor_salva = este.m_CorDoTexto_rgb
+        este:DefinaCorDoTexto(200,200,200)
+		displacement = displacement ou 0.3
+        este:Texto(x+displacement, y+displacement, texto)
+        este:DefinaCorDoTexto(cor_salva)
+        este:Texto(x, y, texto)
+    fim,
+
+    AceitaQuebraDePágina = função(este)
+        -- Aceita quebra de página automática ou não
+        retorne este.m_AutoQuebraDePagina
+    fim,
+
+    Célula = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao)
+        -- Desenhe uma célula
+        local s
+        local k = este.m_k
+		h = h ou 0
+        se (este.m_y+h > este.m_GatilhoDeQuebraDePagina e (não este.m_EmCabecalho) e (não este.m_EmRodape) e este:AceitaQuebraDePágina()) então
+            -- Quebra de página automática
+            local x = este.m_x
+            local ws = este.m_ws
+            se (ws > 0) então
+                este.m_ws = 0
+                este:_saida("0 Tw\n")
+            fim
+            este:AdicionePágina(este.m_OrientacaoAtual, este.m_CurPageSize)
+            este.m_x = x + este.m_xDelta
+            se (ws>0) então
+                este.m_ws = ws
+                este:_saidaformatada("%.3f Tw\n", ws*k)
+            fim
+        fim
+        se (w==0) então
+            w = este.m_w - este.m_rMargin - este.m_x
+		fim
+
+        se (interior ou (borda e borda == 1)) então
+			se interior então
+				se borda e borda == 1 então
+					s = "B"
+				senão
+					s = "f"
+				fim
+			senão
+				s = "S"
+			fim
+            s = cadeiaformate("%.2f %.2f %.2f %.2f re %s ", este.m_x*k,(este.m_h-este.m_y)*k,w*k,-h*k, s)
+        fim
+        se (borda) então
+            local x = este.m_x
+            local y = este.m_y
+            s = s ou ''
+            se(cadeiaprocure(borda, 'L', 1, verdadeiro)) então
+                s = cadeiaformate("%s%.2f %.2f m %.2f %.2f l S ", s, x*k,(este.m_h-y)*k,x*k,(este.m_h-(y+h))*k)
+			fim
+            se (cadeiaprocure(borda, 'T', 1, verdadeiro)) então
+                s = cadeiaformate("%s%.2f %.2f m %.2f %.2f l S ", s, x*k,(este.m_h-y)*k,(x+w)*k,(este.m_h-y)*k)
+			fim
+            se (cadeiaprocure(borda,'R', 1, verdadeiro)) então
+                s = cadeiaformate("%s%.2f %.2f m %.2f %.2f l S ", s, (x+w)*k,(este.m_h-y)*k,(x+w)*k,(este.m_h-(y+h))*k)
+			fim
+            se (cadeiaprocure(borda,'B', 1, verdadeiro)) então
+                s = cadeiaformate("%s%.2f %.2f m %.2f %.2f l S ", s, x*k,(este.m_h-(y+h))*k,(x+w)*k,(este.m_h-(y+h))*k)
+			fim
+        fim
+        se (texto) então
+            local dx
+            local texto_largura = este:PegueLarguraDoColar(texto)
+            se (alinhamento=='R') então
+                dx = w-  este.m_cMargin-texto_largura
+            senãose (alinhamento=='C') então
+                dx = (w-texto_largura)/2
+            senão
+                dx = este.m_cMargin
+	    fim
+
+            s = cadeiaformate("%s%s", s ou '', este:_TextoBase((este.m_x+dx)*k, (este.m_h-(este.m_y+.5*h+.3*este.m_TamanhoDaFonte))*k, texto))
+
+            se (ligacao) então
+                este:Ligação(este.m_x+dx, este.m_y+.5*h-.5*este.m_TamanhoDaFonte, texto_largura, este.m_TamanhoDaFonte, ligacao)
+			fim
+        fim
+        se (s e #s > 0) então este:_saidaformatada("%s\n", s) fim
+        este.m_lasth = h
+        se (linha e linha>0) então
+            -- Vá para a próxima página
+            este.m_y = este.m_y + h
+            se (linha==1) então este.m_x = este.m_lMargin fim
+        senão
+			este.m_x = este.m_x + w
+		fim
+    fim,
+
+    MultiCélula = função(este, w, h, texto, borda, alinhamento, interior)
+		alinhamento = alinhamento ou 'J'
+        -- Desenha um texto com quebra de linhas automáticas ou explícitas
+        local cw = este.m_FonteAtual.font.cw
+        se (w==0) então w = este.m_w-este.m_rMargin-este.m_x fim
+        local wmax = (w-2*este.m_cMargin)*1000.0/este.m_TamanhoDaFonte
+        local stmp
+		local s = colar.troque(texto ou "", "\r", "")
+        local nb = #s
+		local NL = cadeiaembyte("\n", 1)
+		local SP = cadeiaembyte(" ", 1)
+        se (nb>0 e s:byte(nb)==NL) então nb = nb -1 fim
+        local b, b2
+        se (borda) então
+            se(borda== 1) então
+                borda = "LTRB";
+                b = "LRT";
+                b2 = "LR";
+            senão
+                se(cadeiaprocure(borda,'L', 1, verdadeiro)) então  b2 = "L" fim
+                se(cadeiaprocure(borda,'R', 1, verdadeiro)) então b2 =  "R" fim
+                se cadeiaprocure(borda,'T', 1, verdadeiro) então b = "T"
+		senão
+			b = b2
+		fim
+            fim
+        fim
+        local sep = -1
+        local i = 1
+        local j = 1
+        local l = 0
+        local ns = 0
+        local nl = 1
+        local ls = 0
+        enquanto (i<=nb) início
+            -- Pegue próximo caractere
+            local c = s:byte(i)
+            se (c==NL) então
+                -- Quebra de linha explícita
+                se (este.m_ws>0) então
+                    este.m_ws = 0
+                    este:_saida("0 Tw\n")
+                fim
+                stmp = s:corte(j, i-1)
+                este:Célula(w,h,stmp,b,2,alinhamento,interior)
+                i = i + 1
+                sep = -1
+                j = i
+                l = 0
+                ns = 0
+                nl = nl + 1
+                se (borda e nl==2) então b = b2 fim
+                --continue --continue on my luajit is broke
+			senão
+				se (c==SP) então
+					sep = i
+					ls = l
+					ns = ns + 1
+				fim
+				l = l + cw[c+1] --matrizes em lua/prisma começam por 1 então adicione 1
+				se (l>wmax) então
+					-- Quebra de linha automática
+					se (sep==-1) então
+						se(i==j) então i = i +1 fim
+						se (este.m_ws>0) então
+							este.m_ws = 0;
+							este:_saida("0 Tw\n")
+						fim
+						stmp = s:corte(j, i-1)
+						este:Célula(w,h,stmp,b,2,alinhamento,interior)
+					senão
+						se (alinhamento=='J') então
+							se (ns>1) então
+								este.m_ws = (wmax-ls)/1000.0*este.m_TamanhoDaFonte/(ns-1)
+							senão
+								este.m_ws = 0
+							fim
+
+							este:_saidaformatada("%.3f Tw\n",este.m_ws*este.m_k)
+						fim
+						stmp = s:corte(j, sep-1)
+						este:Célula(w,h,stmp,b,2,alinhamento,interior)
+						i = sep+1
+					fim
+					sep = -1
+					j = i
+					l = 0
+					ns = 0
+					nl = nl +1
+					se (borda e nl==2) então
+						b = b2
+					fim
+				senão
+					i = i + 1
+				fim
+			fim
+		fim
+        -- Last chunk
+        se (este.m_ws>0) então
+            este.m_ws = 0
+            este:_saida("0 Tw\n")
+        fim
+        se (borda e cadeiaprocure(borda,'B', 1, verdadeiro)) então
+            b = b .. "B"
+		fim
+        stmp = s:corte(j, i-1)
+        este:Célula(w,h,stmp,b,2,alinhamento,interior)
+        este.m_x = este.m_lMargin
+    fim,
+
+     CalculeLinhas = função(este, w, texto)
+        --Computa o número de linhas que a largura da MultiCélula vai pegar
+        local cw = este.m_FonteAtual.font.cw
+        se (w==0) então w = este.m_w-este.m_rMargin-este.m_x fim
+        local wmax = (w-2*este.m_cMargin)*1000.0/este.m_TamanhoDaFonte
+        local stmp
+		local s = colar.troque(texto ou "", "\r", "")
+        local nb = #s
+		local NL = cadeiaembyte("\n", 1)
+		local SP = cadeiaembyte(" ", 1)
+        se (nb>0 e s:byte(nb)==NL) então nb = nb -1 fim
+        local sep = -1
+        local i = 1
+        local j = 1
+        local l = 0
+        local ns = 0
+        local nl = 1
+        local ls = 0
+        enquanto (i<=nb) início
+            -- Pega próximo caractere
+            local c = s:byte(i)
+            se (c==NL) então
+                i = i + 1
+                sep = -1
+                j = i
+                l = 0
+                ns = 0
+                nl = nl + 1
+			senão
+				se (c==SP) então
+					sep = i
+					ls = l
+					ns = ns + 1
+				fim
+				l = l + cw[c+1] --tabelas em lua/prisma começam em 1 então adicione 1
+				se (l>wmax) então
+					-- Quebra de linha automática
+					se (sep==-1) então
+						se(i==j) então i = i +1 fim
+					senão
+						i = sep+1
+					fim
+					sep = -1
+					j = i
+					l = 0
+					ns = 0
+					nl = nl +1
+				senão
+					i = i + 1
+				fim
+			fim
+		fim
+        retorne nl
+     fim,
+
+    --MultiCélula engarragada
+    MultiCélulaEngarrafada = função(este, w, h, blt, texto, borda, alinhamento, interior)
+		alinhamento = alinhamento ou 'J'
+        --Pegue largura da garrafa incluindo margens
+        local blt_largura = este:PegueLarguraDoColar(blt)+este.m_cMargin*2
+
+        --Salve x
+        local bak_x = este.m_x
+
+        --Saindo uma garrafa
+        este:Célula(blt_largura, h, blt,0,' ', interior)
+
+        --Saindo um texto
+        este:MultiCélula(w-blt_largura, h, texto, borda, alinhamento, interior)
+
+        --Restaura x
+        este.m_x = bak_x;
+    fim,
+
+    RetânguloCortado = função(este, x, y, w, h, borda)
+        local op
+		se borda então
+			op = 'S'
+		senão
+			op = 'n'
+		fim
+		local k = este.m_k
+        este:_saidaformatada("q %.2f %.2f %.2f %.2f re W %s\n",
+            x*k, (este.m_h-y)*k, w*k,-h*k, op);
+    fim,
+
+    CorteIndefinido = função(este)
+        este:_saida("Q\n")
+    fim,
+
+    CélulaCortada = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao)
+		h = h ou 0
+        se (borda ou interior ou este.m_y+h>este.m_GatilhoDeQuebraDePagina) então
+            este:Célula(w,h,'',borda,0,'',interior)
+            este.m_x= este.m_x - w
+        fim
+        este:RetânguloCortado(este.m_x,este.m_y,w,h)
+        este:Célula(w,h,texto,0,linha,alinhamento,falso,ligacao)
+        este:CorteIndefinido()
+    fim,
+
+    --Célula com escala horizontal se o texto for muito grande
+    CélulaAjustada = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao, scale, force)
+		h = h ou 0
+        -- Obtém a largura do colar.
+        local str_largura=este:PegueLarguraDoColar(texto)
+
+        --Calcula relação para ajustar a celula
+        se (w==0.0) então w = este.m_w-este.m_rMargin-este.m_x fim
+        local ratio = (w-este.m_cMargin*2)/str_largura
+
+        local fit = (ratio < 1 ou (ratio > 1 e force))
+        se fit então
+            se scale então
+                --Calcula escala horizontal
+                local horiz_scale=ratio*100.0
+                --Defina escala horizontal
+                este:_saidaformatada("BT %.2f Tz ET\n", horiz_scale)
+            senão
+                --Calcula espaçamento de caracteres em pontos
+                local texto_size = utf8.tamanho(texto)
+                local char_space=(w-este.m_cMargin*2-str_largura)/mat.máximo(texto_size-1,1)*este.m_k
+                --Defina espaçamento de caracteres
+                este:_saidaformatada("BT %.2f Tc ET\n", char_space)
+            fim
+            --Sobrescreve alinhamento do usuário(desde que o texto preencha a céulula)
+            alinhamento=' '
+        fim
+
+        --Passe sobre para o método Célula
+        este:Célula(w,h,texto,borda,linha,alinhamento,interior,ligacao)
+
+        --Redefina escala de espaçamento/horizontal do caractere
+        se fit então
+			se scale então
+				scale = "100 Tz"
+			senão
+				scale = "0 Tc"
+			fim
+            este:_saidaformatada("BT %s ET", scale)
+        fim
+    fim,
+
+    --Célula com escalonamento horizontal somente se necessário
+    CélulaAjustadaHorizontal = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao)
+        este:CélulaAjustada(w,h,texto,borda,linha,alinhamento,interior,ligacao,verdadeiro,falso)
+    fim,
+
+    --Célula com Ajuste horizontal sempre
+    CélulaAjustadaHorizontalForçada = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao)
+        este:CélulaAjustada(w,h,texto,borda,linha,alinhamento,interior,ligacao,verdadeiro,verdadeiro)
+    fim,
+
+    CélulaAjustadaEscapada = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao)
+        este:CélulaAjustada(w,h,texto,borda,linha,alinhamento,interior,ligacao,falso,falso)
+    fim,
+
+    CélulaAjustadaEscapadaForçada = função(este, w, h, texto, borda, linha, alinhamento, interior, ligacao)
+        --O mesmo que CélulaAjustada diretamente
+        este:CélulaAjustada(w,h,texto,borda,linha,alinhamento,interior,ligacao,falso,verdadeiro)
+    fim,
+
+    Escreva = função(este, h, texto, ligacao)
+        --Saída um texto em modo de fluxo
+        local cw = este.m_FonteAtual.font.cw
+        local w = este.m_w - este.m_rMargin - este.m_x
+        local wmax = (w-2 * este.m_cMargin)*1000.0/este.m_TamanhoDaFonte
+        local stmp
+		local s = colar.troque(texto ou "", "\r", "")
+        local nb = #s
+		local NL = cadeiaembyte("\n", 1)
+		local SP = cadeiaembyte(" ", 1)
+        se (nb>0 e s:byte(nb)==NL) então nb = nb -1 fim
+        local sep = -1;
+        local i = 1;
+        local j = 1;
+        local l = 0;
+        local nl = 1;
+        enquanto(i<nb) início
+        enquanto(i<nb) início -- laço duplo para permitir quebra em qualquer lugar simulando continuar
+		-- Pegue próximo caractere
+		local c = s:byte(i)
+		se (c==NL) então
+			-- Quebra de linha explícita
+			stmp = s:corte(j, i-1)
+			este:Célula(w,h,stmp,0,2,'',0,ligacao)
+			i = i + 1
+			sep = -1
+			j = i
+			l = 0
+			se(nl==1) então
+				este.m_x = este.m_lMargin
+				w = este.m_w-este.m_rMargin-este.m_x
+				wmax = (w-2*este.m_cMargin)*1000.0/este.m_TamanhoDaFonte
+			fim
+			nl = nl + 1
+		senão
+			se (c==SP) então sep = i fim
+			l = l + cw[c+1] --tabelas começam por 1
+			se (l>wmax) então
+				-- Quebra de linha automática
+				se (sep==-1) então
+					se (este.m_x > este.m_lMargin) então
+						-- Mova para próxima linha
+						este.m_x = este.m_lMargin
+						este.m_y = este.m_y + h
+						w = este.m_w-este.m_rMargin-este.m_x
+						wmax = (w-2*este.m_cMargin)*1000.0/este.m_TamanhoDaFonte
+						i = i + 1
+						nl = nl + 1
+						pare --continue
+					senão
+						se(i==j) então i = i + 1 fim
+						stmp = s.substr(j, i-j)
+						este:Célula(w,h,stmp,0,2,'',0,ligacao)
+					fim
+				senão
+					stmp = s.substr(j, i-1);
+					este:Célula(w,h,stmp,0,2,'',0,ligacao)
+					i = sep+1
+				fim
+				sep = -1
+				j = i
+				l = 0
+				se (nl==1) então
+					este.m_x = este.m_lMargin;
+					w = este.m_w-este.m_rMargin-este.m_x
+					wmax = (w-2*este.m_cMargin)*1000.0/este.m_TamanhoDaFonte
+				fim
+				nl = nl + 1
+			senão
+				i = i + 1
+			fim
+		fim
+	fim
+	fim
+        -- Último pedaço
+        se (i~=j) então
+            stmp = s:corte(j, i-1)
+            este:Célula(l/1000.0*este.m_TamanhoDaFonte,h,stmp,0,0,'',0,ligacao)
+        fim
+    fim,
+
+    _quebreTextoUnicode = função(este, texto, largura)
+        local linhas, caracteres = {}, {}
+        local função junte(de, atéOnde)
+            local partes = {}
+            para i = de, atéOnde início partes[#partes + 1] = caracteres[i] fim
+            retorne tabela.concatene(partes)
+        fim
+        local função emita(linha) linhas[#linhas + 1] = linha fim
+        para posição, código em utf8.caracteres(colar.troque(texto ou "", "\r", "")) início
+            local caractere = utf8.caractere(código)
+            se caractere == "\n" então
+                emita(junte(1, #caracteres))
+                caracteres = {}
+            senão
+                caracteres[#caracteres + 1] = caractere
+                se #caracteres > 1 e este:PegueLarguraDoColar(junte(1, #caracteres)) > largura então
+                    local separador
+                    para i = #caracteres - 1, 1, -1 início
+                        se caracteres[i] == " " então separador = i; pare fim
+                    fim
+                    se separador então
+                        emita(junte(1, separador - 1))
+                        local restantes = {}
+                        para i = separador + 1, #caracteres início restantes[#restantes + 1] = caracteres[i] fim
+                        caracteres = restantes
+                    senão
+                        local último = caracteres[#caracteres]
+                        caracteres[#caracteres] = nulo
+                        emita(junte(1, #caracteres))
+                        caracteres = { último }
+                    fim
+                fim
+            fim
+        fim
+        se #caracteres > 0 ou #linhas == 0 então emita(junte(1, #caracteres)) fim
+        retorne linhas
+    fim,
+
+    -- Versões Unicode: substituem os percursos byte a byte legados acima.
+    MultiCélula = função(este, w, h, texto, borda, alinhamento, interior)
+        alinhamento = alinhamento ou "J"
+        se w == 0 então w = este.m_w - este.m_rMargin - este.m_x fim
+        local linhas = este:_quebreTextoUnicode(texto, w - 2 * este.m_cMargin)
+        para i, linha em ipares(linhas) início
+            local bordaDaLinha = borda
+            se tipo(borda) == "colar" então
+                bordaDaLinha = ""
+                se i == 1 e borda:procure("T", 1, verdadeiro) então bordaDaLinha = bordaDaLinha .. "T" fim
+                se borda:procure("L", 1, verdadeiro) então bordaDaLinha = bordaDaLinha .. "L" fim
+                se borda:procure("R", 1, verdadeiro) então bordaDaLinha = bordaDaLinha .. "R" fim
+                se i == #linhas e borda:procure("B", 1, verdadeiro) então bordaDaLinha = bordaDaLinha .. "B" fim
+            fim
+            este:Célula(w, h, linha, bordaDaLinha, 2, alinhamento, interior)
+        fim
+        este.m_x = este.m_lMargin
+    fim,
+
+    CalculeLinhas = função(este, w, texto)
+        se w == 0 então w = este.m_w - este.m_rMargin - este.m_x fim
+        retorne #este:_quebreTextoUnicode(texto, w - 2 * este.m_cMargin)
+    fim,
+
+    Escreva = função(este, h, texto, ligacao)
+        local w = este.m_w - este.m_rMargin - este.m_x
+        local linhas = este:_quebreTextoUnicode(texto, w - 2 * este.m_cMargin)
+        para i, linha em ipares(linhas) início
+            se i < #linhas então
+                este:Célula(w, h, linha, 0, 2, "", falso, ligacao)
+                este.m_x = este.m_lMargin
+                w = este.m_w - este.m_rMargin - este.m_x
+            senão
+                este:Célula(este:PegueLarguraDoColar(linha), h, linha, 0, 0, "", falso, ligacao)
+            fim
+        fim
+    fim,
+
+    NovaLinha = função(este, h)
+        -- Entrada de linha; valor padrão é a altura da última célula
+        este.m_x = este.m_lMargin
+        se (não h) então
+			este.m_y = este.m_y + este.m_lasth
+        senão
+			este.m_y = este.m_y + h
+		fim
+    fim,
+
+
+
+    PegueAbscissa = função(este)
+        retorne este.m_x
+    fim,
+
+    DefinaAbscissa = função(este, x)
+        se (x>=0) então
+			este.m_x = x
+        senão
+			este.m_x = este.m_w+x
+		fim
+    fim,
+
+    PegueOrdenada = função(este)
+        retorne este.m_y
+    fim,
+
+    DefinaOrdenada = função(este, y)
+        este.m_x = este.m_lMargin
+        se (y>=0) então
+			este.m_y = y
+        senão
+			este.m_y = este.m_h+y
+		fim
+    fim,
+
+    DefinaAbscissaEOrdenada = função(este, x, y)
+        este:DefinaOrdenada(y)
+        este:DefinaAbscissa(x)
+    fim,
+
+    PegueLargura = função(este)
+        retorne este.m_w
+    fim,
+
+    PegueAltura = função(este)
+        retorne este.m_h
+    fim,
+
+    Saída = função(este, nome, dest)
+        -- Escreva PDF em algum destino
+        se (este.m_estado<3) então este:Feche() fim
+        se (não dest ou dest == '') então
+            se (não nome) então
+                nome = "doc.pdf"
+                dest = 'arquivo'
+            senão
+                dest = 'arquivo'
+			fim
+        fim
+
+	local var_data = tabela.concatene(este.m_buffer)
+        se (dest == 'arquivo') então
+            -- Save to local file
+            local f = es.abra(nome,"escritabin")
+            se (não f) então
+                este:Erro("Não foi possível criar o arquivo: %s", nome)
+		fim
+            f:escreva(var_data);
+            f:feche()
+        senãose dest == 'tela' então -- Imprime a saída
+            mostre(var_data)
+        senãose dest == 'colar' então -- Retorna como colar.
+            retorne var_data
+        senãose dest == 'emlinha' então -- Escreve em linha com cabeçalhos HTTP.
+			local cabecalhoPDF = 'Content-Type: application/pdf\n'..
+				'Content-Disposition: inline; filename="'..nome..'"\n'..
+				'Cache-Control: private, max-age=0, must-revalidate\n'..
+				'Pragma: public\n\n'
+            mostre(cabecalhoPDF..var_data)
+        senãose dest == 'baixar' então -- Escreve como descarga com cabeçalhos HTTP.
+			local cabecalhoPDF = 'Content-Type: application/x-download\n'..
+				'Content-Disposition: attachment; filename="'..nome..'"\n'..
+				'Cache-Control: private, max-age=0, must-revalidate\n'..
+				'Pragma: public\n\n'
+            mostre(cabecalhoPDF..var_data)
+        senão
+            este:Erro("Destino de saída incorreto: %s", dest)
+        fim
+        retorne ""
+    fim,
+
+    RetânguloAbaulado = função(este, x, y, w, h, r, estilo)
+        local k = este.m_k;
+        local hp = este.m_h;
+        local MyArc = 4.0/3.0 * (mat.raiz(2) - 1)
+        este:_saidaformatada("%.2f %.2f m\n",(x+r)*k,(hp-y)*k)
+        local xc = x+w-r
+        local yc = y+r
+        este:_saidaformatada("%.2f %.2f l\n", xc*k,(hp-y)*k)
+
+        este:_Arco(xc + r*MyArc, yc - r, xc + r, yc - r*MyArc, xc + r, yc)
+        xc = x+w-r
+        yc = y+h-r
+        este:_saidaformatada("%.2f %.2f l\n",(x+w)*k,(hp-yc)*k)
+        este:_Arco(xc + r, yc + r*MyArc, xc + r*MyArc, yc + r, xc, yc + r)
+        xc = x+r
+        yc = y+h-r
+        este:_saidaformatada("%.2f %.2f l\n",xc*k,(hp-(y+h))*k)
+        este:_Arco(xc - r*MyArc, yc + r, xc - r, yc + r*MyArc, xc - r, yc)
+        xc = x+r
+        yc = y+r
+        este:_saidaformatada("%.2f %.2f l\n",(x)*k,(hp-yc)*k)
+        este:_Arco(xc - r, yc - r*MyArc, xc - r*MyArc, yc - r, xc, yc - r)
+        se (estilo=="F") então
+			este:_saida("f\n")
+        senãose (estilo=="FD" ou estilo=="DF") então
+			este:_saida("B\n")
+        senão
+			este:_saida("S\n")
+		fim
+    fim,
+
+    Círculo = função(este, x, y, r, estilo)
+        este:Elipse(x,y,r,r,estilo ou "D");
+    fim,
+
+    Elipse = função(este, x, y, rx, ry, estilo)
+		estilo = estilo ou "D"
+        local op = "S"
+        se (estilo=="F") então
+			op ="f"
+        senãose (estilo=="FD" ou estilo=="DF") então
+			op ="B"
+		fim
+        local tmp = 4.0/3.0*(mat.raiz(2)-1)
+        local lx=tmp*rx
+        local ly=tmp*ry
+		local h = este.m_h
+		local k = este.m_k
+        este:_saidaformatada("%.2f %.2f m %.2f %.2f %.2f %.2f %.2f %.2f c\n",
+                (x+rx)*k,(h-y)*k,
+                (x+rx)*k,(h-(y-ly))*k,
+                (x+lx)*k,(h-(y-ry))*k,
+                x*k,(h-(y-ry))*k)
+        este:_saidaformatada("%.2f %.2f %.2f %.2f %.2f %.2f c\n",
+                (x-lx)*k,(h-(y-ry))*k,
+                (x-rx)*k,(h-(y-ly))*k,
+                (x-rx)*k,(h-y)*k)
+        este:_saidaformatada("%.2f %.2f %.2f %.2f %.2f %.2f c\n",
+                (x-rx)*k,(h-(y+ly))*k,
+                (x-lx)*k,(h-(y+ry))*k,
+                x*k,(h-(y+ry))*k)
+        este:_saidaformatada("%.2f %.2f %.2f %.2f %.2f %.2f c %s\n",
+                (x+lx)*k,(h-(y+ry))*k,
+                (x+rx)*k,(h-(y+ly))*k,
+                (x+rx)*k,(h-y)*k,
+                op)
+    fim,
+    Polígono = função(este,pontos,estilo)
+		local estilo = estilo ou "D"
+        local op = "S"
+        se (estilo=="F") então
+			op ="f"
+        senãose (estilo=="FD" ou estilo=="DF") então
+			op ="F"
+		fim
+		local h = este.m_h
+		local k = este.m_k
+		local CadeiaDePontos = ''
+		para i=1, #pontos,2 início
+			CadeiaDePontos = CadeiaDePontos..cadeiaformate('%.2f %.2f\n', pontos[i]*k, h-pontos[i+1]*k)
+			se i == 1  então
+				CadeiaDePontos = CadeiaDePontos..'m\n'
+			senão
+				CadeiaDePontos = CadeiaDePontos..'l\n'
+			fim
+		fim
+		este:_saidaformatada(CadeiaDePontos..op..'\n')
+    fim,
+    AdicioneJavaScript = função(este, script)
+        este.m_javascript=script
+    fim,
+    AutoImprima = função(este)
+		este.m_javascript='print(true);'
+    fim,
+    LinearGradiente = função(este, x, y, w, h, col1, col2, coords)
+		local coords = coords ou {0,0,1,0}
+
+        este:Corte(x,y,w,h);
+        este:Gradiente(2,col1,col2,coords);
+    fim,
+
+    RadialGradiente = função(este,x, y, w, h, col1, col2, coords)
+		local coords = coords ou {0.5,0.5,0.5,0.5,1}
+        este:Corte(x,y,w,h);
+        este:Gradiente(3,col1,col2,coords);
+    fim,
+    Corte = função(este,x,y,w,h)
+        --save current Graphic State
+        local s='q';
+        --set clipping area
+        s = s..cadeiaformate(' %.2f %.2f %.2f %.2f re W n', x*este.m_k, (este.m_h-y)*este.m_k, w*este.m_k, -h*este.m_k);
+        --set up transformation matrix for gradient
+        s = s..cadeiaformate(' %.3f 0 0 %.3f %.3f %.3f cm', w*este.m_k, h*este.m_k, x*este.m_k, (este.m_h-(y+h))*este.m_k);
+        este:_saidaformatada(s)
+    fim,
+
+
+
+    CódigoDeBarras2de5i = função(este, Codigo, BarraEstreita, BarraLarga, Abscissa, Ordenada, Altura)
+
+			-- Define as posições e larguras das barras verticais.
+		se não Codigo ou Codigo == '' então erro('*************Precisa de um codigo de 44 digitos*********') fim
+		local E = BarraEstreita ou 0.39						-- Estreito
+		local L = BarraLarga    ou 0.95						-- Largo: o dobro ou triplo do estreito
+		local PH = Abscissa 	ou este:PegueAbscissa()	-- Posição inicial do código de barras
+		local PV = Ordenada		ou este:PegueOrdenada()	-- Posição vertical
+		local A  = Altura 		ou 16						-- Altura da barra
+		local Preto = 'F'									-- Estilo pré definido
+		local Branco = 'B' 									-- Idem
+
+
+		local função impar(n)										-- Função para determinar se n é impar
+			local resto = mat.resto(n,2)
+			se resto == 1 então retorne verdadeiro
+			senão retorne falso
+			fim
+		fim
+
+		local t = Codigo:analise('0123456789')					-- t é uma tabela contendo todos os díditos
+		se este:_PegueTamanhoDaTabela(t) < 44 então erro('Código deve conter 44 dídigos')	fim
+		para i,v em pares(t) início t[i] = paraNúmero(v) fim 	-- convertendo os números
+
+		local TL = {}              -- tabela contendo os díditos e suas posições
+			TL[0] = {E,E,L,L,E}		-- Largo, Estreito definidos acima
+			TL[1] = {L,E,E,E,L}
+			TL[2] = {E,L,E,E,L}
+			TL[3] = {L,L,E,E,E}
+			TL[4] = {E,E,L,E,L}
+			TL[5] = {L,E,L,E,E}
+			TL[6] = {E,L,L,E,E}
+			TL[7] = {E,E,E,L,L}
+			TL[8] = {L,E,E,L,E}
+			TL[9] = {E,L,E,L,E}
+
+		local TBF = {}			-- Tabela final contendo os díditos intercalados
+
+
+		para i=1, #t,2   início -- laço para cada par de díditos do código digitado
+			para j=1, 10 início -- laço para preencher o conjunto de 2 de 5
+				se impar(j) então    -- se for impar
+					para r,f em pares(TL) início  -- laço na tabela de largura, são 10 índices
+						se r == t[i] então
+							se j == 1 então
+									tabela.insira(TBF,TL[t[i] ][1]) --Inserindo o impar na sua posição
+								senãose j == 3 então
+									tabela.insira(TBF,TL[t[i] ][2])
+								senãose j == 5 então
+									tabela.insira(TBF,TL[t[i] ][3])
+								senãose j == 7 então
+									tabela.insira(TBF,TL[t[i] ][4])
+								senãose j == 9 então
+									tabela.insira(TBF,TL[t[i] ][5])
+							fim
+						fim
+					fim
+				senão
+					para r,f em pares(TL) início
+						se r == t[i+1] então                     -- se r que é par for igual ao par de t
+							se j == 2 então						 -- Vai iserir apenas se
+								tabela.insira(TBF,TL[t[i+1] ][1]) -- Inserindo o par na sua posição
+							senãose j == 4 então
+								tabela.insira(TBF,TL[t[i+1] ][2])
+							senãose j == 6 então
+								tabela.insira(TBF,TL[t[i+1] ][3])
+							senãose j == 8 então
+								tabela.insira(TBF,TL[t[i+1] ][4])
+							senãose j == 10 então
+								tabela.insira(TBF,TL[t[i+1] ][5])
+							fim
+						fim
+					fim
+				fim
+			fim
+		fim
+
+			-- Ajustes gráficos do código.
+	    este:DefinaCorInterna(0)
+	    este:DefinaCorDaLinha(255)
+	    este:DefinaEspessuraDoQuadro(0)
+		    -- Barras iniciais.
+	    este:Retângulo(PH,PV,E,A,Preto)  PH = PH + E
+	    este:Retângulo(PH,PV,E,A,Branco) PH = PH + E
+	    este:Retângulo(PH,PV,E,A,Preto)  PH = PH + E
+	    este:Retângulo(PH,PV,E,A,Branco) PH = PH + E
+		    -- Dados intercalados.
+		local Pos = PH
+		para i,v em pares(TBF) início
+			se impar(i) então
+
+				este:Retângulo(PH,PV,v,A,Preto) PH = PH + v
+			senão
+			Pos = Pos + TBF[i-1]
+
+				este:Retângulo(PH,PV,v,A,Branco) PH = PH + v
+			fim
+		fim
+
+			-- Barras finais.
+
+		este:Retângulo(PH,PV,L,A,Preto) PH = PH + L
+		este:Retângulo(PH,PV,E,A,Branco) PH = PH + E
+		este:Retângulo(PH,PV,E,A,Preto)
+		este:DefinaCorDaLinha(0)
+
+    fim,
+
+
+    _Arco = função(este, x1, y1, x2, y2, x3, y3)
+        local h = este.m_h
+	local k = este.m_k
+        este:_saidaformatada("%.2f %.2f %.2f %.2f %.2f %.2f c \n", x1*k,
+                (h-y1)*k, x2*k, (h-y2)*k, x3*k, (h-y3)*k);
+    fim,
+
+    --end,
+
+    _verifique = função(este)
+    fim,
+
+    _verifiquesaida = função(este)
+    fim,
+
+    _pegue_tamanho_da_pagina = função(este, size)
+	local result = {}
+        se size == pdf_e_A3 então
+            result.w = 841.89
+            result.h = 1190.55
+        senãose size == pdf_e_A5 então
+            result.w = 420.94
+            result.h = 595.28
+        senãose size == pdf_e_Letter então
+            result.w = 612
+            result.h = 792
+        senãose size == pdf_e_Legal então
+            result.w = 612
+            result.h = 1008
+        senão
+            --case pdf_e_A4
+            result.w = 595.28
+            result.h = 841.89
+        fim
+
+        result.w = result.w / este.m_k
+        result.h = result.h / este.m_k
+        retorne result
+    fim,
+
+    _inicio_da_pagina = função(este, orientation, size)
+        este.m_page = este.m_page + 1
+	tabelainsira(este.m_paginas, {})
+        este.m_estado = 2
+        este.m_x = este.m_lMargin
+        este.m_y = este.m_tMargin
+        este.m_FamiliaDaFonte = ""
+        -- Check page size and orientation
+        se (não orientation ou orientation==pdf_e_orientation_none)  então orientation = este.m_DefOrientation fim
+        local psize
+        se não size então
+		psize = este.m_DefPageSize
+        senão
+		psize = size
+	fim
+        se (orientation~=este.m_OrientacaoAtual ou psize.w ~= este.m_CurPageSize.w ou psize.h  ~= este.m_CurPageSize.h) então
+            -- New size or orientation
+            se (orientation==pdf_e_orientation_portrait) então
+                este.m_w = psize.w
+                este.m_h = psize.h
+            senão
+                este.m_w = psize.h
+                este.m_h = psize.w
+            fim
+            este.m_wPt = este.m_w*este.m_k;
+            este.m_hPt = este.m_h*este.m_k;
+            este.m_GatilhoDeQuebraDePagina = este.m_h-este.m_bMargin
+            este.m_OrientacaoAtual = orientation
+            este.m_CurPageSize = psize
+        fim
+
+        se (orientation ~= este.m_DefOrientation ou psize.w ~= este.m_DefPageSize.w ou psize.h ~= este.m_DefPageSize.h) então
+            local ps = {}
+            ps.w = este.m_wPt;
+            ps.h = este.m_hPt;
+            este.m_PageSizes[este.m_page] = ps
+        fim
+
+        se este.m_duploFaceado então
+            se este.m_page % 2 == 0 então
+                este.m_xDelta = este.m_margemExterior - este.m_margemInterior
+                este:DefinaMargemEsquerda(este.m_margemExterior)
+                este:DefinaMargemDireita(este.m_margemInterior)
+            senão
+                este.m_xDelta=este.m_margemInterior - este.m_margemExterior
+                este:DefinaMargemEsquerda(este.m_margemInterior)
+                este:DefinaMargemDireita(este.m_margemExterior)
+            fim
+            este.m_x=este.m_lMargin;
+            este.m_y=este.m_tMargin;
+        fim
+    fim,
+
+    _fim_da_pagina = função(este)
+        se este.m_angulo ~=0 então
+            este.m_angulo=0
+            este:_saida("Q\n")
+        fim
+        este.m_estado = 1
+    fim,
+
+    --end,
+
+     _escape = função(s)
+        -- Escapa apenas a sintaxe de um colar literal PDF. Não converte UTF-8
+        -- para WinAnsi/CP1252: a API pública do RPDF é exclusivamente Unicode.
+        retorne (s ou ""):troque("\\", "\\\\"):troque("(", "\\("):troque(")", "\\)"):troque("\r", "")
+     fim,
+
+    _textstring = função(s)
+        -- Format a text colar
+        retorne cadeiaformate("(%s)", este._escape(s))
+    fim,
+
+     --__UTF8toUTF16(const std::colar &s)
+     --end,
+
+    conte_caracteres = função(str, c)
+        local count = 0
+        se str e #str > 0 então
+		local byte_char = cadeiaembyte(c)
+		para i = 1, #str início
+			se str:byte( i) == byte_char então
+				count = count + 1
+			fim
+		fim
+        fim
+        retorne count
+    fim,
+
+    _Sublinha = função(este, x, y, texto)
+        -- Underline text
+        local up = este.m_FonteAtual.font.up
+        local ut = este.m_FonteAtual.font.ut
+        local w = este:PegueLarguraDoColar(texto) + este.m_ws * este.conte_caracteres(texto,' ')
+        retorne cadeiaformate("%.2f %.2f %.2f %.2f re f", x*este.m_k, (este.m_h-(y-up/1000.0*este.m_TamanhoDaFonte))*este.m_k, w*este.m_k,-ut/1000.0*este.m_TamanhoDaFontePt)
+    fim,
+
+    _calc_m_buffer_size = função(este)
+	local size = 0
+	para k,v em pares(este.m_buffer) início
+		size = size + #v
+	fim
+	retorne size
+    fim,
+
+    _novoobj = função(este)
+        -- Begin a novo object
+        este.m_n = este.m_n + 1
+        tabelainsira(este.m_offsets, este:_calc_m_buffer_size())
+        este:_saidaformatada("%d 0 obj\n", este.m_n)
+    fim,
+
+    _poefluxo = função(este, s)
+        este:_saida("stream\n")
+        este:_saida(s)
+        este:_saida("\nendstream\n")
+    fim,
+
+    _saida = função(este, s)
+        -- Add a line to the document
+        se este.m_estado==2 então
+	    tabelainsira(este.m_paginas[este.m_page], s)
+        senão
+            tabelainsira(este.m_buffer, s)
+        fim
+    fim,
+
+    _saidaformatada = função(este, fmt, ...)
+	este:_saida(cadeiaformate(fmt, ...))
+    fim,
+
+    _poepaginas = função(este)
+        local nb = este.m_page
+	para n=1, nb início
+		este.m_paginas[n] = tabela.concatene(este.m_paginas[n])
+	fim
+        se (este.m_PseudoNumeroDePaginas) então
+            -- Replace number of pages
+            local str = cadeiaformate("%d", nb)
+            para n=1, nb início
+                local page = este.m_paginas[n]
+		este.m_paginas[n] = page:troque(este.m_PseudoNumeroDePaginas, str)
+            fim
+        fim
+        local wPt, hPt
+	local k = este.m_k
+        se (este.m_DefOrientation==pdf_e_orientation_portrait) então
+            wPt = este.m_DefPageSize.w*k
+            hPt = este.m_DefPageSize.h*k
+        senão
+            wPt = este.m_DefPageSize.h*k
+            hPt = este.m_DefPageSize.w*k
+        fim
+        local filter
+	se (este.m_comprima) então
+		filter = "/Filter /FlateDecode "
+	senão
+		filter = ""
+	fim
+        para n=1, nb início
+            -- Page
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Type /Page\n/Parent 1 0 R\n");
+            se (este.m_PageSizes[n] e #este.m_PageSizes[n] > 0) então
+                este:_saidaformatada("/MediaBox [0 0 %.2f %.2f]\n", este.m_PageSizes[n].w, este.m_PageSizes[n].h)
+	    fim
+            este:_saidaformatada("/Resources 2 0 R\n")
+            se (este.m_LigacaoDaPagina[n]) então
+                -- Links
+                local annots = "/Annots ["
+
+               este: _saidaformatada("%s]\n", annots)
+            fim
+            se (este.m_VersaoPDF > "1.3") então
+                este:_saidaformatada("/Group\n<<\n/Type /Group /S /Transparency /CS /DeviceRGB\n>>\n")
+	    fim
+            este:_saidaformatada("/Contents %d 0 R\n>>\n", este.m_n+1)
+            este:_saida("endobj\n")
+            -- Page content
+            local zbuf
+	    local p
+	    se PDF_USING_ZLIB então
+		se este.m_comprima então
+			p = comprimagz(zbuf, este.m_paginas[n])
+		senão
+			p = este.m_paginas[n]
+		fim
+	    senão
+                p = este.m_paginas[n]
+	    fim
+            este:_novoobj()
+            este:_saidaformatada("<<\n%s/Length %d\n>>\n", filter, #p)
+            este:_poefluxo(p)
+            este:_saida("endobj\n")
+        fim
+        -- Pages root
+        este.m_offsets[1] = este:_calc_m_buffer_size()
+        este:_saida("1 0 obj\n<<\n/Type /Pages\n")
+        local kids = "/Kids ["
+        para  i=1, nb início
+		kids = cadeiaformate("%s %d 0 R ", kids, (3+2*(i-1)))
+	fim
+        este:_saidaformatada("%s]\n/Count %d\n/MediaBox [0 0 %.2f %.2f]\n>>\nendobj\n", kids, nb, wPt, hPt);
+    fim,
+
+    -- Fonte composta Unicode incorporada para PDF 2.0.
+    _poefontes = função(este)
+        para _, font em pares(este.m_fonts) início
+            local fonte, nome = font.fonteUnicode, font.name
+            local tipo0 = este.m_n + 1
+            local cidFonte, descritor = tipo0 + 1, tipo0 + 2
+            local arquivoFonte, mapaGlifos, paraUnicode = tipo0 + 3, tipo0 + 4, tipo0 + 5
+            font.n = tipo0
+
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Type /Font\n/Subtype /Type0\n/BaseFont /%s\n/Encoding /Identity-H\n/DescendantFonts [%d 0 R]\n/ToUnicode %d 0 R\n>>\nendobj\n", nome, cidFonte, paraUnicode)
+
+            local larguras = {}
+            para cid = 1, este.m_próximoCid - 1 início larguras[#larguras + 1] = paraColar(este.m_larguraPorCid[cid]) fim
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Type /Font\n/Subtype /CIDFontType2\n/BaseFont /%s\n/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>\n/FontDescriptor %d 0 R\n/DW 1000\n", nome, descritor)
+            se #larguras > 0 então este:_saida("/W [1 [" .. tabela.concatene(larguras, " ") .. "]]\n") fim
+            este:_saidaformatada("/CIDToGIDMap %d 0 R\n>>\nendobj\n", mapaGlifos)
+
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Type /FontDescriptor\n/FontName /%s\n/Flags 32\n/FontBBox [%d %d %d %d]\n/ItalicAngle %.2f\n/Ascent %d\n/Descent %d\n/CapHeight %d\n/StemV 80\n/FontFile2 %d 0 R\n>>\nendobj\n",
+                nome, unicodePdf.escala(fonte, fonte.xMínimo), unicodePdf.escala(fonte, fonte.yMínimo),
+                unicodePdf.escala(fonte, fonte.xMáximo), unicodePdf.escala(fonte, fonte.yMáximo),
+                fonte.ânguloItálico, unicodePdf.escala(fonte, fonte.ascendente), unicodePdf.escala(fonte, fonte.descendente),
+                unicodePdf.escala(fonte, fonte.ascendente), arquivoFonte)
+
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Length %d\n/Length1 %d\n>>\n", #fonte.dados, #fonte.dados)
+            este:_poefluxo(fonte.dados)
+            este:_saida("endobj\n")
+
+            local mapa = {unicodePdf.u16be(0)}
+            para cid = 1, este.m_próximoCid - 1 início mapa[#mapa + 1] = unicodePdf.u16be(este.m_glifoPorCid[cid]) fim
+            mapa = tabela.concatene(mapa)
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Length %d\n>>\n", #mapa)
+            este:_poefluxo(mapa)
+            este:_saida("endobj\n")
+
+            local linhas = {
+                "/CIDInit /ProcSet findresource begin", "12 dict begin", "begincmap",
+                "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+                "/CMapName /Adobe-Identity-UCS def", "/CMapType 2 def",
+                "1 begincodespacerange", "<0000> <FFFF>", "endcodespacerange"
+            }
+            local cid = 1
+            enquanto cid < este.m_próximoCid início
+                local quantidade = mat.mínimo(100, este.m_próximoCid - cid)
+                linhas[#linhas + 1] = quantidade .. " beginbfchar"
+                para deslocamento = 0, quantidade - 1 início
+                    local atual = cid + deslocamento
+                    linhas[#linhas + 1] = colar.formate("<%04X> <%s>", atual, unicodePdf.utf16beHex(este.m_códigoPorCid[atual]))
+                fim
+                linhas[#linhas + 1] = "endbfchar"
+                cid = cid + quantidade
+            fim
+            linhas[#linhas + 1] = "endcmap"
+            linhas[#linhas + 1] = "CMapName currentdict /CMap defineresource pop"
+            linhas[#linhas + 1] = "end"
+            linhas[#linhas + 1] = "end"
+            local mapaUnicode = tabela.concatene(linhas, "\n") .. "\n"
+            este:_novoobj()
+            este:_saidaformatada("<<\n/Length %d\n>>\n", #mapaUnicode)
+            este:_poefluxo(mapaUnicode)
+            este:_saida("endobj\n")
+        fim
+    fim,
+
+    _poeimagens = função(este)
+        para k, img em pares(este.m_imagens) início
+            este:_poeimagem(img)
+            img.dados = nulo -- liberando a memória
+            img.máscaraSuave = nulo -- idem
+        fim
+    fim,
+
+    _poeimagem = função(este, info)
+        este:_novoobj()
+        info.númeroDoObjeto = este.m_n
+        este:_saida("<<\n/Type /XObject\n/Subtype /Image\n")
+        este:_saidaformatada("/Width %d\n", info.largura)
+        este:_saidaformatada("/Height %d\n", info.altura)
+        se (info.espaçoDeCor=="Indexed") então
+            este:_saidaformatada("/ColorSpace [/Indexed /DeviceRGB %d %d 0 R]\n", (#info.paleta)/3-1, (este.m_n+1))
+        senão
+            este:_saidaformatada("/ColorSpace /%s\n", info.espaçoDeCor)
+            se (info.espaçoDeCor=="DeviceCMYK") então
+                este:_saida("/Decode [1 0 1 0 1 0 1 0]\n")
+            fim
+        fim
+        este:_saidaformatada("/BitsPerComponent %d\n", info.bitsPorComponente)
+        se(info.filtro e #info.filtro > 0) então
+            este:_saidaformatada("/Filter /%s\n", info.filtro)
+        fim
+        se (info.parâmetrosDeDecodificação e #info.parâmetrosDeDecodificação > 0) então
+            este:_saidaformatada("/DecodeParms\n<<\n%s\n>>", info.parâmetrosDeDecodificação)
+        fim
+        se(info.transparência e #info.transparência > 0) então
+            local transparência = {"/Mask ["}
+            para i=1, #info.transparência início
+				tabelainsira(transparência, cadeiaformate(" %d", info.transparência[i]))
+            fim
+            tabelainsira(transparência, "]")
+            este:_saidaformatada("%s\n", tabela.concatene(transparência))
+        fim
+        se (info.máscaraSuave e #info.máscaraSuave > 0) então
+            este:_saidaformatada("/SMask %d  0 R\n", (este.m_n+1))
+        fim
+
+        este:_saidaformatada("/Length %d\n>>\n", #info.dados)
+        este:_poefluxo(info.dados)
+        este:_saida("endobj\n")
+        -- Soft mask
+        se(info.máscaraSuave e #info.máscaraSuave > 0) então
+            local parâmetros = cadeiaformate("/Predictor 15 /Colors 1 /BitsPerComponent 8 /Columns %d", info.largura)
+            local máscara = {}
+            para chave, valor em pares(info) início máscara[chave] = valor fim
+            máscara.espaçoDeCor = "DeviceGray"
+            máscara.bitsPorComponente = 8
+            máscara.ticosPorComponente = 8
+            máscara.parâmetrosDeDecodificação = parâmetros
+            máscara.dados = info.máscaraSuave
+            máscara.máscaraSuave = nulo
+            este:_poeimagem(máscara)
+        fim
+        -- Palette
+        se (info.espaçoDeCor=="Indexed") então
+            local filter
+            se (este.m_comprima) então
+				filter = "/Filter /FlateDecode "
+			senão
+				filter = ""
+			fim
+            local zbuf
+            local pal
+			se PDF_USING_ZLIB então
+				se este.m_comprima então
+					pal = comprimagz(zbuf, info.paleta)
+				senão
+					pal = info.paleta
+				fim
+			senão
+				pal = info.paleta
+			fim
+            este:_novoobj()
+            este:_saidaformatada("<<\n%s/Length %d\n>>\n", filter, #pal)
+            este:_poefluxo(pal)
+            este:_saida("endobj\n")
+        fim
+    fim,
+
+    _poe_dicionario_do_objetoX = função(este)
+        para k,v em pares(este.m_imagens) início
+			este:_saidaformatada("/I%d %d 0 R\n", v.índice, v.númeroDoObjeto)
+		fim
+    fim,
+
+    _poeextgstates = função(este)
+        para i = 1, #este.m_extgstates início
+		este:_novoobj()
+		local gs = este.m_extgstates[i]
+		gs.n = este.m_n;
+		este:_saidaformatada("<<\n/Type /ExtGState\n/ca %0.3f\n/CA %0.3f\n/BM /%s\n>>\nendobj\n", gs.alfa, gs.alfa, gs.bm)
+        fim
+    fim,
+
+    _poejavascript = função(este)
+        este:_novoobj()
+        este.m_n_js=este.m_n
+        este:_saidaformatada("<<\n/Names [(EmbeddedJS) %d 0 R]\n>>\nendobj\n", este.m_n+1)
+        este:_novoobj()
+        este:_saidaformatada("<<\n/S /JavaScript\n/JS (%s)\n>>\nendobj\n", este._escape(este.m_javascript))
+    fim,
+
+    _poe_dicionario_do_recurso = função(este)
+        este:_saida("/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]\n/Font\n<<\n")
+        para k,v em pares(este.m_fonts) início
+            este:_saidaformatada("/F%d %d 0 R\n", v.i, v.n ou 0);
+		fim
+        este:_saidaformatada(">>\n/XObject\n<<\n")
+        este:_poe_dicionario_do_objetoX()
+        este:_saidaformatada(">>\n")
+        se #este.m_extgstates > 0 então
+            este:_saida("/ExtGState\n<<\n")
+            para i = 1, #este.m_extgstates início
+                este:_saidaformatada("/GS%d %d 0 R\n", i, este.m_extgstates[i].n)
+            fim
+            este:_saida(">>\n")
+        fim
+    fim,
+
+    _poerecursos = função(este)
+        este:_poeextgstates()
+        este:_poefontes()
+        este:_poeimagens()
+        -- Resource dictionary
+        este.m_offsets[2] = este:_calc_m_buffer_size()
+        este:_saidaformatada("2 0 obj\n<<\n")
+        este:_poe_dicionario_do_recurso()
+        este:_saida(">>\nendobj\n")
+        se  este.m_javascript e #este.m_javascript > 0 então
+            este:_poejavascript()
+        fim
+    fim,
+
+    _poeinfo = função(este)
+        este:_saidaformatada("/Producer %s\n", unicodePdf.textoUtf8("RPDF " .. FPDF_VERSION))
+        se este.m_titulo e #este.m_titulo > 0 então
+            este:_saidaformatada("/Title %s\n", unicodePdf.textoUtf8(este.m_titulo))
+        fim
+        se este.m_assunto e #este.m_assunto > 0 então
+            este:_saidaformatada("/Subject %s\n", unicodePdf.textoUtf8(este.m_assunto))
+        fim
+        se este.m_autor e #este.m_autor > 0 então
+            este:_saidaformatada("/Author %s\n", unicodePdf.textoUtf8(este.m_autor));
+        fim
+        se este.m_palavraschave e #este.m_palavraschave > 0 então
+            este:_saidaformatada("/Keywords %s\n", unicodePdf.textoUtf8(este.m_palavraschave))
+        fim
+        se este.m_criador e #este.m_criador > 0 então
+            este:_saidaformatada("/Creator %s\n", unicodePdf.textoUtf8(este.m_criador))
+        fim
+
+        este:_saida(so.data("/CreationDate (D:%Y%m%d%H%M%S)\n"))
+    fim,
+
+    _poemetadados = função(este)
+        local função xml(texto)
+            retorne (texto ou ""):troque("&", "&amp;"):troque("<", "&lt;"):troque(">", "&gt;"):troque('"', "&quot;"):troque("'", "&apos;")
+        fim
+        local criado = so.data("%Y-%m-%dT%H:%M:%S%z")
+        local xmp = colar.formate([[<?xpacket begin="%s" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:pdf="http://ns.adobe.com/pdf/1.3/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" pdf:Producer="%s" xmp:CreateDate="%s" xmp:ModifyDate="%s">
+   <dc:format>application/pdf</dc:format>
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">%s</rdf:li></rdf:Alt></dc:title>
+   <dc:creator><rdf:Seq><rdf:li>%s</rdf:li></rdf:Seq></dc:creator>
+   <dc:description><rdf:Alt><rdf:li xml:lang="x-default">%s</rdf:li></rdf:Alt></dc:description>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>]], utf8.caractere(0xFEFF), xml("RPDF " .. FPDF_VERSION), criado, criado, xml(este.m_titulo), xml(este.m_autor), xml(este.m_assunto))
+        este:_novoobj()
+        este.m_objetoMetadados = este.m_n
+        este:_saidaformatada("<<\n/Type /Metadata\n/Subtype /XML\n/Length %d\n>>\n", #xmp)
+        este:_poefluxo(xmp)
+        este:_saida("endobj\n")
+    fim,
+
+    _poecatalogo = função(este)
+        este:_saidaformatada("/Type /Catalog\n/Pages 1 0 R\n")
+        se este.m_objetoMetadados então este:_saidaformatada("/Metadata %d 0 R\n", este.m_objetoMetadados) fim
+        se este.m_AmpliaPersonalizado ~= pdf_e_amplia_padrao então
+            este:_saidaformatada("/OpenAction [3 0 R /XYZ null null %.2f]\n", este.m_AmpliaPersonalizado/100.0)
+        senãose este.m_ModoAmpliado==pdf_e_amplia_paginainteira então
+            este:_saidaformatada("/OpenAction [3 0 R /Fit]\n")
+        senãose este.m_ModoAmpliado==pdf_e_amplia_larguratotal então
+            este:_saidaformatada("/OpenAction [3 0 R /FitH null]\n")
+        senãose este.m_ModoAmpliado==pdf_e_amplia_real então
+            este:_saidaformatada("/OpenAction [3 0 R /XYZ null null 1]\n")
+	fim
+
+        se este.m_ModoVisual==pdf_e_visual_simples então
+            este:_saidaformatada("/PageLayout /SinglePage\n")
+        senãose este.m_ModoVisual==pdf_e_visual_continuo então
+            este:_saidaformatada("/PageLayout /OneColumn\n")
+        senãose este.m_ModoVisual==pdf_e_visual_duplo então
+            este:_saidaformatada("/PageLayout /TwoColumnLeft\n")
+	fim
+
+        se este.m_javascript e #este.m_javascript > 0 então
+            este:_saidaformatada("/Names\n<<\n/JavaScript %d 0 R\n>>\n", este.m_n_js)
+        fim
+    fim,
+
+    _poecabecalho = função(este)
+        este:_saida(cadeiaformate("%%PDF-%s\n", este.m_VersaoPDF))
+    fim,
+
+    _poeraiz = função(este)
+		local n = este.m_n
+        este:_saidaformatada("/Size %d\n/Root %d 0 R\n/Info %d 0 R\n", (n+1), este.m_objetoCatalogo, este.m_objetoInfo)
+    fim,
+
+    _enddoc = função(este)
+        se (#este.m_extgstates > 0 e (este.m_VersaoPDF < "1.4") ) então este.m_VersaoPDF = "1.4" fim
+        este:_poecabecalho()
+        este:_poepaginas()
+        este:_poerecursos()
+        -- Info
+        este:_novoobj()
+        este.m_objetoInfo = este.m_n
+        este:_saida("<<\n")
+        este:_poeinfo()
+        este:_saida(">>\nendobj\n")
+        este:_poemetadados()
+        -- Catalog
+        este:_novoobj()
+        este.m_objetoCatalogo = este.m_n
+        este:_saida("<<\n")
+        este:_poecatalogo()
+        este:_saida(">>\nendobj\n")
+        --save begining of xref
+        local saved_startxref = este:_calc_m_buffer_size()
+        -- Cross-ref
+        este:_saidaformatada("xref\n0 %d\n0000000000 65535 f \n", (este.m_n+1))
+        para i=1, este.m_n início
+            este:_saidaformatada("%010d 00000 n \n", este.m_offsets[i])
+        fim
+        -- Trailer
+        este:_saida("trailer\n<<\n")
+        este:_poeraiz()
+        este:_saidaformatada(">>\nstartxref\n%d\n%%%%EOF\n", saved_startxref)
+        este.m_estado = 3
+    fim,
+
+}
+
+função FPDF:novo(obj)
+	obj = obj ou {}   -- create object if user does not provide one
+	definaMetatabela(obj, este)
+	este.__índice = este
+	obj:reinicie(pdf_e_orientation_portrait, pdf_e_units_mm, pdf_e_A4)
+	retorne obj
+fim
+
+retorne FPDF;

@@ -1,0 +1,114 @@
+-- Teste de integração da piscina e das transações assíncronas.
+--
+-- Defina SANTAFE_MARIADB_HOST, SANTAFE_MARIADB_USUARIO,
+-- SANTAFE_MARIADB_SENHA e SANTAFE_MARIADB_BANCO. A porta é opcional.
+
+local mariadb = importe "mariadb"
+local rede = importe "rede"
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local piscina
+
+local função falhe(mensagem)
+    mostre("FALHOU:", mensagem)
+    se piscina então piscina:feche() fim
+    so.saia(1)
+fim
+
+local função aceitou(retorno, falha)
+    se falha então falhe(falha) fim
+fim
+
+local função finalizeTransação(transação)
+    aceitou(transação:desfaçaAssíncrono(
+        função(transaçãoFinalizada, sucesso, falha)
+            se falha então falhe(falha); retorne fim
+            garanta(sucesso == verdadeiro)
+            local estado = piscina:estado()
+            garanta(estado.transações == 0)
+            local retorno, erro = piscina:feche()
+            se erro então falhe(erro); retorne fim
+            mostre("OK: piscina e transações assíncronas")
+            so.saia(0)
+        fim))
+fim
+
+local função testeTransação()
+    aceitou(piscina:inicieTransaçãoAssíncrona(
+        função(p, transação, falha)
+            se falha então falhe(falha); retorne fim
+            aceitou(transação:executePreparadoAssíncrono(
+                "SELECT ?", { "transação" },
+                função(t, resultado, erro)
+                    se erro então falhe(erro); retorne fim
+                    local linha = resultado:obterLinha()
+                    garanta(linha e linha[1] == "transação")
+                    resultado:feche()
+                    finalizeTransação(t)
+                fim))
+        fim))
+fim
+
+local função testeSessão()
+    aceitou(piscina:adquiraAssíncrono(
+        função(p, sessão, falha)
+            se falha então falhe(falha); retorne fim
+            aceitou(sessão:prepareConsultaAssíncrona("SELECT ?",
+                função(s, consulta, erro)
+                    se erro então falhe(erro); retorne fim
+                    garanta(consulta:númeroDeParâmetros() == 1)
+                    aceitou(consulta:executeAssíncrono({ "sessão" },
+                        função(preparada, resultado, falhaDaConsulta)
+                            se falhaDaConsulta então falhe(falhaDaConsulta); retorne fim
+                            local linha = resultado:obterLinha()
+                            garanta(linha e linha[1] == "sessão")
+                            resultado:feche()
+                            preparada:feche()
+                            local retorno, falhaAoDevolver = s:devolva()
+                            se falhaAoDevolver então falhe(falhaAoDevolver); retorne fim
+                            testeTransação()
+                        fim))
+                fim))
+        fim))
+fim
+
+local configuração = {
+    endereço = endereço,
+    usuário = usuário,
+    senha = senha,
+    banco = banco,
+    porta = porta,
+    mínimo = 2,
+    máximo = 4,
+    máximoDaFila = 16,
+    tempoDeEspera = 3000,
+}
+
+aceitou(mariadb.criePiscinaAssíncrona(configuração,
+    função(novaPiscina, falha)
+        se falha então falhe(falha); retorne fim
+        piscina = novaPiscina
+        local estado = piscina:estado()
+        garanta(estado.total == 2 e estado.livres == 2)
+        aceitou(piscina:executePreparadoAssíncrono(
+            "SELECT ?", { "piscina" },
+            função(p, resultado, erro)
+                se erro então falhe(erro); retorne fim
+                local linha = resultado:obterLinha()
+                garanta(linha e linha[1] == "piscina")
+                resultado:feche()
+                testeSessão()
+            fim))
+    fim))
+
+rede.laço()

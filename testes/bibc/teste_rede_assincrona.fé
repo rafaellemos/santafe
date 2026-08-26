@@ -1,0 +1,104 @@
+-- Regressão da biblioteca rede: fragmentação HTTP, escrita integral,
+-- importação local (sem variável global) e endereço remoto.
+
+local rede = importe "rede"
+local porta = 18743
+local tamanhoResposta = 131072
+local recebido = 0
+local finalizado = falso
+local sucesso = falso
+local mensagem = "teste não terminou"
+local servidor
+local cliente
+local conexãoCliente
+
+local função terminar(ok, detalhe)
+    se finalizado então retorne fim
+    finalizado = verdadeiro
+    sucesso = ok
+    mensagem = detalhe ou ""
+    se conexãoCliente então conexãoCliente:feche() fim
+    se cliente então cliente:feche() fim
+    se servidor então servidor:feche() fim
+    rede.pareLaço()
+fim
+
+local função receberResposta(conexão, dados, falha)
+    se falha então
+        terminar(falso, "leitura crua falhou: " .. falha)
+        retorne
+    fim
+    recebido = recebido + #dados
+    se recebido == tamanhoResposta então
+        terminar(verdadeiro, "ok")
+    senão se recebido > tamanhoResposta então
+        terminar(falso, "foram recebidos bytes demais")
+    senão
+        conexão:recebaDadosAssíncrono(4096, receberResposta)
+    fim fim
+fim
+
+local função aceitar(servidorLocal, conexão, falha)
+    se falha então
+        terminar(falso, "aceite falhou: " .. falha)
+        retorne
+    fim
+    conexão:definaTempoLimite(3000)
+    conexão:definaLimitesHTTP(8192, 8192)
+    conexão:recebaHTTPAssíncrono(16384, função(conn, req, erroHTTP)
+        se erroHTTP então
+            terminar(falso, "HTTP falhou: " .. erroHTTP)
+            retorne
+        fim
+        se req.corpo ~= "abcd" ou req.consulta.nome ~= "João Silva" ou
+           tipo(req.ip) ~= "colar" ou tipo(req.portaRemota) ~= "número" então
+            terminar(falso, "requisição analisada incorretamente")
+            retorne
+        fim
+        local res = rede.novaResposta(conn)
+        local cabeçalho, erroCabeçalho = res:definaCabeçalho(
+            "X-Teste", "ok\r\nX-Injetado: sim"
+        )
+        se cabeçalho ~= nulo ou erroCabeçalho == nulo então
+            terminar(falso, "injeção de cabeçalho não foi recusada")
+            retorne
+        fim
+        local resposta = colar.replique("x", tamanhoResposta)
+        conn:envieAssíncrono(resposta, função(c, enviados, erroEnvio)
+            se erroEnvio ou enviados ~= tamanhoResposta então
+                terminar(falso, erroEnvio ou "envio parcial")
+                retorne
+            fim
+            c:feche()
+        fim)
+    fim)
+fim
+
+servidor = rede.servidorTCP()
+servidor:definaTempoLimite(3000)
+local okAmarre, erroAmarre = servidor:amarre("127.0.0.1", porta)
+garanta(okAmarre, erroAmarre)
+servidor:aceiteAssíncrono(aceitar)
+
+cliente = rede.clienteTCP()
+cliente:definaTempoLimite(3000)
+cliente:conecteAssíncrono("127.0.0.1", porta, função(_, conexão, falha)
+    se falha então
+        terminar(falso, "conexão falhou: " .. falha)
+        retorne
+    fim
+    conexãoCliente = conexão
+    conexão:definaTempoLimite(3000)
+    local parte1 = "POST /?nome=Jo%C3%A3o+Silva HTTP/1.1\r\nHost: local\r\nContent-Length: 4\r\n\r\nab"
+    conexão:envieAssíncrono(parte1, função(c, _, erro1)
+        se erro1 então terminar(falso, erro1); retorne fim
+        c:envieAssíncrono("cd", função(c2, _, erro2)
+            se erro2 então terminar(falso, erro2); retorne fim
+            c2:recebaDadosAssíncrono(4096, receberResposta)
+        fim)
+    fim)
+fim)
+
+rede.laço()
+garanta(finalizado e sucesso, mensagem)
+mostre("rede assíncrona: ok")

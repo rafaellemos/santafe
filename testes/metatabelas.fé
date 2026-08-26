@@ -1,0 +1,120 @@
+local função confira(nome, recebido, esperado)
+    garanta(recebido == esperado,
+        nome .. ": esperado " .. paraColar(esperado) ..
+        ", recebido " .. paraColar(recebido))
+fim
+
+local comportamento = {
+    __índice = função(_, chave)
+        se chave == "ausente" então retorne "encontrado" fim
+    fim,
+    __novoÍndice = função(valor, chave, novoValor)
+        defina(valor, "recebido_" .. chave, novoValor)
+    fim,
+    __tamanho = função(valor) retorne valor.valor fim,
+    __igual = função(a, b) retorne a.valor == b.valor fim,
+    __some = função(a, b) retorne a.valor + b.valor fim,
+    __subtraia = função(a, b) retorne a.valor - b.valor fim,
+    __multiplique = função(a, b) retorne a.valor * b.valor fim,
+    __resto = função(a, b) retorne a.valor % b.valor fim,
+    __potência = função(a, b) retorne a.valor ^ b.valor fim,
+    __divida = função(a, b) retorne a.valor / b.valor fim,
+    __divisãoInteira = função(a, b) retorne a.valor // b.valor fim,
+    __eTico = função(a, b) retorne a.valor & b.valor fim,
+    __ouTico = função(a, b) retorne a.valor | b.valor fim,
+    __ouExclusivoTico = função(a, b) retorne a.valor ~ b.valor fim,
+    __desloqueEsquerda = função(a, b) retorne a.valor << b.valor fim,
+    __desloqueDireita = função(a, b) retorne a.valor >> b.valor fim,
+    __negativo = função(a) retorne -a.valor fim,
+    __nãoTico = função(a) retorne ~a.valor fim,
+    __menorQue = função(a, b) retorne a.valor < b.valor fim,
+    __menorOuIgual = função(a, b) retorne a.valor <= b.valor fim,
+    __concatene = função(a, b)
+        retorne paraColar(a.valor) .. ":" .. paraColar(b.valor)
+    fim,
+    __chame = função(a, fator) retorne a.valor * fator fim,
+    __pares = função(_)
+        retorne próximo, { personalizado = 99 }, nulo
+    fim,
+    __paraColar = função(a) retorne "valor(" .. a.valor .. ")" fim,
+    __nome = "valorDeTeste"
+}
+
+local a = definaMetatabela({ valor = 8 }, comportamento)
+local b = definaMetatabela({ valor = 2 }, comportamento)
+local outroOito = definaMetatabela({ valor = 8 }, comportamento)
+
+confira("índice", a.ausente, "encontrado")
+a.novo = 42
+confira("novo índice", a.recebido_novo, 42)
+confira("tamanho", #a, 8)
+confira("igual", a == outroOito, verdadeiro)
+confira("some", a + b, 10)
+confira("subtraia", a - b, 6)
+confira("multiplique", a * b, 16)
+confira("resto", a % b, 0)
+confira("potência", a ^ b, 64.0)
+confira("divida", a / b, 4.0)
+confira("divisão inteira", a // b, 4)
+confira("e tico", a & b, 0)
+confira("ou tico", a | b, 10)
+confira("ou exclusivo tico", a ~ b, 10)
+confira("desloque esquerda", a << b, 32)
+confira("desloque direita", a >> b, 2)
+confira("negativo", -a, -8)
+confira("não tico", ~a, -9)
+confira("menor que", b < a, verdadeiro)
+confira("menor ou igual", b <= a, verdadeiro)
+confira("concatene", a .. b, "8:2")
+confira("chame", a(3), 24)
+confira("para colar", paraColar(a), "valor(8)")
+
+local chave, valor = nulo, nulo
+para c, v em pares(a) início chave, valor = c, v fim
+confira("pares/chave", chave, "personalizado")
+confira("pares/valor", valor, 99)
+
+local erroDeTipo, mensagemDeTipo = proteja(mat.absoluto, a)
+garanta(não erroDeTipo e colar.procure(mensagemDeTipo, "valorDeTeste", 1, verdadeiro))
+
+local protegida = definaMetatabela({}, { __metatabela = "protegida" })
+confira("metatabela protegida", obterMetatabela(protegida), "protegida")
+local mudou = proteja(definaMetatabela, protegida, {})
+garanta(não mudou)
+
+local valoresFracos = definaMetatabela({}, { __modo = "v" })
+local valorFraco = {}
+valoresFracos[1] = valorFraco
+valorFraco = nulo
+coleteLixo("colete")
+coleteLixo("colete")
+confira("modo de valores fracos", valoresFracos[1], nulo)
+
+local chavesFracas = definaMetatabela({}, { __modo = "c" })
+local chaveFraca = {}
+chavesFracas[chaveFraca] = verdadeiro
+chaveFraca = nulo
+coleteLixo("colete")
+coleteLixo("colete")
+confira("modo de chaves fracas", próximo(chavesFracas), nulo)
+
+local finalizou = falso
+(função()
+    local temporário = definaMetatabela({}, {
+        __finalize = função() finalizou = verdadeiro fim
+    })
+    garanta(temporário ~= nulo)
+fim)()
+coleteLixo("colete")
+coleteLixo("colete")
+confira("finalize", finalizou, verdadeiro)
+
+local antigo = definaMetatabela({}, {
+    __index = função() retorne "compatibilidade indevida" fim,
+    __add = função() retorne 123 fim
+})
+confira("nome inglês __index ignorado", antigo.ausente, nulo)
+local somaAntiga = proteja(função() retorne antigo + antigo fim)
+confira("nome inglês __add ignorado", somaAntiga, falso)
+
+mostre("OK: metamétodos do Santafé")

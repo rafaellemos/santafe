@@ -1,0 +1,10 @@
+local função dêBoasVindas(nome)
+    local mensagem = `Bem-vindo, Ⓡnome!`
+    local borda = colar.replique("═", utf8.tamanho(mensagem) + 2)
+
+    mostre(`╔Ⓡborda╗`)
+    mostre(`║ Ⓡmensagem ║`)
+    mostre(`╚Ⓡborda╝`)
+fim
+
+dêBoasVindas("programador")

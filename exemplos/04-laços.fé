@@ -1,0 +1,9 @@
+para número = 1, 5 início
+    mostre(número)
+fim
+
+local restante = 3
+enquanto restante > 0 início
+    mostre("Restam", restante)
+    restante = restante - 1
+fim

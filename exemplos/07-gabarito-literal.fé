@@ -1,0 +1,5 @@
+local nome = "Maria"
+local idade = 30
+
+mostre(`Olá, Ⓡnome!`)
+mostre(`Daqui a 5 anos: Ⓡ{idade + 5}`)

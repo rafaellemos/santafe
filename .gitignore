@@ -1,0 +1,47 @@
+# Sistemas e editores
+.DS_Store
+*.swp
+*.swo
+*~
+
+# C e bibliotecas nativas
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.res
+src/santafé
+src/santafe
+src/santafec
+testes/ferramentas/bombardeia_http
+
+# WebAssembly gerado
+src/santafe.js
+src/santafe.wasm
+src/santafe.worker.js
+src/santafe.data
+
+# Empacotamento e resultados dos testes
+dist/
+publicar/
+*.zip
+*.tar.gz
+*.deb
+*.pdf
+testes/**/*.png
+testes/**/*.jpg
+testes/**/*.jpeg
+testes/**/*.svg
+!testes/recursos/
+!testes/recursos/mat-santafe.jpg
+
+# Configuração e credenciais locais
+.env
+.env.*
+!.env.exemplo
+*.pem
+*.key
+*_rsa
+*_ed25519

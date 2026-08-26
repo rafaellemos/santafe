@@ -1,0 +1,44 @@
+-- Regressão de sobreposição e tempo-limite assíncrono.
+
+local rede = importe "rede"
+local servidor = rede.servidorTCP()
+garanta(servidor:amarre("127.0.0.1", 0))
+servidor:definaTempoLimite(100)
+
+local terminou = falso
+local sucesso = falso
+local mensagem = "teste de tempo limite não terminou"
+servidor:aceiteAssíncrono(função(_, conexão, falha)
+    se conexão ~= nulo ou falha ~= "tempo limite excedido" então
+        terminou = verdadeiro
+        mensagem = falha ou "o aceite deveria expirar"
+        servidor:feche()
+        rede.pareLaço()
+        retorne
+    fim
+
+    -- Depois do prazo, o mesmo servidor pode armar outro aceite.
+    -- Cancela antes de voltar ao laço para verificar GCancellable.
+    servidor:definaTempoLimite(0)
+    servidor:aceiteAssíncrono(função(_, conexãoCancelada, falhaCancelada)
+        terminou = verdadeiro
+        sucesso = conexãoCancelada == nulo e falhaCancelada == "operação cancelada"
+        mensagem = falhaCancelada ou "o aceite cancelado não devolveu uma falha"
+        servidor:feche()
+        rede.pareLaço()
+    fim)
+    se não servidor:cancele() então
+        terminou = verdadeiro
+        mensagem = "cancele não encontrou o aceite pendente"
+        servidor:feche()
+        rede.pareLaço()
+    fim
+fim)
+
+local okDuplicado, falhaDuplicada = servidor:aceiteAssíncrono(função() fim)
+garanta(okDuplicado == nulo)
+garanta(falhaDuplicada == "aceite já em andamento", falhaDuplicada)
+
+rede.laço()
+garanta(terminou e sucesso, mensagem)
+mostre("rede tempo limite: ok")

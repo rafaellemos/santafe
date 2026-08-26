@@ -1,0 +1,109 @@
+-- servidor.fé
+-- Servidor HTTP assíncrono usando a bib rede.so
+-- Nginx já deve estar com proxy_pass apontando para 127.0.0.1:7000
+
+local rede = importe "rede"
+
+local função log(...)
+    mostre(...)
+fim
+
+-- Página HTML simples
+local página_inicial = [[
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Santafé + rede</title>
+  </head>
+  <body>
+    <h1>Funcionou!</h1>
+    <p>Esta página foi servida pelo servidor assíncrono Santafé + rede.</p>
+  </body>
+</html>
+]]
+
+-- Handler de leitura HTTP por conexão
+local função tratar_requisição(conexão, req, erro_leitura, dado)
+    se não req então
+        log("erro ao ler requisição:", erro_leitura)
+        conexão:feche()
+        retorne
+    fim
+
+    local método  = req.método      ou "GET"
+    local caminho = req.caminho     ou "/"
+    local cabeç   = req.cabeçalho   ou {}
+    local corpo   = req.corpo       ou ""
+
+    log("HTTP", método, caminho, cabeç["host"] ou "")
+
+    local status
+    local resposta_corpo
+
+    se caminho == "/" então
+        status         = 200
+        resposta_corpo = página_inicial
+    senão
+        status         = 404
+        resposta_corpo = "<h1>404 — Não encontrado</h1>"
+    fim
+
+    -- Monta a resposta HTTP completa (status-line + headers + corpo)
+    local resposta = rede.respostaHTTP(
+        status,
+        resposta_corpo,
+        "text/html; charset=utf-8"
+    )
+
+    -- Envia de forma assíncrona e fecha a conexão ao final
+    conexão:envieAssíncrono(
+        resposta,
+        função(conexão, enviados, erro_envio, dado_envio)
+            se erro_envio então
+                log("erro ao enviar resposta:", erro_envio)
+            fim
+            conexão:feche()
+        fim
+    )
+fim
+
+-- Handler do aceite assíncrono
+local função aceitar_conexões(servidor, conexão, erro_aceite, dado)
+    se não conexão então
+        log("erro no aceiteAssíncrono:", erro_aceite)
+        -- agenda o próximo accept de qualquer forma
+        servidor:aceiteAssíncrono(aceitar_conexões)
+        retorne
+    fim
+
+    log("novo cliente conectado")
+
+    conexão:definaTempoLimite(30000)
+    conexão:definaLimitesHTTP(32768, 8 * 1024 * 1024)
+    conexão:recebaHTTPAssíncrono(
+        32768 + 8 * 1024 * 1024,
+        tratar_requisição
+    )
+
+    -- Agenda o próximo accept
+    servidor:aceiteAssíncrono(aceitar_conexões)
+fim
+
+-- Cria o servidor TCP, amarra na porta 7000 e inicia o laço GLib
+local função principal()
+    local servidor = rede.servidorTCP()
+
+    -- amarra em 0.0.0.0:7000
+    garanta(servidor:amarre("0.0.0.0", 7000))
+
+    log("Servidor Santafé+rede escutando em 0.0.0.0:7000")
+
+    -- inicia o primeiro aceite assíncrono
+    servidor:aceiteAssíncrono(aceitar_conexões)
+
+    -- entra no laço principal da GLib (bloqueante)
+    rede.laço()
+fim
+
+principal()

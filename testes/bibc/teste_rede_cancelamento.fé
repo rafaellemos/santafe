@@ -1,0 +1,77 @@
+-- Regressão de cancelamento do cliente TCP e da leitura de uma conexão.
+
+local rede = importe "rede"
+
+-- Cancela uma conexão antes de entrar no laço de eventos.
+local clienteCancelado = rede.clienteTCP()
+local retornoCliente = falso
+local sucessoCliente = falso
+clienteCancelado:conecteAssíncrono("192.0.2.1", 9,
+    função(_, conexão, falha)
+        retornoCliente = verdadeiro
+        sucessoCliente = conexão == nulo e falha == "operação cancelada"
+        clienteCancelado:feche()
+        rede.pareLaço()
+    fim)
+garanta(clienteCancelado:cancele())
+rede.laço()
+garanta(retornoCliente e sucessoCliente, "cancelamento do cliente falhou")
+
+-- Estabelece uma conexão local, arma uma leitura e a cancela.
+local porta = 18745
+local servidor = rede.servidorTCP()
+local cliente = rede.clienteTCP()
+local conexãoCliente
+local terminou = falso
+local sucesso = falso
+local mensagem = "cancelamento da leitura não terminou"
+
+garanta(servidor:amarre("127.0.0.1", porta))
+servidor:aceiteAssíncrono(função(_, conexão, falha)
+    se falha então
+        terminou = verdadeiro
+        mensagem = falha
+        rede.pareLaço()
+        retorne
+    fim
+    conexão:recebaDadosAssíncrono(1024, função(c, dados, falhaLeitura)
+        terminou = verdadeiro
+        sucesso = dados == nulo e falhaLeitura == "operação cancelada"
+        mensagem = falhaLeitura ou "a leitura cancelada devolveu dados"
+        c:feche()
+        se conexãoCliente então conexãoCliente:feche() fim
+        cliente:feche()
+        servidor:feche()
+        rede.pareLaço()
+    fim)
+
+    local segunda, falhaSegunda = conexão:recebaDadosAssíncrono(1024, função() fim)
+    se segunda ~= nulo ou falhaSegunda ~= "leitura já em andamento" então
+        terminou = verdadeiro
+        mensagem = falhaSegunda ou "a segunda leitura deveria ser recusada"
+        conexão:feche()
+        rede.pareLaço()
+        retorne
+    fim
+    se não conexão:cancele() então
+        terminou = verdadeiro
+        mensagem = "cancele não encontrou a leitura pendente"
+        conexão:feche()
+        rede.pareLaço()
+    fim
+fim)
+
+cliente:conecteAssíncrono("127.0.0.1", porta, função(_, conexão, falha)
+    se falha então
+        terminou = verdadeiro
+        mensagem = falha
+        servidor:feche()
+        rede.pareLaço()
+        retorne
+    fim
+    conexãoCliente = conexão
+fim)
+
+rede.laço()
+garanta(terminou e sucesso, mensagem)
+mostre("rede cancelamento: ok")

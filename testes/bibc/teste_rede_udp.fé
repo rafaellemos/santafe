@@ -1,0 +1,55 @@
+-- Regressão do retorno GSource e do envio assíncrono UDP.
+
+local rede = importe "rede"
+local porta = 18744
+local receptor = rede.udp("IPv4")
+local emissor = rede.udp("IPv4")
+local terminou = falso
+local sucesso = falso
+local mensagem = "teste UDP não terminou"
+
+local função concluir(ok, detalhe)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = ok
+    mensagem = detalhe ou ""
+    receptor:feche()
+    emissor:feche()
+    rede.pareLaço()
+fim
+
+local okAmarre, falhaAmarre = receptor:amarre("127.0.0.1", porta)
+garanta(okAmarre, falhaAmarre)
+receptor:inicieRecepção(1024, função(dados, falha, ip, portaRemota)
+    se falha então concluir(falso, falha); retorne fim
+    se dados ~= "olá UDP" ou ip ~= "127.0.0.1" ou tipo(portaRemota) ~= "número" então
+        concluir(falso, "datagrama ou remetente incorreto")
+        retorne
+    fim
+    receptor:pareRecepção()
+    -- Um envio cancelado antes da próxima volta do laço precisa chamar
+    -- o retorno uma vez, com a falha traduzida.
+    emissor:envieParaAssíncrono("127.0.0.1", porta, "cancelar",
+        função(_, enviadosCancelados, falhaCancelada)
+            se enviadosCancelados ~= nulo ou falhaCancelada ~= "operação cancelada" então
+                concluir(falso, falhaCancelada ou "envio cancelado incorreto")
+                retorne
+            fim
+            concluir(verdadeiro, "ok")
+        fim)
+    se não emissor:cancele() então
+        concluir(falso, "cancele não encontrou o envio UDP pendente")
+    fim
+fim)
+
+emissor:definaTempoLimite(2000)
+emissor:envieParaAssíncrono("127.0.0.1", porta, "olá UDP",
+    função(_, enviados, falha)
+        se falha ou enviados ~= 8 então
+            concluir(falso, falha ou "quantidade enviada incorreta")
+        fim
+    fim)
+
+rede.laço()
+garanta(terminou e sucesso, mensagem)
+mostre("rede UDP: ok")

@@ -1,0 +1,13 @@
+local função média(notas)
+    garanta(#notas > 0, "A lista de notas está vazia")
+    local soma = 0
+
+    para _, nota em ipares(notas) início
+        soma = soma + nota
+    fim
+
+    retorne soma / #notas
+fim
+
+local resultado = média({ 8.5, 7, 9.5 })
+mostre(colar.formate("Média: %.2f", resultado))

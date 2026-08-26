@@ -1,0 +1,242 @@
+-- Implementação PNG privada da biblioteca imagem.
+-- Aceita todos os tipos de cor definidos pelo PNG, profundidades de 1 a 16
+-- tacos e imagens comuns ou entrelaçadas pelo método Adam7.
+
+local png = { versão = "1.0.0" }
+local ASSINATURA = "\137PNG\13\10\26\10"
+
+local função inteiro32(dados, posição)
+    local a, b, c, d = dados:byte(posição, posição + 3)
+    garanta(d ~= nulo, "PNG truncado ao ler inteiro de 32 ticos")
+    retorne ((a * 256 + b) * 256 + c) * 256 + d
+fim
+
+local função empacote32(valor)
+    valor = valor % 4294967296
+    retorne colar.caractere(
+        (valor >> 24) & 255, (valor >> 16) & 255,
+        (valor >> 8) & 255, valor & 255
+    )
+fim
+
+local função trecho(tipoDoTrecho, dados)
+    local conteúdo = tipoDoTrecho .. dados
+    retorne empacote32(#dados) .. conteúdo .. empacote32(colar.crc32(conteúdo))
+fim
+
+local função leiaTudo(caminho)
+    local arquivo, falha = es.abra(caminho, "leiturabin")
+    garanta(arquivo, falha)
+    local dados = arquivo:leia("*tudo")
+    arquivo:feche()
+    retorne dados
+fim
+
+local função paeth(a, b, c)
+    local p = a + b - c
+    local pa, pb, pc = mat.absoluto(p - a), mat.absoluto(p - b), mat.absoluto(p - c)
+    se pa <= pb e pa <= pc então retorne a fim
+    se pb <= pc então retorne b fim
+    retorne c
+fim
+
+local função desfiltre(dados, posição, larguraEmTacos, altura, tacosPorPixel)
+    local linhas, anterior = {}, {}
+    para y = 1, altura início
+        local filtro = dados:byte(posição); posição = posição + 1
+        garanta(filtro ~= nulo e filtro <= 4, "filtro PNG inválido")
+        local linha = {}
+        para x = 1, larguraEmTacos início
+            local bruto = dados:byte(posição); posição = posição + 1
+            garanta(bruto ~= nulo, "dados PNG truncados")
+            local esquerda = x > tacosPorPixel e linha[x - tacosPorPixel] ou 0
+            local acima = anterior[x] ou 0
+            local diagonal = x > tacosPorPixel e (anterior[x - tacosPorPixel] ou 0) ou 0
+            se filtro == 1 então bruto = (bruto + esquerda) % 256
+            senãose filtro == 2 então bruto = (bruto + acima) % 256
+            senãose filtro == 3 então bruto = (bruto + ((esquerda + acima) // 2)) % 256
+            senãose filtro == 4 então bruto = (bruto + paeth(esquerda, acima, diagonal)) % 256
+            fim
+            linha[x] = bruto
+        fim
+        linhas[y], anterior = linha, linha
+    fim
+    retorne linhas, posição
+fim
+
+local função amostra(linha, índice, profundidade)
+    se profundidade == 8 então retorne linha[índice + 1] fim
+    se profundidade == 16 então
+        local alto = linha[índice * 2 + 1]
+        local baixo = linha[índice * 2 + 2]
+        retorne alto * 256 + baixo
+    fim
+    local porTaco = 8 // profundidade
+    local taco = linha[índice // porTaco + 1]
+    local deslocamento = (porTaco - 1 - (índice % porTaco)) * profundidade
+    retorne (taco >> deslocamento) & ((1 << profundidade) - 1)
+fim
+
+local função paraOito(valor, profundidade)
+    se profundidade == 8 então retorne valor fim
+    se profundidade == 16 então retorne valor >> 8 fim
+    local máximo = (1 << profundidade) - 1
+    retorne (valor * 255 + máximo // 2) // máximo
+fim
+
+local canaisPorTipo = {[0]=1, [2]=3, [3]=1, [4]=2, [6]=4}
+local profundidades = {
+    [0]={[1]=verdadeiro,[2]=verdadeiro,[4]=verdadeiro,[8]=verdadeiro,[16]=verdadeiro},
+    [2]={[8]=verdadeiro,[16]=verdadeiro}, [3]={[1]=verdadeiro,[2]=verdadeiro,[4]=verdadeiro,[8]=verdadeiro},
+    [4]={[8]=verdadeiro,[16]=verdadeiro}, [6]={[8]=verdadeiro,[16]=verdadeiro}
+}
+
+local função decodifiqueAmostra(linha, pixel, cabeçalho, paleta, transparência)
+    local tipo, prof = cabeçalho.tipoDeCor, cabeçalho.profundidade
+    local canais = canaisPorTipo[tipo]
+    local base = pixel * canais
+    se tipo == 0 então
+        local cinzaBruto = amostra(linha, base, prof)
+        local cinza = paraOito(cinzaBruto, prof)
+        local alfa = transparência e cinzaBruto == transparência.cinza e 0 ou 255
+        retorne cinza, cinza, cinza, alfa
+    senãose tipo == 2 então
+        local rb, gb, bb = amostra(linha, base, prof), amostra(linha, base + 1, prof), amostra(linha, base + 2, prof)
+        local alfa = transparência e rb == transparência.r e gb == transparência.g e bb == transparência.b e 0 ou 255
+        retorne paraOito(rb, prof), paraOito(gb, prof), paraOito(bb, prof), alfa
+    senãose tipo == 3 então
+        local índice = amostra(linha, pixel, prof)
+        local p = índice * 3 + 1
+        garanta(paleta e paleta:byte(p + 2), "índice fora da paleta PNG")
+        retorne paleta:byte(p), paleta:byte(p + 1), paleta:byte(p + 2), transparência e (transparência.alfa[índice + 1] ou 255) ou 255
+    senãose tipo == 4 então
+        local cinza = paraOito(amostra(linha, base, prof), prof)
+        retorne cinza, cinza, cinza, paraOito(amostra(linha, base + 1, prof), prof)
+    fim
+    retorne paraOito(amostra(linha, base, prof), prof), paraOito(amostra(linha, base + 1, prof), prof),
+            paraOito(amostra(linha, base + 2, prof), prof), paraOito(amostra(linha, base + 3, prof), prof)
+fim
+
+local passagensAdam7 = {
+    {1,1,8,8}, {5,1,8,8}, {1,5,4,8}, {3,1,4,4},
+    {1,3,2,4}, {2,1,2,2}, {1,2,1,2}
+}
+
+local função dimensãoPassagem(total, começo, passo)
+    se total < começo então retorne 0 fim
+    retorne (total - começo) // passo + 1
+fim
+
+local função decodifiquePixels(cabeçalho, comprimido, paleta, transparência)
+    local bruto = colar.descompacte(comprimido)
+    local r, g, b, a = {}, {}, {}, {}
+    local passagens = cabeçalho.entrelaçado == 1 e passagensAdam7 ou {{1,1,1,1}}
+    local posição = 1
+    local canais = canaisPorTipo[cabeçalho.tipoDeCor]
+    local tacosPorPixel = mat.máximo(1, (canais * cabeçalho.profundidade + 7) // 8)
+    para _, passagem em ipares(passagens) início
+        local x0, y0, dx, dy = passagem[1], passagem[2], passagem[3], passagem[4]
+        local largura = dimensãoPassagem(cabeçalho.largura, x0, dx)
+        local altura = dimensãoPassagem(cabeçalho.altura, y0, dy)
+        se largura > 0 e altura > 0 então
+            local larguraEmTacos = (largura * canais * cabeçalho.profundidade + 7) // 8
+            local linhas; linhas, posição = desfiltre(bruto, posição, larguraEmTacos, altura, tacosPorPixel)
+            para py = 1, altura início
+                para px = 1, largura início
+                    local x, y = x0 + (px - 1) * dx, y0 + (py - 1) * dy
+                    local índice = (y - 1) * cabeçalho.largura + x
+                    r[índice], g[índice], b[índice], a[índice] = decodifiqueAmostra(linhas[py], px - 1, cabeçalho, paleta, transparência)
+                fim
+            fim
+        fim
+    fim
+    retorne r, g, b, a
+fim
+
+função png.leia(fonte, binário)
+    local dados = binário e fonte ou leiaTudo(fonte)
+    garanta(tipo(dados) == "colar" e dados:corte(1, 8) == ASSINATURA, "arquivo não é um PNG válido")
+    local posição, cabeçalho, paleta, transparência = 9, nulo, nulo, nulo
+    local partes = {}
+    enquanto posição <= #dados início
+        local tamanho = inteiro32(dados, posição)
+        local tipoDoTrecho = dados:corte(posição + 4, posição + 7)
+        local conteúdo = dados:corte(posição + 8, posição + 7 + tamanho)
+        garanta(#conteúdo == tamanho, "trecho PNG truncado: " .. tipoDoTrecho)
+        local crc = inteiro32(dados, posição + 8 + tamanho)
+        garanta(colar.crc32(tipoDoTrecho .. conteúdo) % 4294967296 == crc, "CRC inválido no trecho PNG " .. tipoDoTrecho)
+        se tipoDoTrecho == "IHDR" então
+            garanta(tamanho == 13, "cabeçalho PNG inválido")
+            cabeçalho = { largura=inteiro32(conteúdo,1), altura=inteiro32(conteúdo,5), profundidade=conteúdo:byte(9),
+                tipoDeCor=conteúdo:byte(10), entrelaçado=conteúdo:byte(13) }
+            garanta(cabeçalho.largura > 0 e cabeçalho.altura > 0, "dimensões PNG inválidas")
+            garanta(profundidades[cabeçalho.tipoDeCor] e profundidades[cabeçalho.tipoDeCor][cabeçalho.profundidade], "combinação de cor e profundidade PNG não permitida")
+            garanta(cabeçalho.entrelaçado == 0 ou cabeçalho.entrelaçado == 1, "método de entrelaçamento PNG desconhecido")
+        senãose tipoDoTrecho == "PLTE" então paleta = conteúdo
+        senãose tipoDoTrecho == "tRNS" então
+            garanta(cabeçalho, "tRNS encontrado antes de IHDR")
+            se cabeçalho.tipoDeCor == 0 então transparência = {cinza=conteúdo:byte(1)*256+conteúdo:byte(2)}
+            senãose cabeçalho.tipoDeCor == 2 então transparência = {r=conteúdo:byte(1)*256+conteúdo:byte(2), g=conteúdo:byte(3)*256+conteúdo:byte(4), b=conteúdo:byte(5)*256+conteúdo:byte(6)}
+            senãose cabeçalho.tipoDeCor == 3 então transparência = {alfa={conteúdo:byte(1,#conteúdo)}} fim
+        senãose tipoDoTrecho == "IDAT" então partes[#partes+1] = conteúdo
+        senãose tipoDoTrecho == "IEND" então pare fim
+        posição = posição + tamanho + 12
+    fim
+    garanta(cabeçalho e #partes > 0, "PNG sem IHDR ou IDAT")
+    cabeçalho.vermelho, cabeçalho.verde, cabeçalho.azul, cabeçalho.alfa = decodifiquePixels(cabeçalho, tabela.concatene(partes), paleta, transparência)
+    retorne cabeçalho
+fim
+
+função png.paraPDF(fonte, binário)
+    local imagem = png.leia(fonte, binário)
+    local cores, alfas, temAlfa = {}, {}, falso
+    para y = 1, imagem.altura início
+        cores[#cores+1], alfas[#alfas+1] = "\0", "\0"
+        para x = 1, imagem.largura início
+            local i = (y-1)*imagem.largura+x
+            cores[#cores+1] = colar.caractere(imagem.vermelho[i], imagem.verde[i], imagem.azul[i])
+            alfas[#alfas+1] = colar.caractere(imagem.alfa[i])
+            se imagem.alfa[i] ~= 255 então temAlfa = verdadeiro fim
+        fim
+    fim
+    retorne {largura=imagem.largura, altura=imagem.altura,
+        bitsPorComponente=8, ticosPorComponente=8,
+        espaçoDeCor="DeviceRGB", filtro="FlateDecode",
+        parâmetrosDeDecodificação=colar.formate("/Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns %d", imagem.largura),
+        dados=colar.compacte(tabela.concatene(cores)),
+        máscaraSuave=temAlfa e colar.compacte(tabela.concatene(alfas)) ou nulo}
+fim
+
+local função limite(valor)
+    valor = mat.piso(paraNúmero(valor) ou 0)
+    retorne mat.máximo(0, mat.mínimo(255, valor))
+fim
+
+função png.codifique(largura, altura, pixels)
+    garanta(tipo(largura)=="número" e tipo(altura)=="número" e largura>0 e altura>0, "largura e altura devem ser inteiros positivos")
+    largura, altura = mat.piso(largura), mat.piso(altura)
+    garanta(tipo(pixels)=="função" ou tipo(pixels)=="tabela", "pixels deve ser função ou tabela")
+    local linhas, usaAlfa = {}, falso
+    para y=1,altura início
+        linhas[#linhas+1] = "\0"
+        para x=1,largura início
+            local r,g,b,a
+            se tipo(pixels)=="função" então r,g,b,a = pixels(x,y)
+            senão local p=pixels[(y-1)*largura+x] ou {}; r,g,b,a=p.r ou p[1],p.g ou p[2],p.b ou p[3],p.a ou p[4] fim
+            a = a == nulo e 255 ou limite(a); usaAlfa = usaAlfa ou a ~= 255
+            linhas[#linhas+1] = colar.caractere(limite(r),limite(g),limite(b),a)
+        fim
+    fim
+    -- A codificação usa RGBA sempre; isso mantém a API simples e preserva transparência.
+    local ihdr = empacote32(largura)..empacote32(altura).."\8\6\0\0\0"
+    retorne ASSINATURA..trecho("IHDR",ihdr)..trecho("IDAT",colar.compacte(tabela.concatene(linhas)))..trecho("IEND","")
+fim
+
+função png.salve(caminho, largura, altura, pixels)
+    local arquivo, falha = es.abra(caminho, "escritabin")
+    garanta(arquivo, falha)
+    arquivo:escreva(png.codifique(largura, altura, pixels)); arquivo:feche()
+    retorne verdadeiro
+fim
+
+retorne png

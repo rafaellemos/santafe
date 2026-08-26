@@ -1,0 +1,15 @@
+módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
+
+local antes = {}
+para nome em pares(_G) início antes[nome] = verdadeiro fim
+
+local RPDF = importe "rpdf"
+garanta(tipo(RPDF) == "tabela")
+
+local vazamentos = {}
+para nome em pares(_G) início
+    se não antes[nome] então tabela.insira(vazamentos, nome) fim
+fim
+tabela.ordene(vazamentos)
+garanta(#vazamentos == 0, "RPDF criou globais: " .. tabela.concatene(vazamentos, ", "))
+mostre("RPDF sem vazamentos globais")

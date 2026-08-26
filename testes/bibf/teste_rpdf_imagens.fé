@@ -1,0 +1,28 @@
+módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
+local RPDF = importe "rpdf"
+local imagem = importe "imagem"
+local caminhoJPEG = "testes/recursos/mat-santafe.jpg"
+
+imagem.salve("/tmp/santafe-png-rgba.png", "png", 64, 48, função(x, y)
+    retorne x * 4, y * 5, 180, (x + y) * 255 // 112
+fim)
+
+local função gere(caminhoDaImagem, caminhoDoPDF)
+    local documento = RPDF:novo()
+    documento:AdicionePágina()
+    documento:Imagem(caminhoDaImagem, 15, 15, 80, 0)
+    documento:Saída(caminhoDoPDF, "arquivo")
+fim
+
+gere(caminhoJPEG, "/tmp/santafe-rpdf-jpeg.pdf")
+gere("/tmp/santafe-png-rgba.png", "/tmp/santafe-rpdf-png-alfa.pdf")
+
+local arquivo = es.abra("/tmp/santafe-vetor.svg", "escrita")
+arquivo:escreva([[<svg width="160" height="90" viewBox="0 0 160 90">
+  <rect x="2" y="2" width="156" height="86" fill="#35bf9b" stroke="#102a43" stroke-width="4"/>
+  <circle cx="45" cy="45" r="25" fill="#ffc500"/>
+  <path d="M85 70 Q115 5 150 70 Z" fill="#ff6461" stroke="#ffffff" stroke-width="3"/>
+</svg>]])
+arquivo:feche()
+gere("/tmp/santafe-vetor.svg", "/tmp/santafe-rpdf-svg.pdf")
+mostre("RPDF PNG, JPEG e SVG gerados")

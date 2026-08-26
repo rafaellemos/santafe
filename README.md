@@ -1,129 +1,117 @@
 # Santafé
 
-*Uma linguagem de programação inspirada em Lua, pensada para ser natural para falantes de português — leve, rápida e embutível.*
+**Pense natural, programe natural.**
 
-## ▶️ Testar no navegador (WASM)
-
-[![Abrir Santafé WASM](https://img.shields.io/badge/Abrir%20no%20Navegador-Santaf%C3%A9%20WASM-2ea44f?style=for-the-badge)](https://xn--santaf-gva.dev.br/estático/wasm)
-
-
+Santafé é uma linguagem de programação em português derivada do núcleo do Lua 5.3.6. Ela preserva a leveza e a portabilidade do núcleo original, mas apresenta sintaxe, biblioteca padrão, mensagens e conceitos pensados para falantes do português.
 
 [English version → README.en.md](README.en.md)
 
----
+## Experimente no navegador
 
-## O que é o Santafé?
+[Abrir o Santafé WebAssembly](https://xn--santaf-gva.dev.br/est%C3%A1tico/wasm/)
 
-**Santafé** é uma linguagem/runtime baseada no núcleo do Lua, com foco em:
+## Exemplo
 
-- **Sintaxe e nomes em português (lusófono-amigável)**
-- **Web no DNA** (Já nasce com duas ótimas bibliotecas para desenvolver páginas da internet)
-- **Ferramentas práticas** (build nativo e, opcionalmente, WebAssembly para rodar no navegador)
+```santafé
+local função dêBoasVindas(nome)
+    local mensagem = `Bem-vindo, Ⓡnome!`
+    local borda = colar.replique("═", utf8.tamanho(mensagem) + 2)
 
-A ideia é manter o espírito do Lua (simplicidade + portabilidade), mas com uma “cara” mais natural em português.
-Também adicionar ferramentas e bibliotecas úteis para o programador.
-
----
-
-## Destaques
-
-- ✅ Runtime em C (rápido e embutível)
-- ✅ Palavras-chave e bibliotecas com **nomenclatura em português**
-- ✅ **Gabarito literal** com crases + interpolação `Ⓡ{ ... }`
-- ✅ Bom para scripts, automação e criação de bibliotecas
-- ✅ Workflow opcional com **WebAssembly** (quando compilado com Emscripten)
-- ✅**Web** (Duas ótimas biblitecas para desenvolver páginas da internet)
-- ✅**Assíncrono** (Já suporta servidores web com alta carga **piscina+fila de conexões**)
----
-
-## Exemplos rápidos
-
-### Olá mundo
-
-```santafe
-mostre("Olá do Santafé")
-```
-### Condicionais
-```santafe
-se idade >= 18 então
-  mostre("adulto")
-senão
-  mostre("menor")
+    mostre(`╔Ⓡborda╗`)
+    mostre(`║ Ⓡmensagem ║`)
+    mostre(`╚Ⓡborda╝`)
 fim
+
+dêBoasVindas("programador")
 ```
-### Gabarito literal (crases + Ⓡ{...})
-```santafe
-nome = "Rafael"
-mostre(`Bem-vindo, Ⓡ{nome}!`)
-```
----
 
-## Começando
-### Compilar do código-fonte (nativo)
+## Destaques da versão 1.0.0
 
-#### Requisitos
+- Palavras reservadas e funções fundamentais em português;
+- Unicode e UTF-8 como parte central da experiência;
+- gabaritos literais delimitados por acento grave, com interpolação `Ⓡnome` e `Ⓡ{expressão}`;
+- bibliotecas nativas `colar`, `tabela`, `mat`, `es`, `so`, `utf8`, `json`, `corrotina`, `depure` e `módulo`;
+- bibliotecas C assíncronas para rede e MariaDB;
+- bibliotecas Santafé para imagens, PDF, rotas web, operações de 32 ticos e o teste de Turing;
+- execução nativa em macOS e Linux e uma compilação WebAssembly para o navegador.
 
-* Compilador C (GCC/Clang)
-* make
+## Plataformas
 
-#### Construir
+A versão 1.0.0 é validada em:
+
+- macOS com Clang;
+- Debian GNU/Linux com GCC.
+
+O fonte conserva pontos de preparação para outras plataformas, mas Windows ainda não faz parte da matriz validada desta versão.
+
+## Instalação
+
+O instalador detecta o sistema e oferece a instalação das dependências:
+
 ```bash
-make
+chmod +x instalar.sh
+./instalar.sh
 ```
-#### Instalar
+
+Para apenas compilar, sem instalar:
+
 ```bash
-sudo make instalar
+make cbin
+make cbibc
+make test
 ```
-> Dica: se seu Makefile suportar presets de plataforma (como o Lua), pode existir algo como:
-> 
-> ```make PLAT=linux```, ```make PLAT=macosx```, etc.
 
+O executável principal é `santafé`:
 
-#### Executar
 ```bash
-santafe caminho/do/script.fé
+santafé exemplos/01-ola.fé
 ```
 
-## WebAssembly (opcional)
-Se você publicar uma build para navegador (por exemplo static/wasm/santafe.wasm + santafe.js), um esqueleto típico é:
-```html
-<script src="static/wasm/santafe.js"></script>
-<script>
-  Module.onRuntimeInitialized = () => {
-    // ponte JS ↔ runtime (cwrap / funções exportadas)
-  };
-</script>
+## Bibliotecas
+
+### Bibliotecas C
+
+- `rede`: sockets e operações assíncronas sobre GLib/GIO;
+- `mariadb`: acesso assíncrono ao MariaDB, consultas preparadas e piscina de conexões;
+- `segredo`: aleatoriedade criptograficamente segura e bilhetes;
+- `tomada`: conectores TCP, UDP e utilidades de rede.
+
+### Bibliotecas Santafé
+
+- `bit32`;
+- `caminheiro`;
+- `imagem` (`PNG`, `JPEG` e `SVG`);
+- `rpdf` (`PDF 2.0`);
+- `turing`.
+
+## Documentação
+
+- [Manual completo](https://xn--santaf-gva.dev.br/est%C3%A1tico/manual/)
+- [Introdução prática](https://xn--santaf-gva.dev.br/documenta%C3%A7%C3%A3o)
+- [Comunidade](https://xn--santaf-gva.dev.br/comunidade)
+
+## Estrutura
+
+```text
+src/       núcleo e biblioteca padrão em C
+bibs/bibc/ bibliotecas C opcionais
+bibs/bibf/ bibliotecas escritas em Santafé
+exemplos/  programas curtos
+testes/    verificações do núcleo e das bibliotecas
 ```
-> A API exata depende das funções exportadas na build WASM (ex.: ```_sf_init```, ```_sf_run_code```, etc.).
 
-## Estrutura do repositório (sugestão)
+## Desenvolvimento e versões
 
-* ```src/``` — código C do runtime/VM/bibliotecas
-* ```include/``` — cabeçalhos
-* ```bibf/ or libs/``` — bibliotecas/módulos Santafé
-* ```static/wasm/``` — artefatos do navegador (.wasm, JS, assets)
-* ```examples/``` — exemplos ```.fé```
-* ```docs/``` — documentação
-(Ajuste ao seu esquema real.)
+- `main`: versão estável;
+- `desenvolvimento`: próxima versão;
+- etiquetas `vX.Y.Z`: versões publicadas e imutáveis.
 
-## Objetivos / Roteiro
-Santafé está sendo concebida com visão de longo-prazo, incluindo:
-* Expandir a padronização de nomes em português em toda a base
-* Fortalecer bibliotecas padrão e documentação
-* Evoluir o runtime web (integração com DOM / SSR / tooling)
-* Conteúdo educacional (exemplos → cookbook → referência)
-* Experimentos avançados (ex.: redes neurais treinando 100% em Santafé)
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) antes de propor alterações.
 
-## Como contribuir
-Contribuições são bem-vindas:
+## Licenças
 
-* Abra uma issue com bug/ideia
-* Envie PRs pequenos e bem descritos
-* Mantenha consistência com o estilo e a nomenclatura do Santafé
+O código próprio do Santafé é distribuído sob a licença MIT. O projeto deriva de Lua e incorpora componentes de terceiros com licenças permissivas. Consulte [TERCEIROS.md](TERCEIROS.md) e os avisos preservados nos respectivos fontes.
 
-## Contato
+## Autor
 
-* Mantenedor: Rafael Lemos
-* Página oficial: https://santafé.dev.br -- https://xn--santaf-gva.dev.br
-* Discussões/Erros: use GitHub Issues neste repositório
-
+Rafael Alves Lemos — [santafé.dev.br](https://xn--santaf-gva.dev.br/)

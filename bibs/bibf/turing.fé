@@ -1,0 +1,383 @@
+
+local turing = {}
+
+local desafios = {}  -- { [id] = { expiraEmMs, usado, configuração, trajetória } }
+local bilhetes = {}  -- [bilhete] = { expiraEmMs, usado }
+
+-- ===== util: tempo ms (adapte ao seu runtime) =====
+local função agoraMs()
+    -- O relógio de parede basta para expiração; não gera aleatoriedade.
+    se so e so.tempo então retorne so.tempo() * 1000 fim
+    retorne 0
+fim
+
+-- ===== aleatoriedade criptograficamente segura fornecida pelo SO =====
+local função aleatórioU32()
+    retorne so.aleatório()
+fim
+
+local função hex8(n)
+    -- usa a formatação hexadecimal da biblioteca colar:
+    se colar e colar.formate então
+        retorne colar.formate("%08x", n)
+    fim
+    -- fallback tosco:
+    retorne paraColar(n)
+fim
+
+local função gerarId()
+    retorne hex8(aleatórioU32()) .. hex8(aleatórioU32()) .. hex8(aleatórioU32()) .. hex8(aleatórioU32())
+fim
+
+local função rnd01()
+    retorne (aleatórioU32() % 1000000) / 1000000
+fim
+
+local função gerarCfgPadrao()
+    retorne {
+        versão = 1,
+        duraçãoMs = 6000,
+        raioDoAlvo = 14,
+        raioAceitável = 28,
+        margem = 24,
+        mínimoDePontos = 120,
+        aprovação = 7
+    }
+fim
+
+local função gerarTraj()
+    -- mesmos ranges do seu JS atual (w/p/k) mas gerado no servidor
+    local w1 = 0.0012 + rnd01()*0.0011
+    local w2 = 0.0017 + rnd01()*0.0014
+    local w3 = 0.0021 + rnd01()*0.0016
+
+    local p1 = rnd01()*mat.pi*2
+    local p2 = rnd01()*mat.pi*2
+    local p3 = rnd01()*mat.pi*2
+
+    local k1 = 0.44 + rnd01()*0.22
+    local k2 = 0.22 + rnd01()*0.18
+    local k3 = 0.16 + rnd01()*0.14
+
+    retorne {
+        frequência1=w1, frequência2=w2, frequência3=w3,
+        fase1=p1, fase2=p2, fase3=p3,
+        peso1=k1, peso2=k2, peso3=k3
+    }
+fim
+
+local função limparExpirados()
+    local agora = agoraMs()
+
+    -- desafios (semente)
+    para id, d em pares(desafios) início
+        se d.expiraEmMs <= agora então
+            desafios[id] = nulo
+        fim
+    fim
+
+    -- bilhetes/bilhetes (uso único)
+    para tk, t em pares(bilhetes) início
+        se (t.expiraEmMs <= agora) ou t.usado então
+            bilhetes[tk] = nulo
+        fim
+    fim
+fim
+
+-- ===== bilhete/bilhete (2 min, uso único) =====
+função turing.validarBilhete(bilhete, ip)
+    limparExpirados()
+
+    se não bilhete ou bilhete == "" então
+        retorne falso, "sem bilhete"
+    fim
+
+    local t = bilhetes[bilhete]
+    se não t então
+        retorne falso, "bilhete inválido"
+    fim
+
+    se t.usado então
+        bilhetes[bilhete] = nulo
+        retorne falso, "bilhete já usado"
+    fim
+
+    se t.expiraEmMs <= agoraMs() então
+        bilhetes[bilhete] = nulo
+        retorne falso, "bilhete expirado"
+    fim
+
+    -- opcional: amarrar ao IP que gerou o bilhete
+    se t.ip e ip e (t.ip ~= ip) então
+        retorne falso, "bilhete não pertence a este cliente"
+    fim
+
+    -- consumo (uso único)
+    t.usado = verdadeiro
+    bilhetes[bilhete] = nulo
+    retorne verdadeiro
+fim
+
+-- ===== alvo(t) determinístico via traj + dimensões =====
+local função alvoEm(configuração, trajetória, largura, altura, tempoMs)
+    local cx = largura / 2
+    local cy = altura / 2
+    local ax = (largura / 2) - configuração.margem
+    local ay = (altura / 2) - configuração.margem
+
+    local xN = trajetória.peso1*mat.seno(trajetória.frequência1*tempoMs + trajetória.fase1)
+            + trajetória.peso2*mat.seno(trajetória.frequência2*tempoMs + trajetória.fase2)
+            + trajetória.peso3*mat.seno(trajetória.frequência3*tempoMs + trajetória.fase3)
+
+    local yN = trajetória.peso1*mat.cosseno(trajetória.frequência1*tempoMs + trajetória.fase2)
+            + trajetória.peso2*mat.cosseno(trajetória.frequência2*tempoMs + trajetória.fase3)
+            + trajetória.peso3*mat.cosseno(trajetória.frequência3*tempoMs + trajetória.fase1)
+
+    retorne { x = cx + ax*xN, y = cy + ay*yN }
+fim
+
+local função dist(ax, ay, bx, by)
+    local dx = ax - bx
+    local dy = ay - by
+    retorne mat.raiz(dx*dx + dy*dy)
+fim
+
+-- interpolação do ponteiro em t (pontos com {x,y,t})
+local função ponteiroEm(pontos, t)
+    se #pontos == 0 então retorne nulo fim
+    se t <= pontos[1].t então retorne { x=pontos[1].x, y=pontos[1].y } fim
+    local último = pontos[#pontos]
+    se t >= último.t então retorne { x=último.x, y=último.y } fim
+
+    para i=2, #pontos início
+        local a = pontos[i-1]
+        local b = pontos[i]
+        se t <= b.t então
+            local dt = (b.t - a.t)
+            se dt < 1 então dt = 1 fim
+            local u = (t - a.t) / dt
+            retorne { x = a.x + (b.x - a.x)*u, y = a.y + (b.y - a.y)*u }
+        fim
+    fim
+
+    retorne { x=último.x, y=último.y }
+fim
+
+local função calcularMétricas(configuração, trajetória, largura, altura, pontos)
+    se #pontos < 3 então retorne nulo fim
+
+    local n = #pontos
+    local t0 = pontos[1].t
+    local t1 = pontos[n].t
+    local duraçãoMs = t1 - t0
+    se duraçãoMs < 1 então duraçãoMs = 1 fim
+
+    local somaErr = 0
+    local dentro = 0
+    local maxErr = 0
+
+    local somaV = 0
+    local somaV2 = 0
+    local caminho = 0
+
+    para i=2, n início
+        local a = pontos[i-1]
+        local b = pontos[i]
+        local dt = b.t - a.t
+        se dt < 1 então dt = 1 fim
+
+        local d = dist(b.x, b.y, a.x, a.y)
+        caminho = caminho + d
+
+        local v = d / dt
+        somaV = somaV + v
+        somaV2 = somaV2 + v*v
+
+        local al = alvoEm(configuração, trajetória, largura, altura, b.t)
+        local err = dist(b.x, b.y, al.x, al.y)
+
+        somaErr = somaErr + err
+        se err <= configuração.raioAceitável então dentro = dentro + 1 fim
+        se err > maxErr então maxErr = err fim
+    fim
+
+    local velocidadeMédia = somaV / (n-1)
+    local varV = (somaV2 / (n-1)) - velocidadeMédia*velocidadeMédia
+    se varV < 0 então varV = 0 fim
+    local desvioDaVelocidade = mat.raiz(varV)
+
+    local erroMédio = somaErr / (n-1)
+    local proporçãoDentro = dentro / (n-1)
+
+    -- estimar lag (0..320ms em passos de 16ms)
+    local melhorLag = 0
+    local melhorErro = 1e18
+    local lagMax = 320
+    local step = 16
+
+    local tStart = t0
+    local tEnd = t0 + configuração.duraçãoMs
+
+    local lag = 0
+    enquanto lag <= lagMax início
+        local acc = 0
+        local cnt = 0
+        local t = tStart + 200
+        enquanto t <= tEnd início
+            local p = ponteiroEm(pontos, t)
+            se p então
+                local ta = (t - t0) - lag
+                se ta >= 0 então
+                    local al = alvoEm(configuração, trajetória, largura, altura, ta)
+                    acc = acc + dist(p.x, p.y, al.x, al.y)
+                    cnt = cnt + 1
+                fim
+            fim
+            t = t + step
+        fim
+
+        se cnt > 10 então
+            local d = acc / cnt
+            se d < melhorErro então
+                melhorErro = d
+                melhorLag = lag
+            fim
+        fim
+
+        lag = lag + step
+    fim
+
+    local perfeitoDemais = (erroMédio < 6) e (proporçãoDentro > 0.95) e (melhorLag <= 16)
+
+    retorne {
+        pontos = n,
+        duraçãoMs = mat.piso(duraçãoMs + 0.5),
+        caminhoEmPx = mat.piso(caminho + 0.5),
+        erroMédioEmPx = erroMédio,
+        erroMáximoEmPx = maxErr,
+        proporçãoDentro = proporçãoDentro,
+        velocidadeMédia = velocidadeMédia,
+        desvioDaVelocidade = desvioDaVelocidade,
+        atrasoEstimadoMs = melhorLag,
+        erroComAtrasoEmPx = melhorErro,
+        perfeitoDemais = perfeitoDemais
+    }
+fim
+
+local função pontuaçãoHumana(configuração, métricas)
+    local s = 0
+
+    se métricas.pontos >= 220 então s = s + 2
+    senão se métricas.pontos >= configuração.mínimoDePontos então s = s + 1 fim fim
+
+    se métricas.duraçãoMs >= configuração.duraçãoMs*0.80 e métricas.duraçãoMs <= configuração.duraçãoMs*1.25 então s = s + 2
+    senão se métricas.duraçãoMs >= 2000 então s = s + 1 fim fim
+
+    se métricas.erroMédioEmPx <= 38 então s = s + 2
+    senão se métricas.erroMédioEmPx <= 55 então s = s + 1 fim fim
+
+    se métricas.proporçãoDentro >= 0.60 então s = s + 2
+    senão se métricas.proporçãoDentro >= 0.42 então s = s + 1 fim fim
+
+    se métricas.atrasoEstimadoMs >= 32 e métricas.atrasoEstimadoMs <= 260 então s = s + 2
+    senão se métricas.atrasoEstimadoMs <= 320 então s = s + 1 fim fim
+
+    se métricas.desvioDaVelocidade >= 0.0018 então s = s + 1 fim
+
+    se métricas.perfeitoDemais então s = s - 3 fim
+    se métricas.caminhoEmPx < 250 então s = s - 1 fim
+
+    retorne s
+fim
+
+-- ===== API: pluga no seu ap =====
+função turing.registrar(ap)
+    -- GET /turing/semente
+    ap.rota("GET", "/turing/semente", função(req, res)
+        limparExpirados()
+
+        local cfg = gerarCfgPadrao()
+        local traj = gerarTraj()
+
+        local id = gerarId()
+        local exp = agoraMs() + (2 * 60 * 1000) -- 2 minutos
+
+        desafios[id] = { expiraEmMs=exp, usado=falso, configuração=cfg, trajetória=traj }
+
+        local corpo = json.cod({
+            válido = verdadeiro,
+            id = id,
+            expiraEmMs = exp,
+            configuração = cfg,
+            trajetória = traj
+        })
+
+        -- o Caminheiro atual tem res.texto/res.html; JSON vai como texto (ok pro fetch)
+        res:código(200):texto(corpo)
+    fim)
+
+    -- POST /turing/validar
+    ap.rota("POST", "/turing/validar", função(req, res)
+        limparExpirados()
+
+        local corpoTxt = req.corpo ou ""
+        local decodificou, payload = proteja(json.decod, corpoTxt)
+
+        se não decodificou ou não payload então
+            res:código(400):texto(json.cod({ válido=falso, motivo="conteúdo inválido" }))
+            retorne
+        fim
+
+        local id = payload.id
+        local d = id e desafios[id] ou nulo
+        se não d então
+            res:código(400):texto(json.cod({ válido=falso, motivo="desafio inexistente/expirado" }))
+            retorne
+        fim
+        se d.usado então
+            res:código(400):texto(json.cod({ válido=falso, motivo="desafio já usado" }))
+            retorne
+        fim
+        se d.expiraEmMs <= agoraMs() então
+            desafios[id] = nulo
+            res:código(400):texto(json.cod({ válido=falso, motivo="desafio expirou" }))
+            retorne
+        fim
+
+        local largura = payload.largura ou 420
+        local altura  = payload.altura  ou 280
+        local pontos  = payload.pontos  ou {}
+
+        local métricas = calcularMétricas(d.configuração, d.trajetória, largura, altura, pontos)
+        se não métricas então
+            res:código(400):texto(json.cod({ válido=falso, motivo="poucos pontos" }))
+            retorne
+        fim
+
+        local pontuação = pontuaçãoHumana(d.configuração, métricas)
+        local aprovado = (pontuação >= d.configuração.aprovação) e (métricas.pontos >= d.configuração.mínimoDePontos)
+
+        -- marca anti-replay
+        d.usado = verdadeiro
+        desafios[id] = d
+
+
+        local bilhete = nulo
+        se aprovado então
+            bilhete = gerarId()
+            local ip = req.ip ou nulo
+            bilhetes[bilhete] = { expiraEmMs = agoraMs() + (2 * 60 * 1000), usado = falso, ip = ip } -- 2 min
+        fim
+
+        res:código(200):texto(json.cod({
+            válido = aprovado,
+            pontuação = pontuação,
+            métricas = métricas,
+            bilhete = bilhete,
+            motivo = aprovado e "aprovado" ou "reprovado"
+        }))
+
+    fim)
+fim
+
+retorne turing

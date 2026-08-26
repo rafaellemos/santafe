@@ -1,0 +1,29 @@
+módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
+local imagem = importe "imagem"
+local caminhoJPEG = "testes/recursos/mat-santafe.jpg"
+
+imagem.salve("/tmp/santafe-png-rgba.png", "png", 64, 48, função(x, y)
+    retorne x * 4, y * 5, 180, (x + y) * 255 // 112
+fim)
+
+local figura = imagem.leia("/tmp/santafe-png-rgba.png")
+garanta(figura.formato == "png" e figura.largura == 64 e figura.altura == 48)
+garanta(figura.alfa[1] < 255 e figura.alfa[#figura.alfa] == 255)
+garanta(imagem.identifique("/tmp/santafe-png-rgba.png") == "png")
+garanta(imagem.identifique(caminhoJPEG) == "jpeg")
+
+local pngPDF = imagem.paraPDF("/tmp/santafe-png-rgba.png")
+garanta(pngPDF.bitsPorComponente == 8)
+garanta(pngPDF.ticosPorComponente == pngPDF.bitsPorComponente)
+
+local jpegPDF = imagem.paraPDF(caminhoJPEG)
+garanta(jpegPDF.bitsPorComponente == jpegPDF.ticosPorComponente)
+
+local svg = [[<svg width="120" height="80" viewBox="0 0 120 80">
+  <rect x="2" y="2" width="116" height="76" fill="#35bf9b" stroke="#102a43" stroke-width="4"/>
+  <circle cx="35" cy="40" r="20" fill="#ffc500"/>
+  <path d="M65 60 Q90 5 112 60 Z" fill="#ff6461"/>
+</svg>]]
+local vetor = imagem.leia(svg, verdadeiro)
+garanta(vetor.formato == "svg" e vetor.largura == 120 e #vetor.elementos == 3)
+mostre("Imagem PNG/JPEG/SVG:", figura.largura, figura.altura, vetor.largura, vetor.altura)
