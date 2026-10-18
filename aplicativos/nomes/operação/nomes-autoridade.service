@@ -1,0 +1,27 @@
+[Unit]
+Description=Autoridade de Nomes Santafé
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nomes-santafe
+Group=nomes-santafe
+WorkingDirectory=/opt/santafe-nomes
+EnvironmentFile=/etc/santafe-nomes/nomes.env
+ExecStart=/usr/local/bin/santafé /opt/santafe-nomes/autoridade.fé
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

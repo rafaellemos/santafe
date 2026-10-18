@@ -1,0 +1,20 @@
+-- Destino SMTP descartável usado pelo ensaio do Correio Envios.
+
+local correio = importe "correio"
+local porta = paraNúmero(so.obterVariável("TESTE_SMTP_DESTINO_PORTA")) ou 2526
+
+local servidor = garanta(correio.servidor({
+    endereço = "127.0.0.1",
+    porta = porta,
+    nome = "destino.teste.local",
+    segurança = "nenhuma",
+    domíniosLocais = { "exemplo.org" },
+    receba = função(mensagem, conclua)
+        mostre("Destino recebeu:", mensagem.remetente,
+            mensagem.destinatários[1], #mensagem.conteúdo)
+        conclua(verdadeiro)
+    fim
+}))
+
+mostre("Destino SMTP escutando em 127.0.0.1:" .. porta)
+garanta(servidor:escute())

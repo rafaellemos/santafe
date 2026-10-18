@@ -1,0 +1,85 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/segredo/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local dkim = importe "correio.dkim"
+local caminho = so.obterVariável("SANTAFE_TESTE_DKIM_CHAVE") ou
+    "testes/recursos/dkim-teste-chave.pem"
+local arquivo = garanta(es.abra(caminho, "leiturabin"))
+local chave = arquivo:leia("*tudo")
+arquivo:feche()
+
+local mensagem = "Date: Thu, 27 Aug 2026 18:00:00 +0000\r\n" ..
+    "Message-ID: <teste@santafe.dev.br>\r\n" ..
+    "From: rafael@santafe.dev.br\r\n" ..
+    "To: ana@example.net\r\n" ..
+    "Subject: Teste DKIM\r\n" ..
+    "MIME-Version: 1.0\r\n" ..
+    "Content-Type: text/plain; charset=utf-8\r\n" ..
+    "Content-Transfer-Encoding: 8bit\r\n\r\n" ..
+    "Olá, Santafé!\r\n"
+
+local assinada, falha = dkim.assine(mensagem, {
+    domínio = "santafé.dev.br",
+    seletor = "santafe2026",
+    chavePrivada = chave,
+    carimbo = 1787853600
+})
+garanta(assinada, falha)
+garanta(assinada:procure("^DKIM%-Signature: v=1; a=rsa%-sha256;"))
+garanta(assinada:procure(" d=xn%-%-santaf%-gva%.dev%.br;"))
+garanta(assinada:procure(" s=santafe2026;"))
+garanta(assinada:procure(" bh=[A-Za-z0-9+/]+=*; b="))
+garanta(assinada:corte(-#mensagem) == mensagem)
+
+local caminhoPúblico = so.obterVariável("SANTAFE_TESTE_DKIM_PUBLICA_DER")
+se caminhoPúblico e caminhoPúblico ~= "" então
+    local arquivoPúblico = garanta(es.abra(caminhoPúblico, "leiturabin"))
+    local chavePública = arquivoPúblico:leia("*tudo")
+    arquivoPúblico:feche()
+    local resultado
+    garanta(dkim.verifiqueAssíncrono(assinada, {
+        consulteTXT = função(nome, tratador)
+            garanta(nome == "santafe2026._domainkey.xn--santaf-gva.dev.br")
+            tratador({ { valor = "v=DKIM1; k=rsa; p=" ..
+                colar.base64(chavePública) } })
+            retorne verdadeiro
+        fim
+    }, função(avaliação, falhaDaVerificação)
+        garanta(avaliação, falhaDaVerificação)
+        resultado = avaliação
+    fim))
+    garanta(resultado e resultado.resultado == "passa",
+        "assinatura DKIM válida não foi reconhecida")
+
+    local adulterada = assinada:troque("Olá, Santafé!", "Olá, falsificada!")
+    garanta(dkim.verifiqueAssíncrono(adulterada, {
+        consulteTXT = função(_, tratador)
+            tratador({ { valor = "v=DKIM1; p=" ..
+                colar.base64(chavePública) } })
+            retorne verdadeiro
+        fim
+    }, função(avaliação) resultado = avaliação fim))
+    garanta(resultado e resultado.resultado == "falha",
+        "adulteração do corpo não invalidou DKIM")
+fim
+
+local vazia = garanta(dkim.assine(
+    "From: rafael@santafe.dev.br\r\n\r\n", {
+        domínio = "santafé.dev.br",
+        seletor = "santafe2026",
+        chavePrivada = chave,
+        carimbo = 1787853600
+    }))
+garanta(vazia:procure(
+    "bh=frcCV1k9oG9oKj3dpUqdJg1PxRT2RSN/XKdLCPjaYaY=;", 1, verdadeiro),
+    "corpo DKIM vazio não foi canonicalizado como CRLF")
+
+local saída = so.obterVariável("SANTAFE_TESTE_DKIM_SAIDA")
+se saída e saída ~= "" então
+    local destino = garanta(es.abra(saída, "escritabin"))
+    destino:escreva(assinada)
+    destino:feche()
+fim
+
+mostre("DKIM:", "ok")

@@ -1,0 +1,12 @@
+-- Regressão: API matemática própria não depende de modos Lua antigos.
+garanta(mat.arcoTangente2 == nulo)
+garanta(mat.cossenoHiperbólico(0) == 1)
+garanta(mat.senoHiperbólico(0) == 0)
+garanta(mat.tangenteHiperbólica(0) == 0)
+garanta(mat.potência(2, 10) == 1024)
+garanta(mat.log10(1000) == 3)
+
+local mantissa, expoente = mat.decompõe2(10)
+garanta(mat.recompõe2(mantissa, expoente) == 10)
+
+mostre("matemática sem compatibilidade: ok")

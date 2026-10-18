@@ -1,0 +1,144 @@
+-- APPEND transacional, APPENDUID e deduplicação da cópia enviada.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/mariadb/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local mariadb = importe "mariadb"
+local Adaptador = importe "correio.mariadb"
+local rede = importe "rede"
+local piscina
+local terminou = falso
+local falhaFinal
+
+local objetos = { próximo = 0, conteúdos = {}, resumos = {} }
+função objetos.prepareAssíncrono(_, tratador)
+    tratador(verdadeiro); retorne verdadeiro
+fim
+função objetos.graveAssíncrono(este, conteúdo, tratador)
+    se este.resumos[conteúdo] então
+        tratador({ resumo = este.resumos[conteúdo], tamanho = #conteúdo })
+        retorne verdadeiro
+    fim
+    este.próximo = este.próximo + 1
+    local resumo = colar.replique(paraColar(este.próximo % 10), 64)
+    este.conteúdos[resumo] = conteúdo
+    este.resumos[conteúdo] = resumo
+    tratador({ resumo = resumo, tamanho = #conteúdo })
+    retorne verdadeiro
+fim
+função objetos.leiaAssíncrono(este, resumo, tamanho, tratador)
+    local conteúdo = este.conteúdos[resumo]
+    garanta(conteúdo e #conteúdo == tamanho)
+    tratador(conteúdo); retorne verdadeiro
+fim
+
+local função encerre(falha)
+    se terminou então retorne fim
+    terminou, falhaFinal = verdadeiro, falha
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+fim
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local nome = "append-" .. so.tempo() .. "-" .. so.aleatório()
+local função mime(identificação, assunto)
+    retorne "From: " .. nome .. "@santafé.dev.br\r\n" ..
+        "To: Ana <ana@example.net>\r\n" ..
+        "Cc: Maria <maria@example.org>\r\n" ..
+        "Subject: " .. assunto .. "\r\n" ..
+        "Message-ID: " .. identificação .. "\r\n" ..
+        "Content-Type: text/plain; charset=utf-8\r\n\r\n" ..
+        "Conteúdo preservado pelo APPEND."
+fim
+
+mariadb.criePiscinaAssíncrona({
+    endereço = endereço, usuário = usuário, senha = senha, banco = banco,
+    porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306,
+    mínimo = 1, máximo = 2, máximoDaFila = 16, tempoDeEspera = 3000
+}, função(novaPiscina, falhaDaPiscina)
+    se não novaPiscina então encerre(falhaDaPiscina); retorne fim
+    piscina = novaPiscina
+    piscina:executePreparadoAssíncrono([[
+INSERT INTO usuarios (nome,usuario,email,papel,estado)
+VALUES (?,?,?,?,?)]], {
+        "Ensaio APPEND", nome, nome .. "@santafé.dev.br",
+        "usuário", "ativo"
+    }, função(_, inclusão, falhaDaInclusão)
+        se falhaDaInclusão então
+            se inclusão então inclusão:feche() fim
+            encerre(falhaDaInclusão); retorne
+        fim
+        local idDoUsuário = inclusão:idInserido()
+        inclusão:feche()
+        local adaptador = Adaptador.novo(piscina, {
+            domínio = "santafé.dev.br",
+            domínioASCII = "xn--santaf-gva.dev.br"
+        }, objetos)
+        adaptador:obtenhaOuCrieCaixa({
+            id = idDoUsuário, usuário = nome, nome = "Ensaio APPEND"
+        }, função(caixa, falhaDaCaixa)
+            se não caixa então encerre(falhaDaCaixa); retorne fim
+            local rascunho = mime("<rascunho-append@example.net>",
+                "Rascunho APPEND")
+            adaptador:adicioneMensagemIMAP(caixa, "rascunhos", rascunho, {
+                lida = verdadeiro, importante = verdadeiro,
+                criadaEm = 1788132184
+            }, função(inserido, falhaDoRascunho)
+                se não inserido então encerre(falhaDoRascunho); retorne fim
+                garanta(inserido.uid == 1 e não inserido.duplicada)
+                adaptador:listeMensagensIMAP(caixa.id, "rascunhos",
+                    função(rascunhos, falhaDaLista)
+                        se não rascunhos então encerre(falhaDaLista); retorne fim
+                        garanta(rascunhos.quantidade == 1)
+                        garanta(rascunhos.mensagens[1].lida)
+                        garanta(rascunhos.mensagens[1].importante)
+                        garanta(rascunhos.mensagens[1].criadaEm == 1788132184)
+                        local enviada = mime("<enviada-append@example.net>",
+                            "Enviada APPEND")
+                        adaptador:adicioneMensagemIMAP(caixa, "enviadas",
+                            enviada, { lida = verdadeiro },
+                            função(primeira, falhaDaPrimeira)
+                                se não primeira então
+                                    encerre(falhaDaPrimeira); retorne
+                                fim
+                                adaptador:adicioneMensagemIMAP(caixa,
+                                    "enviadas", enviada, { lida = verdadeiro },
+                                    função(segunda, falhaDaSegunda)
+                                        se não segunda então
+                                            encerre(falhaDaSegunda); retorne
+                                        fim
+                                        garanta(segunda.duplicada)
+                                        garanta(segunda.id == primeira.id)
+                                        garanta(segunda.uid == primeira.uid)
+                                        garanta(segunda.validadeUID ==
+                                            primeira.validadeUID)
+                                        adaptador:listeMensagensIMAP(caixa.id,
+                                            "enviadas",
+                                            função(enviadas, falhaDasEnviadas)
+                                                se não enviadas então
+                                                    encerre(falhaDasEnviadas)
+                                                    retorne
+                                                fim
+                                                garanta(enviadas.quantidade == 1)
+                                                mostre("Correio IMAP APPEND MariaDB: ok")
+                                                encerre()
+                                            fim)
+                                    fim)
+                            fim)
+                    fim)
+            fim)
+        fim)
+    fim)
+fim)
+
+rede.laço()
+garanta(terminou e falhaFinal == nulo, falhaFinal)

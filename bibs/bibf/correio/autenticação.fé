@@ -1,0 +1,167 @@
+-- Autenticação postal de entrada: SPF + DKIM + DMARC.
+
+local correio = importe "correio"
+local SPF = importe "correio.spf"
+local DKIM = importe "correio.dkim"
+local DMARC = importe "correio.dmarc"
+local rede = importe "rede"
+
+local autenticação = {
+    nome = "Autenticação postal do Correio Santafé",
+    versão = "1.1.0"
+}
+
+local CRLF = "\r\n"
+
+local função domínioDoEndereço(valor)
+    valor = paraColar(valor ou ""):apare()
+    local encontrados = {}
+    para endereço em valor:capture("([^<>, \t\r\n]+@[^<>, \t\r\n]+)") início
+        encontrados[#encontrados + 1] = endereço
+    fim
+    se #encontrados ~= 1 então retorne nulo fim
+    local arroba = encontrados[1]:procure("@", 1, verdadeiro)
+    se não arroba então retorne nulo fim
+    local domínio = rede.domínioASCII(encontrados[1]:corte(arroba + 1))
+    retorne domínio e domínio:minúscula() ou nulo
+fim
+
+local função conjuntoDeDomínios(itens)
+    local resultado = {}
+    para _, item em ipares(itens ou {}) início
+        local domínio = rede.domínioASCII(paraColar(item):apare())
+        se domínio então resultado[domínio:minúscula()] = verdadeiro fim
+    fim
+    retorne resultado
+fim
+
+local função resultadoSPF(valor)
+    local mapa = {
+        passa = "pass", falha = "fail", falhaSuave = "softfail",
+        neutro = "neutral", nenhum = "none",
+        erroTemporário = "temperror", erroPermanente = "permerror"
+    }
+    retorne mapa[valor] ou "permerror"
+fim
+
+local função resultadoDKIM(valor)
+    local mapa = { passa = "pass", falha = "fail", nenhum = "none",
+        temporário = "temperror" }
+    retorne mapa[valor] ou "permerror"
+fim
+
+local função resultadoDMARC(valor)
+    local mapa = { passa = "pass", falha = "fail", nenhum = "none",
+        erroTemporário = "temperror", erroPermanente = "permerror" }
+    retorne mapa[valor] ou "permerror"
+fim
+
+local função cabeçalhoDosResultados(nomeDoServidor, avaliação)
+    local spf = avaliação.spf
+    local dkim = avaliação.dkim
+    local dmarc = avaliação.dmarc
+    local domínioDKIM = dkim.domínios e dkim.domínios[1]
+    local partes = {
+        "Authentication-Results: " .. nomeDoServidor .. ";",
+        " spf=" .. resultadoSPF(spf.resultado) ..
+            (spf.domínio e " smtp.mailfrom=" .. spf.domínio ou "") .. ";",
+        " dkim=" .. resultadoDKIM(dkim.resultado) ..
+            (domínioDKIM e " header.d=" .. domínioDKIM ou "") .. ";",
+        " dmarc=" .. resultadoDMARC(dmarc.resultado) ..
+            (dmarc.domínioDoAutor e
+                " header.from=" .. dmarc.domínioDoAutor ou "")
+    }
+    retorne tabela.concatene(partes)
+fim
+
+função autenticação.nova(opções)
+    opções = opções ou {}
+    local nomeDoServidor = garanta(rede.domínioASCII(
+        opções.nomeDoServidor ou "localhost"))
+    local tempoLimite = opções.tempoLimite ou 5000
+    local domíniosLocais = conjuntoDeDomínios(opções.domíniosLocais)
+    local este = { nomeDoServidor = nomeDoServidor, tempoLimite = tempoLimite,
+        domíniosLocais = domíniosLocais }
+
+    função este.avalieAssíncrono(_, envelope, tratador)
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador de autenticação deve ser uma função"
+        fim
+        local mensagem, falhaMIME = correio.leiaMensagem(envelope.conteúdo)
+        se não mensagem então tratador(nulo, {
+            tipo = "autenticação-rejeitada",
+            mensagem = "mensagem MIME inválida antes da autenticação: " ..
+                paraColar(falhaMIME)
+        }); retorne verdadeiro fim
+        local domínioDoAutor = domínioDoEndereço(mensagem.remetente)
+        se não domínioDoAutor então
+            tratador(nulo, { tipo = "autenticação-rejeitada",
+                mensagem = "cabeçalho From precisa conter um único endereço válido" })
+            retorne verdadeiro
+        fim
+        SPF.verifiqueAssíncrono({
+            endereço = envelope.endereçoRemoto,
+            remetente = envelope.remetente,
+            nomeDoCliente = envelope.nomeDoCliente,
+            nomeDoServidor = nomeDoServidor,
+            tempoLimite = tempoLimite,
+            consulteTXT = opções.consulteTXT,
+            consulteMX = opções.consulteMX,
+            resolvaEndereços = opções.resolvaEndereços
+        }, função(resultadoDoSPF)
+            DKIM.verifiqueAssíncrono(envelope.conteúdo,
+                { tempoLimite = tempoLimite,
+                  consulteTXT = opções.consulteTXT },
+                função(resultadoDoDKIM, falhaDKIM)
+                    se não resultadoDoDKIM então
+                        tratador(nulo, { tipo = "autenticação-indisponível",
+                            mensagem = paraColar(falhaDKIM) })
+                        retorne
+                    fim
+                    DMARC.avalieAssíncrono({
+                        domínioDoAutor = domínioDoAutor,
+                        spf = resultadoDoSPF,
+                        dkim = resultadoDoDKIM,
+                        tempoLimite = tempoLimite,
+                        consulteTXT = opções.consulteTXT
+                    }, função(resultadoDoDMARC)
+                        local avaliação = { spf = resultadoDoSPF,
+                            dkim = resultadoDoDKIM, dmarc = resultadoDoDMARC }
+                        se resultadoDoDMARC.ação == "adiar" então
+                            tratador(nulo, { tipo = "autenticação-indisponível",
+                                mensagem = resultadoDoDMARC.motivo,
+                                autenticação = avaliação })
+                            retorne
+                        fim
+                        se domíniosLocais[domínioDoAutor] e
+                           resultadoDoDMARC.resultado ~= "passa" então
+                            resultadoDoDMARC.ação = "rejeitar"
+                            resultadoDoDMARC.políticaLocal = verdadeiro
+                            resultadoDoDMARC.motivo =
+                                "domínio local exige SPF ou DKIM alinhado"
+                            tratador(nulo, { tipo = "autenticação-rejeitada",
+                                mensagem = "identidade local sem SPF ou DKIM alinhado: " ..
+                                    domínioDoAutor,
+                                autenticação = avaliação })
+                            retorne
+                        fim
+                        se resultadoDoDMARC.ação == "rejeitar" então
+                            tratador(nulo, { tipo = "autenticação-rejeitada",
+                                mensagem = "DMARC recusou o uso de " .. domínioDoAutor,
+                                autenticação = avaliação })
+                            retorne
+                        fim
+                        envelope.autenticação = avaliação
+                        envelope.mensagemLida = mensagem
+                        envelope.conteúdo = cabeçalhoDosResultados(
+                            nomeDoServidor, avaliação) .. CRLF .. envelope.conteúdo
+                        tratador(avaliação)
+                    fim)
+                fim)
+        fim)
+        retorne verdadeiro
+    fim
+    retorne este
+fim
+
+retorne autenticação

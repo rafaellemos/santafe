@@ -1,0 +1,593 @@
+-- Nomes em Santafé: implementação do protocolo DNS.
+--
+-- Codifica e decodifica mensagens DNS sem depender de uma implementação
+-- externa. O transporte fica a cargo da biblioteca rede; este arquivo trata
+-- somente o protocolo de fio definido pelas RFCs 1035 e posteriores.
+
+local nomes = {
+    versão = 1,
+    porta = 53
+}
+
+nomes.TIPOS = {
+    A = 1, NS = 2, CNAME = 5, SOA = 6, PTR = 12, MX = 15,
+    TXT = 16, AAAA = 28, SRV = 33, OPT = 41, DS = 43, RRSIG = 46,
+    NSEC = 47, DNSKEY = 48, NSEC3 = 50, TLSA = 52,
+    SVCB = 64, HTTPS = 65, CAA = 257,
+    QUALQUER = 255
+}
+
+nomes.CLASSES = { IN = 1, QUALQUER = 255 }
+
+nomes.CÓDIGOS = {
+    SEM_ERRO = 0,
+    FORMATO_INVÁLIDO = 1,
+    FALHA_DO_SERVIDOR = 2,
+    NOME_INEXISTENTE = 3,
+    NÃO_IMPLEMENTADO = 4,
+    RECUSADO = 5
+}
+
+local nomesDosTipos = {}
+para nome, número em pares(nomes.TIPOS) início
+    se nome ~= "QUALQUER" então nomesDosTipos[número] = nome fim
+fim
+nomesDosTipos[255] = "QUALQUER"
+
+local nomesDasClasses = { [1] = "IN", [255] = "QUALQUER" }
+
+local função inteiro(valor, nome, mínimo, máximo)
+    local resultado = mat.paraInteiro(valor)
+    se resultado == nulo ou resultado < mínimo ou resultado > máximo então
+        erro((nome ou "valor") .. " deve ser um inteiro entre " ..
+            mínimo .. " e " .. máximo, 3)
+    fim
+    retorne resultado
+fim
+
+local função u16(valor)
+    valor = inteiro(valor, "inteiro de 16 ticos", 0, 0xFFFF)
+    retorne colar.caractere((valor >> 8) & 0xFF, valor & 0xFF)
+fim
+
+local função u32(valor)
+    valor = inteiro(valor, "inteiro de 32 ticos", 0, 0xFFFFFFFF)
+    retorne colar.caractere(
+        (valor >> 24) & 0xFF, (valor >> 16) & 0xFF,
+        (valor >> 8) & 0xFF, valor & 0xFF
+    )
+fim
+
+local função exijaTacos(pacote, posição, quantidade)
+    se posição < 1 ou quantidade < 0 ou
+       posição + quantidade - 1 > #pacote então
+        erro("mensagem DNS truncada", 3)
+    fim
+fim
+
+local função leiaU16(pacote, posição)
+    exijaTacos(pacote, posição, 2)
+    retorne ((pacote:byte(posição) << 8) |
+        pacote:byte(posição + 1)), posição + 2
+fim
+
+local função leiaU32(pacote, posição)
+    exijaTacos(pacote, posição, 4)
+    retorne ((pacote:byte(posição) << 24) |
+        (pacote:byte(posição + 1) << 16) |
+        (pacote:byte(posição + 2) << 8) |
+        pacote:byte(posição + 3)), posição + 4
+fim
+
+local função termineComPonto(nome)
+    se nome == "" ou nome == "." então retorne "." fim
+    se nome:corte(-1) ~= "." então nome = nome .. "." fim
+    retorne nome
+fim
+
+função nomes.nomeCanônico(nome)
+    se tipo(nome) ~= "colar" então
+        retorne nulo, "nome DNS deve ser um colar"
+    fim
+    nome = termineComPonto(nome:minúscula())
+    se #nome > 254 então retorne nulo, "nome DNS excede 253 tacos" fim
+    se nome == "." então retorne nome fim
+
+    local quantidade = 0
+    para rótulo em nome:corte(1, -2):capture("[^.]+") início
+        quantidade = quantidade + 1
+        se #rótulo > 63 então
+            retorne nulo, "rótulo DNS excede 63 tacos"
+        fim
+        para i = 1, #rótulo início
+            se rótulo:byte(i) > 127 então
+                retorne nulo,
+                    "nome DNS contém Unicode; converta-o com rede.domínioASCII"
+            fim
+        fim
+    fim
+    se quantidade == 0 ou nome:procure("..", 1, verdadeiro) então
+        retorne nulo, "nome DNS possui rótulo vazio"
+    fim
+    retorne nome
+fim
+
+local função codifiqueNomeCru(nome)
+    local canônico, falha = nomes.nomeCanônico(nome)
+    se não canônico então erro(falha, 3) fim
+    se canônico == "." então retorne "\0" fim
+    local partes = {}
+    para rótulo em canônico:corte(1, -2):capture("[^.]+") início
+        partes[#partes + 1] = colar.caractere(#rótulo)
+        partes[#partes + 1] = rótulo
+    fim
+    partes[#partes + 1] = "\0"
+    retorne tabela.concatene(partes)
+fim
+
+função nomes.codifiqueNome(nome)
+    local funcionou, resultado = proteja(codifiqueNomeCru, nome)
+    se não funcionou então retorne nulo, resultado fim
+    retorne resultado
+fim
+
+local função decodifiqueNomeCru(pacote, posição, visitados, profundidade)
+    visitados = visitados ou {}
+    profundidade = profundidade ou 0
+    se profundidade > 32 então erro("nome DNS excede o limite de ponteiros", 3) fim
+    local rótulos = {}
+    local próxima = nulo
+    local total = 1
+
+    enquanto verdadeiro início
+        exijaTacos(pacote, posição, 1)
+        local tamanho = pacote:byte(posição)
+        se (tamanho & 0xC0) == 0xC0 então
+            exijaTacos(pacote, posição, 2)
+            local deslocamento = ((tamanho & 0x3F) << 8) |
+                pacote:byte(posição + 1)
+            local destino = deslocamento + 1
+            se destino > #pacote então erro("ponteiro DNS fora da mensagem", 3) fim
+            se visitados[destino] então erro("ciclo em ponteiros de nome DNS", 3) fim
+            visitados[destino] = verdadeiro
+            se próxima == nulo então próxima = posição + 2 fim
+            local sufixo = decodifiqueNomeCru(
+                pacote, destino, visitados, profundidade + 1
+            )
+            se sufixo ~= "." então
+                para rótulo em sufixo:corte(1, -2):capture("[^.]+") início
+                    rótulos[#rótulos + 1] = rótulo
+                    total = total + #rótulo + 1
+                fim
+            fim
+            pare
+        senão se (tamanho & 0xC0) ~= 0 então
+            erro("tipo de rótulo DNS reservado", 3)
+        senão se tamanho == 0 então
+            se próxima == nulo então próxima = posição + 1 fim
+            pare
+        senão
+            se tamanho > 63 então erro("rótulo DNS excede 63 tacos", 3) fim
+            exijaTacos(pacote, posição + 1, tamanho)
+            local rótulo = pacote:corte(posição + 1, posição + tamanho)
+            total = total + tamanho + 1
+            se total > 255 então erro("nome DNS excede 255 tacos no fio", 3) fim
+            rótulos[#rótulos + 1] = rótulo
+            posição = posição + tamanho + 1
+        fim fim fim
+    fim
+
+    se #rótulos == 0 então retorne ".", próxima fim
+    retorne tabela.concatene(rótulos, ".") .. ".", próxima
+fim
+
+função nomes.decodifiqueNome(pacote, posição)
+    se tipo(pacote) ~= "colar" então retorne nulo, nulo, "pacote deve ser um colar" fim
+    local funcionou, nome, próxima = proteja(
+        decodifiqueNomeCru, pacote, posição ou 1
+    )
+    se não funcionou então retorne nulo, nulo, nome fim
+    retorne nome, próxima
+fim
+
+função nomes.tipoParaNúmero(valor)
+    se tipo(valor) == "número" então
+        local funcionou, resultado = proteja(inteiro, valor, "tipo DNS", 0, 0xFFFF)
+        se funcionou então retorne resultado fim
+        retorne nulo, resultado
+    fim
+    se tipo(valor) ~= "colar" então retorne nulo, "tipo DNS inválido" fim
+    local número = nomes.TIPOS[valor:maiúscula()]
+    se não número então retorne nulo, "tipo DNS desconhecido: " .. valor fim
+    retorne número
+fim
+
+função nomes.nomeDoTipo(valor)
+    retorne nomesDosTipos[valor] ou paraColar(valor)
+fim
+
+local função classeParaNúmero(valor)
+    se valor == nulo então retorne 1 fim
+    se tipo(valor) == "número" então
+        retorne inteiro(valor, "classe DNS", 0, 0xFFFF)
+    fim
+    local número = tipo(valor) == "colar" e nomes.CLASSES[valor:maiúscula()]
+    se não número então erro("classe DNS desconhecida: " .. paraColar(valor), 3) fim
+    retorne número
+fim
+
+local função codifiqueIPv4(endereço)
+    se tipo(endereço) ~= "colar" então erro("endereço IPv4 inválido", 3) fim
+    local a, b, c, d = endereço:separe(
+        "^([0-9]+)%.([0-9]+)%.([0-9]+)%.([0-9]+)$"
+    )
+    se não a então erro("endereço IPv4 inválido: " .. endereço, 3) fim
+    local partes = { a, b, c, d }
+    para i = 1, 4 início
+        partes[i] = inteiro(paraNúmero(partes[i]), "octeto IPv4", 0, 255)
+    fim
+    retorne colar.caractere(partes[1], partes[2], partes[3], partes[4])
+fim
+
+local função gruposIPv6(texto)
+    local grupos = {}
+    se texto == "" então retorne grupos fim
+    para grupo em texto:capture("[^:]+") início
+        se grupo:procure(".", 1, verdadeiro) então
+            local v4 = codifiqueIPv4(grupo)
+            grupos[#grupos + 1] = (v4:byte(1) << 8) | v4:byte(2)
+            grupos[#grupos + 1] = (v4:byte(3) << 8) | v4:byte(4)
+        senão
+            se #grupo > 4 ou não grupo:separe("^[0-9a-fA-F]+$") então
+                erro("endereço IPv6 inválido", 4)
+            fim
+            grupos[#grupos + 1] = paraNúmero(grupo, 16)
+        fim
+    fim
+    retorne grupos
+fim
+
+local função codifiqueIPv6(endereço)
+    se tipo(endereço) ~= "colar" então erro("endereço IPv6 inválido", 3) fim
+    local duplo = endereço:procure("::", 1, verdadeiro)
+    se duplo e endereço:procure("::", duplo + 2, verdadeiro) então
+        erro("endereço IPv6 possui duas abreviações ::", 3)
+    fim
+
+    local esquerda, direita
+    se duplo então
+        esquerda = gruposIPv6(endereço:corte(1, duplo - 1))
+        direita = gruposIPv6(endereço:corte(duplo + 2))
+        local faltantes = 8 - #esquerda - #direita
+        se faltantes < 1 então erro("endereço IPv6 inválido", 3) fim
+        para _ = 1, faltantes início esquerda[#esquerda + 1] = 0 fim
+        para _, grupo em ipares(direita) início esquerda[#esquerda + 1] = grupo fim
+    senão
+        esquerda = gruposIPv6(endereço)
+        se #esquerda ~= 8 então erro("endereço IPv6 precisa de oito grupos", 3) fim
+    fim
+
+    local partes = {}
+    para _, grupo em ipares(esquerda) início partes[#partes + 1] = u16(grupo) fim
+    retorne tabela.concatene(partes)
+fim
+
+local função exibaIPv6(dados)
+    local grupos = {}
+    para i = 1, 16, 2 início
+        grupos[#grupos + 1] = colar.formate(
+            "%x", (dados:byte(i) << 8) | dados:byte(i + 1)
+        )
+    fim
+    -- A forma expandida é inequívoca; a apresentação comprimida é opcional.
+    retorne tabela.concatene(grupos, ":")
+fim
+
+local função codifiqueTexto(valor)
+    local partes = {}
+    se tipo(valor) == "colar" então valor = { valor } fim
+    se tipo(valor) ~= "tabela" então erro("TXT deve ser colar ou lista de colares", 3) fim
+    para _, trecho em ipares(valor) início
+        se tipo(trecho) ~= "colar" ou #trecho > 255 então
+            erro("cada trecho TXT deve ter até 255 tacos", 3)
+        fim
+        partes[#partes + 1] = colar.caractere(#trecho) .. trecho
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função codifiqueDadosCru(registro, tipoDoRegistro)
+    local dados = registro.dados
+    se tipoDoRegistro == nomes.TIPOS.A então
+        retorne codifiqueIPv4(dados ou registro.endereço)
+    senão se tipoDoRegistro == nomes.TIPOS.AAAA então
+        retorne codifiqueIPv6(dados ou registro.endereço)
+    senão se tipoDoRegistro == nomes.TIPOS.NS ou
+             tipoDoRegistro == nomes.TIPOS.CNAME ou
+             tipoDoRegistro == nomes.TIPOS.PTR então
+        retorne codifiqueNomeCru(dados ou registro.alvo ou registro.nomeCanônico)
+    senão se tipoDoRegistro == nomes.TIPOS.MX então
+        dados = dados ou registro
+        retorne u16(dados.preferência ou dados.prioridade ou 0) ..
+            codifiqueNomeCru(dados.troca ou dados.endereço ou dados.alvo)
+    senão se tipoDoRegistro == nomes.TIPOS.TXT então
+        retorne codifiqueTexto(dados ou registro.texto ou registro.valor)
+    senão se tipoDoRegistro == nomes.TIPOS.SOA então
+        dados = dados ou registro
+        retorne codifiqueNomeCru(dados.mestre) ..
+            codifiqueNomeCru(dados.responsável) ..
+            u32(dados.série) .. u32(dados.atualização) ..
+            u32(dados.novaTentativa) .. u32(dados.expiração) ..
+            u32(dados.mínimo)
+    senão se tipoDoRegistro == nomes.TIPOS.SRV então
+        dados = dados ou registro
+        retorne u16(dados.prioridade ou 0) .. u16(dados.peso ou 0) ..
+            u16(dados.porta) .. codifiqueNomeCru(dados.alvo)
+    senão se tipoDoRegistro == nomes.TIPOS.CAA então
+        dados = dados ou registro
+        local etiqueta = dados.etiqueta ou "issue"
+        local valor = dados.valor ou ""
+        se #etiqueta > 255 então erro("etiqueta CAA grande demais", 3) fim
+        retorne colar.caractere(dados.bandeiras ou 0, #etiqueta) .. etiqueta .. valor
+    senão se tipoDoRegistro == nomes.TIPOS.OPT então
+        retorne tipo(dados) == "colar" e dados ou ""
+    fim fim fim fim fim fim fim fim fim
+    se tipo(dados) ~= "colar" então
+        erro("tipo DNS desconhecido exige dados crus em um colar", 3)
+    fim
+    retorne dados
+fim
+
+local função codifiquePergunta(pergunta)
+    local tipoDaPergunta = nomes.tipoParaNúmero(pergunta.tipo ou pergunta[2] ou "A")
+    se não tipoDaPergunta então erro("tipo da pergunta DNS inválido", 3) fim
+    retorne codifiqueNomeCru(pergunta.nome ou pergunta[1]) ..
+        u16(tipoDaPergunta) .. u16(classeParaNúmero(pergunta.classe))
+fim
+
+local função codifiqueRegistro(registro)
+    local tipoDoRegistro, falha = nomes.tipoParaNúmero(registro.tipo)
+    se não tipoDoRegistro então erro(falha, 3) fim
+    local dados = codifiqueDadosCru(registro, tipoDoRegistro)
+    retorne codifiqueNomeCru(registro.nome ou ".") ..
+        u16(tipoDoRegistro) .. u16(classeParaNúmero(registro.classe)) ..
+        u32(registro.ttl ou 0) .. u16(#dados) .. dados
+fim
+
+local função bandeirasParaNúmero(mensagem)
+    se mensagem.bandeirasNuméricas ~= nulo então
+        retorne inteiro(mensagem.bandeirasNuméricas, "bandeiras DNS", 0, 0xFFFF)
+    fim
+    local b = mensagem.bandeiras ou mensagem
+    local valor = ((b.resposta e 1 ou 0) << 15) |
+        ((b.códigoDeOperação ou 0) << 11) |
+        ((b.autoritativa e 1 ou 0) << 10) |
+        ((b.truncada e 1 ou 0) << 9) |
+        ((b.recursãoDesejada e 1 ou 0) << 8) |
+        ((b.recursãoDisponível e 1 ou 0) << 7) |
+        ((b.respostaAutenticada e 1 ou 0) << 5) |
+        ((b.dadosAutênticos e 1 ou 0) << 4) |
+        ((b.verificaçãoDesativada e 1 ou 0) << 3) |
+        (b.códigoDeResposta ou 0)
+    retorne inteiro(valor, "bandeiras DNS", 0, 0xFFFF)
+fim
+
+local função codifiqueLista(lista, codificador)
+    local partes = {}
+    para _, item em ipares(lista ou {}) início
+        partes[#partes + 1] = codificador(item)
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função codifiqueMensagemCru(mensagem)
+    se tipo(mensagem) ~= "tabela" então erro("mensagem DNS deve ser uma tabela", 3) fim
+    local perguntas = mensagem.perguntas ou {}
+    local respostas = mensagem.respostas ou {}
+    local autoridades = mensagem.autoridades ou {}
+    local adicionais = mensagem.adicionais ou {}
+    local cabeçalho = u16(mensagem.identificação ou 0) ..
+        u16(bandeirasParaNúmero(mensagem)) ..
+        u16(#perguntas) .. u16(#respostas) ..
+        u16(#autoridades) .. u16(#adicionais)
+    retorne cabeçalho ..
+        codifiqueLista(perguntas, codifiquePergunta) ..
+        codifiqueLista(respostas, codifiqueRegistro) ..
+        codifiqueLista(autoridades, codifiqueRegistro) ..
+        codifiqueLista(adicionais, codifiqueRegistro)
+fim
+
+função nomes.codifiqueMensagem(mensagem)
+    local funcionou, pacote = proteja(codifiqueMensagemCru, mensagem)
+    se não funcionou então retorne nulo, pacote fim
+    se #pacote > 65535 então retorne nulo, "mensagem DNS excede 65535 tacos" fim
+    retorne pacote
+fim
+
+local função leiaPergunta(pacote, posição)
+    local nome
+    nome, posição = decodifiqueNomeCru(pacote, posição)
+    local tipoDaPergunta, classe
+    tipoDaPergunta, posição = leiaU16(pacote, posição)
+    classe, posição = leiaU16(pacote, posição)
+    retorne {
+        nome = nome, tipo = tipoDaPergunta,
+        nomeDoTipo = nomesDosTipos[tipoDaPergunta] ou paraColar(tipoDaPergunta),
+        classe = classe, nomeDaClasse = nomesDasClasses[classe] ou paraColar(classe)
+    }, posição
+fim
+
+local função leiaDados(pacote, posição, tamanho, tipoDoRegistro)
+    local fimDosDados = posição + tamanho - 1
+    exijaTacos(pacote, posição, tamanho)
+    se tipoDoRegistro == nomes.TIPOS.A então
+        se tamanho ~= 4 então erro("registro A precisa de 4 tacos", 3) fim
+        retorne colar.formate("%d.%d.%d.%d", pacote:byte(posição),
+            pacote:byte(posição + 1), pacote:byte(posição + 2),
+            pacote:byte(posição + 3))
+    senão se tipoDoRegistro == nomes.TIPOS.AAAA então
+        se tamanho ~= 16 então erro("registro AAAA precisa de 16 tacos", 3) fim
+        retorne exibaIPv6(pacote:corte(posição, fimDosDados))
+    senão se tipoDoRegistro == nomes.TIPOS.NS ou
+             tipoDoRegistro == nomes.TIPOS.CNAME ou
+             tipoDoRegistro == nomes.TIPOS.PTR então
+        local nome, próxima = decodifiqueNomeCru(pacote, posição)
+        se próxima ~= fimDosDados + 1 então
+            erro("nome ocupa tamanho diferente do registro DNS", 3)
+        fim
+        retorne nome
+    senão se tipoDoRegistro == nomes.TIPOS.MX então
+        local preferência, próxima = leiaU16(pacote, posição)
+        local troca
+        troca, próxima = decodifiqueNomeCru(pacote, próxima)
+        se próxima ~= fimDosDados + 1 então
+            erro("registro MX possui tamanho inválido", 3)
+        fim
+        retorne { preferência = preferência, troca = troca }
+    senão se tipoDoRegistro == nomes.TIPOS.TXT então
+        local trechos = {}
+        local atual = posição
+        enquanto atual <= fimDosDados início
+            local comprimento = pacote:byte(atual)
+            atual = atual + 1
+            se atual + comprimento - 1 > fimDosDados então
+                erro("registro TXT truncado", 3)
+            fim
+            trechos[#trechos + 1] = pacote:corte(atual, atual + comprimento - 1)
+            atual = atual + comprimento
+        fim
+        retorne trechos
+    senão se tipoDoRegistro == nomes.TIPOS.SOA então
+        local mestre, próxima = decodifiqueNomeCru(pacote, posição)
+        local responsável
+        responsável, próxima = decodifiqueNomeCru(pacote, próxima)
+        local série, atualização, novaTentativa, expiração, mínimo
+        série, próxima = leiaU32(pacote, próxima)
+        atualização, próxima = leiaU32(pacote, próxima)
+        novaTentativa, próxima = leiaU32(pacote, próxima)
+        expiração, próxima = leiaU32(pacote, próxima)
+        mínimo, próxima = leiaU32(pacote, próxima)
+        se próxima - 1 ~= fimDosDados então erro("registro SOA malformado", 3) fim
+        retorne { mestre = mestre, responsável = responsável,
+            série = série, atualização = atualização,
+            novaTentativa = novaTentativa, expiração = expiração,
+            mínimo = mínimo }
+    senão se tipoDoRegistro == nomes.TIPOS.SRV então
+        local prioridade, peso, porta, próxima
+        prioridade, próxima = leiaU16(pacote, posição)
+        peso, próxima = leiaU16(pacote, próxima)
+        porta, próxima = leiaU16(pacote, próxima)
+        local alvo
+        alvo, próxima = decodifiqueNomeCru(pacote, próxima)
+        se próxima ~= fimDosDados + 1 então
+            erro("registro SRV possui tamanho inválido", 3)
+        fim
+        retorne { prioridade = prioridade, peso = peso, porta = porta, alvo = alvo }
+    senão se tipoDoRegistro == nomes.TIPOS.CAA então
+        se tamanho < 2 então erro("registro CAA truncado", 3) fim
+        local bandeiras = pacote:byte(posição)
+        local tamanhoDaEtiqueta = pacote:byte(posição + 1)
+        se tamanhoDaEtiqueta + 2 > tamanho então erro("registro CAA truncado", 3) fim
+        local etiqueta = pacote:corte(posição + 2,
+            posição + 1 + tamanhoDaEtiqueta)
+        local valor = pacote:corte(posição + 2 + tamanhoDaEtiqueta, fimDosDados)
+        retorne { bandeiras = bandeiras, etiqueta = etiqueta, valor = valor }
+    fim fim fim fim fim fim fim fim
+    retorne pacote:corte(posição, fimDosDados)
+fim
+
+local função leiaRegistro(pacote, posição)
+    local nome
+    nome, posição = decodifiqueNomeCru(pacote, posição)
+    local tipoDoRegistro, classe, ttl, tamanho
+    tipoDoRegistro, posição = leiaU16(pacote, posição)
+    classe, posição = leiaU16(pacote, posição)
+    ttl, posição = leiaU32(pacote, posição)
+    tamanho, posição = leiaU16(pacote, posição)
+    local inícioDosDados = posição
+    local dados = leiaDados(pacote, inícioDosDados, tamanho, tipoDoRegistro)
+    posição = inícioDosDados + tamanho
+    retorne { nome = nome, tipo = tipoDoRegistro,
+        nomeDoTipo = nomesDosTipos[tipoDoRegistro] ou paraColar(tipoDoRegistro),
+        classe = classe, nomeDaClasse = nomesDasClasses[classe] ou paraColar(classe),
+        ttl = ttl, dados = dados,
+        dadosCrus = pacote:corte(inícioDosDados, posição - 1) }, posição
+fim
+
+local função leiaLista(pacote, posição, quantidade, leitor)
+    local lista = {}
+    se quantidade > 4096 então erro("seção DNS excede 4096 itens", 3) fim
+    para _ = 1, quantidade início
+        local item
+        item, posição = leitor(pacote, posição)
+        lista[#lista + 1] = item
+    fim
+    retorne lista, posição
+fim
+
+local função decodifiqueMensagemCru(pacote)
+    se tipo(pacote) ~= "colar" então erro("pacote DNS deve ser um colar", 3) fim
+    se #pacote > 65535 então erro("mensagem DNS excede 65535 tacos", 3) fim
+    exijaTacos(pacote, 1, 12)
+    local posição = 1
+    local identificação, bandeiras, qd, an, ns, ar
+    identificação, posição = leiaU16(pacote, posição)
+    bandeiras, posição = leiaU16(pacote, posição)
+    qd, posição = leiaU16(pacote, posição)
+    an, posição = leiaU16(pacote, posição)
+    ns, posição = leiaU16(pacote, posição)
+    ar, posição = leiaU16(pacote, posição)
+
+    local mensagem = {
+        identificação = identificação,
+        bandeirasNuméricas = bandeiras,
+        bandeiras = {
+            resposta = (bandeiras & 0x8000) ~= 0,
+            códigoDeOperação = (bandeiras >> 11) & 0xF,
+            autoritativa = (bandeiras & 0x0400) ~= 0,
+            truncada = (bandeiras & 0x0200) ~= 0,
+            recursãoDesejada = (bandeiras & 0x0100) ~= 0,
+            recursãoDisponível = (bandeiras & 0x0080) ~= 0,
+            respostaAutenticada = (bandeiras & 0x0020) ~= 0,
+            dadosAutênticos = (bandeiras & 0x0010) ~= 0,
+            verificaçãoDesativada = (bandeiras & 0x0008) ~= 0,
+            códigoDeResposta = bandeiras & 0xF
+        }
+    }
+    mensagem.perguntas, posição = leiaLista(pacote, posição, qd, leiaPergunta)
+    mensagem.respostas, posição = leiaLista(pacote, posição, an, leiaRegistro)
+    mensagem.autoridades, posição = leiaLista(pacote, posição, ns, leiaRegistro)
+    mensagem.adicionais, posição = leiaLista(pacote, posição, ar, leiaRegistro)
+    mensagem.tamanho = #pacote
+    mensagem.tacosRestantes = #pacote - posição + 1
+    se mensagem.tacosRestantes < 0 então mensagem.tacosRestantes = 0 fim
+    retorne mensagem
+fim
+
+função nomes.decodifiqueMensagem(pacote)
+    local funcionou, mensagem = proteja(decodifiqueMensagemCru, pacote)
+    se não funcionou então retorne nulo, mensagem fim
+    retorne mensagem
+fim
+
+função nomes.novaConsulta(nome, tipoDoRegistro, identificação, recursiva)
+    local tipoNumérico, falha = nomes.tipoParaNúmero(tipoDoRegistro ou "A")
+    se não tipoNumérico então retorne nulo, falha fim
+    retorne nomes.codifiqueMensagem({
+        identificação = identificação ou (so.aleatório() & 0xFFFF),
+        bandeiras = { recursãoDesejada = recursiva e verdadeiro ou falso },
+        perguntas = { { nome = nome, tipo = tipoNumérico, classe = 1 } }
+    })
+fim
+
+-- Utilidades internas compartilhadas pelos módulos Nomes. Não contêm
+-- transporte e continuam sendo Santafé puro.
+nomes._u16 = u16
+nomes._u32 = u32
+nomes._leiaU16 = leiaU16
+nomes._leiaU32 = leiaU32
+nomes._codifiqueRegistro = codifiqueRegistro
+nomes._codifiqueNome = codifiqueNomeCru
+nomes._codifiqueDados = codifiqueDadosCru
+
+retorne nomes

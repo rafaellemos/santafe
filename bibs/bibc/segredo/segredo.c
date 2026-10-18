@@ -8,6 +8,15 @@
 
 #include <gio/gio.h>
 #include <sodium.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/core_names.h>
+#include <openssl/decoder.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -270,13 +279,316 @@ static int l_precisa_atualizar(lua_State *L) {
     return 1;
 }
 
+static int falha_openssl(lua_State *L, const char *contexto) {
+    unsigned long código = ERR_get_error();
+    char detalhe[256];
+
+    lua_pushnil(L);
+    if (código == 0) {
+        lua_pushfstring(L, "%s", contexto);
+        return 2;
+    }
+    ERR_error_string_n(código, detalhe, sizeof(detalhe));
+    lua_pushfstring(L, "%s: %s", contexto, detalhe);
+    return 2;
+}
+
+/* SHA-256 binário. O chamador escolhe hexadecimal ou Base64 conforme o
+ * protocolo; DKIM exige Base64 e, portanto, não deve receber hexadecimal. */
+static int l_resumir_sha256(lua_State *L) {
+    size_t tamanho;
+    const unsigned char *dados =
+        (const unsigned char *)luaL_checklstring(L, 1, &tamanho);
+    unsigned char resumo[crypto_hash_sha256_BYTES];
+
+    crypto_hash_sha256(resumo, dados, (unsigned long long)tamanho);
+    lua_pushlstring(L, (const char *)resumo, sizeof(resumo));
+    sodium_memzero(resumo, sizeof(resumo));
+    return 1;
+}
+
+/* Assina os dados com RSA PKCS#1 v1.5 e SHA-256, combinação exigida pelo
+ * perfil rsa-sha256 do DKIM. A chave PEM permanece em memória somente
+ * durante a chamada e a assinatura é devolvida em formato binário. */
+static int l_assinar_rsa_sha256(lua_State *L) {
+    size_t dados_tamanho, pem_tamanho;
+    const unsigned char *dados =
+        (const unsigned char *)luaL_checklstring(L, 1, &dados_tamanho);
+    const char *pem = luaL_checklstring(L, 2, &pem_tamanho);
+    BIO *bio = NULL;
+    EVP_PKEY *chave = NULL;
+    EVP_MD_CTX *contexto = NULL;
+    unsigned char *assinatura = NULL;
+    size_t assinatura_tamanho = 0;
+    int retorno;
+
+    luaL_argcheck(L, pem_tamanho > 0 && pem_tamanho <= 1024U * 1024U, 2,
+                  "chave RSA PEM deve ter entre 1 taco e 1 MiB");
+    ERR_clear_error();
+    bio = BIO_new_mem_buf(pem, (int)pem_tamanho);
+    if (!bio) return falha_openssl(L, "não foi possível abrir a chave RSA");
+
+    chave = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+    BIO_free(bio);
+    if (!chave) return falha_openssl(L, "chave RSA privada inválida");
+    if (EVP_PKEY_base_id(chave) != EVP_PKEY_RSA) {
+        EVP_PKEY_free(chave);
+        lua_pushnil(L);
+        lua_pushliteral(L, "a chave privada precisa ser RSA");
+        return 2;
+    }
+
+    contexto = EVP_MD_CTX_new();
+    if (!contexto) {
+        EVP_PKEY_free(chave);
+        return falha_openssl(L, "não foi possível iniciar a assinatura RSA");
+    }
+    retorno = EVP_DigestSignInit(contexto, NULL, EVP_sha256(), NULL, chave);
+    if (retorno == 1)
+        retorno = EVP_DigestSignUpdate(contexto, dados, dados_tamanho);
+    if (retorno == 1)
+        retorno = EVP_DigestSignFinal(contexto, NULL, &assinatura_tamanho);
+    if (retorno != 1 || assinatura_tamanho == 0) {
+        EVP_MD_CTX_free(contexto);
+        EVP_PKEY_free(chave);
+        return falha_openssl(L, "não foi possível calcular a assinatura RSA");
+    }
+
+    assinatura = g_malloc(assinatura_tamanho);
+    retorno = EVP_DigestSignFinal(contexto, assinatura, &assinatura_tamanho);
+    EVP_MD_CTX_free(contexto);
+    EVP_PKEY_free(chave);
+    if (retorno != 1) {
+        sodium_memzero(assinatura, assinatura_tamanho);
+        g_free(assinatura);
+        return falha_openssl(L, "não foi possível concluir a assinatura RSA");
+    }
+
+    lua_pushlstring(L, (const char *)assinatura, assinatura_tamanho);
+    sodium_memzero(assinatura, assinatura_tamanho);
+    g_free(assinatura);
+    return 1;
+}
+
+static EVP_PKEY *ler_chave_publica_der(const unsigned char *dados,
+                                       size_t tamanho) {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    EVP_PKEY *chave = NULL;
+    OSSL_DECODER_CTX *decodificador;
+    const unsigned char *cursor = dados;
+    size_t restante = tamanho;
+
+    decodificador = OSSL_DECODER_CTX_new_for_pkey(
+        &chave, "DER", NULL, "RSA", EVP_PKEY_PUBLIC_KEY, NULL, NULL);
+    if (!decodificador) return NULL;
+    if (OSSL_DECODER_from_data(decodificador, &cursor, &restante) != 1) {
+        EVP_PKEY_free(chave);
+        chave = NULL;
+    }
+    OSSL_DECODER_CTX_free(decodificador);
+    return chave;
+#else
+    const unsigned char *cursor = dados;
+    EVP_PKEY *chave = d2i_PUBKEY(NULL, &cursor, (long)tamanho);
+    if (!chave) {
+        RSA *rsa;
+        ERR_clear_error();
+        cursor = dados;
+        rsa = d2i_RSAPublicKey(NULL, &cursor, (long)tamanho);
+        if (rsa) {
+            chave = EVP_PKEY_new();
+            if (!chave || EVP_PKEY_assign_RSA(chave, rsa) != 1) {
+                if (chave) EVP_PKEY_free(chave);
+                RSA_free(rsa);
+                chave = NULL;
+            }
+        }
+    }
+    return chave;
+#endif
+}
+
+/* Confere uma assinatura RSA PKCS#1 v1.5 com SHA-256. A chave pública pode
+ * chegar em PEM ou no DER publicado no campo p= de um registro DKIM. Aceitar
+ * ambos evita converter material criptográfico em código Santafé. */
+static int l_verificar_rsa_sha256(lua_State *L) {
+    size_t dados_tamanho, assinatura_tamanho, chave_tamanho;
+    const unsigned char *dados =
+        (const unsigned char *)luaL_checklstring(L, 1, &dados_tamanho);
+    const unsigned char *assinatura =
+        (const unsigned char *)luaL_checklstring(L, 2, &assinatura_tamanho);
+    const unsigned char *chave_dados =
+        (const unsigned char *)luaL_checklstring(L, 3, &chave_tamanho);
+    EVP_PKEY *chave = NULL;
+    EVP_MD_CTX *contexto = NULL;
+    BIO *bio = NULL;
+    int retorno;
+
+    luaL_argcheck(L, assinatura_tamanho > 0 && assinatura_tamanho <= 8192U,
+                  2, "assinatura RSA deve ter entre 1 taco e 8 KiB");
+    luaL_argcheck(L, chave_tamanho > 0 && chave_tamanho <= 1024U * 1024U,
+                  3, "chave RSA deve ter entre 1 taco e 1 MiB");
+
+    ERR_clear_error();
+    if (chave_tamanho >= 10U &&
+        memcmp(chave_dados, "-----BEGIN", 10U) == 0) {
+        bio = BIO_new_mem_buf(chave_dados, (int)chave_tamanho);
+        if (!bio) return falha_openssl(L, "não foi possível abrir a chave RSA");
+        chave = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+        BIO_free(bio);
+    } else {
+        chave = ler_chave_publica_der(chave_dados, chave_tamanho);
+    }
+    if (!chave) return falha_openssl(L, "chave pública RSA inválida");
+    if (EVP_PKEY_base_id(chave) != EVP_PKEY_RSA) {
+        EVP_PKEY_free(chave);
+        lua_pushnil(L);
+        lua_pushliteral(L, "a chave pública precisa ser RSA");
+        return 2;
+    }
+    if (EVP_PKEY_bits(chave) < 1024) {
+        EVP_PKEY_free(chave);
+        lua_pushnil(L);
+        lua_pushliteral(L, "a chave pública RSA possui menos de 1024 ticos");
+        return 2;
+    }
+
+    contexto = EVP_MD_CTX_new();
+    if (!contexto) {
+        EVP_PKEY_free(chave);
+        return falha_openssl(L, "não foi possível iniciar a verificação RSA");
+    }
+    retorno = EVP_DigestVerifyInit(contexto, NULL, EVP_sha256(), NULL, chave);
+    if (retorno == 1)
+        retorno = EVP_DigestVerifyUpdate(contexto, dados, dados_tamanho);
+    if (retorno == 1)
+        retorno = EVP_DigestVerifyFinal(contexto, assinatura,
+                                        assinatura_tamanho);
+    EVP_MD_CTX_free(contexto);
+    EVP_PKEY_free(chave);
+
+    if (retorno == 1) {
+        lua_pushboolean(L, 1);
+        return 1;
+    }
+    if (retorno == 0) {
+        ERR_clear_error();
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    return falha_openssl(L, "não foi possível conferir a assinatura RSA");
+}
+
+/* Converte uma chave RSA PEM (privada ou pública) para o campo Public Key de
+ * um DNSKEY RSASHA256, conforme a RFC 3110: comprimento do expoente,
+ * expoente e módulo, todos em ordem de rede. Não devolve o invólucro DER. */
+static int l_chave_publica_rsa(lua_State *L) {
+    size_t pem_tamanho;
+    const char *pem = luaL_checklstring(L, 1, &pem_tamanho);
+    BIO *bio = NULL;
+    EVP_PKEY *chave = NULL;
+    BIGNUM *módulo = NULL;
+    BIGNUM *expoente = NULL;
+    unsigned char *resultado = NULL;
+    size_t tamanho_do_expoente, tamanho_do_módulo, cabeçalho, total;
+
+    luaL_argcheck(L, pem_tamanho > 0 && pem_tamanho <= 1024U * 1024U, 1,
+                  "chave RSA PEM deve ter entre 1 taco e 1 MiB");
+    ERR_clear_error();
+    bio = BIO_new_mem_buf(pem, (int)pem_tamanho);
+    if (!bio) return falha_openssl(L, "não foi possível abrir a chave RSA");
+    chave = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+    BIO_free(bio);
+
+    if (!chave) {
+        ERR_clear_error();
+        bio = BIO_new_mem_buf(pem, (int)pem_tamanho);
+        if (!bio) return falha_openssl(L, "não foi possível abrir a chave RSA");
+        chave = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+        BIO_free(bio);
+    }
+    if (!chave) return falha_openssl(L, "chave RSA PEM inválida");
+    if (EVP_PKEY_base_id(chave) != EVP_PKEY_RSA) {
+        EVP_PKEY_free(chave);
+        lua_pushnil(L);
+        lua_pushliteral(L, "a chave precisa ser RSA");
+        return 2;
+    }
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (EVP_PKEY_get_bn_param(chave, OSSL_PKEY_PARAM_RSA_N, &módulo) != 1 ||
+        EVP_PKEY_get_bn_param(chave, OSSL_PKEY_PARAM_RSA_E, &expoente) != 1) {
+        EVP_PKEY_free(chave);
+        BN_free(módulo);
+        BN_free(expoente);
+        return falha_openssl(L, "não foi possível ler a chave pública RSA");
+    }
+#else
+    {
+        RSA *rsa = EVP_PKEY_get1_RSA(chave);
+        const BIGNUM *n = NULL;
+        const BIGNUM *e = NULL;
+        if (!rsa) {
+            EVP_PKEY_free(chave);
+            return falha_openssl(L, "não foi possível ler a chave pública RSA");
+        }
+        RSA_get0_key(rsa, &n, &e, NULL);
+        módulo = BN_dup(n);
+        expoente = BN_dup(e);
+        RSA_free(rsa);
+        if (!módulo || !expoente) {
+            EVP_PKEY_free(chave);
+            BN_free(módulo);
+            BN_free(expoente);
+            return falha_openssl(L, "não foi possível copiar a chave pública RSA");
+        }
+    }
+#endif
+    EVP_PKEY_free(chave);
+
+    tamanho_do_expoente = (size_t)BN_num_bytes(expoente);
+    tamanho_do_módulo = (size_t)BN_num_bytes(módulo);
+    if (tamanho_do_expoente == 0 || tamanho_do_expoente > 65535U ||
+        tamanho_do_módulo < 128U || tamanho_do_módulo > 8192U) {
+        BN_free(módulo);
+        BN_free(expoente);
+        lua_pushnil(L);
+        lua_pushliteral(L, "dimensões da chave pública RSA inválidas para DNSKEY");
+        return 2;
+    }
+
+    cabeçalho = tamanho_do_expoente < 256U ? 1U : 3U;
+    total = cabeçalho + tamanho_do_expoente + tamanho_do_módulo;
+    resultado = g_malloc(total);
+    if (cabeçalho == 1U) {
+        resultado[0] = (unsigned char)tamanho_do_expoente;
+    } else {
+        resultado[0] = 0;
+        resultado[1] = (unsigned char)(tamanho_do_expoente >> 8);
+        resultado[2] = (unsigned char)tamanho_do_expoente;
+    }
+    BN_bn2bin(expoente, resultado + cabeçalho);
+    BN_bn2bin(módulo, resultado + cabeçalho + tamanho_do_expoente);
+    BN_free(módulo);
+    BN_free(expoente);
+
+    lua_pushlstring(L, (const char *)resultado, total);
+    g_free(resultado);
+    return 1;
+}
+
 static const luaL_Reg segredo_funções[] = {
     {"protejaSenhaAss\xC3\xADncrono", l_proteger_senha_async},
     {"confiraSenhaAss\xC3\xADncrono", l_conferir_senha_async},
     {"novoBilhete", l_novo_token},
+    {"resuma", l_resumir_token},
     {"resumaBilhete", l_resumir_token},
     {"confiraBilhete", l_conferir_token},
     {"precisaAtualizarSenha", l_precisa_atualizar},
+    {"resumaSHA256", l_resumir_sha256},
+    {"assineRSA256", l_assinar_rsa_sha256},
+    {"verifiqueRSA256", l_verificar_rsa_sha256},
+    {"chaveP\xC3\xBA" "blicaRSA", l_chave_publica_rsa},
     {NULL, NULL}
 };
 

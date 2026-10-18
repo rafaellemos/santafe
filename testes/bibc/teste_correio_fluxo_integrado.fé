@@ -1,0 +1,218 @@
+-- Fluxo postal integrado: SMTPUTF8 -> CD -> depósito -> Carteiro.
+-- O catálogo fica em memória para que o ensaio não dependa de um banco real;
+-- a comunicação e a gravação durável usam as bibliotecas verdadeiras.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/arquivo/?.so;bibs/bibc/segredo/?.so;" ..
+    "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local arquivo = importe "arquivo"
+local rede = importe "rede"
+local correio = importe "correio"
+local Depósito = importe "correio.depósito"
+local CorreioCD = importe "correio.cd"
+local Carteiro = importe "carteiro"
+
+local raiz = "/tmp/santafe-correio-fluxo-" .. so.tempo() .. "-" ..
+    so.aleatório()
+local depósito = garanta(Depósito.novo({
+    raiz = raiz,
+    limite = 1024 * 1024
+}))
+
+local usuário = { id = 7, nome = "Ana", usuário = "ana" }
+local caixa = {
+    id = 11,
+    usuárioId = usuário.id,
+    endereço = "ana@santafé.dev.br",
+    estado = "ativa"
+}
+local registro
+local mimeRecebido
+local repositório = {}
+
+função repositório.existeDestinatárioLocal(_, endereço, tratador)
+    tratador(endereço:minúscula() == caixa.endereço, nulo)
+    retorne verdadeiro
+fim
+
+função repositório.recebaSMTP(_, envelope, tratador)
+    mimeRecebido = envelope.conteúdo
+    depósito:graveAssíncrono(envelope.conteúdo,
+        função(objeto, falhaDoDepósito)
+            se não objeto então tratador(nulo, falhaDoDepósito); retorne fim
+            local lida, falhaDaLeitura = correio.leiaMensagem(envelope.conteúdo)
+            se não lida então tratador(nulo, falhaDaLeitura); retorne fim
+            registro = {
+                id = 31,
+                direção = "entrada",
+                pasta = "entrada",
+                identificação = lida.identificação,
+                remetente = envelope.remetente,
+                destinatários = { ["para"] = envelope.destinatários },
+                assunto = lida.assunto,
+                resumo = lida.texto,
+                texto = lida.texto,
+                html = lida.html,
+                tamanho = #envelope.conteúdo,
+                lida = falso,
+                importante = falso,
+                estadoDaEntrega = "recebida",
+                criadaEm = envelope.recebidaEm,
+                atualizadaEm = envelope.recebidaEm,
+                anexos = lida.anexos,
+                objeto = objeto.resumo
+            }
+            tratador(1, nulo)
+        fim)
+    retorne verdadeiro
+fim
+
+função repositório.obtenhaUsuárioPorSessão(_, resumo, tratador)
+    tratador(resumo == "sessão-integrada" e usuário ou nulo, nulo)
+fim
+
+função repositório.obtenhaOuCrieCaixa(_, recebido, tratador)
+    tratador(recebido.id == usuário.id e caixa ou nulo, nulo)
+fim
+
+função repositório.listeMensagens(_, caixaId, pasta, busca, limite,
+        deslocamento, tratador)
+    garanta(caixaId == caixa.id e pasta == "entrada" e limite == 20 e
+        deslocamento == 0)
+    se registro e (busca == "" ou registro.assunto:procure(busca, 1, verdadeiro)) então
+        tratador({ registro }, nulo)
+    senão
+        tratador({}, nulo)
+    fim
+fim
+
+função repositório.obtenhaMensagem(_, caixaId, id, tratador)
+    tratador(caixaId == caixa.id e registro e id == registro.id e
+        registro ou nulo, nulo)
+fim
+
+local cd = CorreioCD.novo({
+    diretório = repositório,
+    repositório = repositório,
+    configuração = { domínio = "santafé.dev.br" }
+})
+local carteiro = Carteiro.novo({ caixas = repositório, cd = cd })
+local servidor = garanta(correio.servidor({
+    endereço = "127.0.0.1",
+    porta = 18756,
+    nome = "correio.teste.local",
+    segurança = "nenhuma",
+    domíniosLocais = { "santafé.dev.br" },
+    autorize = função(_, destinatário, conclua)
+        cd:aceiteDestinatário(destinatário, conclua)
+    fim,
+    receba = função(envelope, conclua)
+        cd:recebaCarta(envelope, conclua)
+    fim
+}))
+
+local cliente
+local terminou = falso
+local sucesso = falso
+local detalhe = "fluxo postal integrado não terminou"
+
+local função finalize(funcionou, falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = funcionou
+    detalhe = falha ou ""
+    se cliente então cliente:feche() fim
+    servidor:feche()
+fim
+
+local função removaDiretórios(caminho)
+    local nível2 = caminho:separe("^(.*)/[^/]+$")
+    local nível1 = nível2:separe("^(.*)/[^/]+$")
+    arquivo.removaAssíncrono(caminho, função(_, falha)
+        se falha então finalize(falso, falha); retorne fim
+        arquivo.removaAssíncrono(nível2, função(_, falha2)
+            se falha2 então finalize(falso, falha2); retorne fim
+            arquivo.removaAssíncrono(nível1, função(_, falha1)
+                se falha1 então finalize(falso, falha1); retorne fim
+                arquivo.removaAssíncrono(depósito.diretórioDosObjetos,
+                    função(_, falhaDosObjetos)
+                        se falhaDosObjetos então
+                            finalize(falso, falhaDosObjetos); retorne
+                        fim
+                        arquivo.removaAssíncrono(raiz,
+                            função(_, falhaFinal)
+                                finalize(não falhaFinal, falhaFinal)
+                            fim)
+                    fim)
+            fim)
+        fim)
+    fim)
+fim
+
+local função confiraFluxo()
+    carteiro:listeCartas(caixa, "entrada", "Integração", 20,
+        função(cartas, falhaDaLista)
+            se falhaDaLista ou #cartas ~= 1 então
+                finalize(falso, falhaDaLista ou
+                    "a carta recebida não apareceu no Carteiro")
+                retorne
+            fim
+            carteiro:obtenhaCarta(caixa, cartas[1].id,
+                função(carta, falhaDaCarta)
+                    se falhaDaCarta ou não carta ou
+                       carta.texto ~= "Olá pelo fluxo integrado." ou
+                       carta.remetente ~= "maria@exemplo.org" então
+                        finalize(falso, falhaDaCarta ou
+                            "a carta recuperada divergiu")
+                        retorne
+                    fim
+                    depósito:leiaAssíncrono(registro.objeto, registro.tamanho,
+                        função(mime, falhaDaIntegridade)
+                            se não mime ou falhaDaIntegridade ou
+                               mime ~= mimeRecebido então
+                                finalize(falso, falhaDaIntegridade ou
+                                    "objeto MIME não foi preservado")
+                                retorne
+                            fim
+                            removaDiretórios(
+                                garanta(depósito:caminhoDoObjeto(registro.objeto)))
+                        fim)
+                fim)
+        fim)
+fim
+
+depósito:prepareAssíncrono(função(preparou, falhaDaPreparação)
+    se não preparou então finalize(falso, falhaDaPreparação); retorne fim
+    local escutou, falhaDaEscuta = servidor:inicie()
+    se não escutou então finalize(falso, falhaDaEscuta); retorne fim
+
+    local mensagem, falhaDaMensagem = correio.novaMensagem({
+        remetente = "maria@exemplo.org",
+        destinatários = { caixa.endereço },
+        assunto = "Integração postal",
+        texto = "Olá pelo fluxo integrado.",
+        anexos = {
+            { nome = "saudação.txt", tipo = "text/plain", dados = "Santafé" }
+        }
+    })
+    se não mensagem então finalize(falso, falhaDaMensagem); retorne fim
+    local falhaDoCliente
+    cliente, falhaDoCliente = correio.cliente({
+        endereço = "127.0.0.1",
+        porta = 18756,
+        nome = "cliente.teste.local",
+        segurança = "nenhuma",
+        tempoLimite = 4000
+    })
+    se não cliente então finalize(falso, falhaDoCliente); retorne fim
+    cliente:envieAssíncrono(mensagem,
+        função(resultado, falhaDoEnvio)
+            se não resultado então finalize(falso, falhaDoEnvio); retorne fim
+            confiraFluxo()
+        fim)
+fim)
+
+rede.laço()
+garanta(terminou e sucesso, detalhe)
+mostre("Correio fluxo integrado: ok")

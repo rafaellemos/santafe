@@ -1,0 +1,45 @@
+#!/usr/local/bin/santafé
+
+local resolvedor = importe "nomes.resolvedor"
+
+local função lista(nome, padrão)
+    local valor = so.obterVariável(nome)
+    se não valor ou valor:apare() == "" então retorne padrão fim
+    local itens = {}
+    para item em valor:capture("[^,]+") início
+        item = item:apare()
+        se item ~= "" então itens[#itens + 1] = item fim
+    fim
+    retorne itens
+fim
+
+local endereço = so.obterVariável("NOMES_RESOLVEDOR_ENDERECO") ou "127.0.0.1"
+local porta = paraNúmero(so.obterVariável("NOMES_RESOLVEDOR_PORTA") ou "53")
+local prefixos = lista("NOMES_RESOLVEDOR_PREFIXOS",
+    { "127.0.0.0/8", "::1/128" })
+
+local servidor, falha = resolvedor.novo({
+    endereço = endereço,
+    porta = porta,
+    prefixosPermitidos = prefixos,
+    máximoUDP = paraNúmero(so.obterVariável("NOMES_MAXIMO_UDP") ou "1232"),
+    tempoLimite = paraNúmero(
+        so.obterVariável("NOMES_RESOLVEDOR_TEMPO_LIMITE") ou "1800"),
+    máximoDePendentes = paraNúmero(
+        so.obterVariável("NOMES_RESOLVEDOR_PENDENTES") ou "2048"),
+    máximoTCP = paraNúmero(
+        so.obterVariável("NOMES_RESOLVEDOR_MAXIMO_TCP") ou "256"),
+    máximoDaMemrap = paraNúmero(
+        so.obterVariável("NOMES_RESOLVEDOR_MEMRAP") ou "20000"),
+    limiteDeTaxa = {
+        porSegundo = paraNúmero(
+            so.obterVariável("NOMES_RESOLVEDOR_POR_SEGUNDO") ou "100"),
+        explosão = paraNúmero(
+            so.obterVariável("NOMES_RESOLVEDOR_EXPLOSAO") ou "200")
+    },
+    aoFalhar = função(erroDNS) mostre("[Nomes — resolvedor]", erroDNS) fim
+})
+garanta(servidor, falha)
+mostre("Resolvedor de nomes escutando em " .. endereço .. ":" .. porta)
+mostre("Prefixos permitidos:", tabela.concatene(prefixos, ", "))
+garanta(servidor:escute())

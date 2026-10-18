@@ -58,22 +58,27 @@ static void checktab (lua_State *L, int arg, int what) {
 }
 
 
-#if defined(LUA_COMPAT_MAXN)
-static int maxn (lua_State *L) {
-  lua_Number max = 0;
+/*
+** Percorre todas as chaves para encontrar o maior índice numérico positivo.
+** Não é uma medida de comprimento e, por isso, deve ser pedida
+** explicitamente por quem trabalha com tabelas esparsas.
+*/
+static int maiorindice (lua_State *L) {
   luaL_checktype(L, 1, LUA_TTABLE);
+  lua_settop(L, 1);
+  lua_pushinteger(L, 0);  /* maximum, kept as integer when possible */
   lua_pushnil(L);  /* first key */
   while (lua_next(L, 1)) {
     lua_pop(L, 1);  /* remove value */
     if (lua_type(L, -1) == LUA_TNUMBER) {
-      lua_Number v = lua_tonumber(L, -1);
-      if (v > max) max = v;
+      if (lua_compare(L, 2, -1, LUA_OPLT)) {
+        lua_pushvalue(L, -1);
+        lua_replace(L, 2);
+      }
     }
   }
-  lua_pushnumber(L, max);
   return 1;
 }
-#endif
 
 
 static int tinsert (lua_State *L) {
@@ -425,9 +430,7 @@ static int sort (lua_State *L) {
 
 static const luaL_Reg tab_funcs[] = {
   {"concatene", tconcat},
-#if defined(LUA_COMPAT_MAXN)
-  {"maiorN", maxn},   /* maxn -> maiorN */
-#endif
+  {"maiorÍndice", maiorindice},
   {"insira", tinsert},
   {"empacote", pack},
   {"desempacote", unpack},
@@ -440,10 +443,5 @@ static const luaL_Reg tab_funcs[] = {
 
 LUAMOD_API int luaopen_table (lua_State *L) {
   luaL_newlib(L, tab_funcs);
-#if defined(LUA_COMPAT_UNPACK)
-  /* _G.unpack = table.unpack */
-  lua_getfield(L, -1, "desempacote");
-  lua_setglobal(L, "desempacote");
-#endif
   return 1;
 }

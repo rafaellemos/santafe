@@ -1,0 +1,43 @@
+{
+  "Função Santafé": {
+    "prefix": "função",
+    "body": [
+      "função ${1:nome}(${2}) início",
+      "    ${0}",
+      "fim"
+    ],
+    "description": "Declara uma função Santafé."
+  },
+  "Condição se": {
+    "prefix": "se",
+    "body": [
+      "se ${1:condição} então",
+      "    ${0}",
+      "fim"
+    ],
+    "description": "Cria uma condição se."
+  },
+  "Laço para": {
+    "prefix": "para",
+    "body": [
+      "para ${1:índice} = ${2:1}, ${3:10} início",
+      "    ${0}",
+      "fim"
+    ],
+    "description": "Cria um laço numérico."
+  },
+  "Laço enquanto": {
+    "prefix": "enquanto",
+    "body": [
+      "enquanto ${1:condição} início",
+      "    ${0}",
+      "fim"
+    ],
+    "description": "Cria um laço enquanto."
+  },
+  "Mostrar": {
+    "prefix": "mostre",
+    "body": "mostre(${0})",
+    "description": "Exibe valores na saída padrão."
+  }
+}

@@ -1,0 +1,71 @@
+-- Garante que uma conexão encerrada pelo MariaDB durante a ociosidade seja
+-- renovada antes de receber a consulta seguinte.
+
+local mariadb = importe "mariadb"
+local rede = importe "rede"
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local piscina
+local terminou = falso
+
+local função falhe(mensagem)
+    mostre("FALHOU:", mensagem)
+    se piscina então piscina:feche() fim
+    so.saia(1)
+fim
+
+local função aceite(_, falha)
+    se falha então falhe(falha) fim
+fim
+
+aceite(mariadb.criePiscinaAssíncrona({
+    endereço = endereço,
+    usuário = usuário,
+    senha = senha,
+    banco = banco,
+    porta = porta,
+    mínimo = 1,
+    máximo = 1,
+    máximoDaFila = 4,
+    tempoDeEspera = 5000
+}, função(novaPiscina, falha)
+    se falha então falhe(falha); retorne fim
+    piscina = novaPiscina
+    aceite(piscina:executeAssíncrono("SET SESSION wait_timeout=1",
+        função(_, resultado, falhaDaConfiguração)
+            se falhaDaConfiguração então
+                falhe(falhaDaConfiguração); retorne
+            fim
+            resultado:feche()
+            rede.agende(6000, função()
+                aceite(piscina:executePreparadoAssíncrono(
+                    "SELECT ?", { "renovada" },
+                    função(_, resposta, falhaDaConsulta)
+                        se falhaDaConsulta então
+                            falhe(falhaDaConsulta); retorne
+                        fim
+                        local linha = resposta:obterLinha()
+                        garanta(linha e linha[1] == "renovada")
+                        resposta:feche()
+                        local _, falhaAoFechar = piscina:feche()
+                        se falhaAoFechar então falhe(falhaAoFechar); retorne fim
+                        terminou = verdadeiro
+                        mostre("OK: piscina renovou conexão ociosa")
+                        rede.pareLaço()
+                    fim))
+            fim)
+        fim))
+fim))
+
+rede.laço()
+garanta(terminou, "teste da conexão ociosa não terminou")

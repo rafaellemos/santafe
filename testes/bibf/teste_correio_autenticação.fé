@@ -1,0 +1,95 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" ..
+    módulo.caminhoC
+
+local Autenticação = importe "correio.autenticação"
+
+local txt = {
+    ["embratel.com.br"] = {
+        "v=spf1 include:spf1.embratel.com.br -all"
+    },
+    ["spf1.embratel.com.br"] = { "v=spf1 ip4:200.200.0.0/16 -all" },
+    ["_dmarc.embratel.com.br"] = { "v=DMARC1; p=reject" },
+    ["xn--santaf-gva.dev.br"] = { "v=spf1 ip4:143.208.252.1 -all" },
+    ["_dmarc.xn--santaf-gva.dev.br"] = { "v=DMARC1; p=none" }
+}
+
+local autenticador = garanta(Autenticação.nova({
+    nomeDoServidor = "mail.santafé.dev.br",
+    domíniosLocais = { "santafé.dev.br" },
+    consulteTXT = função(nome, tratador)
+        local registros = {}
+        para _, valor em ipares(txt[nome] ou {}) início
+            registros[#registros + 1] = { valor = valor }
+        fim
+        tratador(registros)
+        retorne verdadeiro
+    fim,
+    consulteMX = função(_, tratador) tratador({}); retorne verdadeiro fim,
+    resolvaEndereços = função(_, tratador) tratador({}); retorne verdadeiro fim
+}))
+
+local conteúdo = "Received: by emkei.cz\r\n" ..
+    "From: Juliana <juliana@embratel.com.br>\r\n" ..
+    "To: rafael@santafé.dev.br\r\n" ..
+    "Subject: Mensagem de boas vindas\r\n" ..
+    "Date: Sat, 29 Aug 2026 15:35:41 +0200\r\n" ..
+    "Message-ID: <falsa@emkei.cz>\r\n" ..
+    "Content-Type: text/html; charset=utf-8\r\n\r\n" ..
+    "<p>Mensagem falsa</p>\r\n"
+
+local resultado, falha
+garanta(autenticador:avalieAssíncrono({
+    remetente = "juliana@embratel.com.br",
+    destinatários = { "rafael@santafé.dev.br" },
+    conteúdo = conteúdo,
+    endereçoRemoto = "114.29.236.247",
+    nomeDoCliente = "emkei.cz"
+}, função(avaliação, erro)
+    resultado, falha = avaliação, erro
+fim))
+garanta(resultado == nulo e falha.tipo == "autenticação-rejeitada")
+garanta(falha.autenticação.spf.resultado == "falha")
+garanta(falha.autenticação.dkim.resultado == "nenhum")
+garanta(falha.autenticação.dmarc.ação == "rejeitar")
+
+local conteúdoLocal = "Received: from hostil.example\r\n" ..
+    "From: Identidade falsa <identidade-falsa@santafé.dev.br>\r\n" ..
+    "To: rafael@santafé.dev.br\r\n" ..
+    "Subject: Ensaio controlado\r\n" ..
+    "Date: Sun, 30 Aug 2026 10:00:00 -0300\r\n" ..
+    "Message-ID: <falsa@hostil.example>\r\n" ..
+    "Content-Type: text/plain; charset=utf-8\r\n\r\n" ..
+    "Identidade local sem autenticação.\r\n"
+
+resultado, falha = nulo, nulo
+garanta(autenticador:avalieAssíncrono({
+    remetente = "identidade-falsa@santafé.dev.br",
+    destinatários = { "rafael@santafé.dev.br" },
+    conteúdo = conteúdoLocal,
+    endereçoRemoto = "203.0.113.45",
+    nomeDoCliente = "hostil.example"
+}, função(avaliação, erro)
+    resultado, falha = avaliação, erro
+fim))
+garanta(resultado == nulo e falha.tipo == "autenticação-rejeitada")
+garanta(falha.autenticação.dmarc.políticaLocal == verdadeiro)
+garanta(falha.autenticação.dmarc.ação == "rejeitar")
+garanta(falha.mensagem:procure("identidade local", 1, verdadeiro) ~= nulo)
+
+resultado, falha = nulo, nulo
+garanta(autenticador:avalieAssíncrono({
+    remetente = "serviço@santafé.dev.br",
+    destinatários = { "rafael@santafé.dev.br" },
+    conteúdo = conteúdoLocal:troque(
+        "identidade%-falsa@santafé%.dev%.br", "serviço@santafé.dev.br"),
+    endereçoRemoto = "143.208.252.1",
+    nomeDoCliente = "xn--santaf-gva.dev.br"
+}, função(avaliação, erro)
+    resultado, falha = avaliação, erro
+fim))
+garanta(resultado ~= nulo e falha == nulo,
+    "a regra local recusou uma identidade com SPF alinhado")
+garanta(resultado.dmarc.resultado == "passa")
+
+mostre("Autenticação postal:", "ok")

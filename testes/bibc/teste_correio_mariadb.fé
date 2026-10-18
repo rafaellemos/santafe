@@ -1,0 +1,90 @@
+-- Integração optativa da fila durável do Correio com MariaDB.
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local mariadb = importe "mariadb"
+local correio = importe "correio"
+local rede = importe "rede"
+local piscina
+local nomeDaTabela = "santafe_teste_correio"
+local objetos = { resumo = colar.replique("c", 64) }
+
+função objetos.graveAssíncrono(estes, conteúdo, tratador, dado)
+    estes.conteúdo = conteúdo
+    tratador({ resumo = estes.resumo, tamanho = #conteúdo }, nulo, dado)
+    retorne verdadeiro
+fim
+
+função objetos.leiaAssíncrono(estes, resumo, tamanho, tratador, dado)
+    garanta(resumo == estes.resumo e tamanho == #estes.conteúdo)
+    tratador(estes.conteúdo, nulo, dado)
+    retorne verdadeiro
+fim
+
+local função falhe(mensagem)
+    mostre("FALHOU:", mensagem)
+    se piscina então piscina:feche() fim
+    so.saia(1)
+fim
+
+mariadb.criePiscinaAssíncrona({
+    endereço = endereço, usuário = usuário, senha = senha,
+    banco = banco, porta = porta, mínimo = 1, máximo = 2,
+    máximoDaFila = 8, tempoDeEspera = 3000
+}, função(novaPiscina, falhaDaPiscina)
+    se falhaDaPiscina então falhe(falhaDaPiscina); retorne fim
+    piscina = novaPiscina
+    piscina:executeAssíncrono("DROP TABLE IF EXISTS " .. nomeDaTabela,
+        função(_, resultado, falhaDoDescarte)
+            se resultado então resultado:feche() fim
+            se falhaDoDescarte então falhe(falhaDoDescarte); retorne fim
+            local fila = garanta(correio.filaMariaDB(
+                piscina, {
+                    tabela = nomeDaTabela,
+                    tempoDaReserva = 30,
+                    depósito = objetos
+                }
+            ))
+            fila:crieEstruturaAssíncrona(função(criou, falhaDaEstrutura)
+                se não criou então falhe(falhaDaEstrutura); retorne fim
+                local mensagem = garanta(correio.novaMensagem {
+                    remetente = "a@teste.local",
+                    destinatários = { "b@teste.local" },
+                    assunto = "fila",
+                    texto = "persistente"
+                })
+                fila:adicioneAssíncrono(mensagem,
+                    função(identificação, falhaDaInclusão)
+                        se não identificação então falhe(falhaDaInclusão); retorne fim
+                        fila:reservePróximaAssíncrono(função(item, falhaDaReserva)
+                            se não item então falhe(falhaDaReserva ou "fila vazia"); retorne fim
+                            garanta(item.identificação == identificação)
+                            garanta(item.destinatários[1] == "b@teste.local")
+                            fila:marqueEntregueAssíncrono(item.identificação,
+                                função(marcou, falhaDaMarcação)
+                                    se não marcou então falhe(falhaDaMarcação); retorne fim
+                                    piscina:executeAssíncrono(
+                                        "DROP TABLE " .. nomeDaTabela,
+                                        função(_, fimDoResultado, falhaFinal)
+                                            se fimDoResultado então fimDoResultado:feche() fim
+                                            se falhaFinal então falhe(falhaFinal); retorne fim
+                                            piscina:feche()
+                                            mostre("correio MariaDB: ok")
+                                            rede.pareLaço()
+                                        fim)
+                                fim)
+                        fim)
+                    fim)
+            fim)
+        fim)
+fim)
+
+rede.laço()

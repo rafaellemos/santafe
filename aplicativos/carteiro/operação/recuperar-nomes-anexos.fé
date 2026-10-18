@@ -1,0 +1,59 @@
+#!/usr/local/bin/santafé
+
+-- Manutenção idempotente executada pelo publicador com o ambiente de cada
+-- domínio. Relê somente cartas cujo anexo ainda possui o nome provisório.
+
+local mariadb = importe "mariadb"
+local rede = importe "rede"
+local Configuração = importe "correio.configuração"
+local Adaptador = importe "correio.mariadb"
+
+local configuração = Configuração.carregue()
+local somenteValidar =
+    so.obterVariável("CARTEIRO_RECUPERAR_NOMES_SOMENTE_VALIDAR") ==
+        "verdadeiro"
+se somenteValidar então
+    garanta(configuração.banco e configuração.banco.usuário e
+        configuração.banco.banco, "configuração do banco incompleta")
+    garanta(configuração.depósito e configuração.depósito.raiz,
+        "configuração do depósito incompleta")
+fim
+local piscina
+local terminou = falso
+local resultadoFinal
+local falhaFinal
+
+local função encerre(resultado, falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    resultadoFinal, falhaFinal = resultado, falha
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+fim
+
+local iniciou, falhaImediata = mariadb.criePiscinaAssíncrona(
+    configuração.banco,
+    função(novaPiscina, falhaDaPiscina)
+        se não novaPiscina então encerre(nulo, falhaDaPiscina); retorne fim
+        piscina = novaPiscina
+        se somenteValidar então
+            encerre({ validação = verdadeiro }, nulo)
+            retorne
+        fim
+        local repositório = Adaptador.novo(piscina, configuração)
+        repositório:recupereNomesOriginaisDosAnexos(encerre)
+    fim)
+garanta(não falhaImediata, falhaImediata)
+
+rede.laço()
+garanta(terminou e não falhaFinal,
+    falhaFinal ou "a recuperação dos nomes não terminou")
+
+se resultadoFinal.validação então
+    mostre("CONFIGURACAO_E_BANCO_RECUPERACAO_ANEXOS_OK")
+    retorne
+fim
+
+mostre("NOMES_ANEXOS_RECUPERADOS", resultadoFinal.cartas,
+    resultadoFinal.candidatos, resultadoFinal.corrigidos,
+    resultadoFinal.ignorados)

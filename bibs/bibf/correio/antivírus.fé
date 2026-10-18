@@ -1,0 +1,216 @@
+-- Cliente assíncrono do motor ClamAV (clamd).
+--
+-- O motor permanece isolado. O conteúdo é transmitido por INSTREAM e nunca
+-- precisa ser gravado num arquivo temporário pelo Correio.
+
+local rede = importe "rede"
+
+local antivírus = {
+    nome = "Antivírus do Correio Santafé",
+    versão = "0.1.0"
+}
+
+local função inteiro32Grande(valor)
+    retorne colar.caractere(
+        (valor >> 24) & 0xFF,
+        (valor >> 16) & 0xFF,
+        (valor >> 8) & 0xFF,
+        valor & 0xFF
+    )
+fim
+
+local função termineComNulo(conexão, cliente, tratador, falha, dado)
+    se conexão então conexão:feche() fim
+    se cliente então cliente:feche() fim
+    tratador(nulo, falha, dado)
+fim
+
+local função interpreteResposta(resposta)
+    local fimDoRegistro = resposta:procure("\0", 1, verdadeiro)
+    se não fimDoRegistro então retorne nulo, "resposta incompleta do antivírus" fim
+    local linha = resposta:corte(1, fimDoRegistro - 1):apare()
+    se linha:corte(-3) == " OK" então
+        retorne { limpa = verdadeiro, resposta = linha }
+    fim
+    se linha:corte(-6) == " FOUND" então
+        local separador = linha:procure(": ", 1, verdadeiro)
+        local ameaça = separador e linha:corte(separador + 2, -7):apare() ou
+            "ameaça não identificada"
+        retorne { limpa = falso, ameaça = ameaça, resposta = linha }
+    fim
+    retorne nulo, "o antivírus recusou a verificação: " .. linha
+fim
+
+função antivírus.novo(opções)
+    opções = opções ou {}
+    local endereço = opções.endereço ou "127.0.0.1"
+    local porta = opções.porta ou 3310
+    local tempoLimite = opções.tempoLimite ou 120000
+    local limite = opções.limite ou 50 * 1024 * 1024
+    local tamanhoDoBloco = opções.tamanhoDoBloco ou 64 * 1024
+
+    se tipo(endereço) ~= "colar" ou endereço == "" então
+        retorne nulo, "endereço do antivírus inválido"
+    fim
+    se mat.paraInteiro(porta) == nulo ou porta < 1 ou porta > 65535 então
+        retorne nulo, "porta do antivírus inválida"
+    fim
+    se mat.paraInteiro(tempoLimite) == nulo ou tempoLimite < 1000 então
+        retorne nulo, "tempo limite do antivírus inválido"
+    fim
+    se mat.paraInteiro(limite) == nulo ou limite < 1 então
+        retorne nulo, "limite do antivírus inválido"
+    fim
+    se mat.paraInteiro(tamanhoDoBloco) == nulo ou tamanhoDoBloco < 1024 ou
+       tamanhoDoBloco > 1024 * 1024 então
+        retorne nulo, "tamanho do bloco do antivírus deve ficar entre 1 KiB e 1 MiB"
+    fim
+
+    local este = {
+        endereço = endereço,
+        porta = porta,
+        tempoLimite = tempoLimite,
+        limite = limite,
+        tamanhoDoBloco = tamanhoDoBloco
+    }
+
+    função este.confiraAssíncrono(_, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador do antivírus é obrigatório"
+        fim
+        local cliente = rede.clienteTCP()
+        cliente:definaTempoLimite(tempoLimite)
+        local _, falhaAoIniciar = cliente:conecteAssíncrono(endereço, porta,
+            função(_, conexão, falhaDaConexão)
+                se não conexão então
+                    termineComNulo(nulo, cliente, tratador,
+                        falhaDaConexão ou "antivírus indisponível", dado)
+                    retorne
+                fim
+                conexão:definaTempoLimite(tempoLimite)
+                conexão:envieAssíncrono("zPING\0",
+                    função(c, _, falhaDoEnvio)
+                        se falhaDoEnvio então
+                            termineComNulo(c, cliente, tratador, falhaDoEnvio, dado)
+                            retorne
+                        fim
+                        c:recebaDadosAssíncrono(128,
+                            função(_, resposta, falhaDaLeitura)
+                                se falhaDaLeitura ou não resposta então
+                                    termineComNulo(c, cliente, tratador,
+                                        falhaDaLeitura ou "antivírus não respondeu", dado)
+                                    retorne
+                                fim
+                                c:feche(); cliente:feche()
+                                se resposta:procure("PONG\0", 1, verdadeiro) então
+                                    tratador(verdadeiro, nulo, dado)
+                                senão
+                                    tratador(nulo, "resposta inesperada do antivírus", dado)
+                                fim
+                            fim)
+                    fim)
+            fim)
+        se falhaAoIniciar então
+            cliente:feche()
+            retorne nulo, falhaAoIniciar
+        fim
+        retorne verdadeiro
+    fim
+
+    função este.examineAssíncrono(_, conteúdo, tratador, dado)
+        se tipo(conteúdo) ~= "colar" então
+            retorne nulo, "conteúdo para o antivírus deve ser um colar"
+        fim
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador do antivírus é obrigatório"
+        fim
+        se #conteúdo > limite então
+            retorne nulo, "conteúdo excede o limite do antivírus"
+        fim
+
+        local cliente = rede.clienteTCP()
+        cliente:definaTempoLimite(tempoLimite)
+        local _, falhaAoIniciar = cliente:conecteAssíncrono(endereço, porta,
+            função(_, conexão, falhaDaConexão)
+                se não conexão então
+                    termineComNulo(nulo, cliente, tratador,
+                        falhaDaConexão ou "antivírus indisponível", dado)
+                    retorne
+                fim
+                conexão:definaTempoLimite(tempoLimite)
+                conexão:envieAssíncrono("zINSTREAM\0",
+                    função(c, _, falhaDoComando)
+                        se falhaDoComando então
+                            termineComNulo(c, cliente, tratador,
+                                falhaDoComando, dado)
+                            retorne
+                        fim
+                        local posição = 1
+                        local função recebaResposta()
+                            local acumulado = ""
+                            local função receba()
+                                c:recebaDadosAssíncrono(4096,
+                                    função(_, parte, falhaDaLeitura)
+                                        se falhaDaLeitura ou não parte ou parte == "" então
+                                            termineComNulo(c, cliente, tratador,
+                                                falhaDaLeitura ou "antivírus encerrou a resposta",
+                                                dado)
+                                            retorne
+                                        fim
+                                        acumulado = acumulado .. parte
+                                        se #acumulado > 8192 então
+                                            termineComNulo(c, cliente, tratador,
+                                                "resposta do antivírus excedeu o limite", dado)
+                                            retorne
+                                        fim
+                                        se não acumulado:procure("\0", 1, verdadeiro) então
+                                            receba(); retorne
+                                        fim
+                                        local resultado, falha = interpreteResposta(acumulado)
+                                        c:feche(); cliente:feche()
+                                        tratador(resultado, falha, dado)
+                                    fim)
+                            fim
+                            receba()
+                        fim
+                        local função enviePróximo()
+                            se posição > #conteúdo então
+                                c:envieAssíncrono("\0\0\0\0",
+                                    função(_, _, falhaDoFim)
+                                        se falhaDoFim então
+                                            termineComNulo(c, cliente, tratador,
+                                                falhaDoFim, dado)
+                                            retorne
+                                        fim
+                                        recebaResposta()
+                                    fim)
+                                retorne
+                            fim
+                            local fimDoBloco = mat.mínimo(
+                                #conteúdo, posição + tamanhoDoBloco - 1)
+                            local bloco = conteúdo:corte(posição, fimDoBloco)
+                            c:envieAssíncrono(inteiro32Grande(#bloco) .. bloco,
+                                função(_, _, falhaDoBloco)
+                                    se falhaDoBloco então
+                                        termineComNulo(c, cliente, tratador,
+                                            falhaDoBloco, dado)
+                                        retorne
+                                    fim
+                                    posição = fimDoBloco + 1
+                                    enviePróximo()
+                                fim)
+                        fim
+                        enviePróximo()
+                    fim)
+            fim)
+        se falhaAoIniciar então
+            cliente:feche()
+            retorne nulo, falhaAoIniciar
+        fim
+        retorne verdadeiro
+    fim
+
+    retorne este
+fim
+
+retorne antivírus

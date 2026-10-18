@@ -1,0 +1,315 @@
+-- Assinatura DNSSEC de zonas Santafé.
+--
+-- A composição canônica, DNSKEY, RRSIG, NSEC e DS permanecem em Santafé.
+-- A biblioteca segredo fornece somente SHA-256 e a primitiva criptográfica
+-- RSA/SHA-256, da mesma forma que rede fornece apenas o transporte.
+
+local nomes = importe "nomes"
+local segredo = importe "segredo"
+local dnssec = {}
+
+local ALGORITMO = 8       -- RSASHA256
+local RESUMO_DS = 2       -- SHA-256
+local PROTOCOLO = 3
+local BANDEIRAS_CSK = 257 -- chave de zona e ponto seguro de entrada
+
+local função copieLista(lista)
+    local cópia = {}
+    para i, valor em ipares(lista ou {}) início cópia[i] = valor fim
+    retorne cópia
+fim
+
+local função sobNome(nome, origem)
+    se nome == origem então retorne verdadeiro fim
+    local posiçãoInicial = #nome - #origem + 1
+    retorne posiçãoInicial > 1 e nome:corte(posiçãoInicial) == origem e
+        nome:corte(posiçãoInicial - 1, posiçãoInicial - 1) == "."
+fim
+
+local função sobDelegação(zona, nome)
+    para corte em pares(zona.delegações ou {}) início
+        se nome ~= corte e sobNome(nome, corte) então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+local função rótulos(nome)
+    local lista = {}
+    se nome == "." então retorne lista fim
+    para rótulo em nome:corte(1, -2):capture("[^.]+") início
+        lista[#lista + 1] = rótulo:minúscula()
+    fim
+    retorne lista
+fim
+
+local função nomeCanônicoMenor(a, b)
+    local ar, br = rótulos(a), rótulos(b)
+    local ai, bi = #ar, #br
+    enquanto ai > 0 e bi > 0 início
+        se ar[ai] ~= br[bi] então retorne ar[ai] < br[bi] fim
+        ai, bi = ai - 1, bi - 1
+    fim
+    retorne #ar < #br
+fim
+
+local função quantidadeDeRótulos(nome)
+    local quantidade = #rótulos(nome)
+    se nome:corte(1, 2) == "*." então quantidade = quantidade - 1 fim
+    retorne quantidade
+fim
+
+local função tiposOrdenados(porTipo, incluaAssinatura)
+    local tipos, vistos = {}, {}
+    para chave, lista em pares(porTipo ou {}) início
+        local número = paraNúmero(chave)
+        se número e número ~= nomes.TIPOS.RRSIG e #lista > 0 e
+           não vistos[número] então
+            vistos[número] = verdadeiro
+            tipos[#tipos + 1] = número
+        fim
+    fim
+    se incluaAssinatura e não vistos[nomes.TIPOS.RRSIG] então
+        tipos[#tipos + 1] = nomes.TIPOS.RRSIG
+    fim
+    tabela.ordene(tipos)
+    retorne tipos
+fim
+
+local função mapaDeTipos(tipos)
+    local janelas = {}
+    para _, tipoDoRegistro em ipares(tipos) início
+        local janela = mat.piso(tipoDoRegistro / 256)
+        local posição = tipoDoRegistro % 256
+        local octeto = mat.piso(posição / 8) + 1
+        local máscara = 1 << (7 - (posição % 8))
+        se não janelas[janela] então janelas[janela] = {} fim
+        janelas[janela][octeto] = (janelas[janela][octeto] ou 0) | máscara
+    fim
+
+    local números = {}
+    para janela em pares(janelas) início números[#números + 1] = janela fim
+    tabela.ordene(números)
+    local partes = {}
+    para _, janela em ipares(números) início
+        local octetos = janelas[janela]
+        local tamanho = 0
+        para posição em pares(octetos) início
+            se posição > tamanho então tamanho = posição fim
+        fim
+        local conteúdo = {}
+        para posição = 1, tamanho início
+            conteúdo[#conteúdo + 1] = colar.caractere(octetos[posição] ou 0)
+        fim
+        partes[#partes + 1] = colar.caractere(janela, tamanho) ..
+            tabela.concatene(conteúdo)
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função etiquetaDaChave(dadosDNSKEY)
+    local soma = 0
+    para i = 1, #dadosDNSKEY início
+        local valor = dadosDNSKEY:byte(i)
+        se i % 2 == 1 então soma = soma + (valor << 8)
+        senão soma = soma + valor fim
+    fim
+    soma = soma + ((soma >> 16) & 0xFFFF)
+    retorne soma & 0xFFFF
+fim
+
+local função dadosCanônicosDoConjunto(nome, tipoDoRegistro, registros, ttl)
+    local dadosÚnicos, vistos = {}, {}
+    para _, registro em ipares(registros) início
+        se registro.ttl ~= ttl então
+            retorne nulo, "um conjunto DNS não pode misturar valores TTL"
+        fim
+        local dados = nomes._codifiqueDados(registro, tipoDoRegistro)
+        se não vistos[dados] então
+            vistos[dados] = verdadeiro
+            dadosÚnicos[#dadosÚnicos + 1] = dados
+        fim
+    fim
+    tabela.ordene(dadosÚnicos)
+
+    local partes = {}
+    local nomeCodificado = nomes._codifiqueNome(nome)
+    para _, dados em ipares(dadosÚnicos) início
+        partes[#partes + 1] = nomeCodificado .. nomes._u16(tipoDoRegistro) ..
+            nomes._u16(nomes.CLASSES.IN) .. nomes._u32(ttl) ..
+            nomes._u16(#dados) .. dados
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função crieRRSIG(nome, tipoDoRegistro, registros, chave, tempos)
+    local ttl = registros[1].ttl
+    local prefixo = nomes._u16(tipoDoRegistro) ..
+        colar.caractere(ALGORITMO, quantidadeDeRótulos(nome)) ..
+        nomes._u32(ttl) .. nomes._u32(tempos.carimboFinal) ..
+        nomes._u32(tempos.carimboInicial) .. nomes._u16(chave.etiqueta) ..
+        nomes._codifiqueNome(chave.nome)
+    local conjunto, falha = dadosCanônicosDoConjunto(
+        nome, tipoDoRegistro, registros, ttl
+    )
+    se não conjunto então retorne nulo, falha fim
+    local assinatura
+    assinatura, falha = segredo.assineRSA256(
+        prefixo .. conjunto, chave.privada
+    )
+    se não assinatura então retorne nulo, falha fim
+    retorne {
+        nome = nome,
+        tipo = nomes.TIPOS.RRSIG,
+        classe = nomes.CLASSES.IN,
+        ttl = ttl,
+        tipoCoberto = tipoDoRegistro,
+        assinaturaDNSSEC = verdadeiro,
+        dados = prefixo .. assinatura
+    }
+fim
+
+local função encontreCobertura(nomes, nome)
+    para i, atual em ipares(nomes) início
+        local próximo = nomes[(i % #nomes) + 1]
+        se atual == nome então retorne atual fim
+        se nomeCanônicoMenor(atual, próximo) então
+            se nomeCanônicoMenor(atual, nome) e
+               nomeCanônicoMenor(nome, próximo) então retorne atual fim
+        senão
+            -- O último NSEC volta ao primeiro nome da zona.
+            se nomeCanônicoMenor(atual, nome) ou
+               nomeCanônicoMenor(nome, próximo) então retorne atual fim
+        fim
+    fim
+    retorne nomes[#nomes]
+fim
+
+função dnssec.assineZona(zona, opções)
+    opções = opções ou {}
+    local privada = opções.chavePrivada
+    se tipo(privada) ~= "colar" ou #privada == 0 então
+        retorne nulo, "DNSSEC exige chavePrivada RSA em PEM"
+    fim
+
+    local pública, falha = segredo.chavePúblicaRSA(privada)
+    se não pública então retorne nulo, falha fim
+    local primeiro = pública:byte(1)
+    local cabeçalho = primeiro == 0 e 3 ou 1
+    local expoente = primeiro == 0 e
+        ((pública:byte(2) << 8) | pública:byte(3)) ou primeiro
+    local tacosDoMódulo = #pública - cabeçalho - expoente
+    se tacosDoMódulo < 256 então
+        retorne nulo, "a chave DNSSEC RSA precisa ter ao menos 2048 ticos"
+    fim
+
+    local bandeiras = opções.bandeiras ou BANDEIRAS_CSK
+    local dadosDNSKEY = nomes._u16(bandeiras) ..
+        colar.caractere(PROTOCOLO, ALGORITMO) .. pública
+    local chave = {
+        nome = zona.nome,
+        privada = privada,
+        pública = pública,
+        dados = dadosDNSKEY,
+        etiqueta = etiquetaDaChave(dadosDNSKEY),
+        algoritmo = ALGORITMO,
+        bandeiras = bandeiras
+    }
+
+    local agora = mat.paraInteiro(opções.carimbo ou so.tempo())
+    local começoDoDia = mat.piso(agora / 86400) * 86400
+    local tempos = {
+        carimboInicial = mat.paraInteiro(
+            opções.inícioDaValidade ou (começoDoDia - 3600)),
+        carimboFinal = mat.paraInteiro(opções.fimDaValidade ou
+            (começoDoDia + 15 * 86400))
+    }
+    se tempos.carimboInicial < 0 ou tempos.carimboFinal > 0xFFFFFFFF ou
+       tempos.carimboFinal <= tempos.carimboInicial então
+        retorne nulo, "intervalo de validade DNSSEC inválido"
+    fim
+
+    local adicionado
+    adicionado, falha = zona:adicione({
+        nome = zona.nome, tipo = nomes.TIPOS.DNSKEY,
+        ttl = opções.ttl ou zona.ttlPadrão, dados = dadosDNSKEY,
+        dnssec = verdadeiro
+    })
+    se não adicionado então retorne nulo, falha fim
+
+    local nomesDaZona = {}
+    para nome, porTipo em pares(zona.registros) início
+        se não sobDelegação(zona, nome) e tiposOrdenados(porTipo)[1] então
+            nomesDaZona[#nomesDaZona + 1] = nome
+        fim
+    fim
+    tabela.ordene(nomesDaZona, nomeCanônicoMenor)
+    se #nomesDaZona == 0 então
+        retorne nulo, "zona DNSSEC não possui nomes"
+    fim
+
+    para i, nome em ipares(nomesDaZona) início
+        local próximo = nomesDaZona[(i % #nomesDaZona) + 1]
+        local porTipo = zona.registros[nome]
+        local tipos = tiposOrdenados(porTipo, verdadeiro)
+        se não porTipo[paraColar(nomes.TIPOS.NSEC)] então
+            tipos[#tipos + 1] = nomes.TIPOS.NSEC
+            tabela.ordene(tipos)
+        fim
+        adicionado, falha = zona:adicione({
+            nome = nome, tipo = nomes.TIPOS.NSEC,
+            ttl = zona.ttlPadrão,
+            dados = nomes._codifiqueNome(próximo) .. mapaDeTipos(tipos),
+            dnssec = verdadeiro, próximoNomeSeguro = próximo
+        })
+        se não adicionado então retorne nulo, falha fim
+    fim
+
+    para _, nome em ipares(nomesDaZona) início
+        local porTipo = zona.registros[nome]
+        local tipos = tiposOrdenados(porTipo, falso)
+        para _, tipoDoRegistro em ipares(tipos) início
+            local registros = porTipo[paraColar(tipoDoRegistro)]
+            local assinatura
+            assinatura, falha = crieRRSIG(
+                nome, tipoDoRegistro, registros, chave, tempos
+            )
+            se não assinatura então retorne nulo, falha fim
+            adicionado, falha = zona:adicione(assinatura)
+            se não adicionado então retorne nulo, falha fim
+        fim
+    fim
+
+    local resumo = segredo.resumaSHA256(
+        nomes._codifiqueNome(zona.nome) .. dadosDNSKEY
+    )
+    local estado = {
+        ativo = verdadeiro,
+        algoritmo = ALGORITMO,
+        resumo = RESUMO_DS,
+        etiqueta = chave.etiqueta,
+        chavePública = pública,
+        chavePúblicaBase64 = colar.base64(pública),
+        dadosDNSKEY = dadosDNSKEY,
+        digestão = colar.hex(resumo):maiúscula(),
+        inícioDaValidade = tempos.carimboInicial,
+        fimDaValidade = tempos.carimboFinal,
+        nomes = copieLista(nomesDaZona)
+    }
+    função estado.encontreNSEC(_, nome)
+        retorne encontreCobertura(nomesDaZona, nome)
+    fim
+    função estado.formateDS()
+        retorne zona.nome .. " IN DS " .. estado.etiqueta .. " " ..
+            estado.algoritmo .. " " .. estado.resumo .. " " .. estado.digestão
+    fim
+
+    -- A chave privada não permanece no estado nem nas funções de consulta.
+    chave.privada = nulo
+    retorne estado
+fim
+
+dnssec.nomeCanônicoMenor = nomeCanônicoMenor
+dnssec.mapaDeTipos = mapaDeTipos
+dnssec.etiquetaDaChave = etiquetaDaChave
+
+retorne dnssec

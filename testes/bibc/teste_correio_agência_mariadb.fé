@@ -1,0 +1,140 @@
+-- Identidade SMTP da Agência sobre a mesma senha e caixa usadas pelo portal.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/mariadb/?.so;bibs/bibc/rede/?.so;" ..
+    "bibs/bibc/segredo/?.so;" .. módulo.caminhoC
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuárioDoBanco = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senhaDoBanco = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+se não (endereço e usuárioDoBanco e senhaDoBanco e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local mariadb = importe "mariadb"
+local segredo = importe "segredo"
+local rede = importe "rede"
+local Adaptador = importe "correio.mariadb"
+
+local piscina
+local nomeDoUsuário = so.obterVariável("SANTAFE_TESTE_USUARIO") ou
+    ("agencia-" .. so.tempo() .. "-" .. so.aleatório())
+garanta(nomeDoUsuário:separe("^[a-z0-9-]+$") == nomeDoUsuário,
+    "SANTAFE_TESTE_USUARIO aceita apenas a-z, 0-9 e hífen")
+local senha = "senha longa da Agência para o ensaio"
+local terminou = falso
+local falhaFinal
+local inseriuUsuário = falso
+local encerrando = falso
+local execute
+
+local objetos = {}
+função objetos.prepareAssíncrono(_, tratador) tratador(verdadeiro) fim
+
+local função finalize(falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    falhaFinal = falha
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+fim
+
+local função encerre(falha)
+    se terminou ou encerrando então retorne fim
+    encerrando = verdadeiro
+    se não (piscina e inseriuUsuário) então
+        finalize(falha)
+        retorne
+    fim
+
+    -- A caixa usa ON DELETE RESTRICT para o usuário. Apague-a primeiro;
+    -- assim o ensaio não deixa identidades artificiais nem quando falha.
+    execute([[
+DELETE c FROM correio_caixas c
+JOIN usuarios u ON u.id = c.usuario_id
+WHERE u.usuario = ?]], { nomeDoUsuário },
+        função(exclusãoDaCaixa, falhaDaCaixa)
+            se exclusãoDaCaixa então exclusãoDaCaixa:feche() fim
+            execute("DELETE FROM usuarios WHERE usuario = ?",
+                { nomeDoUsuário },
+                função(exclusãoDoUsuário, falhaDoUsuário)
+                    se exclusãoDoUsuário então
+                        exclusãoDoUsuário:feche()
+                    fim
+                    finalize(falha ou falhaDaCaixa ou falhaDoUsuário)
+                fim)
+        fim)
+fim
+
+execute = função(sql, parâmetros, tratador)
+    piscina:executePreparadoAssíncrono(sql, parâmetros,
+        função(_, resultado, falha)
+            tratador(resultado, falha)
+        fim)
+fim
+
+mariadb.criePiscinaAssíncrona({
+    endereço = endereço, usuário = usuárioDoBanco, senha = senhaDoBanco,
+    banco = banco, porta = porta, mínimo = 1, máximo = 2,
+    máximoDaFila = 8, tempoDeEspera = 3000
+}, função(novaPiscina, falhaDaPiscina)
+    se não novaPiscina então encerre(falhaDaPiscina); retorne fim
+    piscina = novaPiscina
+    segredo.protejaSenhaAssíncrono(senha,
+        função(resumo, falhaDoResumo)
+            se não resumo então encerre(falhaDoResumo); retorne fim
+            segredo.protejaSenhaAssíncrono("senha de conta inexistente",
+                função(resumoIsca, falhaDaIsca)
+                    se não resumoIsca então encerre(falhaDaIsca); retorne fim
+                    execute([[
+INSERT INTO usuarios (nome,usuario,email,senha_hash,papel,estado)
+VALUES (?,?,?,?,?,?)]], {
+                        "Agência SMTP", nomeDoUsuário,
+                        nomeDoUsuário .. "@example.net", resumo,
+                        "usuário", "ativo"
+                    }, função(inclusão, falhaDaInclusão)
+                        se falhaDaInclusão então
+                            se inclusão então inclusão:feche() fim
+                            encerre(falhaDaInclusão); retorne
+                        fim
+                        inclusão:feche()
+                        inseriuUsuário = verdadeiro
+                        local adaptador = Adaptador.novo(piscina, {
+                            domínio = "santafé.dev.br",
+                            domínioASCII = "xn--santaf-gva.dev.br",
+                            depósito = { raiz = "/tmp/não-usado-agência" }
+                        }, objetos)
+                        adaptador:autentiqueCaixa(
+                            nomeDoUsuário .. "@santafé.dev.br",
+                            senha, resumoIsca,
+                            função(identidade, falhaDaAutenticação)
+                                se não identidade então
+                                    encerre(falhaDaAutenticação ou
+                                        "senha correta foi recusada")
+                                    retorne
+                                fim
+                                garanta(identidade.usuário == nomeDoUsuário)
+                                garanta(identidade.caixa.endereço ==
+                                    nomeDoUsuário .. "@santafé.dev.br")
+                                adaptador:autentiqueCaixa(nomeDoUsuário,
+                                    "senha errada", resumoIsca,
+                                    função(indevida, falhaIndevida)
+                                        se falhaIndevida ou indevida então
+                                            encerre(falhaIndevida ou
+                                                "senha errada foi aceita")
+                                            retorne
+                                        fim
+                                        mostre("Correio Agência MariaDB: ok")
+                                        encerre()
+                                    fim)
+                            fim)
+                    fim)
+                fim)
+        fim)
+fim)
+
+rede.laço()
+garanta(terminou e falhaFinal == nulo, falhaFinal)

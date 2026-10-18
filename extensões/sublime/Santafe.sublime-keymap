@@ -1,0 +1,13 @@
+[
+    {
+        "keys": ["enter"],
+        "command": "santafe_nova_linha",
+        "context": [
+            {
+                "key": "selector",
+                "operator": "equal",
+                "operand": "source.santafe - comment - string"
+            }
+        ]
+    }
+]

@@ -1,0 +1,304 @@
+local carteiro = {
+    nome = "Carteiro Santafé",
+    versão = "1.5.0"
+}
+
+local pastas = {
+    entrada = verdadeiro,
+    enviadas = verdadeiro,
+    rascunhos = verdadeiro,
+    arquivadas = verdadeiro,
+    indesejadas = verdadeiro,
+    lixeira = verdadeiro,
+    todas = verdadeiro
+}
+
+local destinos = {
+    entrada = verdadeiro, enviadas = verdadeiro,
+    arquivadas = verdadeiro, indesejadas = verdadeiro, lixeira = verdadeiro
+}
+
+local função identificaçãoDaCaixa(caixa)
+    se tipo(caixa) == "tabela" então retorne caixa.id fim
+    retorne caixa
+fim
+
+local função pastaPrincipal(direção)
+    se direção == "entrada" então retorne "entrada" fim
+    se direção == "saída" ou direção == "saida" então retorne "enviadas" fim
+    retorne nulo
+fim
+
+local função movimentoPermitido(mensagem, destino)
+    se destino == "arquivadas" ou destino == "indesejadas" ou
+       destino == "lixeira" então
+        retorne verdadeiro
+    fim
+    local principal = pastaPrincipal(mensagem.direção)
+    retorne principal ~= nulo e destino == principal e
+        (mensagem.pasta == "arquivadas" ou
+         mensagem.pasta == "indesejadas" ou mensagem.pasta == "lixeira")
+fim
+
+função carteiro.novo(opções)
+    opções = opções ou {}
+    local caixas = garanta(opções.caixas,
+        "acesso às caixas postais é obrigatório")
+    local cd = garanta(opções.cd, "Correio CD é obrigatório")
+
+    local este = {
+        caixas = caixas,
+        cd = cd
+    }
+
+    função este.pastas()
+        retorne { "entrada", "enviadas", "rascunhos", "arquivadas",
+            "indesejadas", "lixeira" }
+    fim
+
+    função este.usuárioPorSessão(_, resumoDoBilhete, tratador)
+        retorne caixas:obtenhaUsuárioPorSessão(resumoDoBilhete, tratador)
+    fim
+
+    função este.caixaDoUsuário(_, usuário, tratador)
+        retorne caixas:obtenhaOuCrieCaixa(usuário, tratador)
+    fim
+
+    função este.listeCartas(_, caixa, pasta, busca, limite,
+                                      deslocamento, tratador)
+        se tipo(deslocamento) == "função" então
+            tratador, deslocamento = deslocamento, 0
+        fim
+        se não pastas[pasta] então
+            tratador(nulo, "pasta inválida")
+            retorne
+        fim
+        retorne caixas:listeMensagens(
+            identificaçãoDaCaixa(caixa), pasta, busca, limite,
+            deslocamento, tratador)
+    fim
+
+    função este.conteCartas(_, caixa, pasta, busca, tratador)
+        se não pastas[pasta] então
+            tratador(nulo, "pasta inválida")
+            retorne
+        fim
+        retorne caixas:conteMensagens(
+            identificaçãoDaCaixa(caixa), pasta, busca, tratador)
+    fim
+
+    função este.listeCartasParaAção(_, caixa, pasta, busca, tratador)
+        se não pastas[pasta] então
+            tratador(nulo, "pasta inválida")
+            retorne
+        fim
+        retorne caixas:listeMensagensParaAção(
+            identificaçãoDaCaixa(caixa), pasta, busca, tratador)
+    fim
+
+    função este.listeCartasDaConversa(_, caixa, pasta, identificação,
+                                                    tratador)
+        se não pastas[pasta] então
+            tratador(nulo, "pasta inválida")
+            retorne
+        fim
+        retorne caixas:listeMensagensDaConversa(
+            identificaçãoDaCaixa(caixa), pasta, identificação, tratador)
+    fim
+
+    função este.obtenhaCarta(_, caixa, identificação, tratador)
+        retorne caixas:obtenhaMensagem(
+            identificaçãoDaCaixa(caixa), identificação, tratador)
+    fim
+
+    função este.obtenhaCartaOriginal(_, caixa, identificação, tratador)
+        retorne caixas:obtenhaMensagemIMAP(
+            identificaçãoDaCaixa(caixa), identificação, tratador)
+    fim
+
+    função este.obtenhaAnexo(_, caixa, carta, anexo, tratador)
+        retorne caixas:obtenhaAnexo(
+            identificaçãoDaCaixa(caixa), carta, anexo, tratador)
+    fim
+
+    função este.marqueCartaLida(_, caixa, identificação, tratador)
+        retorne caixas:marqueLida(
+            identificaçãoDaCaixa(caixa), identificação, tratador)
+    fim
+
+    função este.marqueCartaNãoLida(_, caixa, identificação, tratador)
+        retorne caixas:marqueNãoLida(
+            identificaçãoDaCaixa(caixa), identificação, tratador)
+    fim
+
+    função este.movaCarta(_, caixa, identificação, pasta, tratador)
+        se não destinos[pasta] então
+            tratador(nulo, "pasta inválida")
+            retorne
+        fim
+        local caixaId = identificaçãoDaCaixa(caixa)
+        retorne caixas:obtenhaMensagem(caixaId, identificação,
+            função(mensagem, falha)
+                se falha então tratador(nulo, falha); retorne fim
+                se não mensagem então tratador(falso, nulo); retorne fim
+                se não movimentoPermitido(mensagem, pasta) então
+                    tratador(nulo,
+                        "a direção da carta não permite movê-la para " .. pasta,
+                        "pasta-incompatível")
+                    retorne
+                fim
+                caixas:movaMensagem(caixaId, identificação, pasta, tratador)
+            fim)
+    fim
+
+    função este.movaCartas(_, caixa, identificações, pasta, tratador)
+        se não destinos[pasta] então
+            tratador(nulo, "pasta inválida")
+            retorne
+        fim
+        se tipo(identificações) ~= "tabela" ou #identificações == 0 então
+            tratador(nulo, "selecione ao menos uma carta")
+            retorne
+        fim
+
+        se tipo(identificações[1]) == "tabela" e
+           tipo(caixas.movaMensagensEmLote) == "função" então
+            local ids, ignoradas = {}, 0
+            para _, mensagem em ipares(identificações) início
+                se não movimentoPermitido(mensagem, pasta) então
+                    tratador(nulo,
+                        "a direção da carta não permite movê-la para " .. pasta,
+                        "pasta-incompatível")
+                    retorne
+                fim
+                se mensagem.pasta == pasta então ignoradas = ignoradas + 1
+                senão ids[#ids + 1] = mensagem.id fim
+            fim
+            se #ids == 0 então
+                tratador({ quantidade = 0, ignoradas = ignoradas }, nulo)
+                retorne
+            fim
+            retorne caixas:movaMensagensEmLote(
+                identificaçãoDaCaixa(caixa), ids, pasta,
+                função(resultado, falha)
+                    se falha então tratador(nulo, falha); retorne fim
+                    resultado.ignoradas =
+                        (resultado.ignoradas ou 0) + ignoradas
+                    tratador(resultado, nulo)
+                fim)
+        fim
+
+        local movidas, ignoradas = 0, 0
+        local função movaPróxima(índice)
+            se índice > #identificações então
+                tratador({ quantidade = movidas, ignoradas = ignoradas }, nulo)
+                retorne
+            fim
+            local item = identificações[índice]
+            local id = tipo(item) == "tabela" e item.id ou item
+            este:movaCarta(caixa, id, pasta,
+                função(moveu, falha, tipoDaFalha)
+                    se falha então
+                        tratador(nulo, falha, tipoDaFalha, {
+                            quantidade = movidas, ignoradas = ignoradas
+                        })
+                        retorne
+                    fim
+                    se moveu então movidas = movidas + 1
+                    senão ignoradas = ignoradas + 1 fim
+                    movaPróxima(índice + 1)
+                fim)
+        fim
+        movaPróxima(1)
+    fim
+
+    local função marqueCartas(caixa, identificações, lida, tratador)
+        se tipo(identificações) ~= "tabela" ou #identificações == 0 então
+            tratador(nulo, "selecione ao menos uma carta")
+            retorne
+        fim
+        local métodoDoLote = lida e "marqueMensagensLidasEmLote" ou
+            "marqueMensagensNãoLidasEmLote"
+        se tipo(caixas[métodoDoLote]) == "função" então
+            local ids = {}
+            para _, item em ipares(identificações) início
+                ids[#ids + 1] = tipo(item) == "tabela" e item.id ou item
+            fim
+            retorne caixas[métodoDoLote](caixas,
+                identificaçãoDaCaixa(caixa), ids, tratador)
+        fim
+        local marcadas, ignoradas = 0, 0
+        local função marquePróxima(índice)
+            se índice > #identificações então
+                tratador({ quantidade = marcadas, ignoradas = ignoradas }, nulo)
+                retorne
+            fim
+            local método = lida e "marqueCartaLida" ou "marqueCartaNãoLida"
+            este[método](este, caixa, identificações[índice],
+                função(marcou, falha)
+                    se falha então tratador(nulo, falha); retorne fim
+                    se marcou então marcadas = marcadas + 1
+                    senão ignoradas = ignoradas + 1 fim
+                    marquePróxima(índice + 1)
+                fim)
+        fim
+        marquePróxima(1)
+    fim
+
+    função este.marqueCartasLidas(_, caixa, identificações, tratador)
+        retorne marqueCartas(caixa, identificações, verdadeiro, tratador)
+    fim
+
+    função este.marqueCartasNãoLidas(_, caixa, identificações, tratador)
+        retorne marqueCartas(caixa, identificações, falso, tratador)
+    fim
+
+    função este.esvazieLixeira(_, caixa, tratador)
+        retorne caixas:esvazieLixeira(identificaçãoDaCaixa(caixa), tratador)
+    fim
+
+    função este.remetenteConfiável(_, caixa, remetente, tratador)
+        retorne caixas:remetenteConfiável(
+            identificaçãoDaCaixa(caixa), remetente, tratador)
+    fim
+
+    função este.confieNoRemetente(_, caixa, remetente, tratador)
+        retorne caixas:confieNoRemetente(
+            identificaçãoDaCaixa(caixa), remetente, tratador)
+    fim
+
+    função este.deixeDeConfiarNoRemetente(_, caixa, remetente, tratador)
+        retorne caixas:deixeDeConfiarNoRemetente(
+            identificaçãoDaCaixa(caixa), remetente, tratador)
+    fim
+
+    função este.listeRegrasDaTriagem(_, caixa, tratador)
+        retorne caixas:listeRegrasDaTriagem(
+            identificaçãoDaCaixa(caixa), tratador)
+    fim
+
+    função este.salveRegraDaTriagem(_, caixa, escopo, valor, decisão,
+                                             tratador)
+        retorne caixas:salveRegraDaTriagem(
+            identificaçãoDaCaixa(caixa), escopo, valor, decisão, tratador)
+    fim
+
+    função este.removaRegraDaTriagem(_, caixa, escopo, valor, tratador)
+        retorne caixas:removaRegraDaTriagem(
+            identificaçãoDaCaixa(caixa), escopo, valor, tratador)
+    fim
+
+    função este.decidaTriagemDaCarta(_, caixa, identificação, decisão,
+                                              tratador)
+        retorne caixas:decidaTriagemDaCarta(
+            identificaçãoDaCaixa(caixa), identificação, decisão, tratador)
+    fim
+
+    função este.envieCarta(_, caixa, dados, tratador)
+        retorne cd:posteCarta(caixa, dados, tratador)
+    fim
+
+    retorne este
+fim
+
+retorne carteiro

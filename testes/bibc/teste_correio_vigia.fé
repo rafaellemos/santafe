@@ -1,0 +1,83 @@
+-- O Correio usa o Vigia como único mecanismo de limite de conexões.
+
+local rede = importe "rede"
+local correio = importe "correio"
+local pulso = importe "pulso"
+
+local memória = garanta(pulso.memória(32))
+local canal = garanta(pulso.novo({ serviço = "teste-correio-vigia" }))
+garanta(canal:adicioneDestino(memória))
+
+local servidor = garanta(correio.servidor({
+    endereço = "127.0.0.1",
+    porta = 18762,
+    nome = "smtp.vigia.local",
+    domíniosLocais = { "vigia.local" },
+    limiteConexões = 10,
+    limiteConexõesPorEndereço = 1,
+    limiteNovasConexõesPorMinuto = 10,
+    receba = função() retorne verdadeiro fim,
+    pulso = canal
+}))
+garanta(servidor:inicie())
+
+local terminou = falso
+local detalhe = "o ensaio não terminou"
+local conexãoPrimeira
+local clientePrimeiro = rede.clienteTCP()
+
+local função encerre(mensagem)
+    detalhe = mensagem
+    se conexãoPrimeira então conexãoPrimeira:feche() fim
+    servidor:feche()
+fim
+
+clientePrimeiro:conecteAssíncrono("127.0.0.1", 18762,
+    função(_, conexão, falha)
+        se falha então encerre(falha); retorne fim
+        conexãoPrimeira = conexão
+        conexão:recebaDadosAssíncrono(1024,
+            função(_, saída, falhaDaLeitura)
+                se falhaDaLeitura ou não saída:procure("220 ", 1, verdadeiro) então
+                    encerre(falhaDaLeitura ou "primeira conexão sem saudação")
+                    retorne
+                fim
+                local clienteSegundo = rede.clienteTCP()
+                clienteSegundo:conecteAssíncrono("127.0.0.1", 18762,
+                    função(_, segunda, falhaDaConexão)
+                        se falhaDaConexão então encerre(falhaDaConexão); retorne fim
+                        segunda:recebaDadosAssíncrono(1024,
+                            função(c, resposta, falhaDaRecusa)
+                                se falhaDaRecusa então
+                                    encerre(falhaDaRecusa); retorne
+                                fim
+                                terminou = resposta:procure(
+                                    "421 4.7.0", 1, verdadeiro) == 1
+                                detalhe = terminou e "ok" ou
+                                    "segunda conexão não recebeu 421"
+                                c:feche()
+                                encerre(detalhe)
+                            fim)
+                    fim)
+            fim)
+    fim)
+
+rede.laço()
+garanta(terminou, detalhe)
+
+local estatísticas = servidor:estatísticas()
+garanta(estatísticas.aceitas == 1 e estatísticas.recusadas == 1)
+garanta(estatísticas.vigia.admitidas == 1 e
+        estatísticas.vigia.recusadas == 1 e
+        estatísticas.vigia.ativas == 0,
+    "contadores do Vigia SMTP divergentes")
+
+local genérico, postal = falso, falso
+para _, acontecimento em ipares(memória.mensagens) início
+    se acontecimento.nome == "vigia.limiteAtingido" então genérico = verdadeiro fim
+    se acontecimento.nome == "correio.conexãoLimitada" então postal = verdadeiro fim
+fim
+garanta(genérico e postal, "acontecimentos de limite ausentes")
+
+canal:feche()
+mostre("correio Vigia: ok")

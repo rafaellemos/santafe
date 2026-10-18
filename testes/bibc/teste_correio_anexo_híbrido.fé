@@ -1,0 +1,66 @@
+-- Leitura de anexos novos por objeto e compatibilidade com LONGBLOB v1.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/arquivo/?.so;bibs/bibc/segredo/?.so;" ..
+    "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local Repositório = importe "correio.mariadb"
+local resumo = colar.replique("d", 64)
+
+local função resultado(linha)
+    local este = { linha = linha }
+    função este.obterLinha(esta)
+        local valor = esta.linha
+        esta.linha = nulo
+        retorne valor
+    fim
+    função este.feche(_) retorne verdadeiro fim
+    retorne este
+fim
+
+local função piscinaCom(linha)
+    local esta = {}
+    função esta.executePreparadoAssíncrono(piscina, sql, parâmetros, tratador)
+        garanta(sql:procure("a.dados_objeto", 1, verdadeiro),
+            "consulta não selecionou o resumo do objeto")
+        garanta(parâmetros[1] == 7 e parâmetros[2] == 8 e
+            parâmetros[3] == 9)
+        tratador(piscina, resultado(linha), nulo)
+        retorne verdadeiro
+    fim
+    retorne esta
+fim
+
+local objetos = { leituras = 0 }
+função objetos.leiaAssíncrono(estes, objeto, tamanho, tratador, dado)
+    estes.leituras = estes.leituras + 1
+    garanta(objeto == resumo e tamanho == 5)
+    tratador("dados", nulo, dado)
+    retorne verdadeiro
+fim
+
+local configuração = { depósito = { raiz = "/tmp/não-usado" } }
+local linhaNova = { [1] = "foto.png", [2] = "image/png", [3] = "5",
+    [5] = resumo }
+local novo = Repositório.novo(
+    piscinaCom(linhaNova), configuração, objetos)
+local anexoNovo, falhaNova
+novo:obtenhaAnexo(7, 8, 9, função(anexo, falha)
+    anexoNovo, falhaNova = anexo, falha
+fim)
+garanta(anexoNovo e não falhaNova e anexoNovo.dados == "dados")
+garanta(objetos.leituras == 1)
+
+local linhaLegada = { [1] = "antigo.txt", [2] = "text/plain", [3] = "6",
+    [4] = "antigo" }
+local legado = Repositório.novo(
+    piscinaCom(linhaLegada), configuração, objetos)
+local anexoLegado, falhaLegada
+legado:obtenhaAnexo(7, 8, 9, função(anexo, falha)
+    anexoLegado, falhaLegada = anexo, falha
+fim)
+garanta(anexoLegado e não falhaLegada e anexoLegado.dados == "antigo")
+garanta(objetos.leituras == 1,
+    "anexo legado não deveria consultar o depósito de objetos")
+
+mostre("Correio anexo híbrido: ok")

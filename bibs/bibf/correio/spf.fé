@@ -1,0 +1,433 @@
+-- SPF assíncrono para a identidade MAIL FROM, conforme a RFC 7208.
+-- O módulo conserva os limites de consultas entre inclusões e redireções;
+-- uma política maliciosa não consegue provocar resolução DNS ilimitada.
+
+local rede = importe "rede"
+local acesso = importe "nomes.acesso"
+
+local spf = { nome = "SPF do Correio Santafé", versão = "1.0.0" }
+
+local qualificadores = {
+    ["+"] = "passa", ["-"] = "falha",
+    ["~"] = "falhaSuave", ["?"] = "neutro"
+}
+
+local função domínioDoEndereço(endereço)
+    endereço = paraColar(endereço ou ""):apare()
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba então retorne nulo fim
+    retorne endereço:corte(arroba + 1)
+fim
+
+local função parteLocal(endereço)
+    endereço = paraColar(endereço ou ""):apare()
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    retorne arroba e endereço:corte(1, arroba - 1) ou endereço
+fim
+
+local função domínioCanônico(domínio)
+    local resultado = rede.domínioASCII((domínio ou ""):apare())
+    se não resultado ou resultado == "" ou #resultado > 253 então retorne nulo fim
+    retorne resultado:minúscula()
+fim
+
+local função resultado(nome, domínio, mecanismo, explicação)
+    retorne { resultado = nome, domínio = domínio,
+        mecanismo = mecanismo, explicação = explicação }
+fim
+
+local função novoContexto(opções)
+    opções = opções ou {}
+    local contexto = {
+        endereço = opções.endereço,
+        remetente = opções.remetente,
+        nomeDoCliente = opções.nomeDoCliente ou "desconhecido",
+        nomeDoServidor = opções.nomeDoServidor ou "localhost",
+        limiteDNS = opções.limiteDNS ou 10,
+        limiteVazio = opções.limiteVazio ou 2,
+        consultas = 0, vazias = 0, visitados = {}, profundidade = 0,
+        tempoLimite = opções.tempoLimite ou 5000
+    }
+    contexto.consulteTXT = opções.consulteTXT ou função(nome, tratador)
+        rede.consulteDNSAssíncrono(nome, "TXT",
+            { tempoLimite = contexto.tempoLimite }, tratador)
+        retorne verdadeiro
+    fim
+    contexto.consulteMX = opções.consulteMX ou função(nome, tratador)
+        rede.consulteDNSAssíncrono(nome, "MX",
+            { tempoLimite = contexto.tempoLimite }, tratador)
+        retorne verdadeiro
+    fim
+    contexto.resolvaEndereços = opções.resolvaEndereços ou função(nome, tratador)
+        rede.resolvaEndereçosAssíncrono(nome,
+            { tempoLimite = contexto.tempoLimite }, tratador)
+        retorne verdadeiro
+    fim
+    retorne contexto
+fim
+
+local função conteConsulta(contexto)
+    contexto.consultas = contexto.consultas + 1
+    se contexto.consultas > contexto.limiteDNS então
+        retorne nulo, "política SPF excedeu o limite de consultas DNS"
+    fim
+    retorne verdadeiro
+fim
+
+local função consulta(contexto, funçãoDNS, nome, tratador, conteTermo)
+    se conteTermo ~= falso então
+        local pode, falha = conteConsulta(contexto)
+        se não pode então tratador(nulo, falha, "permanente"); retorne fim
+    fim
+    local iniciou, falhaImediata = funçãoDNS(nome,
+        função(registros, falhaDNS)
+            se falhaDNS então tratador(nulo, falhaDNS, "temporário"); retorne fim
+            registros = registros ou {}
+            se #registros == 0 então
+                contexto.vazias = contexto.vazias + 1
+                se contexto.vazias > contexto.limiteVazio então
+                    tratador(nulo, "política SPF excedeu consultas DNS vazias",
+                        "permanente")
+                    retorne
+                fim
+            fim
+            tratador(registros)
+        fim)
+    se iniciou == nulo e falhaImediata então
+        tratador(nulo, falhaImediata, "temporário")
+    fim
+fim
+
+local função expandaDomínio(texto, contexto, domínio)
+    texto = texto ou domínio
+    local saída = {}
+    local posição = 1
+    enquanto posição <= #texto início
+        local porcento = texto:procure("%", posição, verdadeiro)
+        se não porcento então saída[#saída + 1] = texto:corte(posição); pare fim
+        saída[#saída + 1] = texto:corte(posição, porcento - 1)
+        local próximo = texto:corte(porcento + 1, porcento + 1)
+        se próximo == "%" então saída[#saída + 1] = "%"; posição = porcento + 2
+        senão se próximo == "_" então saída[#saída + 1] = " "; posição = porcento + 2
+        senão se próximo == "-" então saída[#saída + 1] = "%20"; posição = porcento + 2
+        senão se próximo == "{" então
+            local fecha = texto:procure("}", porcento + 2, verdadeiro)
+            se não fecha então retorne nulo, "macro SPF sem fechamento" fim
+            local expressão = texto:corte(porcento + 2, fecha - 1)
+            -- Os transformadores completos de macros não são necessários
+            -- para a autorização comum. Recusar explicitamente evita que
+            -- uma construção desconhecida produza autorização falsa.
+            se #expressão ~= 1 então
+                retorne nulo, "transformador de macro SPF ainda não aceito"
+            fim
+            local letra = expressão:minúscula()
+            local valores = {
+                s = contexto.remetente, l = parteLocal(contexto.remetente),
+                o = domínioDoEndereço(contexto.remetente), d = domínio,
+                i = contexto.endereço, h = contexto.nomeDoCliente,
+                v = contexto.endereço:procure(":", 1, verdadeiro) e "ip6" ou "em-addr",
+                r = contexto.nomeDoServidor
+            }
+            se não valores[letra] então retorne nulo, "macro SPF não aceita: " .. expressão fim
+            saída[#saída + 1] = valores[letra]
+            posição = fecha + 1
+        senão
+            retorne nulo, "escape de macro SPF inválido"
+        fim fim fim fim
+    fim
+    local expandido = domínioCanônico(tabela.concatene(saída))
+    se não expandido então retorne nulo, "macro SPF produziu domínio inválido" fim
+    retorne expandido
+fim
+
+local função prefixoDoMecanismo(valor, família)
+    local padrão = família == 6 e "/([0-9]+)$" ou "/([0-9]+)$"
+    local tamanho = valor:separe(padrão)
+    se tamanho então
+        valor = valor:troque("/[0-9]+$", "")
+        tamanho = mat.paraInteiro(paraNúmero(tamanho))
+    fim
+    local máximo = família == 6 e 128 ou 32
+    se tamanho == nulo então tamanho = máximo fim
+    se tamanho < 0 ou tamanho > máximo então
+        retorne nulo, nulo, "prefixo SPF fora do intervalo"
+    fim
+    retorne valor, tamanho
+fim
+
+local função algumEndereço(contexto, nome, prefixo4, prefixo6, tratador,
+                                  conteTermo, limiteDeEndereços)
+    consulta(contexto, contexto.resolvaEndereços, nome,
+        função(endereços, falha, natureza)
+            se não endereços então tratador(nulo, falha, natureza); retorne fim
+            se limiteDeEndereços e #endereços > limiteDeEndereços então
+                tratador(nulo, "mecanismo mx excedeu dez endereços",
+                    "permanente")
+                retorne
+            fim
+            para _, endereço em ipares(endereços) início
+                local ticos = endereço:procure(":", 1, verdadeiro) e prefixo6 ou prefixo4
+                local pertence = acesso.pertence(contexto.endereço,
+                    endereço .. "/" .. ticos)
+                se pertence então tratador(verdadeiro); retorne fim
+            fim
+            tratador(falso)
+        fim, conteTermo)
+fim
+
+local função analiseAtributo(termo)
+    local qualificador = qualificadores[termo:corte(1, 1)] e
+        termo:corte(1, 1) ou "+"
+    se qualificador ~= "+" então termo = termo:corte(2) fim
+    local nome, restante = termo:separe("^([^:=/]+)(.*)$")
+    se não nome então retorne nulo, "", qualificador fim
+    local primeiro = restante:corte(1, 1)
+    local valor = (primeiro == ":" ou primeiro == "=") e
+        restante:corte(2) ou restante
+    retorne nome:minúscula(), valor, qualificador
+fim
+
+local função separeAlvoEPrefixos(valor)
+    local alvo = valor ou ""
+    local prefixo4, prefixo6 = 32, 128
+    local barraDupla = alvo:procure("//", 1, verdadeiro)
+    se barraDupla então
+        local informado6 = alvo:corte(barraDupla + 2)
+        se informado6 == "" ou informado6:separe("^[0-9]+$") == nulo então
+            retorne nulo, nulo, nulo, "prefixo IPv6 inválido"
+        fim
+        prefixo6 = paraNúmero(informado6) ou -1
+        alvo = alvo:corte(1, barraDupla - 1)
+    fim
+    local base, informado4 = alvo:separe("^(.-)/([0-9]+)$")
+    se base então
+        alvo = base
+        prefixo4 = paraNúmero(informado4) ou -1
+    senão se alvo:procure("/", 1, verdadeiro) então
+        retorne nulo, nulo, nulo, "prefixo IPv4 inválido"
+    fim fim
+    se prefixo4 < 0 ou prefixo4 > 32 ou
+       prefixo6 < 0 ou prefixo6 > 128 então
+        retorne nulo, nulo, nulo, "prefixo de endereço fora do intervalo"
+    fim
+    retorne alvo, prefixo4, prefixo6
+fim
+
+local avalieDomínio
+
+local função apliqueMecanismo(contexto, domínio, termo, tratador)
+    local nome, valor, qualificador = analiseAtributo(termo)
+    local resposta = qualificadores[qualificador]
+    local função conclua(confere, falha, natureza)
+        se falha então
+            tratador(resultado(natureza == "temporário" e "erroTemporário" ou
+                "erroPermanente", domínio, termo, falha))
+        senão se confere então
+            tratador(resultado(resposta, domínio, termo))
+        senão
+            tratador(nulo)
+        fim fim
+    fim
+
+    se nome == "all" então conclua(verdadeiro); retorne fim
+    se nome == "ip4" ou nome == "ip6" então
+        local família = nome == "ip6" e 6 ou 4
+        local redeInformada, ticos, falha = prefixoDoMecanismo(valor, família)
+        se não redeInformada então conclua(nulo, falha, "permanente"); retorne fim
+        local confere, falhaDaRede = acesso.pertence(contexto.endereço,
+            redeInformada .. "/" .. ticos)
+        se confere == nulo então conclua(nulo, falhaDaRede, "permanente")
+        senão conclua(confere) fim
+        retorne
+    fim
+    se nome == "a" então
+        local alvo, prefixo4, prefixo6, falhaDoPrefixo =
+            separeAlvoEPrefixos(valor)
+        se não alvo então
+            conclua(nulo, falhaDoPrefixo, "permanente"); retorne
+        fim
+        local expandido, falha = expandaDomínio(alvo ~= "" e alvo ou domínio,
+            contexto, domínio)
+        se não expandido então
+            conclua(nulo, falha, "permanente"); retorne
+        fim
+        algumEndereço(contexto, expandido, prefixo4, prefixo6, conclua)
+        retorne
+    fim
+    se nome == "mx" então
+        local alvo, prefixo4, prefixo6, falhaDoPrefixo =
+            separeAlvoEPrefixos(valor)
+        se não alvo então
+            conclua(nulo, falhaDoPrefixo, "permanente"); retorne
+        fim
+        alvo = alvo ~= "" e alvo ou domínio
+        local expandido, falha = expandaDomínio(alvo, contexto, domínio)
+        se não expandido então conclua(nulo, falha, "permanente"); retorne fim
+        consulta(contexto, contexto.consulteMX, expandido,
+            função(registros, falhaMX, natureza)
+                se não registros então conclua(nulo, falhaMX, natureza); retorne fim
+                se #registros > 10 então
+                    conclua(nulo, "mecanismo mx excedeu dez destinos", "permanente")
+                    retorne
+                fim
+                local função próximo(índice)
+                    se índice > #registros então conclua(falso); retorne fim
+                    local endereço = registros[índice].endereço ou registros[índice]
+                    algumEndereço(contexto, endereço, prefixo4, prefixo6,
+                        função(confere, falhaDoEndereço, naturezaDoErro)
+                            se falhaDoEndereço então
+                                conclua(nulo, falhaDoEndereço, naturezaDoErro)
+                            senão se confere então conclua(verdadeiro)
+                            senão próximo(índice + 1) fim fim
+                        fim, falso, 10)
+                fim
+                próximo(1)
+            fim)
+        retorne
+    fim
+    se nome == "include" então
+        local expandido, falha = expandaDomínio(valor, contexto, domínio)
+        se não expandido então conclua(nulo, falha, "permanente"); retorne fim
+        local pode, falhaDoLimite = conteConsulta(contexto)
+        se não pode então
+            conclua(nulo, falhaDoLimite, "permanente"); retorne
+        fim
+        avalieDomínio(contexto, expandido, função(incluído)
+            se incluído.resultado == "passa" então conclua(verdadeiro)
+            senão se incluído.resultado == "erroTemporário" então
+                conclua(nulo, incluído.explicação, "temporário")
+            senão se incluído.resultado == "erroPermanente" ou
+                     incluído.resultado == "nenhum" então
+                conclua(nulo, incluído.explicação ou
+                    "include sem política SPF", "permanente")
+            senão conclua(falso) fim fim fim
+        fim)
+        retorne
+    fim
+    se nome == "exists" então
+        local expandido, falha = expandaDomínio(valor, contexto, domínio)
+        se não expandido então conclua(nulo, falha, "permanente"); retorne fim
+        consulta(contexto, contexto.resolvaEndereços, expandido,
+            função(endereços, falhaDNS, natureza)
+                se não endereços então conclua(nulo, falhaDNS, natureza)
+                senão conclua(#endereços > 0) fim
+            fim)
+        retorne
+    fim
+    se nome == "ptr" então
+        conclua(nulo, "mecanismo ptr é desaconselhado pela RFC 7208 e não é aceito",
+            "permanente")
+        retorne
+    fim
+    conclua(nulo, "mecanismo SPF desconhecido: " .. paraColar(nome), "permanente")
+fim
+
+avalieDomínio = função(contexto, domínio, tratador)
+    domínio = domínioCanônico(domínio)
+    se não domínio então
+        tratador(resultado("nenhum", domínio, nulo, "domínio SPF inválido")); retorne
+    fim
+    contexto.profundidade = contexto.profundidade + 1
+    se contexto.profundidade > 20 ou contexto.visitados[domínio] então
+        contexto.profundidade = contexto.profundidade - 1
+        tratador(resultado("erroPermanente", domínio, nulo,
+            "ciclo ou profundidade excessiva na política SPF"))
+        retorne
+    fim
+    contexto.visitados[domínio] = verdadeiro
+    consulta(contexto, contexto.consulteTXT, domínio,
+        função(registros, falhaDNS, natureza)
+            local função finalize(valor)
+                contexto.visitados[domínio] = nulo
+                contexto.profundidade = contexto.profundidade - 1
+                tratador(valor)
+            fim
+            se não registros então
+                finalize(resultado(natureza == "temporário" e "erroTemporário" ou
+                    "erroPermanente", domínio, nulo, falhaDNS)); retorne
+            fim
+            local políticas = {}
+            para _, registro em ipares(registros) início
+                local texto = tipo(registro) == "tabela" e registro.valor ou registro
+                local baixo = texto e texto:minúscula() ou ""
+                se baixo:corte(1, 6) == "v=spf1" e
+                   (baixo:corte(7, 7) == "" ou baixo:corte(7, 7) == " ") então
+                    políticas[#políticas + 1] = texto
+                fim
+            fim
+            se #políticas == 0 então
+                finalize(resultado("nenhum", domínio, nulo, "domínio sem SPF")); retorne
+            fim
+            se #políticas > 1 então
+                finalize(resultado("erroPermanente", domínio, nulo,
+                    "domínio publica mais de uma política SPF")); retorne
+            fim
+            local termos = {}
+            para termo em políticas[1]:capture("[^ ]+") início
+                se termo:minúscula() ~= "v=spf1" então termos[#termos + 1] = termo fim
+            fim
+            local redireção
+            local mecanismos = {}
+            para _, termo em ipares(termos) início
+                local nome, valor = analiseAtributo(termo)
+                se nome == "redirect" então
+                    se redireção então
+                        finalize(resultado("erroPermanente", domínio, termo,
+                            "política SPF possui mais de um redirect")); retorne
+                    fim
+                    redireção = valor
+                senão se nome ~= "exp" então
+                    mecanismos[#mecanismos + 1] = termo
+                fim fim
+            fim
+            local função próximo(índice)
+                se índice > #mecanismos então
+                    se redireção então
+                        local destino, falha = expandaDomínio(redireção, contexto, domínio)
+                        se não destino então
+                            finalize(resultado("erroPermanente", domínio,
+                                "redirect", falha)); retorne
+                        fim
+                        local pode, falhaDoLimite = conteConsulta(contexto)
+                        se não pode então
+                            finalize(resultado("erroPermanente", domínio,
+                                "redirect", falhaDoLimite))
+                            retorne
+                        fim
+                        avalieDomínio(contexto, destino, finalize)
+                    senão
+                        finalize(resultado("neutro", domínio))
+                    fim
+                    retorne
+                fim
+                apliqueMecanismo(contexto, domínio, mecanismos[índice],
+                    função(avaliação)
+                        se avaliação então finalize(avaliação)
+                        senão próximo(índice + 1) fim
+                    fim)
+            fim
+            próximo(1)
+        fim, falso)
+fim
+
+função spf.verifiqueAssíncrono(opções, tratador)
+    se tipo(tratador) ~= "função" então
+        retorne nulo, "tratador SPF deve ser uma função"
+    fim
+    opções = opções ou {}
+    local contexto = novoContexto(opções)
+    local domínio = domínioDoEndereço(opções.remetente)
+    se não domínio ou domínio == "" então
+        domínio = opções.nomeDoCliente
+        contexto.remetente = "postmaster@" .. paraColar(domínio ou "")
+    fim
+    domínio = domínioCanônico(domínio)
+    se não domínio então
+        tratador(resultado("nenhum", nulo, nulo, "identidade SPF inválida"))
+        retorne verdadeiro
+    fim
+    avalieDomínio(contexto, domínio, tratador)
+    retorne verdadeiro
+fim
+
+retorne spf

@@ -1,0 +1,36 @@
+-- Regressão inofensiva da cobertura contra fisgadas. Não acessa a ligação
+-- nem envia a mensagem: somente entrega seus metadados à Triagem.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+
+local Triagem = importe "correio.triagem"
+local selecionador = Triagem.nova()
+local resultado = selecionador:avalie({
+    remetente = "segurança@banco-exemplo.org",
+    destinatários = { "pessoa@santafé.dev.br" }
+}, {
+    cabeçalhos = {
+        from = "Banco Exemplo <segurança@banco-exemplo.org>"
+    },
+    remetente = "Banco Exemplo <segurança@banco-exemplo.org>",
+    responderPara = "segurança@banco-exemplo.org",
+    assunto = "Ação urgente: confirme sua conta",
+    data = "Sun, 30 Aug 2026 10:00:00 -0300",
+    identificação = "<auditoria-fisgada@banco-exemplo.org>",
+    texto = "Confirme sua senha imediatamente no endereço informado.",
+    html = '<p>Confirme sua senha.</p><a href="https://acesso-hostil.example/entrar">https://banco-exemplo.org/entrar</a>',
+    anexos = {}
+})
+
+garanta(resultado.classificação == "indesejada" e
+    resultado.pasta == "indesejadas" e
+    resultado.pontuaçãoDeSuspeita >= 8,
+    "a Triagem deixou a fisgada mascarada alcançar a Entrada")
+local regras = {}
+para _, motivo em ipares(resultado.motivos) início
+    regras[motivo.regra] = verdadeiro
+fim
+garanta(regras["ligação-mascarada"] e
+    regras["pedido-de-segredo-com-ligação"],
+    "a explicação da fisgada está incompleta")
+mostre("Fisgada mascarada enviada para Indesejadas: ok")

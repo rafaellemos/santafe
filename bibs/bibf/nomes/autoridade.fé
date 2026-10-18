@@ -1,0 +1,385 @@
+-- Servidor assíncrono de autoridade DNS em Santafé.
+
+local nomes = importe "nomes"
+local zonas = importe "nomes.zona"
+local acesso = importe "nomes.acesso"
+local rede = importe "rede"
+
+local autoridade = {}
+
+local função copieLista(lista)
+    local cópia = {}
+    para i, item em ipares(lista ou {}) início cópia[i] = item fim
+    retorne cópia
+fim
+
+local função identificaçãoDoPacote(pacote)
+    se tipo(pacote) ~= "colar" ou #pacote < 2 então retorne 0 fim
+    retorne (pacote:byte(1) << 8) | pacote:byte(2)
+fim
+
+local função mensagemDeFalha(pacote, mensagem, código)
+    retorne {
+        identificação = mensagem e mensagem.identificação ou
+            identificaçãoDoPacote(pacote),
+        bandeiras = {
+            resposta = verdadeiro,
+            códigoDeOperação = mensagem e mensagem.bandeiras.códigoDeOperação ou 0,
+            recursãoDesejada = mensagem e mensagem.bandeiras.recursãoDesejada ou falso,
+            recursãoDisponível = falso,
+            códigoDeResposta = código
+        },
+        perguntas = mensagem e copieLista(mensagem.perguntas) ou {},
+        respostas = {}, autoridades = {}, adicionais = {}
+    }
+fim
+
+local função detalhesEDNS(mensagem, padrão)
+    local limite = mat.mínimo(padrão, 512)
+    local presente = falso
+    local dnssec = falso
+    para _, registro em ipares(mensagem.adicionais ou {}) início
+        se registro.tipo == nomes.TIPOS.OPT então
+            presente = verdadeiro
+            limite = mat.mínimo(padrão, mat.máximo(512, registro.classe ou 512))
+            dnssec = ((registro.ttl ou 0) & 0x8000) ~= 0
+            pare
+        fim
+    fim
+    retorne limite, presente, dnssec
+fim
+
+local função codifiqueLimitada(resposta, limite)
+    local pacote, falha = nomes.codifiqueMensagem(resposta)
+    se não pacote então retorne nulo, falha fim
+    se não limite ou #pacote <= limite então retorne pacote fim
+    resposta.bandeiras.truncada = verdadeiro
+    se resposta.dnssec então
+        -- Nunca devolva um conjunto parcialmente assinado. Se a resposta
+        -- DNSSEC não couber em UDP, mantenha apenas a pergunta e o OPT para
+        -- que o cliente repita a consulta por TCP.
+        local opt
+        para _, registro em ipares(resposta.adicionais ou {}) início
+            se registro.tipo == nomes.TIPOS.OPT então opt = registro; pare fim
+        fim
+        resposta.respostas = {}
+        resposta.autoridades = {}
+        resposta.adicionais = opt e { opt } ou {}
+        pacote = nomes.codifiqueMensagem(resposta)
+        se #pacote <= limite então retorne pacote fim
+    fim
+    -- Retira primeiro informações adicionais e de autoridade, depois as
+    -- respostas. A pergunta e o cabeçalho sempre permanecem reconhecíveis.
+    enquanto #resposta.adicionais > 0 início
+        tabela.remova(resposta.adicionais)
+        pacote = nomes.codifiqueMensagem(resposta)
+        se #pacote <= limite então retorne pacote fim
+    fim
+    enquanto #resposta.autoridades > 0 início
+        tabela.remova(resposta.autoridades)
+        pacote = nomes.codifiqueMensagem(resposta)
+        se #pacote <= limite então retorne pacote fim
+    fim
+    enquanto #resposta.respostas > 0 início
+        tabela.remova(resposta.respostas)
+        pacote = nomes.codifiqueMensagem(resposta)
+        se #pacote <= limite então retorne pacote fim
+    fim
+    se #pacote > limite então
+        retorne nulo, "limite UDP pequeno demais para o cabeçalho DNS"
+    fim
+    retorne pacote
+fim
+
+local função nova(opções)
+    opções = opções ou {}
+    local listaDeZonas = {}
+    para _, definição em ipares(opções.zonas ou {}) início
+        local z, falha
+        se tipo(definição.consulte) == "função" então z = definição
+        senão z, falha = zonas.nova(definição) fim
+        se não z então retorne nulo, falha fim
+        listaDeZonas[#listaDeZonas + 1] = z
+    fim
+    se #listaDeZonas == 0 então retorne nulo, "autoridade de nomes exige ao menos uma zona" fim
+    tabela.ordene(listaDeZonas, função(a, b) retorne #a.nome > #b.nome fim)
+
+    local limitador, falha = acesso.novoLimitador(opções.limiteDeTaxa ou {
+        porSegundo = 200, explosão = 400, máximoDeOrigens = 50000
+    })
+    se não limitador então retorne nulo, falha fim
+
+    local este = {
+        endereço = opções.endereço ou "0.0.0.0",
+        porta = opções.porta ou 53,
+        máximoUDP = opções.máximoUDP ou 1232,
+        máximoTCP = opções.máximoTCP ou 256,
+        tempoLimiteTCP = opções.tempoLimiteTCP ou 10000,
+        zonas = listaDeZonas,
+        iniciado = falso,
+        udp = nulo,
+        tcp = nulo,
+        conexões = {},
+        registrosDS = {},
+        estatísticasDNS = {
+            recebidas = 0, respondidas = 0, recusadasPorTaxa = 0,
+            malformadas = 0, truncadas = 0, tcpAtivas = 0,
+            tcpRecusadas = 0
+        }
+    }
+    para _, z em ipares(listaDeZonas) início
+        se z.dnssec então
+            este.registrosDS[#este.registrosDS + 1] = z.dnssec.formateDS()
+        fim
+    fim
+
+    local função encontreZona(nome)
+        para _, z em ipares(listaDeZonas) início
+            se z:contém(nome) então retorne z fim
+        fim
+        retorne nulo
+    fim
+
+    função este.responda(_, pacote, transporte)
+        este.estatísticasDNS.recebidas = este.estatísticasDNS.recebidas + 1
+        local mensagem, falhaDaLeitura = nomes.decodifiqueMensagem(pacote)
+        local resposta
+        local limiteUDP, temEDNS, dnssecSolicitado = 512, falso, falso
+        se mensagem então
+            limiteUDP, temEDNS, dnssecSolicitado = detalhesEDNS(
+                mensagem, este.máximoUDP
+            )
+        fim
+        se não mensagem então
+            este.estatísticasDNS.malformadas = este.estatísticasDNS.malformadas + 1
+            resposta = mensagemDeFalha(pacote, nulo, nomes.CÓDIGOS.FORMATO_INVÁLIDO)
+        senão se mensagem.bandeiras.resposta então
+            retorne nulo, "mensagem recebida já é uma resposta DNS"
+        senão se mensagem.bandeiras.códigoDeOperação ~= 0 então
+            resposta = mensagemDeFalha(pacote, mensagem, nomes.CÓDIGOS.NÃO_IMPLEMENTADO)
+        senão se #mensagem.perguntas ~= 1 então
+            resposta = mensagemDeFalha(pacote, mensagem, nomes.CÓDIGOS.FORMATO_INVÁLIDO)
+        senão
+            local pergunta = mensagem.perguntas[1]
+            local z = encontreZona(pergunta.nome)
+            se não z então
+                resposta = mensagemDeFalha(pacote, mensagem, nomes.CÓDIGOS.RECUSADO)
+            senão
+                local resultado, falhaDaZona = z:consulte(
+                    pergunta.nome, pergunta.tipo, pergunta.classe,
+                    dnssecSolicitado
+                )
+                se não resultado então
+                    resposta = mensagemDeFalha(
+                        pacote, mensagem, nomes.CÓDIGOS.FALHA_DO_SERVIDOR
+                    )
+                    falhaDaLeitura = falhaDaZona
+                senão
+                    resposta = {
+                        identificação = mensagem.identificação,
+                        bandeiras = {
+                            resposta = verdadeiro,
+                            autoritativa = resultado.autoritativa,
+                            recursãoDesejada = mensagem.bandeiras.recursãoDesejada,
+                            recursãoDisponível = falso,
+                            códigoDeResposta = resultado.código
+                        },
+                        perguntas = copieLista(mensagem.perguntas),
+                        respostas = copieLista(resultado.respostas),
+                        autoridades = copieLista(resultado.autoridades),
+                        adicionais = copieLista(resultado.adicionais),
+                        dnssec = resultado.dnssec
+                    }
+                fim
+            fim
+        fim fim fim fim
+
+        se mensagem e temEDNS então
+            resposta.adicionais[#resposta.adicionais + 1] = {
+                nome = ".", tipo = nomes.TIPOS.OPT,
+                classe = limiteUDP,
+                ttl = dnssecSolicitado e 0x8000 ou 0,
+                dados = ""
+            }
+        fim
+
+        local limite = transporte == "UDP" e
+            limiteUDP ou nulo
+        local codificada, falhaDaCodificação = codifiqueLimitada(resposta, limite)
+        se não codificada então
+            retorne nulo, falhaDaCodificação ou falhaDaLeitura
+        fim
+        se resposta.bandeiras.truncada então
+            este.estatísticasDNS.truncadas = este.estatísticasDNS.truncadas + 1
+        fim
+        este.estatísticasDNS.respondidas = este.estatísticasDNS.respondidas + 1
+        retorne codificada
+    fim
+
+    local filaUDP = {}
+    local enviandoUDP = falso
+    local função enviePróximoUDP()
+        se enviandoUDP ou #filaUDP == 0 ou não este.udp então retorne fim
+        enviandoUDP = verdadeiro
+        local item = filaUDP[1]
+        este.udp:envieParaAssíncrono(item.endereço, item.porta, item.pacote,
+            função(_, _, falhaDoEnvio)
+                tabela.remova(filaUDP, 1)
+                enviandoUDP = falso
+                se falhaDoEnvio e opções.aoFalhar então
+                    opções.aoFalhar(falhaDoEnvio)
+                fim
+                enviePróximoUDP()
+            fim)
+    fim
+
+    local função enfileireUDP(endereço, porta, pacote)
+        se #filaUDP >= 4096 então retorne falso fim
+        filaUDP[#filaUDP + 1] = { endereço = endereço, porta = porta, pacote = pacote }
+        enviePróximoUDP()
+        retorne verdadeiro
+    fim
+
+    local função fecheConexão(estado)
+        se estado.fechada então retorne fim
+        estado.fechada = verdadeiro
+        estado.conexão:feche()
+        este.conexões[estado] = nulo
+        este.estatísticasDNS.tcpAtivas = mat.máximo(
+            0, este.estatísticasDNS.tcpAtivas - 1
+        )
+    fim
+
+    local função envieTCP(estado)
+        se estado.fechada ou estado.enviando ou #estado.saídas == 0 então retorne fim
+        estado.enviando = verdadeiro
+        local pacote = tabela.remova(estado.saídas, 1)
+        estado.conexão:envieAssíncrono(pacote,
+            função(_, _, falhaDoEnvio)
+                estado.enviando = falso
+                se falhaDoEnvio então fecheConexão(estado); retorne fim
+                envieTCP(estado)
+            fim)
+    fim
+
+    local função processeQuadros(estado)
+        enquanto #estado.entrada >= 2 início
+            local tamanho = (estado.entrada:byte(1) << 8) | estado.entrada:byte(2)
+            se tamanho == 0 então fecheConexão(estado); retorne fim
+            se #estado.entrada < tamanho + 2 então retorne fim
+            local consulta = estado.entrada:corte(3, tamanho + 2)
+            estado.entrada = estado.entrada:corte(tamanho + 3)
+            local resposta = este:responda(consulta, "TCP")
+            se resposta então
+                estado.saídas[#estado.saídas + 1] = nomes._u16(#resposta) .. resposta
+                se #estado.saídas > 64 então fecheConexão(estado); retorne fim
+            fim
+        fim
+        envieTCP(estado)
+    fim
+
+    local função recebaTCP(estado)
+        se estado.fechada então retorne fim
+        estado.conexão:recebaDadosAssíncrono(16384,
+            função(_, dados, falhaDaLeitura)
+                se falhaDaLeitura ou dados == nulo ou dados == "" então
+                    fecheConexão(estado)
+                    retorne
+                fim
+                estado.entrada = estado.entrada .. dados
+                se #estado.entrada > 262144 então
+                    fecheConexão(estado)
+                    retorne
+                fim
+                processeQuadros(estado)
+                recebaTCP(estado)
+            fim)
+    fim
+
+    local função armeAceite()
+        se não este.iniciado então retorne fim
+        este.tcp:aceiteAssíncrono(função(_, conexão, falhaDoAceite)
+            armeAceite()
+            se falhaDoAceite ou não conexão então retorne fim
+            se este.estatísticasDNS.tcpAtivas >= este.máximoTCP então
+                este.estatísticasDNS.tcpRecusadas =
+                    este.estatísticasDNS.tcpRecusadas + 1
+                conexão:feche()
+                retorne
+            fim
+            local par = conexão:parRemoto()
+            se par e não limitador:permita(par.endereço) então
+                este.estatísticasDNS.recusadasPorTaxa =
+                    este.estatísticasDNS.recusadasPorTaxa + 1
+                conexão:feche()
+                retorne
+            fim
+            conexão:definaTempoLimite(este.tempoLimiteTCP)
+            local estado = { conexão = conexão, entrada = "", saídas = {},
+                enviando = falso, fechada = falso }
+            este.conexões[estado] = verdadeiro
+            este.estatísticasDNS.tcpAtivas = este.estatísticasDNS.tcpAtivas + 1
+            recebaTCP(estado)
+        fim)
+    fim
+
+    função este.inicie()
+        se este.iniciado então retorne nulo, "servidor DNS já foi iniciado" fim
+        local família = este.endereço:procure(":", 1, verdadeiro) e "IPv6" ou "IPv4"
+        local udp, falhaDoUDP = rede.udp(família)
+        se não udp então retorne nulo, falhaDoUDP fim
+        local amarrou, falhaDaAmarração = udp:amarre(este.endereço, este.porta)
+        se não amarrou então udp:feche(); retorne nulo, falhaDaAmarração fim
+        local tcp, falhaDoTCP = rede.servidorTCP()
+        se não tcp então udp:feche(); retorne nulo, falhaDoTCP fim
+        amarrou, falhaDaAmarração = tcp:amarre(este.endereço, este.porta)
+        se não amarrou então
+            udp:feche(); tcp:feche(); retorne nulo, falhaDaAmarração
+        fim
+        este.udp = udp
+        este.tcp = tcp
+        este.iniciado = verdadeiro
+        udp:inicieRecepção(65535,
+            função(pacote, falhaDaRecepção, endereço, porta)
+                se falhaDaRecepção ou não pacote então retorne fim
+                se não limitador:permita(endereço) então
+                    este.estatísticasDNS.recusadasPorTaxa =
+                        este.estatísticasDNS.recusadasPorTaxa + 1
+                    retorne
+                fim
+                local resposta = este:responda(pacote, "UDP")
+                se resposta então enfileireUDP(endereço, porta, resposta) fim
+            fim)
+        armeAceite()
+        retorne verdadeiro
+    fim
+
+    função este.escute()
+        se não este.iniciado então
+            local iniciou, falhaDoInício = este:inicie()
+            se não iniciou então retorne nulo, falhaDoInício fim
+        fim
+        rede.laço()
+        retorne verdadeiro
+    fim
+
+    função este.feche()
+        se não este.iniciado então retorne falso fim
+        este.iniciado = falso
+        para estado em pares(este.conexões) início fecheConexão(estado) fim
+        se este.udp então este.udp:feche(); este.udp = nulo fim
+        se este.tcp então este.tcp:feche(); este.tcp = nulo fim
+        retorne verdadeiro
+    fim
+
+    função este.estatísticas()
+        local resultado = {}
+        para chave, valor em pares(este.estatísticasDNS) início resultado[chave] = valor fim
+        retorne resultado
+    fim
+
+    retorne este
+fim
+
+autoridade.novo = nova
+retorne autoridade

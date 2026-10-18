@@ -1,0 +1,197 @@
+local base = importe "correio.util"
+local rede = importe "rede"
+
+local web = {
+    escapeHTML = base.escapeHTML,
+    apare = base.apare,
+    idNatural = base.idNatural,
+    separeEndereços = base.separeEndereços,
+    resumo = base.resumo,
+    nomeSeguroDoAnexo = base.nomeSeguroDoAnexo
+}
+
+local imagensExibíveis = {
+    ["image/png"] = verdadeiro,
+    ["image/jpeg"] = verdadeiro,
+    ["image/gif"] = verdadeiro,
+    ["image/webp"] = verdadeiro
+}
+
+-- Converte somente o domínio de um endereço para sua forma Unicode de
+-- apresentação. O endereço canônico em Punycode continua preservado no
+-- banco, nos envelopes SMTP e nos perfis de configuração.
+função web.endereçoLegível(valor)
+    local endereço = paraColar(valor ou "")
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba então retorne endereço fim
+
+    local fechamento = endereço:procure(">", arroba + 1, verdadeiro)
+    local domínio = fechamento e
+        endereço:corte(arroba + 1, fechamento - 1) ou
+        endereço:corte(arroba + 1)
+    local unicode = rede.domínioUnicode(domínio)
+    se não unicode então retorne endereço fim
+
+    local sufixo = fechamento e endereço:corte(fechamento) ou ""
+    retorne endereço:corte(1, arroba) .. unicode .. sufixo
+fim
+
+função web.imagemExibível(tipoDoConteúdo)
+    retorne imagensExibíveis[paraColar(tipoDoConteúdo ou ""):minúscula()] == verdadeiro
+fim
+
+função web.anexoExibível(tipoDoConteúdo)
+    local tipo = paraColar(tipoDoConteúdo ou ""):minúscula()
+    retorne web.imagemExibível(tipo) ou tipo == "application/pdf"
+fim
+
+-- O compositor oferece somente um subconjunto sem atributos. Primeiro todo
+-- o valor é escapado; depois apenas marcas exatas da lista positiva voltam a
+-- ser HTML. Assim um POST forjado não consegue introduzir programas, estilos,
+-- imagens remotas, formulários ou atributos de evento na carta.
+função web.htmlSeguroDoCompositor(valor)
+    local html = base.escapeHTML(paraColar(valor ou ""))
+    local marcas = {
+        "p", "div", "br", "b", "strong", "i", "em", "u",
+        "ul", "ol", "li", "blockquote", "h2", "h3"
+    }
+    para _, marca em ipares(marcas) início
+        html = html:troque("&lt;" .. marca .. "&gt;", "<" .. marca .. ">")
+        se marca ~= "br" então
+            html = html:troque("&lt;/" .. marca .. "&gt;", "</" .. marca .. ">")
+        fim
+    fim
+    retorne html
+fim
+
+função web.obtenhaBiscoito(req, nome)
+    local cabeçalho = (req.cabeçalho ou {})["cookie"] ou ""
+    para parte em cabeçalho:capture("[^;]+") início
+        local chave, valor = parte:apare():separe("^([^=]+)=(.*)$")
+        se chave == nome então retorne valor fim
+    fim
+    retorne nulo
+fim
+
+função web.redirecione(res, destino, código)
+    res:código(código ou 303)
+    res:definaCabeçalho("Location", destino)
+    retorne res:texto("")
+fim
+
+função web.protejaResposta(res)
+    res:definaCabeçalho("X-Content-Type-Options", "nosniff")
+    res:definaCabeçalho("Referrer-Policy", "strict-origin-when-cross-origin")
+    res:definaCabeçalho("X-Frame-Options", "DENY")
+    res:definaCabeçalho("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    res:definaCabeçalho(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " ..
+        "script-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; " ..
+        "form-action 'self'; frame-ancestors 'none'"
+    )
+    retorne res
+fim
+
+-- Imagens e PDFs autorizados podem ser incorporados somente pelo próprio
+-- Carteiro. A resposta continua privada, sem farejamento de tipo nem
+-- incorporação por outros sítios.
+função web.protejaAnexo(res)
+    res:definaCabeçalho("Cache-Control", "private, no-store")
+    res:definaCabeçalho("X-Content-Type-Options", "nosniff")
+    res:definaCabeçalho("Referrer-Policy", "no-referrer")
+    res:definaCabeçalho("X-Frame-Options", "SAMEORIGIN")
+    res:definaCabeçalho("Cross-Origin-Resource-Policy", "same-origin")
+    res:definaCabeçalho(
+        "Content-Security-Policy",
+        "default-src 'none'; frame-ancestors 'self'; sandbox allow-modals"
+    )
+    retorne res
+fim
+
+-- A visualização de impressão é um documento inerte e completo. Ela não
+-- carrega recursos externos nem executa programas; a janela que a abriu pode
+-- apenas invocar a caixa de impressão do navegador.
+função web.protejaImpressão(res)
+    res:definaCabeçalho("Cache-Control", "private, no-store")
+    res:definaCabeçalho("X-Content-Type-Options", "nosniff")
+    res:definaCabeçalho("Referrer-Policy", "no-referrer")
+    res:definaCabeçalho("X-Frame-Options", "DENY")
+    res:definaCabeçalho(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    )
+    res:definaCabeçalho(
+        "Content-Security-Policy",
+        "default-src 'none'; script-src 'none'; connect-src 'none'; " ..
+        "img-src data:; style-src 'unsafe-inline'; object-src 'none'; " ..
+        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; " ..
+        "sandbox allow-modals"
+    )
+    retorne res
+fim
+
+-- O HTML de uma carta é conteúdo externo e potencialmente hostil. Esta
+-- resposta existe somente para um <iframe sandbox> do Carteiro: ela pode usar
+-- estilo incorporado, mas não executa programas, envia formulários, abre
+-- conexões nem carrega recursos remotos. Ligações abertas voluntariamente
+-- pelo usuário podem sair do quadro em uma nova aba.
+função web.protejaCartaHTML(res, permitaConteúdoExterno)
+    local fontesDeImagem = permitaConteúdoExterno e
+        "img-src https: data:; " ou "img-src data:; "
+    res:definaCabeçalho("Cache-Control", "private, no-store")
+    res:definaCabeçalho("X-Content-Type-Options", "nosniff")
+    res:definaCabeçalho("Referrer-Policy", "no-referrer")
+    res:definaCabeçalho("X-Frame-Options", "SAMEORIGIN")
+    res:definaCabeçalho("Cross-Origin-Resource-Policy", "same-origin")
+    res:definaCabeçalho(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    )
+    res:definaCabeçalho(
+        "Content-Security-Policy",
+        "default-src 'none'; script-src 'none'; connect-src 'none'; " ..
+        fontesDeImagem .. "media-src 'none'; font-src data:; " ..
+        "style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; " ..
+        "form-action 'none'; frame-src 'none'; frame-ancestors 'self'; " ..
+        "sandbox allow-popups allow-popups-to-escape-sandbox"
+    )
+    retorne res
+fim
+
+-- Define uma nova aba como destino das ligações que não declaram um alvo.
+-- O Referrer-Policy da resposta impede o envio do endereço do Carteiro, e o
+-- iframe sandbox continua impedindo programas, formulários e navegação da
+-- janela principal.
+função web.prepareCartaHTML(html)
+    retorne '<base target="_blank">\n' .. paraColar(html ou "")
+fim
+
+função web.codifiquePercentual(texto)
+    local hexadecimal = "0123456789ABCDEF"
+    local partes = {}
+    para índice = 1, #texto início
+        local taco = texto:byte(índice)
+        local seguro = (taco >= 48 e taco <= 57) ou
+            (taco >= 65 e taco <= 90) ou (taco >= 97 e taco <= 122) ou
+            taco == 45 ou taco == 46 ou taco == 95 ou taco == 126
+        se seguro então
+            partes[#partes + 1] = colar.caractere(taco)
+        senão
+            partes[#partes + 1] = "%" ..
+                hexadecimal:corte((taco >> 4) + 1, (taco >> 4) + 1) ..
+                hexadecimal:corte((taco & 15) + 1, (taco & 15) + 1)
+        fim
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+função web.confiraCSRF(usuário, formulário, segredo)
+    se não usuário ou não formulário então retorne falso fim
+    retorne segredo.confiraBilhete(
+        paraColar(formulário.csrf ou ""),
+        paraColar(usuário.csrf ou "")
+    )
+fim
+
+retorne web

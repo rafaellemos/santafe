@@ -1,0 +1,299 @@
+-- DMARC conforme a RFC 9989: descoberta por caminhada da árvore DNS,
+-- alinhamento de identificadores e aplicação explicável da política.
+
+local rede = importe "rede"
+
+local dmarc = { nome = "DMARC do Correio Santafé", versão = "1.0.0" }
+
+local função domínioCanônico(valor)
+    local domínio = rede.domínioASCII((valor ou ""):apare())
+    se não domínio ou domínio == "" ou #domínio > 253 então retorne nulo fim
+    retorne domínio:minúscula()
+fim
+
+local função etiquetas(domínio)
+    local resultado = {}
+    para etiqueta em domínio:capture("[^.]+") início
+        resultado[#resultado + 1] = etiqueta
+    fim
+    retorne resultado
+fim
+
+local função junteEtiquetas(itens, começo)
+    local partes = {}
+    para índice = começo, #itens início partes[#partes + 1] = itens[índice] fim
+    retorne colar.junte(".", tabela.desempacote(partes))
+fim
+
+local função tags(texto)
+    local resultado = {}
+    local primeiro = verdadeiro
+    para trecho em (texto ou ""):capture("[^;]+") início
+        local igual = trecho:procure("=", 1, verdadeiro)
+        se não igual então retorne nulo fim
+        local nome = trecho:corte(1, igual - 1):apare():minúscula()
+        local valor = trecho:corte(igual + 1):apare()
+        se nome == "" ou valor == "" ou resultado[nome] ~= nulo então
+            retorne nulo
+        fim
+        se primeiro e (nome ~= "v" ou valor ~= "DMARC1") então retorne nulo fim
+        resultado[nome] = valor
+        primeiro = falso
+    fim
+    se primeiro então retorne nulo fim
+    retorne resultado
+fim
+
+local políticas = { none = verdadeiro, quarantine = verdadeiro, reject = verdadeiro }
+
+local função possuiEndereçoDeRelatório(valor)
+    para endereço em (valor ou ""):capture("[^,]+") início
+        endereço = endereço:apare()
+        se endereço:separe("^[A-Za-z][A-Za-z0-9+.-]*:") então
+            retorne verdadeiro
+        fim
+    fim
+    retorne falso
+fim
+
+local função analiseRegistro(texto)
+    local campos = tags(texto)
+    se não campos ou campos.v ~= "DMARC1" então retorne nulo fim
+    local pVálido = campos.p e políticas[campos.p:minúscula()]
+    local spInválido = campos.sp e não políticas[campos.sp:minúscula()]
+    local npInválido = campos.np e não políticas[campos.np:minúscula()]
+    se não pVálido ou spInválido ou npInválido então
+        se não possuiEndereçoDeRelatório(campos.rua) então retorne nulo fim
+        -- RFC 9989, 4.10.1: uma política ausente/inválida acompanhada
+        -- por ao menos um destino de relatório válido equivale a p=none.
+        campos.p, campos.sp, campos.np = "none", nulo, nulo
+    fim
+    se campos.adkim ~= "s" então campos.adkim = "r" fim
+    se campos.aspf ~= "s" então campos.aspf = "r" fim
+    se campos.psd ~= "y" e campos.psd ~= "n" então campos.psd = "u" fim
+    se campos.t ~= "y" então campos.t = "n" fim
+    campos.p = campos.p:minúscula()
+    se campos.sp então campos.sp = campos.sp:minúscula() fim
+    se campos.np então campos.np = campos.np:minúscula() fim
+    retorne campos
+fim
+
+local função registroVálido(registros)
+    local encontrados = {}
+    para _, registro em ipares(registros ou {}) início
+        local texto = tipo(registro) == "tabela" e registro.valor ou registro
+        local campos = analiseRegistro(texto ou "")
+        se campos então encontrados[#encontrados + 1] = campos fim
+    fim
+    se #encontrados ~= 1 então retorne nulo fim
+    retorne encontrados[1]
+fim
+
+local função alvosDaCaminhada(domínio)
+    local partes = etiquetas(domínio)
+    local alvos = { domínio }
+    local começo
+    se #partes < 8 então começo = 2
+    senão começo = #partes - 6 fim
+    enquanto começo <= #partes início
+        alvos[#alvos + 1] = junteEtiquetas(partes, começo)
+        começo = começo + 1
+    fim
+    retorne alvos
+fim
+
+local função caminhe(domínio, consulteTXT, tratador)
+    local alvos = alvosDaCaminhada(domínio)
+    local encontrados = {}
+    local função próximo(índice)
+        se índice > #alvos então
+            tratador({ origem = domínio, registros = encontrados })
+            retorne
+        fim
+        local alvo = alvos[índice]
+        local iniciou, falhaImediata = consulteTXT("_dmarc." .. alvo,
+            função(registros, falhaDNS)
+                se falhaDNS então tratador(nulo, falhaDNS); retorne fim
+                local campos = registroVálido(registros)
+                se campos então
+                    encontrados[#encontrados + 1] = {
+                        domínio = alvo, campos = campos, índice = índice
+                    }
+                    se campos.psd == "y" ou campos.psd == "n" então
+                        tratador({ origem = domínio, registros = encontrados })
+                        retorne
+                    fim
+                fim
+                próximo(índice + 1)
+            fim)
+        se iniciou == nulo e falhaImediata então
+            tratador(nulo, falhaImediata)
+        fim
+    fim
+    próximo(1)
+fim
+
+local função domínioOrganizacional(caminhada)
+    local encontrados = caminhada.registros
+    para _, item em ipares(encontrados) início
+        se item.campos.psd == "n" então retorne item.domínio fim
+        se item.campos.psd == "y" e item.domínio ~= caminhada.origem então
+            local partesDoInício = etiquetas(caminhada.origem)
+            local partesPSD = etiquetas(item.domínio)
+            local posição = #partesDoInício - #partesPSD
+            se posição >= 1 então
+                retorne junteEtiquetas(partesDoInício, posição)
+            fim
+        fim
+    fim
+    se #encontrados > 0 então retorne encontrados[#encontrados].domínio fim
+    retorne caminhada.origem
+fim
+
+local função políticaAplicável(caminhada)
+    se #caminhada.registros == 0 então retorne nulo fim
+    local direta = caminhada.registros[1]
+    se direta.domínio == caminhada.origem então
+        retorne direta, direta.campos.p
+    fim
+    local organizacional = domínioOrganizacional(caminhada)
+    para _, item em ipares(caminhada.registros) início
+        se item.domínio == organizacional então
+            retorne item, item.campos.sp ou item.campos.p
+        fim
+    fim
+    -- Quando o domínio organizacional é o filho de um sufixo público
+    -- marcado com psd=y, a política aplicável pertence ao próprio PSD.
+    para _, item em ipares(caminhada.registros) início
+        se item.campos.psd == "y" então
+            retorne item, item.campos.sp ou item.campos.p
+        fim
+    fim
+    retorne nulo
+fim
+
+local função alinheEstrito(autor, autenticado)
+    retorne autor == autenticado
+fim
+
+local função alinheRelaxado(autor, autenticado, consulteTXT, tratador)
+    se autor == autenticado então tratador(verdadeiro); retorne fim
+    caminhe(autor, consulteTXT, função(caminhadaAutor, falhaAutor)
+        se não caminhadaAutor então tratador(nulo, falhaAutor); retorne fim
+        caminhe(autenticado, consulteTXT,
+            função(caminhadaAutenticada, falhaAutenticada)
+                se não caminhadaAutenticada então
+                    tratador(nulo, falhaAutenticada); retorne
+                fim
+                tratador(domínioOrganizacional(caminhadaAutor) ==
+                    domínioOrganizacional(caminhadaAutenticada))
+            fim)
+    fim)
+fim
+
+local função reduzaPolítica(política, teste)
+    se teste ~= "y" então retorne política fim
+    se política == "reject" então retorne "quarantine" fim
+    se política == "quarantine" então retorne "none" fim
+    retorne política
+fim
+
+local função açãoDaPolítica(política)
+    se política == "reject" então retorne "rejeitar" fim
+    se política == "quarantine" então retorne "indesejadas" fim
+    retorne "aceitar"
+fim
+
+função dmarc.avalieAssíncrono(opções, tratador)
+    opções = opções ou {}
+    se tipo(tratador) ~= "função" então
+        retorne nulo, "tratador DMARC deve ser uma função"
+    fim
+    local autor = domínioCanônico(opções.domínioDoAutor)
+    se não autor então
+        tratador({ resultado = "erroPermanente", ação = "rejeitar",
+            motivo = "cabeçalho From não possui um único domínio válido" })
+        retorne verdadeiro
+    fim
+    local consulta = opções.consulteTXT ou função(nome, aoConcluir)
+        rede.consulteDNSAssíncrono(nome, "TXT",
+            { tempoLimite = opções.tempoLimite ou 5000 }, aoConcluir)
+        retorne verdadeiro
+    fim
+
+    caminhe(autor, consulta, função(caminhada, falhaDNS)
+        se não caminhada então
+            tratador({ resultado = "erroTemporário", ação = "adiar",
+                domínioDoAutor = autor, motivo = paraColar(falhaDNS) })
+            retorne
+        fim
+        local registro, política = políticaAplicável(caminhada)
+        se não registro então
+            tratador({ resultado = "nenhum", ação = "aceitar",
+                domínioDoAutor = autor, spfAlinhado = falso,
+                dkimAlinhado = falso })
+            retorne
+        fim
+        política = reduzaPolítica(política, registro.campos.t)
+        local spf = opções.spf ou { resultado = "nenhum" }
+        local dkim = opções.dkim ou { resultado = "nenhum", domínios = {} }
+        local alinhamentos = {
+            spf = falso, dkim = falso, temporário = falso
+        }
+        local pendentes = 1 + #(dkim.domínios ou {})
+        local encerrou = falso
+        local função concluaAlinhamento()
+            pendentes = pendentes - 1
+            se pendentes > 0 ou encerrou então retorne fim
+            encerrou = verdadeiro
+            local passou = alinhamentos.spf ou alinhamentos.dkim
+            local temporário = não passou e
+                (spf.resultado == "erroTemporário" ou
+                 dkim.resultado == "temporário" ou alinhamentos.temporário)
+            se temporário então
+                tratador({ resultado = "erroTemporário", ação = "adiar",
+                    domínioDoAutor = autor, política = política,
+                    domínioDaPolítica = registro.domínio,
+                    spfAlinhado = alinhamentos.spf,
+                    dkimAlinhado = alinhamentos.dkim,
+                    motivo = "autenticação postal depende de DNS temporariamente indisponível" })
+                retorne
+            fim
+            tratador({ resultado = passou e "passa" ou "falha",
+                ação = passou e "aceitar" ou açãoDaPolítica(política),
+                domínioDoAutor = autor, política = política,
+                domínioDaPolítica = registro.domínio,
+                spfAlinhado = alinhamentos.spf,
+                dkimAlinhado = alinhamentos.dkim })
+        fim
+        local função confira(autenticado, modo, aoConcluir)
+            autenticado = domínioCanônico(autenticado)
+            se não autenticado então aoConcluir(falso); retorne fim
+            se modo == "s" então aoConcluir(alinheEstrito(autor, autenticado))
+            senão
+                alinheRelaxado(autor, autenticado, consulta,
+                    função(alinhado, falhaDoAlinhamento)
+                        se alinhado == nulo e falhaDoAlinhamento então
+                            alinhamentos.temporário = verdadeiro
+                            aoConcluir(falso)
+                        senão aoConcluir(alinhado) fim
+                    fim)
+            fim
+        fim
+        se spf.resultado == "passa" então
+            confira(spf.domínio, registro.campos.aspf, função(alinhado)
+                alinhamentos.spf = alinhado
+                concluaAlinhamento()
+            fim)
+        senão concluaAlinhamento() fim
+        para _, domínioDKIM em ipares(dkim.domínios ou {}) início
+            confira(domínioDKIM, registro.campos.adkim, função(alinhado)
+                alinhamentos.dkim = alinhamentos.dkim ou alinhado
+                concluaAlinhamento()
+            fim)
+        fim
+    fim)
+    retorne verdadeiro
+fim
+
+retorne dmarc

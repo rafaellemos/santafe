@@ -1,0 +1,141 @@
+local arquivo = importe "arquivo"
+local segredo = importe "segredo"
+
+-- Depósito imutável de objetos postais. O nome de cada objeto é o resumo
+-- criptográfico do conteúdo; o MariaDB conserva apenas metadados e o resumo.
+local depósito = {}
+
+local função falhe(tratador, mensagem, dado)
+    tratador(nulo, mensagem, dado)
+    retorne nulo, mensagem
+fim
+
+local função raizVálida(valor)
+    se tipo(valor) ~= "colar" ou valor == "" ou valor:corte(1, 1) ~= "/" então
+        retorne nulo, "raiz do depósito deve ser um caminho absoluto"
+    fim
+    enquanto #valor > 1 e valor:corte(-1) == "/" início
+        valor = valor:corte(1, -2)
+    fim
+    se valor == "/" então
+        retorne nulo, "a raiz do sistema não pode ser o depósito postal"
+    fim
+    retorne valor
+fim
+
+local função resumoVálido(valor)
+    se tipo(valor) ~= "colar" ou #valor ~= 64 então retorne falso fim
+    retorne valor:procure("^[0-9a-f]+$") ~= nulo
+fim
+
+função depósito.novo(opções)
+    opções = opções ou {}
+    local raiz, falha = raizVálida(opções.raiz ou
+        "/var/lib/santafé/correio")
+    se não raiz então retorne nulo, falha fim
+    local limite = mat.paraInteiro(opções.limite ou 50 * 1024 * 1024)
+    se não limite ou limite < 1 então
+        retorne nulo, "limite do depósito deve ser um inteiro positivo"
+    fim
+
+    local este = {
+        raiz = raiz,
+        diretórioDosObjetos = raiz .. "/objetos",
+        limite = limite,
+        permissõesDoArquivo = opções.permissõesDoArquivo ou 432,
+        permissõesDoDiretório = opções.permissõesDoDiretório ou 1528
+    }
+
+    função este.caminhoDoObjeto(esta, resumo)
+        se não resumoVálido(resumo) então
+            retorne nulo, "resumo de objeto inválido"
+        fim
+        retorne esta.diretórioDosObjetos .. "/" .. resumo:corte(1, 2) ..
+            "/" .. resumo:corte(3, 4) .. "/" .. resumo
+    fim
+
+    função este.prepareAssíncrono(esta, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador precisa ser uma função"
+        fim
+        retorne arquivo.crieDiretóriosComPermissõesAssíncrono(
+            esta.diretórioDosObjetos, esta.permissõesDoDiretório,
+            tratador, dado)
+    fim
+
+    função este.graveAssíncrono(esta, conteúdo, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador precisa ser uma função"
+        fim
+        se tipo(conteúdo) ~= "colar" então
+            retorne falhe(tratador, "conteúdo deve ser um colar binário", dado)
+        fim
+        se #conteúdo > esta.limite então
+            retorne falhe(tratador, "objeto excede o limite de " ..
+                esta.limite .. " tacos", dado)
+        fim
+        local resumo = segredo.resuma(conteúdo)
+        local caminho = garanta(esta:caminhoDoObjeto(resumo))
+        local diretório = caminho:separe("^(.*)/[^/]+$")
+        local primeiroNível = diretório:separe("^(.*)/[^/]+$")
+        retorne arquivo.crieDiretóriosComPermissõesAssíncrono(
+            primeiroNível, esta.permissõesDoDiretório,
+            função(criouPrimeiro, falhaDoPrimeiro)
+                se não criouPrimeiro então
+                    tratador(nulo, falhaDoPrimeiro, dado)
+                    retorne
+                fim
+                arquivo.crieDiretóriosComPermissõesAssíncrono(
+                    diretório, esta.permissõesDoDiretório,
+                    função(criou, falhaDaCriação)
+                        se não criou então
+                            tratador(nulo, falhaDaCriação, dado)
+                            retorne
+                        fim
+                        arquivo.graveDurávelComPermissõesAssíncrono(
+                            caminho, conteúdo, esta.permissõesDoArquivo,
+                            função(gravou, falhaDaGravação)
+                                se não gravou então
+                                    tratador(nulo, falhaDaGravação, dado)
+                                    retorne
+                                fim
+                                tratador({ resumo = resumo, tamanho = #conteúdo },
+                                    nulo, dado)
+                            fim)
+                    fim)
+            fim)
+    fim
+
+    função este.leiaAssíncrono(esta, resumo, tamanho, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne nulo, "tratador precisa ser uma função"
+        fim
+        local caminho, falha = esta:caminhoDoObjeto(resumo)
+        se não caminho então retorne falhe(tratador, falha, dado) fim
+        tamanho = tamanho e mat.paraInteiro(tamanho) ou nulo
+        se tamanho e (tamanho < 0 ou tamanho > esta.limite) então
+            retorne falhe(tratador, "tamanho esperado do objeto é inválido", dado)
+        fim
+        local limite = tamanho ou esta.limite
+        retorne arquivo.leiaAssíncrono(caminho, limite,
+            função(conteúdo, falhaDaLeitura)
+                se não conteúdo então
+                    tratador(nulo, falhaDaLeitura, dado)
+                    retorne
+                fim
+                se tamanho e #conteúdo ~= tamanho então
+                    tratador(nulo, "tamanho do objeto armazenado divergiu", dado)
+                    retorne
+                fim
+                se segredo.resuma(conteúdo) ~= resumo então
+                    tratador(nulo, "integridade do objeto armazenado divergiu", dado)
+                    retorne
+                fim
+                tratador(conteúdo, nulo, dado)
+            fim)
+    fim
+
+    retorne este
+fim
+
+retorne depósito

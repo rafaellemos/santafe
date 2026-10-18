@@ -1,0 +1,120 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local spf = importe "correio.spf"
+
+local txt = {
+    ["embratel.com.br"] = {
+        "v=spf1 include:spf1.embratel.com.br -all"
+    },
+    ["spf1.embratel.com.br"] = {
+        "v=spf1 ip4:200.200.0.0/16 -all"
+    },
+    ["sem-politica.example"] = {},
+    ["duplicado.example"] = { "v=spf1 -all", "v=spf1 +all" },
+    ["ciclo-a.example"] = { "v=spf1 include:ciclo-b.example -all" },
+    ["ciclo-b.example"] = { "v=spf1 include:ciclo-a.example -all" },
+    ["a-prefixo.example"] = { "v=spf1 a/24 -all" },
+    ["mx-prefixo.example"] = { "v=spf1 mx:correio.example/24//64 -all" },
+    ["mx-dez.example"] = { "v=spf1 mx -all" },
+    ["mx-onze.example"] = { "v=spf1 mx -all" }
+}
+
+local mx = {
+    ["correio.example"] = { { endereço = "mx1.correio.example" } }
+}
+
+local endereços = {
+    ["a-prefixo.example"] = { "192.0.2.200" },
+    ["mx1.correio.example"] = { "198.51.100.200", "2001:db8:1::20" }
+}
+
+mx["mx-dez.example"] = {}
+mx["mx-onze.example"] = {}
+para índice = 1, 11 início
+    local nome = "mx" .. índice .. ".limite.example"
+    se índice <= 10 então mx["mx-dez.example"][#mx["mx-dez.example"] + 1] = nome fim
+    mx["mx-onze.example"][#mx["mx-onze.example"] + 1] = nome
+    endereços[nome] = { índice == 10 e "203.0.113.42" ou
+        ("203.0.113." .. índice) }
+fim
+
+local função verifique(endereço, domínio, aoConcluir, falhaDNS)
+    retorne spf.verifiqueAssíncrono({
+        endereço = endereço,
+        remetente = "pessoa@" .. domínio,
+        nomeDoCliente = "remetente.example",
+        consulteTXT = função(nome, tratador)
+            se falhaDNS e nome == falhaDNS então
+                tratador(nulo, "DNS indisponível")
+            senão
+                local registros = {}
+                para _, valor em ipares(txt[nome] ou {}) início
+                    registros[#registros + 1] = { valor = valor }
+                fim
+                tratador(registros)
+            fim
+            retorne verdadeiro
+        fim,
+        consulteMX = função(nome, tratador)
+            tratador(mx[nome] ou {}); retorne verdadeiro
+        fim,
+        resolvaEndereços = função(nome, tratador)
+            tratador(endereços[nome] ou {}); retorne verdadeiro
+        fim
+    }, aoConcluir)
+fim
+
+local avaliação
+garanta(verifique("114.29.236.247", "embratel.com.br",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "falha" e avaliação.mecanismo == "-all",
+    "origem não autorizada deveria falhar no SPF")
+
+garanta(verifique("200.200.10.20", "embratel.com.br",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "passa",
+    "origem presente no include deveria passar no SPF")
+
+garanta(verifique("192.0.2.1", "sem-politica.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "nenhum")
+
+garanta(verifique("192.0.2.1", "duplicado.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "erroPermanente")
+
+garanta(verifique("192.0.2.1", "ciclo-a.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "erroPermanente")
+
+garanta(verifique("192.0.2.1", "embratel.com.br",
+    função(resultado) avaliação = resultado fim, "embratel.com.br"))
+garanta(avaliação.resultado == "erroTemporário")
+
+garanta(verifique("192.0.2.42", "a-prefixo.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "passa" e avaliação.mecanismo == "a/24",
+    "a/24 deveria aplicar o prefixo IPv4")
+
+garanta(verifique("198.51.100.42", "mx-prefixo.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "passa",
+    "mx:domínio/24//64 deveria aplicar o prefixo IPv4")
+
+garanta(verifique("2001:db8:1::99", "mx-prefixo.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "passa",
+    "mx:domínio/24//64 deveria aplicar o prefixo IPv6")
+
+garanta(verifique("203.0.113.42", "mx-dez.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "passa",
+    "dez destinos MX não devem consumir dez termos SPF adicionais")
+
+garanta(verifique("203.0.113.42", "mx-onze.example",
+    função(resultado) avaliação = resultado fim))
+garanta(avaliação.resultado == "erroPermanente",
+    "mais de dez destinos MX deveriam produzir erro permanente")
+
+mostre("SPF:", "ok")

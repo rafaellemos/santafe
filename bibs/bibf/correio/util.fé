@@ -1,0 +1,51 @@
+-- Operações textuais compartilhadas pelos adaptadores do sistema postal.
+local util = {}
+
+função util.escapeHTML(valor)
+    retorne paraColar(valor ou ""):troque("&", "&amp;")
+        :troque("<", "&lt;")
+        :troque(">", "&gt;")
+        :troque('"', "&quot;")
+        :troque("'", "&#39;")
+fim
+
+função util.apare(valor)
+    retorne paraColar(valor ou ""):apare()
+fim
+
+função util.idNatural(valor)
+    local id = paraNúmero(valor)
+    se não id ou id < 1 ou id % 1 ~= 0 então retorne nulo fim
+    retorne id
+fim
+
+função util.separeEndereços(texto, limite)
+    texto = paraColar(texto ou "")
+    local endereços = {}
+    texto = texto:troque("\r", ","):troque("\n", ","):troque(";", ",")
+    para endereço em texto:capture("[^,]+") início
+        endereço = endereço:apare()
+        se endereço ~= "" então
+            endereços[#endereços + 1] = endereço
+            se #endereços > limite então
+                retorne nulo, "quantidade de destinatários excede " .. limite
+            fim
+        fim
+    fim
+    retorne endereços
+fim
+
+função util.resumo(texto, limite)
+    texto = paraColar(texto ou ""):troque("%e+", " "):apare()
+    se #texto <= limite então retorne texto fim
+    retorne texto:corte(1, limite - 3) .. "..."
+fim
+
+função util.nomeSeguroDoAnexo(nome)
+    nome = paraColar(nome ou "anexo"):troque("[\r\n]", ""):apare()
+    nome = nome:troque("[/\\]", "_")
+    se nome == "" então nome = "anexo" fim
+    retorne nome:corte(1, 180)
+fim
+
+retorne util

@@ -1,0 +1,2 @@
+# Dados oficiais: preservar bytes e hashes, inclusive espaços dos comentários.
+ferramentas/unicode/17.0.0/* -text -whitespace

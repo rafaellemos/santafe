@@ -20,14 +20,18 @@
 #define LUA_VERSION_RELEASE	"0"
 
 /*
-** A versão pública do Santafé é 1.0.0. LUA_VERSION_NUM permanece 503
+** Os números acima preservam o layout de módulos e o formato binário 1.0.
+** A versão pública é independente. LUA_VERSION_NUM permanece 503
 ** porque identifica a ABI C herdada do Lua 5.3; não significa
 ** compatibilidade da sintaxe ou do vocabulário público com Lua.
 */
 #define LUA_VERSION_NUM		503
 
-#define LUA_VERSION	"SantaFé " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
-#define LUA_RELEASE	LUA_VERSION "." LUA_VERSION_RELEASE
+#define SANTAFE_VERSION_MAJOR "2"
+#define SANTAFE_VERSION_MINOR "0"
+#define SANTAFE_VERSION_PATCH "2"
+#define LUA_VERSION	"Santafé " SANTAFE_VERSION_MAJOR "." SANTAFE_VERSION_MINOR
+#define LUA_RELEASE	LUA_VERSION "." SANTAFE_VERSION_PATCH
 #define LUA_COPYRIGHT	LUA_RELEASE "  (C) 2025-2026 Rafael Alves Lemos - Baseado em Lua 5.3.6"
 #define LUA_AUTHORS	"Rafael Alves Lemos"
 
@@ -64,7 +68,6 @@
 #define LUA_MM_NOME                "__nome"
 #define LUA_MM_METATABELA          "__metatabela"
 #define LUA_MM_PARES               "__pares"
-#define LUA_MM_IPARES              "__ipares"
 #define LUA_MM_PARA_COLAR          "__paraColar"
 #define LUA_MM_DESCARREGUE         "__descarregue"
 
@@ -416,20 +419,6 @@ LUA_API void      (lua_setallocf) (lua_State *L, lua_Alloc f, void *ud);
 
 /* }============================================================== */
 
-
-/*
-** {==============================================================
-** compatibility macros for unsigned conversions
-** ===============================================================
-*/
-#if defined(LUA_COMPAT_APIINTCASTS)
-
-#define lua_pushunsigned(L,n)	lua_pushinteger(L, (lua_Integer)(n))
-#define lua_tounsignedx(L,i,is)	((lua_Unsigned)lua_tointegerx(L,i,is))
-#define lua_tounsigned(L,i)	lua_tounsignedx(L,(i),NULL)
-
-#endif
-/* }============================================================== */
 
 /*
 ** {======================================================================

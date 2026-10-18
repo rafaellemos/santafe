@@ -1,0 +1,92 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local correio = importe "correio"
+local rede = importe "rede"
+local recebidas = {}
+
+local servidor = garanta(correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 18754,
+    nome = "mx.teste.local",
+    segurança = "nenhuma",
+    domíniosLocais = { "exemplo.net" },
+    autorize = função(_, destinatário)
+        se destinatário == "recusada@exemplo.net" então
+            retorne falso, "caixa postal inexistente"
+        fim
+        se destinatário == "temporária@exemplo.net" então
+            retorne falso, {
+                tipo = "temporária",
+                mensagem = "banco propositalmente indisponível"
+            }
+        fim
+        retorne verdadeiro
+    fim,
+    receba = função(mensagem)
+        recebidas[#recebidas + 1] = mensagem
+        retorne verdadeiro
+    fim
+})
+garanta(servidor:inicie())
+
+local mensagem = garanta(correio.novaMensagem {
+    remetente = "rafael@santafe.dev.br",
+    destinatários = {
+        "ana@exemplo.net",
+        "recusada@exemplo.net",
+        "temporária@exemplo.net"
+    },
+    assunto = "Entrega direta",
+    texto = "Carta entregue sem retransmissor."
+})
+
+local relatório, relatórioNulo, falhaFinal
+garanta(correio.entregueDiretamenteAssíncrono(mensagem, {
+    nome = "mail.santafe.dev.br",
+    porta = 18754,
+    tempoLimite = 1500,
+    consulteMX = função(domínio, conclua)
+        garanta(domínio == "exemplo.net")
+        conclua({
+            { preferência = 10, endereço = "127.0.0.2" },
+            { preferência = 20, endereço = "localhost" }
+        }, nulo)
+    fim
+}, função(resultado, falha)
+    relatório, falhaFinal = resultado, falha
+    local semCaixa = garanta(correio.novaMensagem {
+        remetente = "rafael@santafe.dev.br",
+        destinatários = { "ninguém@semcorreio.example" },
+        assunto = "MX nulo",
+        texto = "Esta carta deve ser recusada sem abrir conexão."
+    })
+    garanta(correio.entregueDiretamenteAssíncrono(semCaixa, {
+        nome = "mail.santafe.dev.br",
+        consulteMX = função(_, conclua)
+            conclua({ { preferência = 0, endereço = "." } }, nulo)
+        fim
+    }, função(resultadoNulo, falhaNula)
+        garanta(não falhaNula, falhaNula)
+        relatórioNulo = resultadoNulo
+        servidor:feche()
+    fim))
+fim))
+
+rede.laço()
+garanta(relatório, falhaFinal ou "entrega direta não terminou")
+garanta(#relatório.entregues == 1)
+garanta(#relatório.temporárias == 1)
+garanta(relatório.temporárias[1] == "temporária@exemplo.net")
+garanta(#relatório.permanentes == 1)
+garanta(relatório.permanentes[1] == "recusada@exemplo.net")
+garanta(relatório.domínios["exemplo.net"].estado == "parcial")
+garanta(#relatório.domínios["exemplo.net"].tentativas == 2)
+garanta(#recebidas == 1)
+garanta(recebidas[1].destinatários[1] == "ana@exemplo.net")
+garanta(#recebidas[1].destinatários == 1)
+garanta(relatórioNulo)
+garanta(#relatórioNulo.permanentes == 1)
+garanta(relatórioNulo.domínios["semcorreio.example"].estado ==
+    "permanente")
+mostre("correio entrega direta por MX: ok")

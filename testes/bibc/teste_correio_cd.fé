@@ -1,0 +1,224 @@
+-- Fronteiras entre Correio CD e o núcleo do Carteiro.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local CorreioCD = importe "correio.cd"
+local Carteiro = importe "carteiro"
+
+local recebeu
+local postou
+local atualizou
+local modoDoAntivírus = "limpo"
+local verificações = 0
+local modoDaAutenticação = "passa"
+local autenticações = 0
+local recebimentos = 0
+local triagens = 0
+local repositório = {}
+local selecionador = {}
+
+função selecionador.avalie(_, envelope, mensagem)
+    triagens = triagens + 1
+    garanta(envelope.remetente == "maria@exemplo.org")
+    garanta(mensagem.remetente == "maria@exemplo.org")
+    garanta(envelope.autenticação.dmarc.resultado == "passa",
+        "Triagem executou antes da autenticação postal")
+    retorne {
+        classificação = "indesejada", pontuaçãoDeSuspeita = 9,
+        pasta = "indesejadas",
+        motivos = {{ regra = "ensaio", pontos = 9, descrição = "ensaio" }}
+    }
+fim
+
+local verificador = {}
+função verificador.examineAssíncrono(_, conteúdo, tratador)
+    verificações = verificações + 1
+    garanta(tipo(conteúdo) == "colar" e #conteúdo > 0)
+    se modoDoAntivírus == "ameaça" então
+        tratador({ limpa = falso, ameaça = "Win.Teste-Santafe" }, nulo)
+    senão se modoDoAntivírus == "indisponível" então
+        tratador(nulo, "motor fora do ar")
+    senão
+        tratador({ limpa = verdadeiro }, nulo)
+    fim fim
+    retorne verdadeiro
+fim
+
+local autenticador = {}
+função autenticador.avalieAssíncrono(_, envelope, tratador)
+    autenticações = autenticações + 1
+    garanta(verificações >= autenticações,
+        "autenticação postal executou antes do antivírus")
+    se modoDaAutenticação == "rejeita" então
+        tratador(nulo, {
+            tipo = "autenticação-rejeitada",
+            mensagem = "DMARC recusou o remetente de ensaio"
+        })
+    senão se modoDaAutenticação == "indisponível" então
+        tratador(nulo, {
+            tipo = "autenticação-indisponível",
+            mensagem = "DNS temporariamente indisponível"
+        })
+    senão
+        envelope.autenticação = {
+            spf = { resultado = "passa" },
+            dkim = { resultado = "nenhum" },
+            dmarc = { resultado = "passa", ação = "aceitar" }
+        }
+        tratador(envelope.autenticação, nulo)
+    fim fim
+    retorne verdadeiro
+fim
+
+função repositório.existeDestinatárioLocal(_, endereço, tratador)
+    tratador(endereço == "ana@santafé.dev.br", nulo)
+fim
+
+função repositório.recebaSMTP(_, envelope, tratador)
+    recebimentos = recebimentos + 1
+    recebeu = envelope
+    tratador(1, nulo)
+fim
+
+função repositório.adicioneSaída(_, caixa, mensagem, fila, tratador)
+    postou = { caixa = caixa, mensagem = mensagem, fila = fila }
+    tratador({ mensagem = 17, fila = 29 }, nulo)
+fim
+
+função repositório.atualizeEntrega(_, identificação, estado, falha, tratador)
+    atualizou = { identificação, estado, falha }
+    tratador(1, nulo)
+fim
+
+função repositório.obtenhaUsuárioPorSessão(_, resumo, tratador)
+    tratador({ id = 3, usuário = "ana", resumo = resumo }, nulo)
+fim
+
+função repositório.obtenhaOuCrieCaixa(_, usuário, tratador)
+    tratador({ id = 5, usuárioId = usuário.id,
+        endereço = "ana@santafé.dev.br", estado = "ativa" }, nulo)
+fim
+
+função repositório.listeMensagens(_, caixa, pasta, busca, limite,
+        deslocamento, tratador)
+    tratador({ { id = 11, caixa = caixa, pasta = pasta,
+        busca = busca, limite = limite, deslocamento = deslocamento } }, nulo)
+fim
+
+local cd = CorreioCD.novo({
+    diretório = repositório,
+    repositório = repositório,
+    fila = { tabela = "correio_fila" },
+    configuração = { domínio = "santafé.dev.br" },
+    antivírus = verificador,
+    autenticação = autenticador,
+    triagem = selecionador
+})
+
+local existe
+cd:aceiteDestinatário("ana@santafé.dev.br",
+    função(valor, falha) garanta(não falha); existe = valor fim)
+garanta(existe == verdadeiro, "CD não reconheceu a caixa local")
+
+local envelope = {
+    remetente = "maria@exemplo.org",
+    destinatários = { "ana@santafé.dev.br" },
+    conteúdo = "From: maria@exemplo.org\r\n\r\nOlá",
+    recebidaEm = 1700000000
+}
+local quantidade
+cd:recebaCarta(envelope,
+    função(valor, falha) garanta(não falha); quantidade = valor fim)
+garanta(quantidade == 1 e recebeu == envelope,
+    "CD não encaminhou a carta recebida ao repositório")
+garanta(recebeu.triagem.classificação == "indesejada" e
+    recebeu.triagem.pontuaçãoDeSuspeita == 9,
+    "CD não anexou a decisão da Triagem ao envelope")
+garanta(autenticações == 1 e triagens == 1 e recebimentos == 1,
+    "CD não respeitou antivírus -> autenticação -> triagem -> depósito")
+
+local caixa = { id = 5, endereço = "ana@santafé.dev.br" }
+local postagem
+cd:posteCarta(caixa, {
+    destinatários = { "maria@exemplo.org" },
+    assunto = "Olá", texto = "Carta de teste"
+}, função(valor, falha) garanta(não falha, falha); postagem = valor fim)
+garanta(postagem.mensagem == 17 e postagem.fila == 29)
+garanta(postagem.destinatários == 1)
+garanta(postou.caixa == caixa e postou.fila.tabela == "correio_fila")
+garanta(verificações == 2, "entrada e saída não passaram pelo antivírus")
+
+modoDoAntivírus = "ameaça"
+local recusaMaliciosa
+cd:recebaCarta(envelope, função(valor, falha)
+    recusaMaliciosa = não valor e tipo(falha) == "tabela" e
+        falha.tipo == "ameaça" e falha.ameaça == "Win.Teste-Santafe"
+fim)
+garanta(recusaMaliciosa, "CD aceitou uma ameaça")
+
+modoDoAntivírus = "indisponível"
+local falhouFechado
+cd:posteCarta(caixa, {
+    destinatários = { "maria@exemplo.org" }, texto = "Outra carta"
+}, função(valor, falha)
+    falhouFechado = não valor e tipo(falha) == "tabela" e
+        falha.tipo == "antivírus-indisponível"
+fim)
+garanta(falhouFechado, "CD prosseguiu sem o antivírus")
+
+modoDoAntivírus = "limpo"
+modoDaAutenticação = "rejeita"
+local recusouRemetenteFalso
+cd:recebaCarta({
+    remetente = "maria@exemplo.org",
+    destinatários = { "ana@santafé.dev.br" },
+    conteúdo = "From: maria@exemplo.org\r\n\r\nFalsa",
+    recebidaEm = 1700000001
+}, função(valor, falha)
+    recusouRemetenteFalso = não valor e tipo(falha) == "tabela" e
+        falha.tipo == "autenticação-rejeitada"
+fim)
+garanta(recusouRemetenteFalso,
+    "CD aceitou uma carta recusada pela autenticação postal")
+garanta(recebimentos == 1 e triagens == 1,
+    "carta sem autenticação alcançou a Triagem ou o depósito")
+
+modoDaAutenticação = "indisponível"
+local falhouTemporariamente
+cd:recebaCarta({
+    remetente = "maria@exemplo.org",
+    destinatários = { "ana@santafé.dev.br" },
+    conteúdo = "From: maria@exemplo.org\r\n\r\nTemporária",
+    recebidaEm = 1700000002
+}, função(valor, falha)
+    falhouTemporariamente = não valor e tipo(falha) == "tabela" e
+        falha.tipo == "autenticação-indisponível"
+fim)
+garanta(falhouTemporariamente,
+    "CD persistiu carta sem conseguir consultar a autenticação postal")
+garanta(recebimentos == 1 e triagens == 1)
+
+cd:atualizeEntrega(29, "entregue", nulo,
+    função(valor, falha) garanta(valor == 1 e não falha) fim)
+garanta(atualizou[1] == 29 e atualizou[2] == "entregue")
+
+local carteiro = Carteiro.novo({ caixas = repositório, cd = cd })
+local usuário
+carteiro:usuárioPorSessão("resumo",
+    função(valor, falha) garanta(não falha); usuário = valor fim)
+local caixaObtida
+carteiro:caixaDoUsuário(usuário,
+    função(valor, falha) garanta(não falha); caixaObtida = valor fim)
+local cartas
+carteiro:listeCartas(caixaObtida, "entrada", "olá", 20,
+    função(valor, falha) garanta(não falha); cartas = valor fim)
+garanta(cartas[1].pasta == "entrada" e cartas[1].limite == 20 e
+    cartas[1].deslocamento == 0)
+
+local recusou
+carteiro:listeCartas(caixaObtida, "inexistente", "", 20,
+    função(valor, falha) recusou = não valor e falha == "pasta inválida" fim)
+garanta(recusou, "Carteiro aceitou pasta desconhecida")
+
+mostre("Correio CD e Carteiro: ok")

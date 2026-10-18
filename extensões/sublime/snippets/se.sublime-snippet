@@ -1,0 +1,8 @@
+<snippet>
+    <content><![CDATA[se ${1:condição} então
+    ${0}
+fim]]></content>
+    <tabTrigger>se</tabTrigger>
+    <scope>source.santafe</scope>
+    <description>condição se</description>
+</snippet>

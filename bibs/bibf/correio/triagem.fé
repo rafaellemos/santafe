@@ -1,0 +1,379 @@
+-- Triagem explicável de cartas recebidas.
+--
+-- A decisão combina sinais estruturais, autenticação postal, ligações e
+-- indícios textuais fracos. Nenhuma ligação é aberta: cada ponto conserva um
+-- motivo objetivo para auditoria e futura aprendizagem do usuário.
+
+local rede = importe "rede"
+
+local triagem = {
+    nome = "Triagem do Correio Santafé",
+    versão = "1.1.0"
+}
+
+local extensõesExecutáveis = {
+    exe = verdadeiro, dll = verdadeiro, com = verdadeiro,
+    scr = verdadeiro, bat = verdadeiro, cmd = verdadeiro,
+    ps1 = verdadeiro, vbs = verdadeiro, vbe = verdadeiro,
+    js = verdadeiro, jse = verdadeiro, jar = verdadeiro,
+    msi = verdadeiro, lnk = verdadeiro, apk = verdadeiro
+}
+
+local tiposExecutáveis = {
+    ["application/x-dosexec"] = verdadeiro,
+    ["application/x-msdownload"] = verdadeiro,
+    ["application/x-msdos-program"] = verdadeiro,
+    ["application/x-msi"] = verdadeiro,
+    ["application/java-archive"] = verdadeiro,
+    ["application/vnd.android.package-archive"] = verdadeiro
+}
+
+local função conjunto(itens)
+    local resultado = {}
+    para _, item em ipares(itens ou {}) início
+        item = paraColar(item):minúscula():apare()
+        se item ~= "" então resultado[item] = verdadeiro fim
+    fim
+    retorne resultado
+fim
+
+local função endereçoLimpo(valor)
+    valor = paraColar(valor ou ""):minúscula():apare()
+    local entreSinais = valor:separe("<([^<>]+)>")
+    se entreSinais então valor = entreSinais:apare() fim
+    retorne valor
+fim
+
+local função domínioDoEndereço(valor)
+    valor = endereçoLimpo(valor)
+    local arroba, fimDoArroba = valor:procure("@", 1, verdadeiro)
+    se não arroba ou fimDoArroba == #valor então retorne nulo fim
+    retorne valor:corte(fimDoArroba + 1):apare()
+fim
+
+local função conteOcorrências(texto, procurado)
+    local quantidade, posição = 0, 1
+    enquanto verdadeiro início
+        local começo, final = texto:procure(procurado, posição, verdadeiro)
+        se não começo então pare fim
+        quantidade = quantidade + 1
+        posição = final + 1
+    fim
+    retorne quantidade
+fim
+
+local função extensão(nome)
+    retorne paraColar(nome ou ""):minúscula():separe("%.([^%.]+)$")
+fim
+
+local função decodifiqueEntidadesHTML(texto)
+    texto = paraColar(texto ou "")
+    texto = texto:troque("&#[xX](%h+);?", função(hexadecimal)
+        local código = paraNúmero(hexadecimal, 16)
+        se não código ou código < 1 ou código > 0x10FFFF ou
+           (código >= 0xD800 e código <= 0xDFFF) então retorne "" fim
+        retorne utf8.caractere(código)
+    fim)
+    texto = texto:troque("&#([0-9]+);?", função(decimal)
+        local código = paraNúmero(decimal)
+        se não código ou código < 1 ou código > 0x10FFFF ou
+           (código >= 0xD800 e código <= 0xDFFF) então retorne "" fim
+        retorne utf8.caractere(código)
+    fim)
+    retorne texto:troque("&colon;", ":"):troque("&sol;", "/")
+        :troque("&commat;", "@"):troque("&quot;", '"')
+        :troque("&apos;", "'"):troque("&amp;", "&")
+fim
+
+local função atributoHTML(marca, nome)
+    local valor = marca:separe(nome ..
+        "[ \t\r\n]*=[ \t\r\n]*[\"']([^\"']+)[\"']")
+    se valor então retorne valor fim
+    retorne marca:separe(nome ..
+        "[ \t\r\n]*=[ \t\r\n]*([^ \t\r\n>]+)")
+fim
+
+local função éIPv4(hospedeiro)
+    local a, b, c, d = hospedeiro:separe(
+        "^([0-9]+)%.([0-9]+)%.([0-9]+)%.([0-9]+)$")
+    se não a então retorne falso fim
+    para _, parte em ipares({ a, b, c, d }) início
+        parte = mat.paraInteiro(parte)
+        se não parte ou parte < 0 ou parte > 255 então retorne falso fim
+    fim
+    retorne verdadeiro
+fim
+
+local função examineLigação(valor)
+    valor = decodifiqueEntidadesHTML(valor):apare():minúscula()
+    local autoridade = valor:separe("^https?://([^/%?#]+)")
+    se não autoridade então retorne nulo fim
+    local possuiCredencial = autoridade:procure("@", 1, verdadeiro) ~= nulo
+    se possuiCredencial então
+        autoridade = autoridade:separe("^.*@(.+)$") ou autoridade
+    fim
+    local ipv6 = autoridade:separe("^%[([^%]]+)%]")
+    local hospedeiro = ipv6 ou autoridade:separe("^([^:]+)") ou autoridade
+    hospedeiro = hospedeiro:apare():minúscula()
+    local domínio = rede.domínioASCII(hospedeiro)
+    domínio = domínio e domínio:minúscula() ou hospedeiro
+    retorne {
+        valor = valor,
+        domínio = domínio,
+        possuiCredencial = possuiCredencial,
+        usaIP = ipv6 ~= nulo ou éIPv4(hospedeiro),
+        seguro = valor:procure("https://", 1, verdadeiro) == 1
+    }
+fim
+
+local função contémAlgum(texto, termos)
+    para _, termo em ipares(termos) início
+        se texto:procure(termo, 1, verdadeiro) então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+local termosDeSegredo = {
+    "senha", "palavra-passe", "password", "credencial",
+    "código de acesso", "codigo de acesso", "access code"
+}
+
+local termosDeUrgência = {
+    "urgente", "imediatamente", "agora", "expira", "expirará",
+    "suspens", "bloquead", "último aviso", "urgent", "immediately",
+    "expires", "suspended", "blocked", "final notice"
+}
+
+local função examineFisgadas(mensagem, some)
+    local html = paraColar(mensagem.html ou ""):minúscula()
+    local visível = decodifiqueEntidadesHTML(
+        html:troque("<[^>]*>", " "))
+    local texto = (paraColar(mensagem.assunto ou "") .. " " ..
+        paraColar(mensagem.texto ou "") .. " " .. visível):minúscula()
+    local possuiSegredo = contémAlgum(texto, termosDeSegredo)
+    local possuiUrgência = contémAlgum(texto, termosDeUrgência)
+    local ligações, conhecidas = {}, {}
+    local mascarada, comCredencial, porIP, semTLS = falso, falso, falso, falso
+    local esquemaPerigoso = falso
+
+    local função adicioneLigação(valor)
+        se #ligações >= 100 então retorne nulo fim
+        valor = decodifiqueEntidadesHTML(valor):apare()
+        se conhecidas[valor] então retorne examineLigação(valor) fim
+        local analisada = examineLigação(valor)
+        se não analisada então retorne nulo fim
+        conhecidas[valor] = verdadeiro
+        ligações[#ligações + 1] = analisada
+        comCredencial = comCredencial ou analisada.possuiCredencial
+        porIP = porIP ou analisada.usaIP
+        semTLS = semTLS ou não analisada.seguro
+        retorne analisada
+    fim
+
+    local material = decodifiqueEntidadesHTML(texto) .. " " .. html
+    para ligação em material:capture("(https?://[^<>\"' \t\r\n]+)") início
+        adicioneLigação(ligação)
+    fim
+
+    para atributos, rótulo em html:capture(
+        "<a[ \t\r\n]+([^>]*)>(.-)</a[ \t\r\n]*>") início
+        local destino = atributoHTML(atributos, "href")
+        se destino então
+            destino = decodifiqueEntidadesHTML(destino):apare()
+            se destino:procure("javascript:", 1, verdadeiro) == 1 ou
+               destino:procure("vbscript:", 1, verdadeiro) == 1 ou
+               destino:procure("data:text/html", 1, verdadeiro) == 1 então
+                esquemaPerigoso = verdadeiro
+            fim
+            local destinoAnalisado = adicioneLigação(destino)
+            local textoDoRótulo = decodifiqueEntidadesHTML(
+                rótulo:troque("<[^>]*>", " ")):apare()
+            local aparente = textoDoRótulo:separe(
+                "(https?://[^<>\"' \t\r\n]+)")
+            local aparenteAnalisado = aparente e examineLigação(aparente)
+            se destinoAnalisado e aparenteAnalisado e
+               destinoAnalisado.domínio ~= aparenteAnalisado.domínio então
+                mascarada = verdadeiro
+            fim
+        fim
+    fim
+
+    local possuiFormulário = html:procure("<form", 1, verdadeiro) ~= nulo
+    local campoDeSenha = html:separe(
+        "<input[^>]-type[ \t\r\n]*=[ \t\r\n]*[\"']?password") ~= nulo
+
+    se esquemaPerigoso então
+        some("ligação-com-esquema-perigoso", 8,
+            "ligação tenta executar ou incorporar conteúdo ativo")
+    fim
+    se mascarada então
+        some("ligação-mascarada", 6,
+            "o domínio mostrado na ligação difere do destino real")
+    fim
+    se comCredencial então
+        some("credencial-na-ligação", 6,
+            "ligação esconde dados de acesso antes do domínio")
+    fim
+    se porIP então
+        some("ligação-por-ip", 4,
+            "ligação aponta diretamente para um endereço IP")
+    fim
+    se possuiFormulário e campoDeSenha então
+        some("formulário-de-credenciais", 8,
+            "HTML solicita senha dentro de um formulário")
+    senãose possuiFormulário então
+        some("formulário-no-corpo", 5,
+            "HTML tenta apresentar um formulário interativo")
+    fim
+    se possuiSegredo e #ligações > 0 então
+        some("pedido-de-segredo-com-ligação", 4,
+            "mensagem pede informação secreta e oferece uma ligação")
+    fim
+    se possuiSegredo e possuiUrgência então
+        some("pedido-de-segredo-urgente", 2,
+            "pedido de informação secreta usa linguagem de urgência")
+    fim
+    se possuiSegredo e semTLS então
+        some("segredo-por-ligação-sem-tls", 2,
+            "pedido de informação secreta aponta para HTTP sem TLS")
+    fim
+fim
+
+função triagem.nova(opções)
+    opções = opções ou {}
+    local limiteSuspeita = mat.paraInteiro(opções.limiteSuspeita ou 4)
+    local limiteIndesejada = mat.paraInteiro(opções.limiteIndesejada ou 8)
+    garanta(limiteSuspeita e limiteSuspeita >= 1,
+        "limite de suspeita deve ser positivo")
+    garanta(limiteIndesejada e limiteIndesejada > limiteSuspeita,
+        "limite de indesejada deve superar o de suspeita")
+
+    local bloqueados = conjunto(opções.bloqueados)
+    local este = {
+        limiteSuspeita = limiteSuspeita,
+        limiteIndesejada = limiteIndesejada
+    }
+
+    função este.avalie(_, envelope, mensagem)
+        envelope = envelope ou {}
+        mensagem = mensagem ou {}
+        local remetente = endereçoLimpo(envelope.remetente)
+        local domínio = domínioDoEndereço(remetente)
+        local motivos = {}
+        local pontuação = 0
+
+        local função some(regra, pontos, descrição)
+            pontuação = pontuação + pontos
+            motivos[#motivos + 1] = {
+                regra = regra, pontos = pontos, descrição = descrição
+            }
+        fim
+
+        local postal = envelope.autenticação
+        se postal e postal.dmarc e postal.dmarc.ação == "indesejadas" então
+            some("dmarc-indesejadas", limiteIndesejada,
+                "política DMARC do remetente solicitou quarentena")
+        fim
+        se postal e postal.dmarc e
+           postal.dmarc.resultado == "falha" e
+           postal.dmarc.ação == "aceitar" então
+            some("dmarc-falhou-em-observação", 3,
+                "DMARC falhou, mas o domínio ainda pediu somente observação")
+        fim
+
+        se bloqueados[remetente] ou (domínio e bloqueados["@" .. domínio]) então
+            some("remetente-bloqueado", 100,
+                "remetente presente na lista de bloqueio")
+        fim
+
+        local cabeçalhos = mensagem.cabeçalhos ou {}
+        se não cabeçalhos.from ou cabeçalhos.from:apare() == "" então
+            some("sem-remetente", 4, "cabeçalho From ausente")
+        fim
+        se não mensagem.identificação ou mensagem.identificação == "" então
+            some("sem-identificação", 1, "cabeçalho Message-ID ausente")
+        fim
+        se não mensagem.data ou mensagem.data == "" então
+            some("sem-data", 1, "cabeçalho Date ausente")
+        fim
+        se não mensagem.assunto ou mensagem.assunto:apare() == "" então
+            some("sem-assunto", 1, "assunto vazio")
+        fim
+
+        local domínioDoFrom = domínioDoEndereço(mensagem.remetente)
+        se domínio e domínioDoFrom e domínio ~= domínioDoFrom então
+            some("remetentes-divergentes", 2,
+                "domínios do envelope e do cabeçalho From divergem")
+        fim
+        local domínioDaResposta = domínioDoEndereço(mensagem.responderPara)
+        se domínioDoFrom e domínioDaResposta e
+           domínioDoFrom ~= domínioDaResposta então
+            some("resposta-divergente", 2,
+                "Reply-To aponta para outro domínio")
+        fim
+
+        se #(envelope.destinatários ou {}) > 25 então
+            some("muitos-destinatários", 2,
+                "envelope possui mais de 25 destinatários")
+        fim
+
+        -- O ritmo observado pelo Vigia é somente um indício auxiliar. Mesmo
+        -- próximo do limite, ele soma um único ponto e jamais separa uma carta
+        -- sozinho; redes compartilhadas podem concentrar remetentes legítimos.
+        local fotografiaDoVigia = envelope.vigia
+        se tipo(fotografiaDoVigia) == "tabela" e
+           (fotografiaDoVigia.limiteNaJanela ou 0) > 0 e
+           (fotografiaDoVigia.naJanela ou 0) * 5 >=
+                fotografiaDoVigia.limiteNaJanela * 4 então
+            some("ritmo-de-conexões-elevado", 1,
+                "endereço remoto está próximo do limite de conexões do Vigia")
+        fim
+        se mensagem.html e mensagem.html ~= "" e
+           (não mensagem.texto ou mensagem.texto:apare() == "") então
+            some("somente-html", 1, "mensagem oferece HTML sem texto simples")
+        fim
+
+        local ligações = conteOcorrências(
+            (mensagem.html ou ""):minúscula(), "http://") +
+            conteOcorrências((mensagem.html ou ""):minúscula(), "https://")
+        se ligações > 20 então
+            some("muitas-ligações", 2, "HTML possui mais de 20 ligações")
+        fim
+
+        examineFisgadas(mensagem, some)
+
+        se #(mensagem.anexos ou {}) > 10 então
+            some("muitos-anexos", 2, "mensagem possui mais de 10 anexos")
+        fim
+        para _, anexo em ipares(mensagem.anexos ou {}) início
+            local tipoDoAnexo = paraColar(anexo.tipo ou ""):minúscula()
+            local extensãoDoAnexo = extensão(anexo.nome)
+            se tiposExecutáveis[tipoDoAnexo] ou
+               extensõesExecutáveis[extensãoDoAnexo] então
+                some("anexo-executável", 8,
+                    "anexo executável ou instalável: " ..
+                    paraColar(anexo.nome ou "sem nome"))
+            fim
+        fim
+
+        se pontuação < 0 então pontuação = 0 fim
+        local classificação = "regular"
+        local pasta = "entrada"
+        se pontuação >= limiteIndesejada então
+            classificação = "indesejada"
+            pasta = "indesejadas"
+        senão se pontuação >= limiteSuspeita então
+            classificação = "suspeita"
+        fim fim
+        retorne {
+            pontuaçãoDeSuspeita = pontuação,
+            classificação = classificação,
+            pasta = pasta,
+            motivos = motivos
+        }
+    fim
+
+    retorne este
+fim
+
+retorne triagem

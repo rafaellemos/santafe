@@ -1,0 +1,211 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/ini.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local IMAP = importe "correio.imap"
+local correio = importe "correio"
+local rede = importe "rede"
+
+local porta = mat.paraInteiro(paraNúmero(
+    so.obterVariável("CORREIO_IMAP_TESTE_PORTA") ou "19993"))
+local agora = so.tempo()
+local mensagens = {
+    {
+        id = 1, uid = 11, pasta = "entrada", direção = "entrada",
+        remetente = "ana@exemplo.net",
+        destinatários = { ["para"] = { "teste@santafé.dev.br" } },
+        assunto = "Primeira carta", resumo = "Olá pelo IMAP",
+        texto = "Olá pelo IMAP!", html = nulo, anexos = {},
+        tamanho = 0, lida = falso, importante = falso,
+        apagadaNoIMAP = falso, criadaEm = agora - 60,
+        identificação = "<primeira@exemplo.net>",
+        mime = "Date: Sun, 30 Aug 2026 12:00:00 -0300\r\n" ..
+            "From: Ana <ana@exemplo.net>\r\n" ..
+            "To: teste@santafé.dev.br\r\n" ..
+            "Subject: Primeira carta\r\n" ..
+            "Message-ID: <primeira@exemplo.net>\r\n" ..
+            "Content-Type: text/plain; charset=UTF-8\r\n\r\n" ..
+            "Olá pelo IMAP!"
+    },
+    {
+        id = 2, uid = 14, pasta = "entrada", direção = "entrada",
+        remetente = "maria@exemplo.org",
+        destinatários = { ["para"] = { "teste@santafé.dev.br" } },
+        assunto = "Segunda carta", resumo = "Conteúdo de ensaio",
+        texto = "Conteúdo de ensaio", html = "<p>Conteúdo de ensaio</p>",
+        anexos = {}, tamanho = 0, lida = falso, importante = verdadeiro,
+        apagadaNoIMAP = falso,
+        criadaEm = agora, identificação = "<segunda@exemplo.org>",
+        mime = "Date: Sun, 30 Aug 2026 12:01:00 -0300\r\n" ..
+            "From: Maria <maria@exemplo.org>\r\n" ..
+            "To: teste@santafé.dev.br\r\n" ..
+            "Subject: Segunda carta\r\n" ..
+            "Message-ID: <segunda@exemplo.org>\r\n" ..
+            "Content-Type: text/plain; charset=UTF-8\r\n\r\n" ..
+            "Conteúdo de ensaio"
+    }
+}
+para _, mensagem em ipares(mensagens) início mensagem.tamanho = #mensagem.mime fim
+
+local próximos = {
+    entrada = 15, enviadas = 1, rascunhos = 1, arquivadas = 1,
+    indesejadas = 1, lixeira = 1
+}
+local repositório = {}
+
+função repositório.autentiqueCaixa(_, usuário, senha, _, tratador)
+    se (usuário == "teste@santafé.dev.br" ou
+        usuário == "tésté@santafé.dev.br" ou
+        usuário == "teste@xn--santaf-gva.dev.br") e senha == "segredo" então
+        tratador({
+            usuário = "teste", endereço = "teste@santafé.dev.br",
+            caixa = { id = 7, endereço = "teste@santafé.dev.br", estado = "ativa" }
+        }, nulo)
+    senão tratador(nulo, nulo) fim
+fim
+
+função repositório.listeMensagensIMAP(_, _, pasta, tratador)
+    local itens, nãoLidas = {}, 0
+    para _, mensagem em ipares(mensagens) início
+        se mensagem.pasta == pasta então
+            itens[#itens + 1] = mensagem
+            se não mensagem.lida então nãoLidas = nãoLidas + 1 fim
+        fim
+    fim
+    tabela.ordene(itens, função(a, b) retorne a.uid < b.uid fim)
+    tratador({
+        validadeUID = 1788130000, próximoUID = próximos[pasta],
+        quantidade = #itens, nãoLidas = nãoLidas, mensagens = itens
+    }, nulo)
+fim
+
+função repositório.obtenhaMensagemIMAP(_, _, id, tratador)
+    para _, mensagem em ipares(mensagens) início
+        se mensagem.id == id então tratador(mensagem, nulo); retorne fim
+    fim
+    tratador(nulo, nulo)
+fim
+
+função repositório.obtenhaAnexo(_, _, _, _, tratador)
+    tratador(nulo, "anexo de ensaio inexistente")
+fim
+
+função repositório.atualizeSinalizadoresIMAP(_, _, id, sinalizadores,
+                                                        tratador)
+    para _, mensagem em ipares(mensagens) início
+        se mensagem.id == id então
+            mensagem.lida = sinalizadores.lida
+            mensagem.importante = sinalizadores.importante
+            mensagem.apagadaNoIMAP = sinalizadores.apagada
+            tratador(verdadeiro, nulo); retorne
+        fim
+    fim
+    tratador(falso, nulo)
+fim
+
+função repositório.movaMensagemIMAP(_, _, id, pasta, tratador)
+    para _, mensagem em ipares(mensagens) início
+        se mensagem.id == id então
+            mensagem.pasta = pasta
+            mensagem.uid = próximos[pasta]
+            mensagem.apagadaNoIMAP = falso
+            próximos[pasta] = próximos[pasta] + 1
+            tratador({ uid = mensagem.uid }, nulo); retorne
+        fim
+    fim
+    tratador(nulo, "carta inexistente")
+fim
+
+função repositório.copieMensagensIMAP(_, _, ids, pasta, tratador)
+    local cópias = {}
+    para _, id em ipares(ids ou {}) início
+        local original
+        para _, mensagem em ipares(mensagens) início
+            se mensagem.id == id então original = mensagem; pare fim
+        fim
+        se não original então tratador(nulo, "carta inexistente"); retorne fim
+        local nova = {}
+        para nome, valor em pares(original) início nova[nome] = valor fim
+        local maiorId = 0
+        para _, mensagem em ipares(mensagens) início
+            maiorId = mat.máximo(maiorId, mensagem.id)
+        fim
+        nova.id = maiorId + 1
+        nova.pasta = pasta
+        nova.uid = próximos[pasta]
+        próximos[pasta] = próximos[pasta] + 1
+        mensagens[#mensagens + 1] = nova
+        cópias[#cópias + 1] = {
+            origem = id, id = nova.id, uid = nova.uid
+        }
+    fim
+    tratador({ validadeUID = 1788130000, cópias = cópias }, nulo)
+fim
+
+função repositório.removaMensagemIMAP(_, _, id, tratador)
+    para índice, mensagem em ipares(mensagens) início
+        se mensagem.id == id então
+            se mensagem.pasta ~= "lixeira" então
+                tratador(nulo,
+                    "somente cartas da lixeira podem ser removidas definitivamente")
+                retorne
+            fim
+            tabela.remova(mensagens, índice)
+            tratador({ id = id, tacosLiberados = mensagem.tamanho }, nulo)
+            retorne
+        fim
+    fim
+    tratador(nulo, "carta inexistente")
+fim
+
+função repositório.adicioneMensagemIMAP(_, caixa, pasta, mime, opções,
+                                                    tratador)
+    local lida, falha = correio.leiaMensagem(mime)
+    se não lida então tratador(nulo, falha); retorne fim
+    se pasta == "enviadas" então
+        para _, mensagem em ipares(mensagens) início
+            se mensagem.pasta == pasta e
+               mensagem.identificação == lida.identificação e
+               mensagem.mime == mime então
+                tratador({
+                    id = mensagem.id, uid = mensagem.uid,
+                    validadeUID = 1788130000, duplicada = verdadeiro
+                }, nulo)
+                retorne
+            fim
+        fim
+    fim
+    local maiorId = 0
+    para _, mensagem em ipares(mensagens) início
+        maiorId = mat.máximo(maiorId, mensagem.id)
+    fim
+    local mensagem = {
+        id = maiorId + 1, uid = próximos[pasta], pasta = pasta,
+        direção = "saida", remetente = caixa.endereço,
+        destinatários = { ["para"] = { lida.destinatários } },
+        assunto = lida.assunto, resumo = lida.texto ou lida.html ou "",
+        texto = lida.texto, html = lida.html, anexos = lida.anexos,
+        tamanho = #mime, lida = opções.lida == verdadeiro,
+        importante = opções.importante == verdadeiro,
+        apagadaNoIMAP = falso,
+        criadaEm = opções.criadaEm, identificação = lida.identificação,
+        mime = mime
+    }
+    próximos[pasta] = próximos[pasta] + 1
+    mensagens[#mensagens + 1] = mensagem
+    tratador({
+        id = mensagem.id, uid = mensagem.uid,
+        validadeUID = 1788130000, duplicada = falso
+    }, nulo)
+fim
+
+local servidor, falha = IMAP.servidor({
+    endereço = "127.0.0.1", porta = porta, nome = "imap.teste",
+    certificado = "testes/recursos/tls-local-certificado.pem",
+    chavePrivada = "testes/recursos/tls-local-chave.pem",
+    repositório = repositório, resumoIsca = "resumo-isca",
+    tempoLimite = 10000, intervaloOcioso = 1000
+})
+garanta(servidor, falha)
+garanta(servidor:inicie())
+mostre("IMAP_TESTE_PRONTO", porta)
+rede.laço()

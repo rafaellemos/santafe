@@ -6,7 +6,11 @@ módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
 
 local rede = importe "rede"
 local caminheiro = importe "caminheiro"
-local ap = caminheiro.novo()
+local pulso = importe "pulso"
+local memóriaPULSO = pulso.memória(200)
+local canalPULSO = garanta(pulso.novo { serviço = "teste-caminheiro" })
+canalPULSO:adicioneDestino(memóriaPULSO)
+local ap = caminheiro.novo { pulso = canalPULSO }
 local porta = 18746
 local cliente = rede.clienteTCP()
 local conexãoCliente
@@ -271,4 +275,13 @@ ap.escute(porta, {
 }, executarPróximoTeste)
 
 garanta(terminou e sucesso, mensagem)
+garanta(#memóriaPULSO.mensagens >= #testes * 2,
+    "eventos PULSO do Caminheiro ausentes")
+para _, evento em ipares(memóriaPULSO.mensagens) início
+    se evento.nome:procure("caminheiro.", 1, verdadeiro) == 1 então
+        garanta(evento.tipo ~= "operação",
+            "acontecimento do Caminheiro foi classificado como ordem PULSO")
+    fim
+fim
+canalPULSO:feche()
 mostre("Caminheiro + rede: ok")

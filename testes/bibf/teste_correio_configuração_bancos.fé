@@ -1,0 +1,17 @@
+módulo.caminho = "aplicativos/correio/fonte/?.fé;" ..
+    "aplicativos/correio/fonte/?/ini.fé;bibs/bibf/?.fé;" ..
+    "bibs/bibf/?/?.fé;" .. módulo.caminho
+
+local configuração = (importe "correio.configuração").carregue()
+garanta(#configuração.bancosPostais == 2)
+garanta(configuração.bancosPostais[1].banco.banco ==
+    so.obterVariável("SANTAFE_MARIADB_BANCO"))
+garanta(configuração.bancosPostais[1].depósito.raiz ==
+    "/var/lib/santafé/correio")
+garanta(configuração.bancosPostais[2].domínioASCII ==
+    "xn--domnio-5va.example")
+garanta(configuração.bancosPostais[2].banco.banco ==
+    so.obterVariável("SECUNDARIO_MARIADB_BANCO"))
+garanta(configuração.bancosPostais[2].depósito.raiz ==
+    "/var/lib/correio-clientes/secundario/correio")
+mostre("Configuração de bancos postais isolados: ok")

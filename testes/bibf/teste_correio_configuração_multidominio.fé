@@ -1,0 +1,16 @@
+-- Identidades DKIM independentes para mais de um domínio postal.
+
+módulo.caminho = "aplicativos/correio/fonte/?.fé;" ..
+    "aplicativos/correio/fonte/?/ini.fé;bibs/bibf/?.fé;" ..
+    "bibs/bibf/?/?.fé;" .. módulo.caminho
+
+local configuração = (importe "correio.configuração").carregue()
+local santafé = configuração.dkim.identidades["xn--santaf-gva.dev.br"]
+local secundário = configuração.dkim.identidades["xn--domnio-5va.example"]
+
+garanta(santafé e santafé.seletor == "santafe2026")
+garanta(santafé.chave == "/tmp/santafe.pem")
+garanta(secundário e secundário.seletor == "secundario2026")
+garanta(secundário.chave == "/tmp/secundario.pem")
+
+mostre("Correio com identidades DKIM multidomínio: ok")

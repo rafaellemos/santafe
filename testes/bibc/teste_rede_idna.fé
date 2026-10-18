@@ -1,0 +1,11 @@
+-- Conversão determinística entre Unicode e Punycode para DNS e SMTP.
+
+local rede = importe "rede"
+
+local ascii = garanta(rede.domínioASCII("santafé.dev.br"))
+garanta(ascii == "xn--santaf-gva.dev.br", "conversão IDNA inesperada: " .. ascii)
+garanta(rede.domínioASCII(ascii) == ascii, "Punycode não foi preservado")
+garanta(rede.domínioUnicode(ascii) == "santafé.dev.br",
+    "conversão de volta para Unicode falhou")
+
+mostre("rede IDNA/Punycode: ok")

@@ -28,7 +28,7 @@ static const char udatatypename[] = "dadoOpaco";
 
 LUAI_DDEF const char *const luaT_typenames_[LUA_TOTALTAGS] = {
   "vazio",
-  "nulo", "booleano", udatatypename, "n\xC3\xBAmero", /*número*/
+  "nulo", "l\xC3\xB3gico", udatatypename, "n\xC3\xBAmero", /* lógico, número */
   "colar", "tabela", "fun\xC3\xA7\xC3\xA3o", udatatypename, "corrotina", /*função*/
   "proto" /* this last case is used for tests only */
 };

@@ -1,0 +1,127 @@
+#!/usr/local/bin/santafé
+
+local raiz = so.obterVariável("CORREIO_RAIZ") ou "aplicativos/correio"
+módulo.caminho = raiz .. "/fonte/?.fé;" .. raiz .. "/fonte/?/ini.fé;" ..
+    módulo.caminho
+
+local correio = importe "correio"
+local pulso = importe "pulso"
+local CorreioCD = importe "correio.cd"
+local Antivírus = importe "correio.antivírus"
+local Triagem = importe "correio.triagem"
+local AutenticaçãoPostal = importe "correio.autenticação"
+local configuração = (importe "correio.configuração").carregue()
+local CorreioMultibanco = importe "correio.multibanco"
+
+local verificador
+se configuração.antivírus.ativo então
+    verificador = garanta(Antivírus.novo(configuração.antivírus))
+fim
+local selecionador
+se configuração.triagem.ativa então
+    selecionador = garanta(Triagem.nova(configuração.triagem))
+fim
+local autenticador
+se configuração.autenticação.ativa então
+    autenticador = garanta(AutenticaçãoPostal.nova({
+        nomeDoServidor = configuração.recebedor.nome,
+        tempoLimite = configuração.autenticação.tempoLimite,
+        domíniosLocais = configuração.domíniosLocais
+    }))
+fim
+
+local canal = garanta(pulso.novo({ serviço = "correio-recebedor",
+    instância = so.obterVariável("CORREIO_RECEBEDOR_INSTANCIA") ou "recebedor-01" }))
+se configuração.pulsoArquivo e configuração.pulsoArquivo ~= "" então
+    local destino, falha = pulso.registrador(configuração.pulsoArquivo)
+    se destino então canal:adicioneDestino(destino)
+    senão mostre("[Correio] registrador PULSO indisponível:", falha) fim
+fim
+
+local estado = { cd = nulo, falha = "banco ainda não está pronto" }
+local função falhaTemporária(mensagem)
+    retorne {
+        tipo = "temporária",
+        mensagem = paraColar(mensagem ou "serviço temporariamente indisponível")
+    }
+fim
+CorreioMultibanco.inicie(configuração, função(repositório, falha)
+    se não repositório então
+        estado.falha = falha
+        mostre("[Correio] bancos postais indisponíveis:", falha)
+        retorne
+    fim
+    local função prepareCD()
+        estado.repositório = repositório
+        estado.cd = CorreioCD.novo({
+            diretório = repositório,
+            repositório = repositório,
+            fila = { tabela = configuração.tabelaDaFila },
+            configuração = configuração,
+            pulso = canal,
+            antivírus = verificador,
+            triagem = selecionador,
+            autenticação = autenticador
+        })
+        estado.falha = nulo
+        mostre("[Correio] bancos postais, estruturas e segurança prontos")
+    fim
+    se não verificador então prepareCD(); retorne fim
+    estado.falha = "antivírus ainda não está pronto"
+    verificador:confiraAssíncrono(função(pronto, falhaDoAntivírus)
+        se não pronto então
+            estado.falha = falhaDoAntivírus
+            mostre("[Correio] antivírus indisponível:", falhaDoAntivírus)
+            canal:sinal("correio.antivírusIndisponível",
+                { falha = falhaDoAntivírus }, { prioridade = "crítica" })
+            retorne
+        fim
+        prepareCD()
+    fim)
+fim)
+
+local recebedor = configuração.recebedor
+local servidor = garanta(correio.servidor({
+    endereço = recebedor.endereço,
+    porta = recebedor.porta,
+    nome = recebedor.nome,
+    segurança = recebedor.segurança,
+    certificado = recebedor.certificado,
+    chavePrivada = recebedor.chavePrivada,
+    domíniosLocais = configuração.domíniosLocais,
+    limiteMensagem = configuração.limiteCorpo,
+    limiteDestinatários = configuração.limiteDestinatários,
+    pulso = canal,
+
+    autorize = função(_, destinatário, conclua, sessão)
+        se não estado.cd então
+            conclua(nulo, falhaTemporária(estado.falha))
+            retorne
+        fim
+        se #sessão.destinatários == 0 então sessão.bancoPostal = nulo fim
+        local chave = estado.repositório:chaveDoEndereço(destinatário)
+        se sessão.bancoPostal e chave ~= sessão.bancoPostal então
+            conclua(nulo, falhaTemporária(
+                "envie destinatários de domínios isolados em envelopes separados"))
+            retorne
+        fim
+        estado.cd:aceiteDestinatário(destinatário,
+            função(aceito, falha)
+                se falha então
+                    conclua(nulo, falhaTemporária(falha))
+                senão
+                    se aceito então sessão.bancoPostal = chave fim
+                    conclua(aceito, nulo)
+                fim
+            fim)
+    fim,
+
+    receba = função(mensagem, conclua)
+        se não estado.cd então conclua(nulo, estado.falha); retorne fim
+        estado.cd:recebaCarta(mensagem, conclua)
+    fim
+}))
+
+mostre("Correio Recebedor escutando em " .. recebedor.endereço .. ":" .. recebedor.porta)
+garanta(servidor:escute())
+canal:feche()

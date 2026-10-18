@@ -1,0 +1,70 @@
+-- Regressão de STARTTLS: uma conexão TCP já aberta é atualizada para TLS
+-- nos dois lados sem bloquear o laço de eventos.
+
+local rede = importe "rede"
+local certificado, falhaCertificado = rede.carregueCertificadoTLS(
+    "testes/recursos/tls-local-certificado.pem",
+    "testes/recursos/tls-local-chave.pem"
+)
+garanta(certificado, falhaCertificado)
+
+local porta = 18749
+local servidor = rede.servidorTCP()
+local cliente = rede.clienteTCP()
+local conexãoCliente
+local finalizado = falso
+local sucesso = falso
+local mensagem = "teste TLS não terminou"
+
+local função terminar(ok, detalhe)
+    se finalizado então retorne fim
+    finalizado = verdadeiro
+    sucesso = ok
+    mensagem = detalhe ou ""
+    se conexãoCliente então conexãoCliente:feche() fim
+    cliente:feche()
+    servidor:feche()
+    rede.pareLaço()
+fim
+
+garanta(servidor:amarre("127.0.0.1", porta))
+servidor:definaTempoLimite(3000)
+servidor:aceiteAssíncrono(função(_, conexão, falha)
+    se falha então terminar(falso, falha); retorne fim
+    conexão:definaTempoLimite(3000)
+    conexão:aceiteTLSAssíncrono(certificado, função(segura, falhaTLS)
+        se falhaTLS então terminar(falso, falhaTLS); retorne fim
+        segura:recebaDadosAssíncrono(64, função(c, dados, falhaLeitura)
+            se falhaLeitura então terminar(falso, falhaLeitura); retorne fim
+            terminar(dados == "PULSO sobre TLS", "conteúdo TLS divergente")
+            c:feche()
+        fim)
+    fim)
+fim)
+
+cliente:definaTempoLimite(3000)
+cliente:conecteAssíncrono("127.0.0.1", porta, função(_, conexão, falha)
+    se falha então terminar(falso, falha); retorne fim
+    conexãoCliente = conexão
+    conexão:definaTempoLimite(3000)
+    conexão:inicieTLSAssíncrono("localhost",
+        { validarCertificado = falso },
+        função(segura, falhaTLS)
+            se falhaTLS então terminar(falso, falhaTLS); retorne fim
+            segura:envieAssíncrono("PULSO sobre TLS", função(_, enviados, falhaEnvio)
+                se falhaEnvio então terminar(falso, falhaEnvio); retorne fim
+                se enviados ~= 15 então
+                    terminar(falso, "quantidade enviada divergente")
+                fim
+            fim)
+        fim)
+fim)
+
+local consulta, falhaConsulta = rede.consulteDNSAssíncrono(
+    "localhost", "A", função() fim
+)
+garanta(consulta == nulo e falhaConsulta == "tipo DNS aceito: MX ou TXT")
+
+rede.laço()
+garanta(finalizado e sucesso, mensagem)
+mostre("rede TLS: ok")

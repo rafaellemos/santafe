@@ -1,0 +1,6 @@
+garanta(colar.junte("\0", "a", "b", "c") == "a\0b\0c")
+garanta(tabela.maiorÍndice({[9007199254740993] = verdadeiro}) == 9007199254740993)
+garanta(mat.tipo(tabela.maiorÍndice({[9007199254740993] = verdadeiro})) == "inteiro")
+garanta(tabela.maiorÍndice({[-2]=1, [2.5]=1}) == 2.5)
+garanta(tabela.maiorÍndice({a=1}) == 0)
+mostre("Regressões 2.0: separador binário e índices inteiros exatos: ok")

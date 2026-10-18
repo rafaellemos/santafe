@@ -1,0 +1,53 @@
+-- Integração SMTP com TLS desde o primeiro taco, perfil da porta 465.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local recebidas = {}
+local servidor = garanta(correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 18753,
+    nome = "smtp.teste.local",
+    segurança = "TLS",
+    certificado = "testes/recursos/tls-local-certificado.pem",
+    chavePrivada = "testes/recursos/tls-local-chave.pem",
+    -- A forma Punycode e a forma Unicode representam o mesmo domínio.
+    domíniosLocais = { "xn--santaf-gva.dev.br" },
+    receba = função(mensagem)
+        tabela.insira(recebidas, mensagem)
+        retorne verdadeiro
+    fim
+})
+garanta(servidor:inicie())
+
+local mensagem = garanta(correio.novaMensagem {
+    remetente = "ação@teste.local",
+    destinatários = { "josé@santafé.dev.br" },
+    assunto = "TLS implícito",
+    texto = "conexão cifrada desde o início"
+})
+local cliente = garanta(correio.cliente {
+    endereço = "localhost",
+    porta = 18753,
+    nome = "cliente.teste.local",
+    segurança = "TLS",
+    validarCertificado = falso,
+    tempoLimite = 4000
+})
+
+local terminou, falhaFinal = falso, "envio não terminou"
+garanta(cliente:envieAssíncrono(mensagem, função(resultado, falha)
+    terminou = resultado ~= nulo
+    falhaFinal = falha
+    cliente:feche()
+    servidor:feche()
+fim))
+
+rede.laço()
+garanta(terminou, falhaFinal)
+garanta(#recebidas == 1, "TLS implícito não entregou exatamente uma mensagem")
+garanta(recebidas[1].smtpUTF8 == verdadeiro,
+    "servidor não registrou o envelope SMTPUTF8")
+garanta(recebidas[1].destinatários[1] == "josé@santafé.dev.br",
+    "parte local e domínio SMTPUTF8 não foram preservados")
+mostre("correio TLS implícito: ok")

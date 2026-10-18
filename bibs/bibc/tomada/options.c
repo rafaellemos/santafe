@@ -267,7 +267,7 @@ int opt_set_linger(lua_State *L, p_socket ps)
     lua_pushstring(L, "ativo");
     lua_gettable(L, 3);
     if (!lua_isboolean(L, -1))
-        luaL_argerror(L, 3, "campo booleano 'ativo' esperado");
+        luaL_argerror(L, 3, "campo l\xC3\xB3gico 'ativo' esperado");
     li.l_onoff = (u_short) lua_toboolean(L, -1);
     lua_pushstring(L, "tempoEsgotado");
     lua_gettable(L, 3);

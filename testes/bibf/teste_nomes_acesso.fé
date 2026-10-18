@@ -1,0 +1,21 @@
+local acesso = importe "nomes.acesso"
+
+local acl, falha = acesso.novo({
+    "127.0.0.0/8", "::1/128", "143.208.252.0/22"
+})
+garanta(acl, falha)
+garanta(acl:permita("127.0.0.1"))
+garanta(acl:permita("::1"))
+garanta(acl:permita("143.208.252.1"))
+garanta(acl:permita("143.208.255.254"))
+garanta(não acl:permita("143.208.251.255"))
+garanta(não acl:permita("143.208.0.1"))
+garanta(não acl:permita("2001:db8::1"))
+
+local limitador = garanta(acesso.novoLimitador({
+    porSegundo = 1, explosão = 2, máximoDeOrigens = 2
+}))
+garanta(limitador:permita("192.0.2.1"))
+garanta(limitador:permita("192.0.2.1"))
+garanta(não limitador:permita("192.0.2.1"))
+mostre("nomes acesso e taxa: ok")

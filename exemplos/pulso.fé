@@ -1,0 +1,20 @@
+local pulso = importe "pulso"
+
+local canal = garanta(pulso.novo({
+    serviço = "correio",
+    instância = "smtp-01"
+}))
+
+canal:adicioneDestino(pulso.terminal())
+
+canal:sinal("serviçoIniciado", {
+    endereço = "127.0.0.1",
+    porta = 2525
+})
+
+canal:leitura("filaDeSaída", {
+    pendentes = 0,
+    adiadas = 0
+})
+
+canal:feche()

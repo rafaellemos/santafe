@@ -1,0 +1,41 @@
+módulo.caminho = "aplicativos/carteiro/fonte/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/segredo/?.so;" .. módulo.caminhoC
+
+local configurador = importe "carteiro.configurador"
+local dados = {
+    nome = "Rafael & Ana <teste>",
+    endereço = "rafael@santafé.dev.br",
+    usuário = "rafael@santafé.dev.br",
+    servidor = "xn--santaf-gva.dev.br",
+    identidade = 11,
+    senha = "segredo-que-não-pode-sair"
+}
+local perfil = configurador.perfilApple(dados)
+local repetido = configurador.perfilApple(dados)
+
+garanta(perfil == repetido, "o perfil precisa ser determinístico")
+garanta(perfil:procure("com.apple.mail.managed", 1, verdadeiro))
+garanta(perfil:procure("EmailTypeIMAP", 1, verdadeiro))
+garanta(perfil:procure("<integer>993</integer>", 1, verdadeiro))
+garanta(perfil:procure("<integer>465</integer>", 1, verdadeiro))
+garanta(perfil:procure("xn--santaf-gva.dev.br", 1, verdadeiro))
+garanta(perfil:procure("rafael@santafé.dev.br", 1, verdadeiro))
+garanta(perfil:procure("Rafael &amp; Ana &lt;teste&gt;", 1, verdadeiro))
+garanta(perfil:procure("OutgoingPasswordSameAsIncomingPassword", 1, verdadeiro))
+garanta(perfil:procure("<key>PayloadScope</key>\n  <string>System</string>", 1, verdadeiro))
+garanta(perfil:procure("<key>TargetDeviceType</key>\n  <integer>1</integer>", 1, verdadeiro))
+garanta(não perfil:procure("segredo-que-não-pode-sair", 1, verdadeiro),
+    "o perfil não pode conter a credencial recebida")
+garanta(não perfil:procure("EmailAccountPassword", 1, verdadeiro))
+garanta(perfil:procure("%h%h%h%h%h%h%h%h%-%h%h%h%h%-%h%h%h%h%-%h%h%h%h%-%h%h%h%h%h%h%h%h%h%h%h%h"))
+
+local perfilMac = configurador.perfilApple({
+    nome = dados.nome, endereço = dados.endereço,
+    usuário = dados.usuário, servidor = dados.servidor,
+    identidade = dados.identidade, alvo = "mac"
+})
+garanta(perfilMac ~= perfil, "os aparelhos precisam de perfis distintos")
+garanta(perfilMac:procure("<key>PayloadScope</key>\n  <string>User</string>", 1, verdadeiro))
+garanta(perfilMac:procure("<key>TargetDeviceType</key>\n  <integer>5</integer>", 1, verdadeiro))
+
+mostre("Carteiro configurador: ok")

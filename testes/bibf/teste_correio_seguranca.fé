@@ -1,0 +1,85 @@
+-- Regressões de segurança do Correio: injeção e retransmissão aberta.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local inválida, falha = correio.novaMensagem {
+    remetente = "a@teste.local\r\nBcc: invasor@fora.test",
+    destinatários = { "b@teste.local" },
+    texto = "x"
+}
+garanta(inválida == nulo e falha:procure("quebras", 1, verdadeiro))
+
+local internacional = garanta(correio.novaMensagem {
+    remetente = "josé@santafé.dev.br",
+    nomeDoRemetente = "José",
+    destinatários = { "ana@santafé.dev.br" },
+    texto = "x"
+})
+garanta(internacional.smtpUTF8,
+    "mensagem internacional não marcou a necessidade de SMTPUTF8")
+local mimeInternacional = garanta(internacional:forme())
+garanta(mimeInternacional:procure(
+    "From: \"José\" <josé@santafé.dev.br>",
+    1, verdadeiro
+), "remetente SMTPUTF8 não preservou a apresentação Unicode")
+garanta(mimeInternacional:procure(
+    "To: ana@santafé.dev.br", 1, verdadeiro
+), "domínio Unicode do destinatário não foi preservado")
+garanta(não mimeInternacional:procure("=?UTF-8?", 1, verdadeiro),
+    "mensagem SMTPUTF8 recebeu palavra MIME desnecessária")
+
+local reservada = garanta(correio.novaMensagem {
+    remetente = "a@teste.local",
+    destinatários = { "b@teste.local" },
+    texto = "x",
+    cabeçalhos = { ["Bcc"] = "invasor@fora.test" }
+})
+local formada, falhaReservada = reservada:forme()
+garanta(formada == nulo e falhaReservada:procure("reservado", 1, verdadeiro))
+
+local privada = garanta(correio.novaMensagem {
+    remetente = "a@teste.local",
+    destinatários = { "b@teste.local" },
+    cópiaOculta = { "oculta@teste.local" },
+    assunto = "Ação segura",
+    texto = "x"
+})
+local mimePrivado = garanta(privada:forme())
+garanta(não mimePrivado:procure("Bcc:", 1, verdadeiro),
+    "cópia oculta apareceu no cabeçalho MIME")
+garanta(não mimePrivado:procure("oculta@teste.local", 1, verdadeiro),
+    "endereço de cópia oculta vazou no conteúdo MIME")
+garanta(mimePrivado:procure("=?UTF-8?B?", 1, verdadeiro) ~= nulo,
+    "assunto UTF-8 não recebeu codificação MIME")
+
+local servidor = garanta(correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 18752,
+    nome = "smtp.teste.local",
+    domíniosLocais = { "teste.local" },
+    receba = função() retorne verdadeiro fim
+})
+garanta(servidor:inicie())
+
+local mensagem = garanta(correio.novaMensagem {
+    remetente = "a@teste.local",
+    destinatários = { "alvo@fora.test" },
+    texto = "não deve sair"
+})
+local cliente = garanta(correio.cliente {
+    endereço = "127.0.0.1", porta = 18752,
+    segurança = "nenhuma", nome = "cliente.teste.local"
+})
+local terminou = falso
+local recusou = falso
+garanta(cliente:envieAssíncrono(mensagem, função(resultado, falhaDoEnvio)
+    terminou = verdadeiro
+    recusou = resultado == nulo e falhaDoEnvio ~= nulo e
+        falhaDoEnvio:procure("retransmissão", 1, verdadeiro) ~= nulo
+    cliente:feche()
+    servidor:feche()
+fim))
+rede.laço()
+garanta(terminou e recusou, "servidor SMTP aceitou retransmissão aberta")
+mostre("correio segurança: ok")

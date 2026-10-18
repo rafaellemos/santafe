@@ -1,0 +1,107 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local dmarc = importe "correio.dmarc"
+
+local registros = {
+    ["_dmarc.embratel.com.br"] = { "v=DMARC1; p=reject; pct=100" },
+    ["_dmarc.quarentena.example"] = { "v=DMARC1; p=quarantine" },
+    ["_dmarc.teste.example"] = { "v=DMARC1; p=reject; t=y" },
+    ["_dmarc.empresa.example"] = { "v=DMARC1; p=reject; sp=quarantine" },
+    ["_dmarc.sub.organizacao.example"] = { "v=DMARC1; p=reject" },
+    ["_dmarc.organizacao.example"] = { "v=DMARC1; p=none; psd=n" },
+    ["_dmarc.monitorada.example"] = {
+        "v=DMARC1; rua=mailto:dmarc@monitorada.example"
+    },
+    ["_dmarc.inválida.example"] = { "v=DMARC1; p=talvez" }
+}
+
+local função consulte(nome, tratador)
+    local saída = {}
+    para _, valor em ipares(registros[nome] ou {}) início
+        saída[#saída + 1] = { valor = valor }
+    fim
+    tratador(saída)
+    retorne verdadeiro
+fim
+
+local função avalie(opções)
+    local resultado
+    opções.consulteTXT = opções.consulteTXT ou consulte
+    garanta(dmarc.avalieAssíncrono(opções,
+        função(avaliação) resultado = avaliação fim))
+    garanta(resultado, "DMARC não concluiu")
+    retorne resultado
+fim
+
+local falsoEmbratel = avalie({
+    domínioDoAutor = "embratel.com.br",
+    spf = { resultado = "falha", domínio = "embratel.com.br" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(falsoEmbratel.resultado == "falha" e
+    falsoEmbratel.ação == "rejeitar")
+
+local legítimoEmbratel = avalie({
+    domínioDoAutor = "embratel.com.br",
+    spf = { resultado = "passa", domínio = "embratel.com.br" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(legítimoEmbratel.resultado == "passa" e
+    legítimoEmbratel.spfAlinhado)
+
+local quarentena = avalie({
+    domínioDoAutor = "quarentena.example",
+    spf = { resultado = "falha", domínio = "outro.example" },
+    dkim = { resultado = "falha", domínios = {} }
+})
+garanta(quarentena.ação == "indesejadas")
+
+local emTeste = avalie({
+    domínioDoAutor = "teste.example",
+    spf = { resultado = "falha", domínio = "teste.example" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(emTeste.política == "quarantine" e emTeste.ação == "indesejadas")
+
+local subdomínio = avalie({
+    domínioDoAutor = "mail.empresa.example",
+    spf = { resultado = "falha", domínio = "mail.empresa.example" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(subdomínio.política == "quarantine" e
+    subdomínio.ação == "indesejadas")
+
+local intermediária = avalie({
+    domínioDoAutor = "mail.sub.organizacao.example",
+    spf = { resultado = "falha", domínio = "outro.example" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(intermediária.política == "none" e
+    intermediária.ação == "aceitar",
+    "registro intermediário não deve substituir o domínio organizacional")
+
+local monitorada = avalie({
+    domínioDoAutor = "monitorada.example",
+    spf = { resultado = "falha", domínio = "outro.example" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(monitorada.política == "none" e monitorada.ação == "aceitar",
+    "registro com rua válido e sem p deveria equivaler a p=none")
+
+local inválida = avalie({
+    domínioDoAutor = "inválida.example",
+    spf = { resultado = "falha", domínio = "outro.example" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(inválida.resultado == "nenhum" e inválida.ação == "aceitar",
+    "política inválida sem rua não deve ativar DMARC")
+
+local temporário = avalie({
+    domínioDoAutor = "embratel.com.br",
+    spf = { resultado = "erroTemporário", domínio = "embratel.com.br" },
+    dkim = { resultado = "nenhum", domínios = {} }
+})
+garanta(temporário.resultado == "erroTemporário" e temporário.ação == "adiar")
+
+mostre("DMARC:", "ok")

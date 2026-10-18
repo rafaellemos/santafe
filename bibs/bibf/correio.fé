@@ -1,0 +1,3419 @@
+-- Correio Santafé - mensagens MIME e SMTP assíncrono.
+--
+-- A biblioteca separa construção de mensagem, entrega SMTP e recepção SMTP.
+-- Toda entrada de rede possui limite; senhas nunca entram nos registros PULSO.
+
+local rede = importe "rede"
+local pulso = importe "pulso"
+local Vigia = importe "vigia"
+
+local correio = {
+    nome = "Correio Santafé",
+    versão = "1.0.0"
+}
+
+local CRLF = "\r\n"
+local LIMITE_LINHA = 998
+local LIMITE_CABEÇALHOS = 64 * 1024
+local LIMITE_MENSAGEM = 50 * 1024 * 1024
+local LIMITE_MENSAGEM_DE_SAÍDA = 40 * 1024 * 1024
+local LIMITE_ANEXO = 25 * 1024 * 1024
+local LIMITE_TOTAL_DOS_ANEXOS = 25 * 1024 * 1024
+local LIMITE_QUANTIDADE_DE_ANEXOS = 25
+
+local função falhe(mensagem)
+    retorne nulo, mensagem
+fim
+
+local função inteiroPositivo(valor, nome, padrão)
+    se valor == nulo então valor = padrão fim
+    se mat.paraInteiro(valor) == nulo ou valor <= 0 então
+        retorne nulo, nome .. " deve ser um inteiro positivo"
+    fim
+    retorne valor
+fim
+
+local função semQuebra(valor, nome, permitaVazio)
+    se tipo(valor) ~= "colar" ou (não permitaVazio e valor == "") então
+        retorne nulo, nome .. " deve ser um colar" ..
+            (permitaVazio e "" ou " não vazio")
+    fim
+    se valor:procure("\r", 1, verdadeiro) ou valor:procure("\n", 1, verdadeiro) então
+        retorne nulo, nome .. " não aceita quebras de linha"
+    fim
+    para índice = 1, #valor início
+        local taco = valor:byte(índice)
+        se taco == 0 ou (taco < 32 e taco ~= 9) ou taco == 127 então
+            retorne nulo, nome .. " contém um caractere de controle"
+        fim
+    fim
+    retorne valor
+fim
+
+local função normalizeQuebras(texto)
+    texto = texto:troque("\r\n", "\n")
+    texto = texto:troque("\r", "\n")
+    retorne texto:troque("\n", CRLF)
+fim
+
+local função possuiNãoASCII(texto)
+    para índice = 1, #texto início
+        se texto:byte(índice) > 127 então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+local função codifiqueCabeçalho(texto)
+    se não possuiNãoASCII(texto) então retorne texto fim
+    retorne "=?UTF-8?B?" .. colar.base64(texto) .. "?="
+fim
+
+local função valideParteLocal(parte, nome)
+    se #parte < 1 ou #parte > 64 então
+        retorne nulo, nome .. " possui parte local fora do limite de 64 tacos"
+    fim
+    se parte:corte(1, 1) == "." ou parte:corte(-1) == "." ou
+       parte:procure("..", 1, verdadeiro) então
+        retorne nulo, nome .. " possui pontos em posição inválida"
+    fim
+    local sinais = "!#$%&'*+-/=?^_`{|}~."
+    local quantidadeUTF8, posiçãoInválida = utf8.tamanho(parte)
+    se não quantidadeUTF8 então
+        retorne nulo, nome .. " possui UTF-8 inválido no taco " ..
+            paraColar(posiçãoInválida)
+    fim
+    para índice = 1, #parte início
+        local taco = parte:byte(índice)
+        local alfanumérico =
+            (taco >= 48 e taco <= 57) ou (taco >= 65 e taco <= 90) ou
+            (taco >= 97 e taco <= 122)
+        se taco < 128 e não alfanumérico e
+           não sinais:procure(colar.caractere(taco), 1, verdadeiro) então
+            retorne nulo, nome .. " possui caractere não aceito"
+        fim
+    fim
+    retorne verdadeiro
+fim
+
+local função valideDomínio(domínio, nome)
+    local domínioASCII, falha = rede.domínioASCII(domínio)
+    se não domínioASCII então
+        retorne nulo, nome .. " possui domínio inválido: " .. paraColar(falha)
+    fim
+    se #domínioASCII < 1 ou #domínioASCII > 253 então
+        retorne nulo, nome .. " possui domínio fora do limite de 253 tacos"
+    fim
+    local começo = 1
+    para índice = 1, #domínioASCII + 1 início
+        se índice > #domínioASCII ou
+           domínioASCII:corte(índice, índice) == "." então
+            local rótulo = domínioASCII:corte(começo, índice - 1)
+            se #rótulo < 1 ou #rótulo > 63 ou
+               rótulo:corte(1, 1) == "-" ou rótulo:corte(-1) == "-" então
+                retorne nulo, nome .. " possui rótulo de domínio inválido"
+            fim
+            para posição = 1, #rótulo início
+                local taco = rótulo:byte(posição)
+                local aceito =
+                    (taco >= 48 e taco <= 57) ou (taco >= 65 e taco <= 90) ou
+                    (taco >= 97 e taco <= 122) ou taco == 45
+                se não aceito então
+                    retorne nulo, nome .. " possui domínio inválido"
+                fim
+            fim
+            começo = índice + 1
+        fim
+    fim
+    retorne domínioASCII
+fim
+
+local função valideEndereço(endereço, nome)
+    local válido, falha = semQuebra(endereço, nome ou "endereço", falso)
+    se não válido então retorne nulo, falha fim
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba ou arroba == 1 ou arroba == #endereço ou
+       endereço:procure("@", arroba + 1, verdadeiro) ou
+       endereço:procure(" ", 1, verdadeiro) então
+        retorne nulo, (nome ou "endereço") .. " inválido"
+    fim
+    se #endereço > 254 então
+        retorne nulo, (nome ou "endereço") .. " excede 254 tacos"
+    fim
+    local parteLocal = endereço:corte(1, arroba - 1)
+    local domínio = endereço:corte(arroba + 1)
+    válido, falha = valideParteLocal(parteLocal, nome ou "endereço")
+    se não válido então retorne nulo, falha fim
+    válido, falha = valideDomínio(domínio, nome ou "endereço")
+    se não válido então retorne nulo, falha fim
+    retorne endereço
+fim
+
+local função copieLista(valor, nome, permitaVazia)
+    se tipo(valor) == "colar" então valor = { valor } fim
+    se tipo(valor) ~= "tabela" então
+        retorne nulo, nome .. " deve ser um endereço ou uma lista"
+    fim
+    local lista = {}
+    para índice, endereço em ipares(valor) início
+        local válido, falha = valideEndereço(endereço, nome .. "[" .. índice .. "]")
+        se não válido então retorne nulo, falha fim
+        tabela.insira(lista, válido)
+    fim
+    se #lista == 0 e não permitaVazia então
+        retorne nulo, nome .. " precisa de ao menos um endereço"
+    fim
+    retorne lista
+fim
+
+-- O envelope e o DNS continuam usando o domínio canônico em ASCII. Quando a
+-- mensagem negocia SMTPUTF8, porém, os cabeçalhos apresentam o endereço humano
+-- completo em Unicode, como autoriza o RFC 6532.
+local função endereçoParaCabeçalho(endereço, internacional)
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba então retorne endereço fim
+    se internacional então
+        local domínioUnicode = rede.domínioUnicode(
+            endereço:corte(arroba + 1))
+        se domínioUnicode então
+            retorne endereço:corte(1, arroba - 1) .. "@" .. domínioUnicode
+        fim
+    fim
+    local domínioASCII = rede.domínioASCII(endereço:corte(arroba + 1))
+    se não domínioASCII então retorne endereço fim
+    retorne endereço:corte(1, arroba - 1) .. "@" .. domínioASCII
+fim
+
+local função parteLocalDoEndereço(endereço)
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    retorne arroba e endereço:corte(1, arroba - 1) ou endereço
+fim
+
+local função nomeParaCabeçalho(nome, internacional)
+    se internacional então
+        retorne '"' .. nome:troque("\\", "\\\\"):troque('"', '\\"') .. '"'
+    fim
+    se possuiNãoASCII(nome) então retorne codifiqueCabeçalho(nome) fim
+    retorne '"' .. nome:troque("\\", "\\\\"):troque('"', '\\"') .. '"'
+fim
+
+local função remetenteParaCabeçalho(mensagem)
+    local endereço = endereçoParaCabeçalho(
+        mensagem.remetente, mensagem.smtpUTF8)
+    local nome = mensagem.nomeDoRemetente
+    se (não nome ou nome == "") e
+       possuiNãoASCII(parteLocalDoEndereço(mensagem.remetente)) então
+        nome = parteLocalDoEndereço(mensagem.remetente)
+    fim
+    se não nome ou nome == "" então retorne endereço fim
+    retorne nomeParaCabeçalho(nome, mensagem.smtpUTF8) ..
+        " <" .. endereço .. ">"
+fim
+
+local função cabeçalhoDeEndereços(nome, lista, internacional)
+    local linhas = {}
+    local atual = nome .. ": "
+    para índice, endereço em ipares(lista) início
+        endereço = endereçoParaCabeçalho(endereço, internacional)
+        local parte = (índice > 1 e ", " ou "") .. endereço
+        se #atual + #parte > 78 e #atual > #nome + 2 então
+            tabela.insira(linhas, atual)
+            atual = " " .. endereço
+        senão
+            atual = atual .. parte
+        fim
+    fim
+    tabela.insira(linhas, atual)
+    retorne tabela.concatene(linhas, CRLF)
+fim
+
+local cabeçalhosReservados = {
+    ["date"] = verdadeiro, ["message-id"] = verdadeiro,
+    ["from"] = verdadeiro, ["to"] = verdadeiro, ["cc"] = verdadeiro,
+    ["bcc"] = verdadeiro, ["subject"] = verdadeiro,
+    ["mime-version"] = verdadeiro, ["content-type"] = verdadeiro,
+    ["content-transfer-encoding"] = verdadeiro
+}
+
+local função valideNomeDeCabeçalho(nome)
+    local válido, falha = semQuebra(nome, "nome de cabeçalho", falso)
+    se não válido então retorne nulo, falha fim
+    para índice = 1, #nome início
+        local taco = nome:byte(índice)
+        se taco < 33 ou taco > 126 ou taco == 58 então
+            retorne nulo, "nome de cabeçalho SMTP inválido"
+        fim
+    fim
+    se cabeçalhosReservados[nome:minúscula()] então
+        retorne nulo, "cabeçalho reservado não pode ser redefinido: " .. nome
+    fim
+    retorne nome
+fim
+
+local dias = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
+local meses = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+
+local função dataSMTP(carimbo)
+    local data = so.data("!*t", carimbo ou so.tempo())
+    retorne colar.formate("%s, %02d %s %04d %02d:%02d:%02d +0000",
+        dias[data.wday], data.day, meses[data.month], data.year,
+        data.hour, data.min, data.sec)
+fim
+
+local função identificaçãoMensagem(domínio)
+    retorne "<" .. colar.formate("%08x.%08x.%08x",
+        so.tempo() & 0xFFFFFFFF,
+        so.aleatório() & 0xFFFFFFFF,
+        so.aleatório() & 0xFFFFFFFF) .. "@" .. domínio .. ">"
+fim
+
+local função limiteAleatório(prefixo)
+    retorne "=_Santafe_" .. prefixo .. "_" ..
+        colar.formate("%08x%08x", so.aleatório(), so.aleatório())
+fim
+
+local função base64EmLinhas(dados)
+    local bruto = colar.base64(dados)
+    local linhas = {}
+    para posição = 1, #bruto, 76 início
+        tabela.insira(linhas, bruto:corte(posição, posição + 75))
+    fim
+    retorne colar.junte(CRLF, tabela.desempacote(linhas))
+fim
+
+local função leiaArquivo(caminho)
+    local arquivo, falha = es.abra(caminho, "leiturabin")
+    se não arquivo então retorne nulo, falha fim
+    local dados = arquivo:leia("*tudo")
+    arquivo:feche()
+    retorne dados
+fim
+
+local função anexoPreparado(anexo, índice)
+    se tipo(anexo) ~= "tabela" então
+        retorne nulo, "anexo[" .. índice .. "] deve ser uma tabela"
+    fim
+    local nome, falha = semQuebra(anexo.nome, "nome do anexo", falso)
+    se não nome então retorne nulo, falha fim
+    se #nome > 255 então retorne nulo, "nome do anexo excede 255 tacos" fim
+    local tipoDoConteúdo = anexo.tipo ou "application/octet-stream"
+    local tipoVálido
+    tipoVálido, falha = semQuebra(tipoDoConteúdo, "tipo do anexo", falso)
+    se não tipoVálido então retorne nulo, falha fim
+    local dados = anexo.dados
+    se dados == nulo e anexo.caminho então
+        dados, falha = leiaArquivo(anexo.caminho)
+        se não dados então retorne nulo, falha fim
+    fim
+    se tipo(dados) ~= "colar" então
+        retorne nulo, "anexo precisa de dados binários ou caminho"
+    fim
+    se #dados > LIMITE_ANEXO então
+        retorne nulo, "anexo[" .. índice .. "] excede o limite de " ..
+            LIMITE_ANEXO .. " tacos"
+    fim
+    retorne { nome = nome, tipo = tipoVálido, dados = dados }
+fim
+
+local função formeParteTextual(tipoDoConteúdo, conteúdo)
+    retorne "Content-Type: " .. tipoDoConteúdo .. "; charset=utf-8" .. CRLF ..
+        "Content-Transfer-Encoding: base64" .. CRLF .. CRLF ..
+        base64EmLinhas(normalizeQuebras(conteúdo ou ""))
+fim
+
+local função parâmetroMIME(nome)
+    local simples, percentual = {}, {}
+    local hex = "0123456789ABCDEF"
+    para índice = 1, #nome início
+        local taco = nome:byte(índice)
+        se taco >= 32 e taco <= 126 e taco ~= 34 e taco ~= 92 então
+            tabela.insira(simples, colar.caractere(taco))
+        senão
+            tabela.insira(simples, "_")
+        fim
+        local nãoEscapado =
+            (taco >= 48 e taco <= 57) ou (taco >= 65 e taco <= 90) ou
+            (taco >= 97 e taco <= 122) ou taco == 45 ou taco == 46 ou
+            taco == 95 ou taco == 126
+        se nãoEscapado então
+            tabela.insira(percentual, colar.caractere(taco))
+        senão
+            tabela.insira(percentual, "%" .. hex:corte((taco >> 4) + 1, (taco >> 4) + 1) ..
+                hex:corte((taco & 15) + 1, (taco & 15) + 1))
+        fim
+    fim
+    retorne tabela.concatene(simples), tabela.concatene(percentual)
+fim
+
+local função formeCorpo(mensagem)
+    local partePrincipal
+    se mensagem.texto ~= nulo e mensagem.html ~= nulo então
+        local limiteAlternativo = limiteAleatório("alternativo")
+        partePrincipal = "Content-Type: multipart/alternative; boundary=\"" ..
+            limiteAlternativo .. "\"" .. CRLF .. CRLF ..
+            "--" .. limiteAlternativo .. CRLF ..
+            formeParteTextual("text/plain", mensagem.texto) .. CRLF ..
+            "--" .. limiteAlternativo .. CRLF ..
+            formeParteTextual("text/html", mensagem.html) .. CRLF ..
+            "--" .. limiteAlternativo .. "--"
+    senão se mensagem.html ~= nulo então
+        partePrincipal = formeParteTextual("text/html", mensagem.html)
+    senão
+        partePrincipal = formeParteTextual("text/plain", mensagem.texto ou "")
+    fim fim
+
+    se #mensagem.anexos == 0 então retorne partePrincipal fim
+    local limiteMisto = limiteAleatório("misto")
+    local partes = {
+        "Content-Type: multipart/mixed; boundary=\"" .. limiteMisto .. "\"",
+        "",
+        "--" .. limiteMisto,
+        partePrincipal
+    }
+    para _, anexo em ipares(mensagem.anexos) início
+        local nomeSimples, nomeUTF8 = parâmetroMIME(anexo.nome)
+        tabela.insira(partes, "--" .. limiteMisto)
+        tabela.insira(partes,
+            "Content-Type: " .. anexo.tipo .. "; name=\"" .. nomeSimples .. "\";" .. CRLF ..
+            " name*=UTF-8''" .. nomeUTF8 .. CRLF ..
+            "Content-Disposition: attachment; filename=\"" .. nomeSimples .. "\";" .. CRLF ..
+            " filename*=UTF-8''" .. nomeUTF8 .. CRLF ..
+            "Content-Transfer-Encoding: base64" .. CRLF .. CRLF ..
+            base64EmLinhas(anexo.dados))
+    fim
+    tabela.insira(partes, "--" .. limiteMisto .. "--")
+    retorne colar.junte(CRLF, tabela.desempacote(partes))
+fim
+
+função correio.novaMensagem(opções)
+    se tipo(opções) ~= "tabela" então
+        retorne falhe("opções da mensagem devem ser uma tabela")
+    fim
+    local remetente, falha = valideEndereço(opções.remetente, "remetente")
+    se não remetente então retorne nulo, falha fim
+    local destinatários
+    destinatários, falha = copieLista(opções.destinatários, "destinatários", falso)
+    se não destinatários então retorne nulo, falha fim
+    local cópia
+    cópia, falha = copieLista(opções.cópia ou {}, "cópia", verdadeiro)
+    se não cópia então retorne nulo, falha fim
+    local cópiaOculta
+    cópiaOculta, falha = copieLista(
+        opções.cópiaOculta ou {}, "cópiaOculta", verdadeiro
+    )
+    se não cópiaOculta então retorne nulo, falha fim
+    local assunto
+    assunto, falha = semQuebra(opções.assunto ou "", "assunto", verdadeiro)
+    se não assunto então retorne nulo, falha fim
+    se #codifiqueCabeçalho(assunto) > 900 então
+        retorne falhe("assunto codificado excede o limite SMTP")
+    fim
+    local nomeDoRemetente = opções.nomeDoRemetente
+    se nomeDoRemetente ~= nulo então
+        nomeDoRemetente, falha = semQuebra(
+            nomeDoRemetente, "nome do remetente", verdadeiro)
+        se não nomeDoRemetente então retorne nulo, falha fim
+        se #codifiqueCabeçalho(nomeDoRemetente) > 700 então
+            retorne falhe("nome do remetente codificado excede o limite SMTP")
+        fim
+    fim
+    se opções.texto ~= nulo e tipo(opções.texto) ~= "colar" então
+        retorne falhe("texto da mensagem deve ser um colar")
+    fim
+    se opções.html ~= nulo e tipo(opções.html) ~= "colar" então
+        retorne falhe("HTML da mensagem deve ser um colar")
+    fim
+    se opções.texto == nulo e opções.html == nulo então
+        retorne falhe("a mensagem precisa de texto, HTML ou ambos")
+    fim
+
+    se opções.anexos ~= nulo e tipo(opções.anexos) ~= "tabela" então
+        retorne falhe("anexos devem ser uma lista")
+    fim
+    se #(opções.anexos ou {}) > LIMITE_QUANTIDADE_DE_ANEXOS então
+        retorne falhe("a mensagem excede o limite de " ..
+            LIMITE_QUANTIDADE_DE_ANEXOS .. " anexos")
+    fim
+    se opções.cabeçalhos ~= nulo e tipo(opções.cabeçalhos) ~= "tabela" então
+        retorne falhe("cabeçalhos devem ser uma tabela")
+    fim
+    local anexos = {}
+    local tamanhoDosAnexos = 0
+    para índice, anexo em ipares(opções.anexos ou {}) início
+        local preparado
+        preparado, falha = anexoPreparado(anexo, índice)
+        se não preparado então retorne nulo, falha fim
+        tamanhoDosAnexos = tamanhoDosAnexos + #preparado.dados
+        se tamanhoDosAnexos > LIMITE_TOTAL_DOS_ANEXOS então
+            retorne falhe("os anexos excedem o limite total de " ..
+                LIMITE_TOTAL_DOS_ANEXOS .. " tacos")
+        fim
+        tabela.insira(anexos, preparado)
+    fim
+
+    local domínio = opções.domínio ou remetente:corte(
+        remetente:procure("@", 1, verdadeiro) + 1
+    )
+    local domínioDaIdentificação, falhaDoDomínio =
+        valideDomínio(domínio, "domínio da mensagem")
+    se não domínioDaIdentificação então
+        retorne nulo, falhaDoDomínio
+    fim
+    local identificação = opções.identificação ou
+        identificaçãoMensagem(domínioDaIdentificação)
+    identificação, falha = semQuebra(identificação, "identificação", falso)
+    se não identificação então retorne nulo, falha fim
+    local data = opções.data ou dataSMTP()
+    data, falha = semQuebra(data, "data", falso)
+    se não data então retorne nulo, falha fim
+    local exigeSMTPUTF8 = possuiNãoASCII(remetente)
+    para _, lista em ipares({ destinatários, cópia, cópiaOculta }) início
+        para _, endereço em ipares(lista) início
+            se possuiNãoASCII(endereço) então exigeSMTPUTF8 = verdadeiro fim
+        fim
+    fim
+    local mensagem = {
+        remetente = remetente,
+        destinatáriosPrincipais = destinatários,
+        cópia = cópia,
+        cópiaOculta = cópiaOculta,
+        assunto = assunto,
+        texto = opções.texto,
+        html = opções.html,
+        anexos = anexos,
+        identificação = identificação,
+        smtpUTF8 = exigeSMTPUTF8,
+        nomeDoRemetente = nomeDoRemetente,
+        data = data,
+        cabeçalhos = opções.cabeçalhos ou {}
+    }
+
+    função mensagem.destinatários(esta)
+        local todos = {}
+        para _, lista em ipares({ esta.destinatáriosPrincipais, esta.cópia, esta.cópiaOculta }) início
+            para _, endereço em ipares(lista) início tabela.insira(todos, endereço) fim
+        fim
+        retorne todos
+    fim
+
+    função mensagem.forme(esta)
+        local linhas = {
+            "Date: " .. esta.data,
+            "Message-ID: " .. esta.identificação,
+            "From: " .. remetenteParaCabeçalho(esta),
+            cabeçalhoDeEndereços(
+                "To", esta.destinatáriosPrincipais, esta.smtpUTF8)
+        }
+        se #esta.cópia > 0 então
+            tabela.insira(linhas, cabeçalhoDeEndereços(
+                "Cc", esta.cópia, esta.smtpUTF8))
+        fim
+        tabela.insira(linhas, "Subject: " ..
+            (esta.smtpUTF8 e esta.assunto ou codifiqueCabeçalho(esta.assunto)))
+        tabela.insira(linhas, "MIME-Version: 1.0")
+        para nome, valor em pares(esta.cabeçalhos) início
+            local nomeVálido, falhaDoNome = valideNomeDeCabeçalho(nome)
+            local valorVálido, falhaDoValor = semQuebra(valor, "valor de cabeçalho", verdadeiro)
+            se não nomeVálido então retorne nulo, falhaDoNome fim
+            se não valorVálido então retorne nulo, falhaDoValor fim
+            se #nome + #valor + 2 > LIMITE_LINHA então
+                retorne nulo, "cabeçalho personalizado excede o limite SMTP"
+            fim
+            tabela.insira(linhas, nome .. ": " .. valor)
+        fim
+        local corpo = formeCorpo(esta)
+        local formada = colar.junte(CRLF, tabela.desempacote(linhas)) .. CRLF .. corpo .. CRLF
+        se #formada > LIMITE_MENSAGEM_DE_SAÍDA então
+            retorne nulo, "mensagem MIME de saída excedeu o limite de " ..
+                LIMITE_MENSAGEM_DE_SAÍDA .. " tacos"
+        fim
+        retorne formada
+    fim
+
+    retorne mensagem
+fim
+
+local função protejaPontos(dados)
+    dados = normalizeQuebras(dados)
+    se dados:corte(1, 1) == "." então dados = "." .. dados fim
+    dados = dados:troque(CRLF .. "%.", CRLF .. "..")
+    retorne dados
+fim
+
+local função desprotejaPontos(dados)
+    se dados:corte(1, 2) == ".." então dados = dados:corte(2) fim
+    retorne dados:troque(CRLF .. "%.%.", CRLF .. ".")
+fim
+
+correio.protejaPontos = protejaPontos
+
+-- ---------- LEITURA MIME -------------------------------------------------
+-- O servidor SMTP entrega o envelope e o conteúdo bruto separadamente. O
+-- Carteiro precisa interpretar o conteúdo sem confiar nele: cabeçalhos,
+-- partes e anexos possuem limites próprios e nunca executam HTML.
+
+local função hexadecimal(taco)
+    se taco >= 48 e taco <= 57 então retorne taco - 48 fim
+    se taco >= 65 e taco <= 70 então retorne taco - 55 fim
+    se taco >= 97 e taco <= 102 então retorne taco - 87 fim
+    retorne nulo
+fim
+
+local função decodifiquePercentual(texto)
+    local partes = {}
+    local posição = 1
+    enquanto posição <= #texto início
+        se texto:byte(posição) == 37 e posição + 2 <= #texto então
+            local alto = hexadecimal(texto:byte(posição + 1))
+            local baixo = hexadecimal(texto:byte(posição + 2))
+            se alto e baixo então
+                partes[#partes + 1] = colar.caractere(alto * 16 + baixo)
+                posição = posição + 3
+            senão
+                partes[#partes + 1] = "%"
+                posição = posição + 1
+            fim
+        senão
+            partes[#partes + 1] = texto:corte(posição, posição)
+            posição = posição + 1
+        fim
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função decodifiqueImprimívelEntreAspas(texto, palavraDeCabeçalho)
+    local partes = {}
+    local posição = 1
+    enquanto posição <= #texto início
+        local taco = texto:byte(posição)
+        se palavraDeCabeçalho e taco == 95 então
+            partes[#partes + 1] = " "
+            posição = posição + 1
+        senão se taco == 61 então
+            se texto:corte(posição + 1, posição + 2) == CRLF então
+                posição = posição + 3
+            senão se texto:corte(posição + 1, posição + 1) == "\n" então
+                posição = posição + 2
+            senão se posição + 2 <= #texto então
+                local alto = hexadecimal(texto:byte(posição + 1))
+                local baixo = hexadecimal(texto:byte(posição + 2))
+                se alto e baixo então
+                    partes[#partes + 1] = colar.caractere(alto * 16 + baixo)
+                    posição = posição + 3
+                senão
+                    partes[#partes + 1] = "="
+                    posição = posição + 1
+                fim
+            senão
+                partes[#partes + 1] = "="
+                posição = posição + 1
+            fim fim fim
+        senão
+            partes[#partes + 1] = texto:corte(posição, posição)
+            posição = posição + 1
+        fim fim
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função decodifiquePalavrasDeCabeçalho(texto)
+    retorne (texto ou ""):troque(
+        "=%?([^?]+)%?([BbQq])%?([^?]*)%?=",
+        função(conjunto, modo, dados)
+            local nome = conjunto:minúscula()
+            se nome ~= "utf-8" e nome ~= "utf8" e nome ~= "us-ascii" então
+                retorne "=?" .. conjunto .. "?" .. modo .. "?" .. dados .. "?="
+            fim
+            se modo:minúscula() == "b" então
+                local funcionou, valor = proteja(colar.decBase64, dados)
+                retorne funcionou e valor ou
+                    ("=?" .. conjunto .. "?" .. modo .. "?" .. dados .. "?=")
+            fim
+            retorne decodifiqueImprimívelEntreAspas(dados, verdadeiro)
+        fim
+    )
+fim
+
+local função analiseParâmetros(valor)
+    local partes = {}
+    local atual = {}
+    local entreAspas = falso
+    local escape = falso
+    para posição = 1, #valor início
+        local caractere = valor:corte(posição, posição)
+        se escape então
+            atual[#atual + 1] = caractere
+            escape = falso
+        senão se entreAspas e caractere == "\\" então
+            escape = verdadeiro
+        senão se caractere == '"' então
+            entreAspas = não entreAspas
+            atual[#atual + 1] = caractere
+        senão se caractere == ";" e não entreAspas então
+            partes[#partes + 1] = tabela.concatene(atual):apare()
+            atual = {}
+        senão
+            atual[#atual + 1] = caractere
+        fim fim fim fim
+    fim
+    partes[#partes + 1] = tabela.concatene(atual):apare()
+
+    local principal = (partes[1] ou ""):minúscula()
+    local parâmetros = {}
+    para índice = 2, #partes início
+        local igual = partes[índice]:procure("=", 1, verdadeiro)
+        se igual então
+            local nome = partes[índice]:corte(1, igual - 1):apare():minúscula()
+            local dado = partes[índice]:corte(igual + 1):apare()
+            se dado:corte(1, 1) == '"' e dado:corte(-1) == '"' então
+                dado = dado:corte(2, -2):troque('\\"', '"'):troque("\\\\", "\\")
+            fim
+            parâmetros[nome] = dado
+        fim
+    fim
+    retorne principal, parâmetros
+fim
+
+local função analiseCabeçalhos(bloco)
+    se #bloco > LIMITE_CABEÇALHOS então
+        retorne nulo, "cabeçalhos MIME excedem o limite"
+    fim
+    local cabeçalhos = {}
+    local nomes = {}
+    local nomeAtual
+    local posição = 1
+    enquanto posição <= #bloco início
+        local fimDaLinha = bloco:procure(CRLF, posição, verdadeiro)
+        local linha = bloco:corte(posição, fimDaLinha e fimDaLinha - 1 ou #bloco)
+        se linha:corte(1, 1) == " " ou linha:corte(1, 1) == "\t" então
+            se não nomeAtual então retorne nulo, "continuação de cabeçalho sem nome" fim
+            cabeçalhos[nomeAtual] = cabeçalhos[nomeAtual] .. " " .. linha:apare()
+        senão
+            local doisPontos = linha:procure(":", 1, verdadeiro)
+            se não doisPontos então retorne nulo, "cabeçalho MIME inválido" fim
+            nomeAtual = linha:corte(1, doisPontos - 1):minúscula()
+            local valor = linha:corte(doisPontos + 1):apare()
+            se cabeçalhos[nomeAtual] então
+                cabeçalhos[nomeAtual] = cabeçalhos[nomeAtual] .. ", " .. valor
+            senão
+                cabeçalhos[nomeAtual] = valor
+                nomes[#nomes + 1] = nomeAtual
+            fim
+        fim
+        se não fimDaLinha então pare fim
+        posição = fimDaLinha + 2
+    fim
+    retorne cabeçalhos, nulo, nomes
+fim
+
+local função separeCabeçalhoECorpo(conteúdo)
+    local normalizado = normalizeQuebras(conteúdo)
+    local separador = normalizado:procure(CRLF .. CRLF, 1, verdadeiro)
+    se não separador então
+        retorne nulo, nulo, "mensagem MIME não separa cabeçalhos e corpo"
+    fim
+    retorne normalizado:corte(1, separador - 1),
+        normalizado:corte(separador + 4)
+fim
+
+local camposDeEndereço = {
+    "from", "to", "cc", "bcc", "reply-to", "sender"
+}
+
+-- RFC 2047 permite uma palavra codificada no nome de apresentação, mas
+-- nunca dentro do endereço. Alguns clientes codificam a parte local ou até
+-- substituem tacos perdidos por U+FFFD. Depois dessa perda não existe reparo
+-- seguro; a submissão precisa ser recusada em vez de adivinhar a identidade.
+local função palavraCodificadaEntrouNoEndereço(valor)
+    local posição = 1
+    enquanto verdadeiro início
+        local começo = valor:procure("=?", posição, verdadeiro)
+        se não começo então retorne falso fim
+        local fimDaPalavra = valor:procure("?=", começo + 2, verdadeiro)
+        se não fimDaPalavra então retorne verdadeiro fim
+        local próximoSinal = valor:procure("<", fimDaPalavra + 2, verdadeiro)
+        local próximoArroba = valor:procure("@", fimDaPalavra + 2, verdadeiro)
+        se próximoArroba e
+           (não próximoSinal ou próximoArroba < próximoSinal) então
+            retorne verdadeiro
+        fim
+        posição = fimDaPalavra + 2
+    fim
+fim
+
+função correio.inspecioneCabeçalhos(conteúdo)
+    se tipo(conteúdo) ~= "colar" então
+        retorne nulo, "conteúdo MIME deve ser um colar"
+    fim
+    local bloco, _, falha = separeCabeçalhoECorpo(conteúdo)
+    se não bloco então retorne nulo, falha fim
+    local quantidadeUTF8, posiçãoInválida = utf8.tamanho(bloco)
+    se não quantidadeUTF8 então
+        retorne nulo, "cabeçalhos possuem UTF-8 inválido no taco " ..
+            paraColar(posiçãoInválida)
+    fim
+    local cabeçalhos
+    cabeçalhos, falha = analiseCabeçalhos(bloco)
+    se não cabeçalhos então retorne nulo, falha fim
+    para _, nome em ipares(camposDeEndereço) início
+        local valor = cabeçalhos[nome]
+        se valor e valor:procure("�", 1, verdadeiro) então
+            retorne nulo, "cabeçalho " .. nome ..
+                " perdeu caracteres Unicode no cliente"
+        fim
+        se valor e palavraCodificadaEntrouNoEndereço(valor) então
+            retorne nulo, "cabeçalho " .. nome ..
+                " usa codificação MIME dentro do endereço"
+        fim
+    fim
+    local identificação = cabeçalhos["message-id"]
+    se identificação e
+       identificação:procure("=?", 1, verdadeiro) então
+        retorne nulo, "Message-ID não aceita palavras MIME codificadas"
+    fim
+    retorne {
+        internacionais = possuiNãoASCII(bloco),
+        cabeçalhos = cabeçalhos
+    }
+fim
+
+local função decodifiqueCorpo(corpo, codificação)
+    local modo = (codificação ou ""):apare():minúscula()
+    se modo == "base64" então
+        local compacto = corpo:troque("%e", "")
+        local funcionou, dados = proteja(colar.decBase64, compacto)
+        se não funcionou então retorne nulo, "corpo Base64 inválido" fim
+        retorne dados
+    fim
+    se modo == "quoted-printable" então
+        retorne decodifiqueImprimívelEntreAspas(corpo, falso)
+    fim
+    se modo == "" ou modo == "7bit" ou modo == "8bit" ou modo == "binary" então
+        retorne corpo
+    fim
+    retorne nulo, "codificação MIME não aceita: " .. modo
+fim
+
+local função valorEstendidoDosParâmetros(parâmetros, nome)
+    local direto = parâmetros[nome .. "*"]
+    se direto então
+        local primeiro = direto:procure("'", 1, verdadeiro)
+        local segundo = primeiro e direto:procure("'", primeiro + 1, verdadeiro)
+        se segundo então direto = direto:corte(segundo + 1) fim
+        retorne decodifiquePercentual(direto)
+    fim
+
+    -- RFC 2231 permite repartir nomes longos em filename*0*, filename*1*
+    -- etc. O conjunto precisa ser remontado antes da decodificação
+    -- percentual; decodificar cada trecho isoladamente quebraria um taco UTF-8
+    -- que estivesse dividido entre duas continuações.
+    local partes = {}
+    local codificado = falso
+    para índice = 0, 99 início
+        local chaveCodificada = nome .. "*" .. índice .. "*"
+        local chaveSimples = nome .. "*" .. índice
+        local valor = parâmetros[chaveCodificada]
+        se valor então codificado = verdadeiro
+        senão valor = parâmetros[chaveSimples] fim
+        se não valor então pare fim
+        partes[#partes + 1] = valor
+    fim
+    se #partes == 0 então retorne nulo fim
+
+    local reunido = tabela.concatene(partes)
+    se codificado então
+        local primeiro = reunido:procure("'", 1, verdadeiro)
+        local segundo = primeiro e reunido:procure("'", primeiro + 1, verdadeiro)
+        se segundo então reunido = reunido:corte(segundo + 1) fim
+        retorne decodifiquePercentual(reunido)
+    fim
+    retorne decodifiquePalavrasDeCabeçalho(reunido)
+fim
+
+local função nomeDoAnexo(parâmetrosDoTipo, parâmetrosDaDisposição)
+    local estendido = valorEstendidoDosParâmetros(
+        parâmetrosDaDisposição, "filename") ou
+        valorEstendidoDosParâmetros(parâmetrosDoTipo, "name")
+    se estendido então
+        retorne estendido
+    fim
+    local simples = parâmetrosDaDisposição.filename ou
+        parâmetrosDoTipo.name
+    retorne simples e decodifiquePalavrasDeCabeçalho(simples) ou nulo
+fim
+
+local função partesMultipart(corpo, limite)
+    se não limite ou limite == "" ou #limite > 200 então
+        retorne nulo, "limite multipart ausente ou inválido"
+    fim
+    local marcador = "--" .. limite
+    local partes = {}
+    local posição = corpo:procure(marcador, 1, verdadeiro)
+    se não posição então retorne nulo, "limite multipart não encontrado" fim
+    enquanto posição início
+        local depois = posição + #marcador
+        se corpo:corte(depois, depois + 1) == "--" então pare fim
+        se corpo:corte(depois, depois + 1) == CRLF então depois = depois + 2 fim
+        local próximo = corpo:procure(CRLF .. marcador, depois, verdadeiro)
+        se não próximo então retorne nulo, "multipart sem fechamento" fim
+        partes[#partes + 1] = corpo:corte(depois, próximo - 1)
+        posição = próximo + 2
+        se #partes > 200 então retorne nulo, "mensagem MIME possui partes demais" fim
+    fim
+    retorne partes
+fim
+
+local função leiaParteMIME(conteúdo, saída, controle, profundidade)
+    se profundidade > 12 então retorne nulo, "mensagem MIME profunda demais" fim
+    local bloco, corpo, falha = separeCabeçalhoECorpo(conteúdo)
+    se não bloco então retorne nulo, falha fim
+    local cabeçalhos
+    cabeçalhos, falha = analiseCabeçalhos(bloco)
+    se não cabeçalhos então retorne nulo, falha fim
+    local tipo, parâmetrosDoTipo = analiseParâmetros(
+        cabeçalhos["content-type"] ou "text/plain; charset=utf-8"
+    )
+    local disposição, parâmetrosDaDisposição = analiseParâmetros(
+        cabeçalhos["content-disposition"] ou ""
+    )
+
+    se tipo:corte(1, 10) == "multipart/" então
+        local partes
+        partes, falha = partesMultipart(corpo, parâmetrosDoTipo.boundary)
+        se não partes então retorne nulo, falha fim
+        para _, parte em ipares(partes) início
+            local leu, falhaDaParte = leiaParteMIME(
+                parte, saída, controle, profundidade + 1)
+            se não leu então retorne nulo, falhaDaParte fim
+        fim
+        retorne verdadeiro
+    fim
+
+    local dados
+    dados, falha = decodifiqueCorpo(
+        corpo, cabeçalhos["content-transfer-encoding"]
+    )
+    se não dados então retorne nulo, falha fim
+    local nome = nomeDoAnexo(parâmetrosDoTipo, parâmetrosDaDisposição)
+    local éAnexo = disposição == "attachment" ou nome ~= nulo ou
+        (tipo ~= "text/plain" e tipo ~= "text/html")
+    se éAnexo então
+        se #saída.anexos >= LIMITE_QUANTIDADE_DE_ANEXOS então
+            retorne nulo, "mensagem MIME possui anexos demais"
+        fim
+        se #dados > LIMITE_ANEXO então
+            retorne nulo, "anexo MIME excede o limite de " ..
+                LIMITE_ANEXO .. " tacos"
+        fim
+        se controle.tamanhoDosAnexos + #dados > LIMITE_TOTAL_DOS_ANEXOS então
+            retorne nulo, "anexos MIME excedem o limite total de " ..
+                LIMITE_TOTAL_DOS_ANEXOS .. " tacos"
+        fim
+        controle.tamanhoDosAnexos = controle.tamanhoDosAnexos + #dados
+        saída.anexos[#saída.anexos + 1] = {
+            nome = nome ou ("anexo-" .. (#saída.anexos + 1)),
+            tipo = tipo ~= "" e tipo ou "application/octet-stream",
+            dados = dados,
+            tamanho = #dados
+        }
+    senão se tipo == "text/plain" e saída.texto == nulo então
+        saída.texto = dados
+    senão se tipo == "text/html" e saída.html == nulo então
+        saída.html = dados
+    fim fim fim
+    retorne verdadeiro
+fim
+
+local função extraiaEndereçoParaResposta(cabeçalhos)
+    local valor = decodifiquePalavrasDeCabeçalho(
+        cabeçalhos["reply-to"] ou cabeçalhos.from ou ""
+    ):apare()
+    se valor == "" então retorne nulo fim
+    local entreSinais = valor:separe("<([^<>]+)>")
+    se entreSinais então retorne entreSinais:apare() fim
+    local primeiro = valor:separe("^([^,]+)")
+    retorne primeiro e primeiro:apare() ou nulo
+fim
+
+função correio.leiaMensagem(conteúdo)
+    se tipo(conteúdo) ~= "colar" então
+        retorne falhe("conteúdo MIME deve ser um colar")
+    fim
+    se #conteúdo == 0 ou #conteúdo > LIMITE_MENSAGEM então
+        retorne falhe("conteúdo MIME vazio ou grande demais")
+    fim
+    local bloco, corpo, falha = separeCabeçalhoECorpo(conteúdo)
+    se não bloco então retorne nulo, falha fim
+    local cabeçalhos
+    cabeçalhos, falha = analiseCabeçalhos(bloco)
+    se não cabeçalhos então retorne nulo, falha fim
+    local resultado = {
+        cabeçalhos = cabeçalhos,
+        remetente = decodifiquePalavrasDeCabeçalho(cabeçalhos.from ou ""),
+        responderPara = extraiaEndereçoParaResposta(cabeçalhos),
+        destinatários = decodifiquePalavrasDeCabeçalho(cabeçalhos.to ou ""),
+        cópia = decodifiquePalavrasDeCabeçalho(cabeçalhos.cc ou ""),
+        assunto = decodifiquePalavrasDeCabeçalho(cabeçalhos.subject ou ""),
+        data = cabeçalhos.date,
+        identificação = cabeçalhos["message-id"],
+        texto = nulo,
+        html = nulo,
+        anexos = {},
+        conteúdo = conteúdo,
+        tamanho = #conteúdo
+    }
+    local parteCompleta = bloco .. CRLF .. CRLF .. corpo
+    local leu
+    leu, falha = leiaParteMIME(
+        parteCompleta, resultado, { tamanhoDosAnexos = 0 }, 1)
+    se não leu então retorne nulo, falha fim
+    retorne resultado
+fim
+correio.desprotejaPontos = desprotejaPontos
+
+local função extraiaLinha(estado)
+    local fimDaLinha = estado.acumulado:procure(CRLF, 1, verdadeiro)
+    se não fimDaLinha então retorne nulo fim
+    local linha = estado.acumulado:corte(1, fimDaLinha - 1)
+    estado.acumulado = estado.acumulado:corte(fimDaLinha + 2)
+    retorne linha
+fim
+
+local função analiseRespostaSMTP(estado)
+    local original = estado.acumulado
+    local linhas = {}
+    local código
+    enquanto verdadeiro início
+        local linha = extraiaLinha(estado)
+        se linha == nulo então
+            estado.acumulado = original
+            retorne nulo
+        fim
+        se #linha < 4 então retorne nulo, "resposta SMTP curta demais" fim
+        local atual = paraNúmero(linha:corte(1, 3))
+        se não atual então retorne nulo, "resposta SMTP sem código numérico" fim
+        código = código ou atual
+        se atual ~= código então retorne nulo, "resposta SMTP com códigos divergentes" fim
+        tabela.insira(linhas, linha:corte(5))
+        local separador = linha:corte(4, 4)
+        se separador == " " então
+            retorne { código = código, linhas = linhas,
+                      texto = colar.junte("\n", tabela.desempacote(linhas)) }
+        fim
+        se separador ~= "-" então
+            retorne nulo, "separador inválido na resposta SMTP"
+        fim
+    fim
+fim
+
+local função emitaPulso(canal, tipoDaMensagem, nome, dados, opções)
+    se não canal então retorne fim
+    local função emitir()
+        se tipoDaMensagem == "leitura" então
+            canal:leitura(nome, dados, opções)
+        senão se tipoDaMensagem == "sinal" então
+            canal:sinal(nome, dados, opções)
+        senão
+            canal:operação(nome, dados, opções)
+        fim fim
+    fim
+    proteja(emitir)
+fim
+
+local função leiaResposta(sessão, tratador)
+    local resposta, falha = analiseRespostaSMTP(sessão)
+    se resposta ou falha então
+        tratador(resposta, falha)
+        retorne
+    fim
+    se #sessão.acumulado > LIMITE_CABEÇALHOS então
+        tratador(nulo, "resposta SMTP excedeu o limite")
+        retorne
+    fim
+    sessão.conexão:recebaDadosAssíncrono(4096,
+        função(_, dados, falhaDaLeitura)
+            se falhaDaLeitura então tratador(nulo, falhaDaLeitura); retorne fim
+            sessão.acumulado = sessão.acumulado .. dados
+            leiaResposta(sessão, tratador)
+        fim)
+fim
+
+local função envieComando(sessão, comando, tratador)
+    se comando:procure("\r", 1, verdadeiro) ou comando:procure("\n", 1, verdadeiro) então
+        tratador(nulo, "comando SMTP contém quebra de linha")
+        retorne
+    fim
+    sessão.conexão:envieAssíncrono(comando .. CRLF,
+        função(_, _, falhaDoEnvio)
+            se falhaDoEnvio então tratador(nulo, falhaDoEnvio); retorne fim
+            leiaResposta(sessão, tratador)
+        fim)
+fim
+
+local função envieDadosBrutos(sessão, dados, tratador)
+    sessão.conexão:envieAssíncrono(dados,
+        função(_, _, falhaDoEnvio)
+            se falhaDoEnvio então tratador(nulo, falhaDoEnvio); retorne fim
+            leiaResposta(sessão, tratador)
+        fim)
+fim
+
+local função respostaEsperada(resposta, esperados, etapa)
+    se não resposta então retorne nulo, etapa .. " sem resposta" fim
+    para _, código em ipares(esperados) início
+        se resposta.código == código então retorne verdadeiro fim
+    fim
+    retorne nulo, etapa .. " recusada pelo SMTP (" .. resposta.código .. "): " ..
+        resposta.texto
+fim
+
+local função capacidadesSMTP(resposta)
+    local capacidades = {}
+    para _, linha em ipares(resposta.linhas ou {}) início
+        local espaço = linha:procure(" ", 1, verdadeiro)
+        local nome = (espaço e linha:corte(1, espaço - 1) ou linha):maiúscula()
+        capacidades[nome] = espaço e linha:corte(espaço + 1) ou verdadeiro
+    fim
+    retorne capacidades
+fim
+
+função correio.cliente(opções)
+    opções = opções ou {}
+    se tipo(opções) ~= "tabela" então
+        retorne falhe("opções do cliente devem ser uma tabela")
+    fim
+    local endereço, falha = semQuebra(
+        opções.endereço ou "localhost", "endereço", falso
+    )
+    se não endereço então retorne nulo, falha fim
+    local porta = opções.porta ou 587
+    se mat.paraInteiro(porta) == nulo ou porta < 1 ou porta > 65535 então
+        retorne falhe("porta SMTP fora do intervalo 1..65535")
+    fim
+    local segurança = opções.segurança ou "inícioTLS"
+    se segurança ~= "inícioTLS" e segurança ~= "oportunista" e
+       segurança ~= "TLS" e segurança ~= "nenhuma" então
+        retorne falhe("segurança deve ser inícioTLS, oportunista, TLS ou nenhuma")
+    fim
+    local nome, falhaDoNome = semQuebra(
+        opções.nome ou "localhost", "nome do cliente SMTP", falso
+    )
+    se não nome então retorne nulo, falhaDoNome fim
+
+    local cliente = {
+        endereço = endereço,
+        porta = porta,
+        segurança = segurança,
+        validarCertificado = opções.validarCertificado ~= falso,
+        nome = nome,
+        usuário = opções.usuário,
+        senha = opções.senha,
+        permitirAutenticaçãoSemTLS =
+            opções.permitirAutenticaçãoSemTLS == verdadeiro,
+        tempoLimite = opções.tempoLimite ou 10000,
+        pulso = opções.pulso,
+        ocupado = falso,
+        fechado = falso,
+        últimaFalha = nulo
+    }
+
+    se cliente.usuário ~= nulo então
+        local usuárioVálido, falhaDoUsuário = semQuebra(
+            cliente.usuário, "usuário SMTP", falso
+        )
+        se não usuárioVálido então retorne nulo, falhaDoUsuário fim
+        se tipo(cliente.senha) ~= "colar" então
+            retorne falhe("senha SMTP deve ser um colar")
+        fim
+    fim
+
+    função cliente.feche(este)
+        este.fechado = verdadeiro
+        se este.sessão e este.sessão.conexão então este.sessão.conexão:feche() fim
+        se este.sessão e este.sessão.conector então este.sessão.conector:feche() fim
+        retorne verdadeiro
+    fim
+
+    função cliente.envieAssíncrono(este, mensagem, tratador, dado)
+        se este.fechado então retorne falhe("cliente SMTP fechado") fim
+        se este.ocupado então retorne falhe("cliente SMTP já possui um envio em andamento") fim
+        se tipo(mensagem) ~= "tabela" ou tipo(mensagem.forme) ~= "função" então
+            retorne falhe("mensagem SMTP inválida; use correio.novaMensagem")
+        fim
+        se tipo(tratador) ~= "função" então
+            retorne falhe("tratador do envio precisa ser uma função")
+        fim
+        local formada, falhaDaFormação = mensagem:forme()
+        se não formada então retorne nulo, falhaDaFormação fim
+
+        este.ocupado = verdadeiro
+        local sessão = {
+            acumulado = "",
+            mensagem = mensagem,
+            formada = formada,
+            conector = rede.clienteTCP(),
+            segura = este.segurança == "TLS",
+            concluída = falso
+        }
+        este.sessão = sessão
+        sessão.conector:definaTempoLimite(este.tempoLimite)
+        se este.segurança == "TLS" então
+            sessão.conector:definaValidaçãoTLS(este.validarCertificado)
+            sessão.conector:definaTLS(verdadeiro)
+        fim
+
+        local função conclua(resultado, falhaDoEnvio, códigoSMTP, detalhes)
+            se sessão.concluída então retorne fim
+            sessão.concluída = verdadeiro
+            este.ocupado = falso
+            se falhaDoEnvio então
+                este.últimaFalha = detalhes ou {}
+                este.últimaFalha.mensagem = paraColar(falhaDoEnvio)
+                este.últimaFalha.códigoSMTP = códigoSMTP
+                este.últimaFalha.temporária = códigoSMTP == nulo ou
+                    (códigoSMTP >= 400 e códigoSMTP < 500)
+                este.últimaFalha.permanente = códigoSMTP ~= nulo e
+                    códigoSMTP >= 500 e códigoSMTP < 600
+            senão
+                este.últimaFalha = nulo
+            fim
+            se sessão.conexão então sessão.conexão:feche() fim
+            sessão.conector:feche()
+            emitaPulso(este.pulso, "sinal",
+                falhaDoEnvio e "correio.entregaFalhou" ou "correio.entregue",
+                { endereço = este.endereço, porta = este.porta,
+                  identificação = mensagem.identificação,
+                  destinatários = #mensagem:destinatários(),
+                  falha = falhaDoEnvio })
+            tratador(resultado, falhaDoEnvio, dado)
+        fim
+
+        local função detalhesDosDestinatários()
+            retorne {
+                destinatáriosAceitos = sessão.destinatáriosAceitos,
+                destinatáriosRecusados = sessão.destinatáriosRecusados
+            }
+        fim
+
+        local função envieDados()
+            envieComando(sessão, "DATA", função(resposta, falhaDATA)
+                se falhaDATA então
+                    conclua(nulo, falhaDATA, nulo, detalhesDosDestinatários())
+                    retorne
+                fim
+                local ok, recusa = respostaEsperada(resposta, {354}, "DATA")
+                se não ok então
+                    conclua(nulo, recusa, resposta.código,
+                        detalhesDosDestinatários())
+                    retorne
+                fim
+                envieDadosBrutos(sessão,
+                    protejaPontos(sessão.formada) .. "." .. CRLF,
+                    função(respostaFinal, falhaFinal)
+                        se falhaFinal então
+                            conclua(nulo, falhaFinal, nulo,
+                                detalhesDosDestinatários())
+                            retorne
+                        fim
+                        local aceitou, recusaFinal = respostaEsperada(
+                            respostaFinal, {250}, "mensagem"
+                        )
+                        se não aceitou então
+                            conclua(nulo, recusaFinal, respostaFinal.código,
+                                detalhesDosDestinatários())
+                            retorne
+                        fim
+                        sessão.conexão:envieAssíncrono("QUIT" .. CRLF, função() fim)
+                        conclua({ aceita = verdadeiro, código = respostaFinal.código,
+                                  resposta = respostaFinal.texto,
+                                  identificação = mensagem.identificação,
+                                  destinatáriosAceitos = sessão.destinatáriosAceitos,
+                                  destinatáriosRecusados = sessão.destinatáriosRecusados })
+                    fim)
+            fim)
+        fim
+
+        local função envieDestinatários(lista, índice)
+            se índice > #lista então
+                se #sessão.destinatáriosAceitos > 0 então
+                    envieDados()
+                    retorne
+                fim
+                local primeira = sessão.destinatáriosRecusados[1] ou {}
+                conclua(nulo, primeira.falha ou
+                    "todos os destinatários foram recusados",
+                    primeira.códigoSMTP, {
+                        destinatáriosAceitos = sessão.destinatáriosAceitos,
+                        destinatáriosRecusados = sessão.destinatáriosRecusados
+                    })
+                retorne
+            fim
+            envieComando(sessão, "RCPT TO:<" .. lista[índice] .. ">",
+                função(resposta, falhaRCPT)
+                    se falhaRCPT então conclua(nulo, falhaRCPT); retorne fim
+                    local aceitou, recusa = respostaEsperada(
+                        resposta, {250, 251}, "destinatário " .. lista[índice]
+                    )
+                    se aceitou então
+                        sessão.destinatáriosAceitos[
+                            #sessão.destinatáriosAceitos + 1] = lista[índice]
+                    senão
+                        sessão.destinatáriosRecusados[
+                            #sessão.destinatáriosRecusados + 1] = {
+                                endereço = lista[índice],
+                                códigoSMTP = resposta.código,
+                                falha = recusa,
+                                temporária = resposta.código >= 400 e
+                                    resposta.código < 500,
+                                permanente = resposta.código >= 500 e
+                                    resposta.código < 600
+                            }
+                    fim
+                    envieDestinatários(lista, índice + 1)
+                fim)
+        fim
+
+        local função envieEnvelope()
+            sessão.destinatáriosAceitos = {}
+            sessão.destinatáriosRecusados = {}
+            se mensagem.smtpUTF8 e não sessão.capacidades.SMTPUTF8 então
+                conclua(nulo,
+                    "servidor SMTP não anuncia SMTPUTF8 para o endereço Unicode")
+                retorne
+            fim
+            local extensão = mensagem.smtpUTF8 e " SMTPUTF8" ou ""
+            envieComando(sessão,
+                "MAIL FROM:<" .. mensagem.remetente .. ">" .. extensão,
+                função(resposta, falhaMAIL)
+                    se falhaMAIL então conclua(nulo, falhaMAIL); retorne fim
+                    local aceitou, recusa = respostaEsperada(resposta, {250}, "remetente")
+                    se não aceitou então
+                        conclua(nulo, recusa, resposta.código); retorne
+                    fim
+                    envieDestinatários(mensagem:destinatários(), 1)
+                fim)
+        fim
+
+        local função autentique()
+            se este.usuário == nulo então envieEnvelope(); retorne fim
+            se não sessão.segura e não este.permitirAutenticaçãoSemTLS então
+                conclua(nulo, "autenticação SMTP recusada sem TLS")
+                retorne
+            fim
+            local credencial = colar.base64(
+                "\0" .. este.usuário .. "\0" .. este.senha
+            )
+            envieComando(sessão, "AUTH PLAIN " .. credencial,
+                função(resposta, falhaAUTH)
+                    se falhaAUTH então conclua(nulo, falhaAUTH); retorne fim
+                    local aceitou, recusa = respostaEsperada(
+                        resposta, {235}, "autenticação"
+                    )
+                    se não aceitou então
+                        conclua(nulo, recusa, resposta.código); retorne
+                    fim
+                    envieEnvelope()
+                fim)
+        fim
+
+        local função digaOlá(apósTLS)
+            envieComando(sessão, "EHLO " .. este.nome,
+                função(resposta, falhaEHLO)
+                    se falhaEHLO então conclua(nulo, falhaEHLO); retorne fim
+                    local aceitou, recusa = respostaEsperada(resposta, {250}, "EHLO")
+                    se não aceitou então
+                        conclua(nulo, recusa, resposta.código); retorne
+                    fim
+                    sessão.capacidades = capacidadesSMTP(resposta)
+                    se (este.segurança == "inícioTLS" ou
+                        este.segurança == "oportunista") e não apósTLS então
+                        se não sessão.capacidades.STARTTLS então
+                            se este.segurança == "inícioTLS" então
+                                conclua(nulo, "servidor SMTP não anuncia STARTTLS: " ..
+                                    paraColar(resposta.texto))
+                                retorne
+                            fim
+                            autentique()
+                            retorne
+                        fim
+                        envieComando(sessão, "STARTTLS",
+                            função(respostaTLS, falhaSTARTTLS)
+                                se falhaSTARTTLS então conclua(nulo, falhaSTARTTLS); retorne fim
+                                local pronto, recusaTLS = respostaEsperada(
+                                    respostaTLS, {220}, "STARTTLS"
+                                )
+                                se não pronto então
+                                    conclua(nulo, recusaTLS, respostaTLS.código); retorne
+                                fim
+                                sessão.acumulado = ""
+                                sessão.conexão:inicieTLSAssíncrono(
+                                    este.endereço,
+                                    { validarCertificado = este.validarCertificado },
+                                    função(_, falhaDaNegociação)
+                                        se falhaDaNegociação então
+                                            conclua(nulo, falhaDaNegociação)
+                                            retorne
+                                        fim
+                                        sessão.segura = verdadeiro
+                                        digaOlá(verdadeiro)
+                                    fim)
+                            fim)
+                    senão
+                        autentique()
+                    fim
+                fim)
+        fim
+
+        sessão.conector:conecteAssíncrono(este.endereço, este.porta,
+            função(_, conexão, falhaDaConexão)
+                se falhaDaConexão então conclua(nulo, falhaDaConexão); retorne fim
+                sessão.conexão = conexão
+                conexão:definaTempoLimite(este.tempoLimite)
+                leiaResposta(sessão, função(saudacão, falhaDaSaudação)
+                    se falhaDaSaudação então conclua(nulo, falhaDaSaudação); retorne fim
+                    local pronta, recusa = respostaEsperada(saudacão, {220}, "saudação")
+                    se não pronta então
+                        conclua(nulo, recusa, saudacão.código); retorne
+                    fim
+                    digaOlá(este.segurança == "TLS")
+                fim)
+            fim)
+        emitaPulso(este.pulso, "sinal", "correio.entregaIniciada",
+            { endereço = este.endereço, porta = este.porta,
+              identificação = mensagem.identificação,
+              destinatários = #mensagem:destinatários() })
+        retorne verdadeiro
+    fim
+
+    retorne cliente
+fim
+
+local função domínioDoEndereço(endereço)
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba então retorne "" fim
+    local canônico = rede.domínioASCII(endereço:corte(arroba + 1))
+    retorne canônico ou ""
+fim
+
+-- Entrega entre servidores. Os destinatários são agrupados por domínio,
+-- os registros MX são consultados sem bloquear o laço e cada alternativa é
+-- tentada por prioridade. Uma recusa SMTP 5xx é definitiva para o grupo;
+-- falhas de conexão, DNS e respostas 4xx permanecem temporárias.
+função correio.entregueDiretamenteAssíncrono(mensagem, opções, tratador, dado)
+    opções = opções ou {}
+    se tipo(mensagem) ~= "tabela" ou tipo(mensagem.forme) ~= "função" ou
+       tipo(mensagem.destinatários) ~= "função" então
+        retorne falhe("mensagem inválida; use correio.novaMensagem")
+    fim
+    se tipo(tratador) ~= "função" então
+        retorne falhe("tratador da entrega direta precisa ser uma função")
+    fim
+    local nome, falha = valideDomínio(opções.nome ou "localhost",
+        "nome do entregador SMTP")
+    se não nome então retorne nulo, falha fim
+    local porta = opções.porta ou 25
+    se mat.paraInteiro(porta) == nulo ou porta < 1 ou porta > 65535 então
+        retorne falhe("porta da entrega direta fora do intervalo 1..65535")
+    fim
+    local máximoMX = opções.máximoMX ou 10
+    se mat.paraInteiro(máximoMX) == nulo ou máximoMX < 1 ou máximoMX > 50 então
+        retorne falhe("máximoMX deve ser um inteiro entre 1 e 50")
+    fim
+    local consulteMX = opções.consulteMX
+    se consulteMX ~= nulo e tipo(consulteMX) ~= "função" então
+        retorne falhe("consulteMX precisa ser uma função")
+    fim
+    consulteMX = consulteMX ou função(domínio, conclua)
+        retorne rede.consulteDNSAssíncrono(domínio, "MX",
+            { tempoLimite = opções.tempoLimiteDNS ou 5000 }, conclua)
+    fim
+
+    local grupos, ordem = {}, {}
+    para _, destinatário em ipares(mensagem:destinatários()) início
+        local domínio = domínioDoEndereço(destinatário)
+        se domínio == "" então
+            retorne falhe("destinatário sem domínio válido: " ..
+                paraColar(destinatário))
+        fim
+        se não grupos[domínio] então
+            grupos[domínio] = { domínio = domínio, destinatários = {} }
+            ordem[#ordem + 1] = domínio
+        fim
+        grupos[domínio].destinatários[#grupos[domínio].destinatários + 1] =
+            destinatário
+    fim
+    se #ordem == 0 então retorne falhe("entrega direta sem destinatários") fim
+
+    local relatório = {
+        entregues = {},
+        temporárias = {},
+        permanentes = {},
+        domínios = {}
+    }
+    local índiceDoDomínio = 1
+
+    local função acrescente(destino, itens)
+        para _, item em ipares(itens) início destino[#destino + 1] = item fim
+    fim
+
+    local função próximoDomínio()
+        se índiceDoDomínio > #ordem então
+            tratador(relatório, nulo, dado)
+            retorne
+        fim
+        local grupo = grupos[ordem[índiceDoDomínio]]
+        índiceDoDomínio = índiceDoDomínio + 1
+        consulteMX(grupo.domínio, função(registros, falhaDNS)
+                se falhaDNS então
+                    acrescente(relatório.temporárias, grupo.destinatários)
+                    relatório.domínios[grupo.domínio] = {
+                        estado = "temporária", falha = falhaDNS, tentativas = {}
+                    }
+                    próximoDomínio()
+                    retorne
+                fim
+
+                local servidores = {}
+                para _, registro em ipares(registros ou {}) início
+                    local endereço = paraColar(registro.endereço ou "")
+                    se endereço:corte(-1) == "." então
+                        endereço = endereço:corte(1, -2)
+                    fim
+                    servidores[#servidores + 1] = {
+                        endereço = endereço,
+                        preferência = registro.preferência ou 0
+                    }
+                fim
+                se #servidores == 0 então
+                    servidores[1] = { endereço = grupo.domínio, preferência = 0,
+                        implícito = verdadeiro }
+                fim
+                tabela.ordene(servidores, função(a, b)
+                    se a.preferência == b.preferência então
+                        retorne a.endereço < b.endereço
+                    fim
+                    retorne a.preferência < b.preferência
+                fim)
+
+                se #servidores == 1 e servidores[1].endereço == "" então
+                    acrescente(relatório.permanentes, grupo.destinatários)
+                    relatório.domínios[grupo.domínio] = {
+                        estado = "permanente",
+                        falha = "domínio declara MX nulo e não recebe correio",
+                        tentativas = {}
+                    }
+                    próximoDomínio()
+                    retorne
+                fim
+
+                local tentativas = {}
+                local entreguesDoGrupo = {}
+                local permanentesDoGrupo = {}
+                local pendentes = {}
+                acrescente(pendentes, grupo.destinatários)
+                local índiceMX = 1
+
+                local função concluaGrupo(temporárias, falhaFinal, códigoSMTP)
+                    temporárias = temporárias ou {}
+                    acrescente(relatório.entregues, entreguesDoGrupo)
+                    acrescente(relatório.permanentes, permanentesDoGrupo)
+                    acrescente(relatório.temporárias, temporárias)
+                    local estado
+                    se #entreguesDoGrupo == #grupo.destinatários então
+                        estado = "entregue"
+                    senão se #permanentesDoGrupo == #grupo.destinatários então
+                        estado = "permanente"
+                    senão se #temporárias == #grupo.destinatários então
+                        estado = "temporária"
+                    senão
+                        estado = "parcial"
+                    fim fim fim
+                    relatório.domínios[grupo.domínio] = {
+                        estado = estado,
+                        falha = falhaFinal,
+                        códigoSMTP = códigoSMTP,
+                        entregues = entreguesDoGrupo,
+                        permanentes = permanentesDoGrupo,
+                        temporárias = temporárias,
+                        tentativas = tentativas
+                    }
+                    próximoDomínio()
+                fim
+
+                local função separeRecusas(recusas, temporárias)
+                    para _, recusa em ipares(recusas ou {}) início
+                        se recusa.permanente então
+                            permanentesDoGrupo[#permanentesDoGrupo + 1] =
+                                recusa.endereço
+                        senão
+                            temporárias[#temporárias + 1] = recusa.endereço
+                        fim
+                    fim
+                fim
+
+                local função tentePróximoMX(últimaFalha)
+                    se #pendentes == 0 então
+                        concluaGrupo({}, últimaFalha)
+                        retorne
+                    fim
+                    se índiceMX > #servidores ou índiceMX > máximoMX então
+                        concluaGrupo(pendentes,
+                            últimaFalha ou "nenhum MX pôde receber a carta")
+                        retorne
+                    fim
+                    local servidor = servidores[índiceMX]
+                    índiceMX = índiceMX + 1
+                    se servidor.endereço == "" então
+                        tentePróximoMX("registro MX vazio")
+                        retorne
+                    fim
+
+                    local envelope = {
+                        remetente = mensagem.remetente,
+                        identificação = mensagem.identificação,
+                        smtpUTF8 = mensagem.smtpUTF8
+                    }
+                    função envelope.forme() retorne mensagem:forme() fim
+                    função envelope.destinatários()
+                        retorne pendentes
+                    fim
+
+                    local cliente, falhaDoCliente = correio.cliente({
+                        endereço = servidor.endereço,
+                        porta = porta,
+                        segurança = opções.segurança ou "oportunista",
+                        nome = nome,
+                        validarCertificado = opções.validarCertificado ~= falso,
+                        tempoLimite = opções.tempoLimite ou 15000,
+                        pulso = opções.pulso
+                    })
+                    se não cliente então
+                        tentativas[#tentativas + 1] = {
+                            endereço = servidor.endereço, falha = falhaDoCliente
+                        }
+                        tentePróximoMX(falhaDoCliente)
+                        retorne
+                    fim
+                    cliente:envieAssíncrono(envelope,
+                        função(resultado, falhaDaEntrega)
+                            local diagnóstico = cliente.últimaFalha
+                            cliente:feche()
+                            tentativas[#tentativas + 1] = {
+                                endereço = servidor.endereço,
+                                códigoSMTP = diagnóstico e diagnóstico.códigoSMTP,
+                                falha = falhaDaEntrega,
+                                aceitos = resultado e
+                                    #(resultado.destinatáriosAceitos ou {}) ou
+                                    #(diagnóstico e
+                                        diagnóstico.destinatáriosAceitos ou {}),
+                                recusados = resultado e
+                                    #(resultado.destinatáriosRecusados ou {}) ou
+                                    #(diagnóstico e
+                                        diagnóstico.destinatáriosRecusados ou {})
+                            }
+                            se resultado então
+                                acrescente(entreguesDoGrupo,
+                                    resultado.destinatáriosAceitos ou pendentes)
+                                local temporárias = {}
+                                separeRecusas(resultado.destinatáriosRecusados,
+                                    temporárias)
+                                pendentes = temporárias
+                                se #pendentes == 0 então
+                                    concluaGrupo({}, falhaDaEntrega)
+                                senão
+                                    tentePróximoMX(falhaDaEntrega)
+                                fim
+                                retorne
+                            fim
+
+                            local temporárias = {}
+                            local recusas = diagnóstico e
+                                diagnóstico.destinatáriosRecusados ou {}
+                            separeRecusas(recusas, temporárias)
+                            local aceitos = diagnóstico e
+                                diagnóstico.destinatáriosAceitos ou {}
+                            se #aceitos > 0 então
+                                se diagnóstico.permanente então
+                                    acrescente(permanentesDoGrupo, aceitos)
+                                senão
+                                    acrescente(temporárias, aceitos)
+                                fim
+                            senão se #recusas == 0 então
+                                se diagnóstico e diagnóstico.permanente então
+                                    acrescente(permanentesDoGrupo, pendentes)
+                                senão
+                                    acrescente(temporárias, pendentes)
+                                fim
+                            fim fim
+                            pendentes = temporárias
+                            se #pendentes == 0 então
+                                concluaGrupo({}, falhaDaEntrega,
+                                    diagnóstico e diagnóstico.códigoSMTP)
+                            senão
+                                tentePróximoMX(falhaDaEntrega)
+                            fim
+                        fim)
+                fim
+                tentePróximoMX()
+            fim)
+    fim
+
+    próximoDomínio()
+    retorne verdadeiro
+fim
+
+-- RFC 5321 permite a parte local entre aspas. Clientes como o Gmail usam
+-- essa forma também para uma parte local SMTPUTF8 que já seria válida sem
+-- aspas, por exemplo <"josé"@xn--santaf-gva.dev.br>. O armazenamento postal
+-- trabalha com o endereço canônico; por isso removemos apenas as aspas
+-- sintáticas e os escapes antes da validação, sem adivinhar caracteres.
+local função normalizeCaminhoSMTP(endereço)
+    se endereço:corte(1, 1) ~= '"' então
+        retorne valideEndereço(endereço, "endereço SMTP")
+    fim
+
+    local parteLocal = ""
+    local posição = 2
+    enquanto posição <= #endereço início
+        local caractere = endereço:corte(posição, posição)
+        se caractere == "\\" então
+            posição = posição + 1
+            se posição > #endereço então
+                retorne nulo, "endereço SMTP possui escape incompleto"
+            fim
+            local escapado = endereço:corte(posição, posição)
+            se escapado:byte(1) > 127 então
+                retorne nulo, "endereço SMTP possui escape inválido"
+            fim
+            parteLocal = parteLocal .. escapado
+        senão se caractere == '"' então
+            se endereço:corte(posição + 1, posição + 1) ~= "@" então
+                retorne nulo,
+                    "endereço SMTP exige @ depois da parte local entre aspas"
+            fim
+            local domínio = endereço:corte(posição + 2)
+            retorne valideEndereço(
+                parteLocal .. "@" .. domínio, "endereço SMTP")
+        senão
+            parteLocal = parteLocal .. caractere
+        fim fim
+        posição = posição + 1
+    fim
+    retorne nulo, "endereço SMTP possui parte local entre aspas incompleta"
+fim
+
+local função extraiaCaminhoSMTP(argumento, prefixo)
+    se argumento:maiúscula():corte(1, #prefixo) ~= prefixo então
+        retorne nulo, nulo, "esperado " .. prefixo .. "<endereço>"
+    fim
+    local restante = argumento:corte(#prefixo + 1):apare()
+    se restante:corte(1, 1) ~= "<" então
+        retorne nulo, nulo, "endereço SMTP precisa estar entre < e >"
+    fim
+    local fechamento = restante:procure(">", 2, verdadeiro)
+    se não fechamento então retorne nulo, nulo, "endereço SMTP sem >" fim
+    local endereço = restante:corte(2, fechamento - 1)
+    local parâmetros = restante:corte(fechamento + 1):apare()
+    se endereço == "" e prefixo == "FROM:" então
+        retorne "", parâmetros
+    fim
+    local válido, falha = normalizeCaminhoSMTP(endereço)
+    se não válido então retorne nulo, nulo, falha fim
+    retorne válido, parâmetros
+fim
+
+local função separeParâmetrosSMTP(texto)
+    local parâmetros = {}
+    texto = (texto ou ""):apare()
+    enquanto texto ~= "" início
+        local espaço = texto:procure(" ", 1, verdadeiro)
+        local item
+        se espaço então
+            item = texto:corte(1, espaço - 1)
+            texto = texto:corte(espaço + 1):apare()
+        senão
+            item = texto
+            texto = ""
+        fim
+        se item ~= "" então tabela.insira(parâmetros, item) fim
+    fim
+    retorne parâmetros
+fim
+
+local função analiseParâmetrosMAIL(texto, limiteMensagem)
+    local analisados = { smtpUTF8 = falso }
+    para _, item em ipares(separeParâmetrosSMTP(texto)) início
+        local superior = item:maiúscula()
+        se superior == "SMTPUTF8" então
+            se analisados.smtpUTF8 então
+                retorne nulo, "SMTPUTF8 foi repetido"
+            fim
+            analisados.smtpUTF8 = verdadeiro
+        senão se superior:corte(1, 5) == "SIZE=" então
+            local tamanho = paraNúmero(superior:corte(6))
+            se mat.paraInteiro(tamanho) == nulo ou tamanho < 0 então
+                retorne nulo, "parâmetro SIZE inválido"
+            fim
+            se tamanho > limiteMensagem então
+                retorne nulo, "mensagem anunciada excede o limite", 552
+            fim
+            analisados.tamanho = tamanho
+        senão se superior == "BODY=7BIT" ou superior == "BODY=8BITMIME" então
+            analisados.corpo = superior:corte(6)
+        senão
+            retorne nulo, "parâmetro MAIL não aceito: " .. item
+        fim fim fim
+    fim
+    retorne analisados
+fim
+
+local função credencialPlana(valor)
+    local funcionou, dados = proteja(colar.decBase64, valor)
+    se não funcionou ou tipo(dados) ~= "colar" então
+        retorne nulo, "credencial PLAIN inválida"
+    fim
+    local primeiro = dados:procure("\0", 1, verdadeiro)
+    local segundo = primeiro e dados:procure("\0", primeiro + 1, verdadeiro)
+    se não primeiro ou não segundo então
+        retorne nulo, "credencial PLAIN incompleta"
+    fim
+    local usuário = dados:corte(primeiro + 1, segundo - 1)
+    local senha = dados:corte(segundo + 1)
+    se usuário == "" então retorne nulo, "usuário vazio" fim
+    retorne usuário, senha
+fim
+
+local função opçõesDoServidor(opções)
+    local preparadas = {}
+    preparadas.endereço = opções.endereço ou "0.0.0.0"
+    preparadas.porta = opções.porta ou 2525
+    preparadas.nome = opções.nome ou "localhost"
+    preparadas.segurança = opções.segurança ou "nenhuma"
+    preparadas.tempoLimite = opções.tempoLimite ou 60000
+    preparadas.limiteMensagem = opções.limiteMensagem ou LIMITE_MENSAGEM
+    preparadas.limiteLinha = opções.limiteLinha ou LIMITE_LINHA
+    preparadas.limiteComandos = opções.limiteComandos ou 100
+    preparadas.limiteDestinatários = opções.limiteDestinatários ou 100
+    preparadas.limiteConexões = opções.limiteConexões ou 1000
+    preparadas.limiteConexõesPorEndereço =
+        opções.limiteConexõesPorEndereço ou 20
+    preparadas.limiteNovasConexõesPorMinuto =
+        opções.limiteNovasConexõesPorMinuto ou 60
+    preparadas.limiteTentativasDeAutenticação =
+        opções.limiteTentativasDeAutenticação ou 3
+    preparadas.exigirAutenticação = opções.exigirAutenticação == verdadeiro
+    preparadas.permitirAutenticaçãoSemTLS =
+        opções.permitirAutenticaçãoSemTLS == verdadeiro
+    preparadas.autentique = opções.autentique
+    preparadas.autorizeRemetente = opções.autorizeRemetente
+    preparadas.autorize = opções.autorize
+    preparadas.receba = opções.receba
+    preparadas.pulso = opções.pulso
+    preparadas.domíniosLocais = {}
+    para _, domínio em ipares(opções.domíniosLocais ou {}) início
+        se tipo(domínio) ~= "colar" ou domínio == "" então
+            retorne nulo, "domínio local inválido"
+        fim
+        local canônico, falhaDoDomínio = rede.domínioASCII(domínio)
+        se não canônico então
+            retorne nulo, "domínio local inválido: " ..
+                paraColar(falhaDoDomínio)
+        fim
+        preparadas.domíniosLocais[canônico] = verdadeiro
+    fim
+
+    se mat.paraInteiro(preparadas.porta) == nulo ou
+       preparadas.porta < 1 ou preparadas.porta > 65535 então
+        retorne nulo, "porta SMTP fora do intervalo 1..65535"
+    fim
+    se preparadas.segurança ~= "nenhuma" e
+       preparadas.segurança ~= "inícioTLS" e
+       preparadas.segurança ~= "TLS" então
+        retorne nulo, "segurança deve ser nenhuma, inícioTLS ou TLS"
+    fim
+    para _, item em ipares({
+        {"tempoLimite", preparadas.tempoLimite},
+        {"limiteMensagem", preparadas.limiteMensagem},
+        {"limiteLinha", preparadas.limiteLinha},
+        {"limiteComandos", preparadas.limiteComandos},
+        {"limiteDestinatários", preparadas.limiteDestinatários},
+        {"limiteConexões", preparadas.limiteConexões},
+        {"limiteConexõesPorEndereço", preparadas.limiteConexõesPorEndereço},
+        {"limiteNovasConexõesPorMinuto", preparadas.limiteNovasConexõesPorMinuto},
+        {"limiteTentativasDeAutenticação", preparadas.limiteTentativasDeAutenticação}
+    }) início
+        local _, falha = inteiroPositivo(item[2], item[1])
+        se falha então retorne nulo, falha fim
+    fim
+    se preparadas.autentique ~= nulo e tipo(preparadas.autentique) ~= "função" então
+        retorne nulo, "autentique precisa ser uma função"
+    fim
+    se preparadas.autorizeRemetente ~= nulo e
+       tipo(preparadas.autorizeRemetente) ~= "função" então
+        retorne nulo, "autorizeRemetente precisa ser uma função"
+    fim
+    se preparadas.autorize ~= nulo e tipo(preparadas.autorize) ~= "função" então
+        retorne nulo, "autorize precisa ser uma função"
+    fim
+    se tipo(preparadas.receba) ~= "função" então
+        retorne nulo, "receba precisa persistir cada mensagem antes da confirmação SMTP"
+    fim
+    retorne preparadas
+fim
+
+função correio.servidor(opções)
+    se tipo(opções) ~= "tabela" então
+        retorne falhe("opções do servidor devem ser uma tabela")
+    fim
+    local configuração, falha = opçõesDoServidor(opções)
+    se não configuração então retorne nulo, falha fim
+
+    local certificado
+    se configuração.segurança ~= "nenhuma" então
+        certificado, falha = rede.carregueCertificadoTLS(
+            opções.certificado, opções.chavePrivada
+        )
+        se não certificado então retorne nulo, falha fim
+    fim
+
+    local proteção
+    proteção, falha = Vigia.novo({
+        nome = "correio.smtp.conexões",
+        pulso = configuração.pulso,
+        janela = 60,
+        limiteNaJanela = configuração.limiteNovasConexõesPorMinuto,
+        limiteSimultâneo = configuração.limiteConexõesPorEndereço,
+        limiteGlobal = configuração.limiteConexões,
+        -- Preserva a política anterior: cada excesso é recusado, mas não
+        -- cria sozinho um bloqueio duradouro para endereços compartilhados.
+        duraçãoDoBloqueio = 0,
+        máximoDeChaves = 10000,
+        ociosidade = 120
+    })
+    se não proteção então retorne nulo, falha fim
+
+    local servidor = {
+        configuração = configuração,
+        certificado = certificado,
+        receptor = rede.servidorTCP(),
+        conexões = {},
+        vigia = proteção,
+        total = 0,
+        iniciado = falso,
+        fechado = falso,
+        contadores = {
+            aceitas = 0, recusadas = 0, mensagens = 0,
+            autenticações = 0, falhasDeAutenticação = 0
+        }
+    }
+
+    local função evento(tipoDaMensagem, nome, dados, prioridade)
+        emitaPulso(configuração.pulso, tipoDaMensagem, nome, dados,
+            prioridade e { prioridade = prioridade } ou nulo)
+    fim
+
+    local função encerreSessão(sessão)
+        se sessão.fechada então retorne fim
+        sessão.fechada = verdadeiro
+        sessão.conexão:feche()
+        servidor.conexões[sessão] = nulo
+        servidor.total = mat.máximo(0, servidor.total - 1)
+        servidor.vigia:conclua(sessão.endereço)
+        evento("leitura", "correio.conexãoFechada",
+            { endereço = sessão.endereço,
+              comandos = sessão.comandos,
+              mensagens = sessão.mensagens,
+              -- Somente nomes de comandos e códigos SMTP. Argumentos,
+              -- credenciais, endereços e conteúdo nunca entram aqui.
+              rastro = sessão.rastro })
+    fim
+
+    local função respondaBruto(sessão, texto, depois)
+        se sessão.fechada então retorne fim
+        sessão.conexão:envieAssíncrono(texto,
+            função(_, _, falhaDoEnvio)
+                se falhaDoEnvio então encerreSessão(sessão); retorne fim
+                se depois então depois() fim
+            fim)
+    fim
+
+    local função responda(sessão, código, texto, depois)
+        se sessão.comandoAtual e #sessão.rastro < 64 então
+            sessão.rastro[#sessão.rastro + 1] = "R:" .. código
+        fim
+        se código >= 400 e sessão.comandoAtual então
+            evento("leitura", "correio.comandoRecusado", {
+                endereço = sessão.endereço,
+                comando = sessão.comandoAtual,
+                código = código,
+                motivo = texto
+            })
+        fim
+        respondaBruto(sessão, código .. " " .. texto .. CRLF, depois)
+    fim
+
+    local função reinicieEnvelope(sessão)
+        sessão.remetente = nulo
+        sessão.destinatários = {}
+        sessão.dados = ""
+        sessão.emDados = falso
+        sessão.smtpUTF8 = falso
+    fim
+
+    local processeEntrada
+
+    local função leiaMais(sessão)
+        se sessão.fechada ou sessão.aguardando então retorne fim
+        sessão.conexão:recebaDadosAssíncrono(8192,
+            função(_, dados, falhaDaLeitura)
+                se falhaDaLeitura então encerreSessão(sessão); retorne fim
+                sessão.acumulado = sessão.acumulado .. dados
+                processeEntrada(sessão)
+            fim)
+    fim
+
+    local função prossiga(sessão)
+        se sessão.fechada então retorne fim
+        sessão.aguardando = falso
+        processeEntrada(sessão)
+    fim
+
+    local função trateAssíncrono(sessão, funçãoDoUsuário, argumentos,
+                                     aoConcluir)
+        sessão.aguardando = verdadeiro
+        local concluiu = falso
+        local função conclua(resultado, falhaDoTratamento)
+            se concluiu ou sessão.fechada então retorne fim
+            concluiu = verdadeiro
+            aoConcluir(resultado, falhaDoTratamento)
+        fim
+        tabela.insira(argumentos, conclua)
+        tabela.insira(argumentos, sessão)
+        local chamou, resultado, falhaDoTratamento = proteja(
+            funçãoDoUsuário, tabela.desempacote(argumentos)
+        )
+        se não chamou então
+            conclua(nulo, resultado)
+        senão se resultado ~= nulo ou falhaDoTratamento ~= nulo então
+            conclua(resultado, falhaDoTratamento)
+        fim fim
+    fim
+
+    local função autorizeDestinatário(sessão, destinatário, concluir)
+        se configuração.autorize então
+            trateAssíncrono(sessão, configuração.autorize,
+                { sessão.remetente, destinatário }, concluir)
+            retorne
+        fim
+        se sessão.autenticada ou
+           configuração.domíniosLocais[domínioDoEndereço(destinatário)] então
+            concluir(verdadeiro)
+        senão
+            concluir(nulo, "retransmissão não permitida")
+        fim
+    fim
+
+    local função autorizeRemetente(sessão, remetente, concluir)
+        se não configuração.autorizeRemetente então
+            concluir(verdadeiro)
+            retorne
+        fim
+        trateAssíncrono(sessão, configuração.autorizeRemetente,
+            { sessão.identidade ou sessão.usuário, remetente }, concluir)
+    fim
+
+    local função autentiqueCredencial(sessão, credencial)
+        sessão.autenticaçãoPendente = falso
+        se credencial == "*" então
+            responda(sessão, 501, "5.7.0 autenticação cancelada",
+                função() prossiga(sessão) fim)
+            retorne
+        fim
+        local usuário, senha = credencialPlana(credencial)
+        se não usuário então
+            sessão.tentativasDeAutenticação =
+                sessão.tentativasDeAutenticação + 1
+            servidor.contadores.falhasDeAutenticação =
+                servidor.contadores.falhasDeAutenticação + 1
+            responda(sessão, 535, "5.7.8 credenciais recusadas",
+                função() prossiga(sessão) fim)
+            retorne
+        fim
+        trateAssíncrono(sessão, configuração.autentique,
+            { usuário, senha }, função(identidade, falhaDaAutenticação)
+                se identidade então
+                    sessão.autenticada = verdadeiro
+                    sessão.identidade = tipo(identidade) == "tabela" e
+                        identidade ou nulo
+                    sessão.usuário = sessão.identidade e
+                        (sessão.identidade.usuário ou
+                         sessão.identidade.endereço) ou usuário
+                    servidor.contadores.autenticações =
+                        servidor.contadores.autenticações + 1
+                    evento("sinal", "correio.autenticado",
+                        { endereço = sessão.endereço,
+                          usuário = sessão.usuário })
+                    responda(sessão, 235, "2.7.0 autenticado",
+                        função() prossiga(sessão) fim)
+                    retorne
+                fim
+
+                sessão.tentativasDeAutenticação =
+                    sessão.tentativasDeAutenticação + 1
+                servidor.contadores.falhasDeAutenticação =
+                    servidor.contadores.falhasDeAutenticação + 1
+                local temporária = tipo(falhaDaAutenticação) == "tabela" e
+                    falhaDaAutenticação.tipo == "temporária"
+                evento("sinal", temporária e
+                    "correio.autenticaçãoIndisponível" ou
+                    "correio.autenticaçãoRecusada",
+                    { endereço = sessão.endereço,
+                      motivo = tipo(falhaDaAutenticação) == "tabela" e
+                        paraColar(falhaDaAutenticação.mensagem ou
+                            falhaDaAutenticação.tipo) ou
+                        paraColar(falhaDaAutenticação ou "recusada") }, "alta")
+                responda(sessão, temporária e 454 ou 535,
+                    temporária e
+                        "4.7.0 autenticação temporariamente indisponível" ou
+                        "5.7.8 credenciais recusadas",
+                    função() prossiga(sessão) fim)
+            fim)
+    fim
+
+    local função entregueMensagem(sessão, conteúdo)
+        local recebida = {
+            remetente = sessão.remetente,
+            destinatários = sessão.destinatários,
+            conteúdo = desprotejaPontos(conteúdo),
+            tamanho = #conteúdo,
+            endereçoRemoto = sessão.endereço,
+            nomeDoCliente = sessão.nomeDoCliente,
+            usuário = sessão.usuário,
+            identidade = sessão.identidade,
+            smtpUTF8 = sessão.smtpUTF8,
+            vigia = servidor.vigia:estado(sessão.endereço),
+            recebidaEm = so.tempo()
+        }
+        trateAssíncrono(sessão, configuração.receba, { recebida },
+            função(guardou, falhaAoGuardar)
+                se guardou então
+                    servidor.contadores.mensagens = servidor.contadores.mensagens + 1
+                    sessão.mensagens = sessão.mensagens + 1
+                    evento("sinal", "correio.mensagemRecebida",
+                        { endereço = sessão.endereço,
+                          remetente = sessão.remetente,
+                          destinatários = #sessão.destinatários,
+                          tamanho = #conteúdo })
+                    reinicieEnvelope(sessão)
+                    responda(sessão, 250, "2.0.0 mensagem aceita", função()
+                        prossiga(sessão)
+                    fim)
+                senão
+                    local falhaEstruturada = tipo(falhaAoGuardar) == "tabela" e
+                        falhaAoGuardar ou nulo
+                    local tipoDaFalha = falhaEstruturada e
+                        falhaEstruturada.tipo ou nulo
+                    local mensagemDaFalha = falhaEstruturada e
+                        falhaEstruturada.mensagem ou
+                        paraColar(falhaAoGuardar ou "recusada")
+                    reinicieEnvelope(sessão)
+                    se tipoDaFalha == "ameaça" então
+                        servidor.contadores.recusadas =
+                            servidor.contadores.recusadas + 1
+                        evento("sinal", "correio.mensagemMaliciosaRecusada",
+                            { endereço = sessão.endereço,
+                              ameaça = falhaEstruturada.ameaça }, "crítica")
+                        responda(sessão, 554,
+                            "5.7.1 conteúdo recusado por segurança",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    se tipoDaFalha == "antivírus-indisponível" então
+                        evento("sinal", "correio.antivírusIndisponível",
+                            { endereço = sessão.endereço,
+                              falha = mensagemDaFalha }, "crítica")
+                        responda(sessão, 451,
+                            "4.3.0 verificação de segurança indisponível",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    se tipoDaFalha == "autenticação-rejeitada" então
+                        servidor.contadores.recusadas =
+                            servidor.contadores.recusadas + 1
+                        evento("sinal", "correio.autenticaçãoRecusou",
+                            { endereço = sessão.endereço,
+                              falha = mensagemDaFalha }, "alta")
+                        responda(sessão, 550,
+                            "5.7.1 autenticação do remetente falhou",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    se tipoDaFalha == "autenticação-indisponível" então
+                        evento("sinal", "correio.autenticaçãoIndisponível",
+                            { endereço = sessão.endereço,
+                              falha = mensagemDaFalha }, "alta")
+                        responda(sessão, 451,
+                            "4.7.5 autenticação do remetente indisponível",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    se tipoDaFalha == "conteúdo-inválido" então
+                        servidor.contadores.recusadas =
+                            servidor.contadores.recusadas + 1
+                        evento("sinal", "correio.conteúdoMalformadoRecusado",
+                            { endereço = sessão.endereço,
+                              falha = mensagemDaFalha }, "alta")
+                        responda(sessão, 550,
+                            "5.6.0 conteúdo MIME ou UTF-8 inválido",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    se tipoDaFalha == "autorização-rejeitada" então
+                        servidor.contadores.recusadas =
+                            servidor.contadores.recusadas + 1
+                        evento("sinal", "correio.autorizaçãoRecusou",
+                            { endereço = sessão.endereço,
+                              falha = mensagemDaFalha }, "alta")
+                        responda(sessão, 550,
+                            "5.7.1 autor visível recusado",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    evento("sinal", "correio.persistênciaFalhou",
+                        { endereço = sessão.endereço,
+                          falha = mensagemDaFalha }, "alta")
+                    responda(sessão, 451, "4.3.0 mensagem não foi persistida",
+                        função() prossiga(sessão) fim)
+                fim
+            fim)
+    fim
+
+    local função trateComando(sessão, linha)
+        sessão.comandos = sessão.comandos + 1
+        se sessão.comandos > configuração.limiteComandos então
+            responda(sessão, 421, "4.7.0 limite de comandos atingido",
+                função() encerreSessão(sessão) fim)
+            retorne
+        fim
+        local espaço = linha:procure(" ", 1, verdadeiro)
+        local comando = (espaço e linha:corte(1, espaço - 1) ou linha):maiúscula()
+        local argumento = espaço e linha:corte(espaço + 1):apare() ou ""
+        sessão.comandoAtual = comando
+        se #sessão.rastro < 64 então
+            sessão.rastro[#sessão.rastro + 1] = "C:" .. comando
+        fim
+
+        se comando == "EHLO" ou comando == "HELO" então
+            se argumento == "" então
+                responda(sessão, 501, "5.5.2 informe o nome do cliente",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            sessão.saudada = verdadeiro
+            sessão.estendida = comando == "EHLO"
+            sessão.nomeDoCliente = argumento
+            reinicieEnvelope(sessão)
+            se comando == "EHLO" então
+                local linhas = {
+                    "250-" .. configuração.nome,
+                    "250-SIZE " .. configuração.limiteMensagem,
+                    "250-8BITMIME",
+                    "250-SMTPUTF8"
+                }
+                se configuração.segurança == "inícioTLS" e não sessão.segura então
+                    tabela.insira(linhas, "250-STARTTLS")
+                fim
+                se configuração.autentique e
+                   (sessão.segura ou configuração.permitirAutenticaçãoSemTLS) então
+                    tabela.insira(linhas, "250-AUTH PLAIN")
+                fim
+                tabela.insira(linhas, "250 PIPELINING")
+                se #sessão.rastro < 64 então
+                    sessão.rastro[#sessão.rastro + 1] = "R:250"
+                fim
+                respondaBruto(sessão, colar.junte(CRLF, tabela.desempacote(linhas)) .. CRLF,
+                    função() prossiga(sessão) fim)
+            senão
+                responda(sessão, 250, configuração.nome,
+                    função() prossiga(sessão) fim)
+            fim
+            retorne
+        fim
+
+        se comando == "STARTTLS" então
+            se configuração.segurança ~= "inícioTLS" ou sessão.segura então
+                responda(sessão, 454, "4.7.0 TLS indisponível",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se sessão.remetente ou sessão.autenticada então
+                responda(sessão, 503, "5.5.1 STARTTLS fora de sequência",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            sessão.aguardando = verdadeiro
+            responda(sessão, 220, "2.0.0 pronto para iniciar TLS", função()
+                sessão.conexão:aceiteTLSAssíncrono(servidor.certificado,
+                    função(_, falhaTLS)
+                        se falhaTLS então encerreSessão(sessão); retorne fim
+                        sessão.segura = verdadeiro
+                        sessão.saudada = falso
+                        sessão.estendida = falso
+                        sessão.acumulado = ""
+                        prossiga(sessão)
+                    fim)
+            fim)
+            retorne
+        fim
+
+        se comando == "AUTH" então
+            se não configuração.autentique então
+                responda(sessão, 502, "5.5.1 autenticação indisponível",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se não sessão.segura e não configuração.permitirAutenticaçãoSemTLS então
+                responda(sessão, 538, "5.7.11 criptografia obrigatória",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se não sessão.estendida então
+                responda(sessão, 503, "5.5.1 envie EHLO primeiro",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se sessão.autenticada então
+                responda(sessão, 503, "5.5.0 sessão já autenticada",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se sessão.remetente ~= nulo ou #sessão.destinatários > 0 então
+                responda(sessão, 503, "5.5.0 AUTH fora de sequência",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se sessão.tentativasDeAutenticação >=
+               configuração.limiteTentativasDeAutenticação então
+                responda(sessão, 454, "4.7.0 limite de autenticação atingido",
+                    função() encerreSessão(sessão) fim)
+                retorne
+            fim
+            local separador = argumento:procure(" ", 1, verdadeiro)
+            local mecanismo = (separador e
+                argumento:corte(1, separador - 1) ou argumento):maiúscula()
+            local credencial = separador e
+                argumento:corte(separador + 1):apare() ou ""
+            se mecanismo ~= "PLAIN" então
+                responda(sessão, 504,
+                    "5.5.4 mecanismo de autenticação não aceito",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se credencial == "" então
+                sessão.autenticaçãoPendente = verdadeiro
+                responda(sessão, 334, "", função() prossiga(sessão) fim)
+                retorne
+            fim
+            autentiqueCredencial(sessão, credencial)
+            retorne
+        fim
+
+        se comando == "MAIL" então
+            se não sessão.saudada então
+                responda(sessão, 503, "5.5.1 envie EHLO primeiro",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se configuração.exigirAutenticação e não sessão.autenticada então
+                responda(sessão, 530, "5.7.0 autenticação obrigatória",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            local remetente, textoDosParâmetros, falhaDoRemetente =
+                extraiaCaminhoSMTP(argumento, "FROM:")
+            se remetente == nulo então
+                responda(sessão, 501, "5.1.7 " .. falhaDoRemetente,
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            local parâmetros, falhaDosParâmetros, códigoDosParâmetros =
+                analiseParâmetrosMAIL(
+                    textoDosParâmetros, configuração.limiteMensagem
+                )
+            se não parâmetros então
+                responda(sessão, códigoDosParâmetros ou 555,
+                    "5.5.4 " .. falhaDosParâmetros,
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se parâmetros.smtpUTF8 e não sessão.estendida então
+                responda(sessão, 555, "5.5.4 SMTPUTF8 exige EHLO",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se possuiNãoASCII(remetente) e não parâmetros.smtpUTF8 então
+                responda(sessão, 553,
+                    "5.6.7 endereço Unicode exige o parâmetro SMTPUTF8",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            autorizeRemetente(sessão, remetente,
+                função(aceito, falhaDaAutorização)
+                    se aceito então
+                        local autorizado = remetente
+                        se tipo(aceito) == "colar" então
+                            local válido, falhaDaNormalização =
+                                valideEndereço(aceito, "remetente normalizado")
+                            se não válido então
+                                responda(sessão, 553,
+                                    "5.7.1 normalização do remetente inválida",
+                                    função() prossiga(sessão) fim)
+                                retorne
+                            fim
+                            autorizado = válido
+                        fim
+                        reinicieEnvelope(sessão)
+                        sessão.remetente = autorizado
+                        sessão.smtpUTF8 = parâmetros.smtpUTF8 ou
+                            possuiNãoASCII(autorizado)
+                        responda(sessão, 250, "2.1.0 remetente aceito",
+                            função() prossiga(sessão) fim)
+                        retorne
+                    fim
+                    local temporária = tipo(falhaDaAutorização) == "tabela" e
+                        falhaDaAutorização.tipo == "temporária"
+                    responda(sessão, temporária e 451 ou 553,
+                        temporária e
+                            "4.7.1 autorização do remetente indisponível" ou
+                            "5.7.1 remetente não autorizado",
+                        função() prossiga(sessão) fim)
+                fim)
+            retorne
+        fim
+
+        se comando == "RCPT" então
+            se sessão.remetente == nulo então
+                responda(sessão, 503, "5.5.1 envie MAIL FROM primeiro",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se #sessão.destinatários >= configuração.limiteDestinatários então
+                responda(sessão, 452, "4.5.3 destinatários demais",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            local destinatário, parâmetrosRCPT, falhaDoDestinatário =
+                extraiaCaminhoSMTP(argumento, "TO:")
+            se não destinatário então
+                -- RCPT não carrega senha nem corpo. Conservar apenas a linha
+                -- rejeitada permite distinguir com exatidão as variações de
+                -- caminho produzidas por clientes sem registrar a carta.
+                evento("leitura", "correio.destinatárioMalformado", {
+                    endereço = sessão.endereço,
+                    argumento = argumento,
+                    falha = falhaDoDestinatário
+                })
+                responda(sessão, 501, "5.1.3 " .. falhaDoDestinatário,
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se parâmetrosRCPT ~= "" então
+                responda(sessão, 555, "5.5.4 parâmetros RCPT não aceitos",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            se possuiNãoASCII(destinatário) e não sessão.smtpUTF8 então
+                responda(sessão, 553,
+                    "5.6.7 destinatário Unicode exige SMTPUTF8 em MAIL FROM",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            autorizeDestinatário(sessão, destinatário,
+                função(aceito, falhaDaAutorização)
+                    se aceito então
+                        local autorizado = destinatário
+                        se tipo(aceito) == "colar" então
+                            local válido = valideEndereço(
+                                aceito, "destinatário normalizado")
+                            se não válido então
+                                responda(sessão, 553,
+                                    "5.7.1 normalização do destinatário inválida",
+                                    função() prossiga(sessão) fim)
+                                retorne
+                            fim
+                            autorizado = válido
+                        fim
+                        se possuiNãoASCII(autorizado) então
+                            sessão.smtpUTF8 = verdadeiro
+                        fim
+                        tabela.insira(sessão.destinatários, autorizado)
+                        responda(sessão, 250, "2.1.5 destinatário aceito",
+                            função() prossiga(sessão) fim)
+                    senão
+                        local falhaEstruturada =
+                            tipo(falhaDaAutorização) == "tabela" e
+                            falhaDaAutorização ou nulo
+                        se falhaEstruturada e
+                           falhaEstruturada.tipo == "temporária" então
+                            evento("sinal", "correio.autorizaçãoIndisponível", {
+                                endereço = sessão.endereço,
+                                destinatário = destinatário,
+                                falha = falhaEstruturada.mensagem
+                            }, "alta")
+                            responda(sessão, 451,
+                                "4.3.0 verificação do destinatário indisponível",
+                                função() prossiga(sessão) fim)
+                            retorne
+                        fim
+                        servidor.contadores.recusadas = servidor.contadores.recusadas + 1
+                        responda(sessão, 550, "5.7.1 " ..
+                            paraColar(falhaDaAutorização ou "destinatário recusado"),
+                            função() prossiga(sessão) fim)
+                    fim
+                fim)
+            retorne
+        fim
+
+        se comando == "DATA" então
+            se sessão.remetente == nulo ou #sessão.destinatários == 0 então
+                responda(sessão, 503, "5.5.1 envelope incompleto",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            sessão.emDados = verdadeiro
+            sessão.dados = ""
+            responda(sessão, 354, "termine os dados com <CRLF>.<CRLF>",
+                função() prossiga(sessão) fim)
+            retorne
+        fim
+
+        se comando == "RSET" então
+            reinicieEnvelope(sessão)
+            responda(sessão, 250, "2.0.0 estado reiniciado",
+                função() prossiga(sessão) fim)
+            retorne
+        fim
+        se comando == "NOOP" então
+            responda(sessão, 250, "2.0.0 ok", função() prossiga(sessão) fim)
+            retorne
+        fim
+        se comando == "QUIT" então
+            responda(sessão, 221, "2.0.0 até logo",
+                função() encerreSessão(sessão) fim)
+            retorne
+        fim
+        se comando == "VRFY" então
+            responda(sessão, 252, "2.5.2 não é possível verificar",
+                função() prossiga(sessão) fim)
+            retorne
+        fim
+        responda(sessão, 502, "5.5.1 comando não implementado",
+            função() prossiga(sessão) fim)
+    fim
+
+    processeEntrada = função(sessão)
+        se sessão.fechada ou sessão.aguardando então retorne fim
+        se sessão.emDados então
+            local marcador = CRLF .. "." .. CRLF
+            local fimDosDados = sessão.acumulado:procure(marcador, 1, verdadeiro)
+            se fimDosDados então
+                local conteúdo = sessão.dados .. sessão.acumulado:corte(1, fimDosDados - 1) .. CRLF
+                sessão.acumulado = sessão.acumulado:corte(fimDosDados + #marcador)
+                sessão.dados = ""
+                sessão.emDados = falso
+                se #conteúdo > configuração.limiteMensagem então
+                    reinicieEnvelope(sessão)
+                    responda(sessão, 552, "5.3.4 mensagem grande demais",
+                        função() prossiga(sessão) fim)
+                senão
+                    entregueMensagem(sessão, conteúdo)
+                fim
+                retorne
+            fim
+            se #sessão.dados + #sessão.acumulado > configuração.limiteMensagem então
+                reinicieEnvelope(sessão)
+                sessão.acumulado = ""
+                responda(sessão, 552, "5.3.4 mensagem grande demais",
+                    função() prossiga(sessão) fim)
+                retorne
+            fim
+            -- Conserva uma cauda suficiente para reconhecer o marcador fragmentado.
+            se #sessão.acumulado > #marcador então
+                local corte = #sessão.acumulado - #marcador
+                sessão.dados = sessão.dados .. sessão.acumulado:corte(1, corte)
+                sessão.acumulado = sessão.acumulado:corte(corte + 1)
+            fim
+            leiaMais(sessão)
+            retorne
+        fim
+
+        local fimDaLinha = sessão.acumulado:procure(CRLF, 1, verdadeiro)
+        se não fimDaLinha então
+            se #sessão.acumulado > configuração.limiteLinha então
+                responda(sessão, 500, "5.5.2 linha SMTP grande demais",
+                    função() encerreSessão(sessão) fim)
+            senão
+                leiaMais(sessão)
+            fim
+            retorne
+        fim
+        local linha = sessão.acumulado:corte(1, fimDaLinha - 1)
+        sessão.acumulado = sessão.acumulado:corte(fimDaLinha + 2)
+        se #linha > configuração.limiteLinha então
+            responda(sessão, 500, "5.5.2 linha SMTP grande demais",
+                função() encerreSessão(sessão) fim)
+            retorne
+        fim
+        sessão.aguardando = verdadeiro
+        se sessão.autenticaçãoPendente então
+            autentiqueCredencial(sessão, linha:apare())
+            retorne
+        fim
+        trateComando(sessão, linha)
+    fim
+
+    local função novaSessão(conexão)
+        local par = conexão:parRemoto()
+        local endereço = par e par.endereço ou "desconhecido"
+        local admitida, decisão = servidor.vigia:admita(endereço)
+        se não admitida então
+            servidor.contadores.recusadas = servidor.contadores.recusadas + 1
+            evento("sinal", "correio.conexãoLimitada",
+                { endereço = endereço,
+                  motivo = decisão e decisão.motivo ou "limite local",
+                  simultâneas = decisão e decisão.ativas + 1 ou 0,
+                  naJanela = decisão e decisão.naJanela ou 0 }, "alta")
+            conexão:envieAssíncrono("421 4.7.0 servidor ocupado" .. CRLF,
+                função(c) c:feche() fim)
+            retorne
+        fim
+
+        local sessão = {
+            conexão = conexão,
+            endereço = endereço,
+            acumulado = "",
+            dados = "",
+            destinatários = {},
+            segura = configuração.segurança == "TLS",
+            autenticada = falso,
+            autenticaçãoPendente = falso,
+            saudada = falso,
+            estendida = falso,
+            smtpUTF8 = falso,
+            aguardando = verdadeiro,
+            fechada = falso,
+            emDados = falso,
+            comandos = 0,
+            mensagens = 0,
+            comandoAtual = nulo,
+            rastro = {},
+            tentativasDeAutenticação = 0
+        }
+        conexão:definaTempoLimite(configuração.tempoLimite)
+        servidor.conexões[sessão] = verdadeiro
+        servidor.total = servidor.total + 1
+        servidor.contadores.aceitas = servidor.contadores.aceitas + 1
+        evento("leitura", "correio.conexãoAceita", { endereço = endereço })
+
+        local função saúde()
+            responda(sessão, 220, configuração.nome .. " Correio Santafé",
+                função() prossiga(sessão) fim)
+        fim
+        se configuração.segurança == "TLS" então
+            conexão:aceiteTLSAssíncrono(servidor.certificado,
+                função(_, falhaTLS)
+                    se falhaTLS então encerreSessão(sessão); retorne fim
+                    saúde()
+                fim)
+        senão
+            saúde()
+        fim
+    fim
+
+    local função armeAceite()
+        se servidor.fechado então retorne fim
+        servidor.receptor:aceiteAssíncrono(
+            função(_, conexão, falhaDoAceite)
+                se servidor.fechado então
+                    se conexão então conexão:feche() fim
+                    retorne
+                fim
+                armeAceite()
+                se falhaDoAceite então
+                    evento("sinal", "correio.aceiteFalhou", { falha = falhaDoAceite }, "alta")
+                    retorne
+                fim
+                novaSessão(conexão)
+            fim)
+    fim
+
+    função servidor.inicie(este)
+        se este.fechado então retorne falhe("servidor SMTP fechado") fim
+        se este.iniciado então retorne este fim
+        local amarrou, falhaDoEnlace = este.receptor:amarre(
+            configuração.endereço, configuração.porta
+        )
+        se não amarrou então retorne nulo, falhaDoEnlace fim
+        este.iniciado = verdadeiro
+        armeAceite()
+        evento("sinal", "correio.servidorIniciado",
+            { endereço = configuração.endereço,
+              porta = configuração.porta,
+              segurança = configuração.segurança })
+        retorne este
+    fim
+
+    função servidor.escute(este)
+        local iniciou, falhaDoInício = este:inicie()
+        se não iniciou então retorne nulo, falhaDoInício fim
+        rede.laço()
+        retorne verdadeiro
+    fim
+
+    função servidor.estatísticas(este)
+        local resultado = {
+            conexões = este.total,
+            aceitas = este.contadores.aceitas,
+            recusadas = este.contadores.recusadas,
+            mensagens = este.contadores.mensagens,
+            autenticações = este.contadores.autenticações,
+            falhasDeAutenticação = este.contadores.falhasDeAutenticação
+        }
+        resultado.vigia = este.vigia:estatísticas()
+        retorne resultado
+    fim
+
+    função servidor.feche(este)
+        se este.fechado então retorne verdadeiro fim
+        este.fechado = verdadeiro
+        este.receptor:feche()
+        local ativas = {}
+        para sessão em pares(este.conexões) início tabela.insira(ativas, sessão) fim
+        para _, sessão em ipares(ativas) início encerreSessão(sessão) fim
+        evento("sinal", "correio.servidorEncerrado", {})
+        rede.pareLaço()
+        retorne verdadeiro
+    fim
+
+    retorne servidor
+fim
+
+função correio.filaMemória(limite)
+    limite = limite ou 1000
+    local valor, falha = inteiroPositivo(limite, "limite", 1000)
+    se não valor então retorne nulo, falha fim
+    local fila = { mensagens = {}, limite = valor, descartadas = 0 }
+    função fila.receba(esta, mensagem, conclua)
+        se #esta.mensagens >= esta.limite então
+            esta.descartadas = esta.descartadas + 1
+            se conclua então conclua(nulo, "fila em memória cheia") fim
+            retorne nulo, "fila em memória cheia"
+        fim
+        tabela.insira(esta.mensagens, mensagem)
+        se conclua então conclua(verdadeiro) fim
+        retorne verdadeiro
+    fim
+    retorne fila
+fim
+
+local função identificadorSQL(nome)
+    se tipo(nome) ~= "colar" ou nome == "" ou #nome > 64 então
+        retorne nulo, "nome da tabela MariaDB inválido"
+    fim
+    para índice = 1, #nome início
+        local taco = nome:byte(índice)
+        local aceito = (taco >= 48 e taco <= 57) ou
+            (taco >= 65 e taco <= 90) ou (taco >= 97 e taco <= 122) ou taco == 95
+        se não aceito então retorne nulo, "nome da tabela MariaDB inválido" fim
+    fim
+    retorne nome
+fim
+
+local função fecheResultado(resultado)
+    se resultado e tipo(resultado.feche) == "função" então resultado:feche() fim
+fim
+
+função correio.filaMariaDB(piscina, opções)
+    opções = opções ou {}
+    se tipo(piscina) ~= "dadoOpaco" e tipo(piscina) ~= "tabela" então
+        retorne falhe("piscina MariaDB inválida")
+    fim
+    local tabelaSQL, falha = identificadorSQL(
+        opções.tabela ou "correio_fila"
+    )
+    se não tabelaSQL então retorne nulo, falha fim
+    local nomePadrãoDosAvisos = tabelaSQL == "correio_fila" e
+        "correio_avisos_entrega" ou tabelaSQL .. "_avisos"
+    local tabelaDeAvisos
+    tabelaDeAvisos, falha = identificadorSQL(
+        opções.tabelaDeAvisos ou nomePadrãoDosAvisos
+    )
+    se não tabelaDeAvisos então retorne nulo, falha fim
+    local tempoDaReserva = opções.tempoDaReserva ou 300
+    local _, falhaDoTempo = inteiroPositivo(
+        tempoDaReserva, "tempoDaReserva", 300
+    )
+    se falhaDoTempo então retorne nulo, falhaDoTempo fim
+    local limiteDeFalhasInternas = opções.limiteDeFalhasInternas ou 3
+    local _, falhaDoLimite = inteiroPositivo(
+        limiteDeFalhasInternas, "limiteDeFalhasInternas", 3
+    )
+    se falhaDoLimite então retorne nulo, falhaDoLimite fim
+
+    local fila = {
+        piscina = piscina,
+        tabela = tabelaSQL,
+        tabelaDeAvisos = tabelaDeAvisos,
+        tempoDaReserva = tempoDaReserva,
+        limiteDeFalhasInternas = limiteDeFalhasInternas,
+        depósito = opções.depósito
+    }
+
+    local função chame(tratador, resultado, falhaDaOperação, dado)
+        se tratador então tratador(resultado, falhaDaOperação, dado) fim
+    fim
+
+    função fila.crieEstruturaAssíncrona(esta, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne falhe("tratador precisa ser uma função")
+        fim
+        local sql = "CREATE TABLE IF NOT EXISTS `" .. esta.tabela .. "` (" ..
+            "id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY," ..
+            "direcao VARCHAR(12) NOT NULL,estado VARCHAR(20) NOT NULL," ..
+            "remetente VARCHAR(254) NOT NULL,destinatarios LONGTEXT NOT NULL," ..
+            "conteudo LONGBLOB NULL," ..
+            "conteudo_objeto CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL," ..
+            "tamanho BIGINT UNSIGNED NOT NULL," ..
+            "tentativas INT UNSIGNED NOT NULL DEFAULT 0," ..
+            "proxima_tentativa BIGINT NOT NULL DEFAULT 0," ..
+            "criada_em BIGINT NOT NULL,atualizada_em BIGINT NOT NULL," ..
+            "ultima_falha TEXT NULL,falhas_permanentes LONGTEXT NULL," ..
+            "falhas_internas INT UNSIGNED NOT NULL DEFAULT 0," ..
+            "bilhete VARCHAR(80) NULL," ..
+            "arrendada_ate BIGINT NULL," ..
+            "INDEX correio_estado_proxima (estado,proxima_tentativa,id)," ..
+            "INDEX correio_fila_objeto (conteudo_objeto)," ..
+            "UNIQUE INDEX correio_bilhete (bilhete)) ENGINE=InnoDB"
+        retorne esta.piscina:executeAssíncrono(sql,
+            função(_, resultado, falhaSQL)
+                fecheResultado(resultado)
+                se falhaSQL então chame(tratador, nulo, falhaSQL, dado); retorne fim
+                local avisos = "CREATE TABLE IF NOT EXISTS `" ..
+                    esta.tabelaDeAvisos .. "` (" ..
+                    "fila_id BIGINT UNSIGNED NOT NULL," ..
+                    "tipo VARCHAR(12) NOT NULL,estado VARCHAR(20) NOT NULL," ..
+                    "detalhes LONGTEXT NOT NULL," ..
+                    "tentativas INT UNSIGNED NOT NULL DEFAULT 0," ..
+                    "proxima_tentativa BIGINT NOT NULL DEFAULT 0," ..
+                    "ultima_falha TEXT NULL,bilhete VARCHAR(80) NULL," ..
+                    "arrendada_ate BIGINT NULL,carta_id BIGINT UNSIGNED NULL," ..
+                    "criada_em BIGINT NOT NULL,atualizada_em BIGINT NOT NULL," ..
+                    "PRIMARY KEY (fila_id,tipo)," ..
+                    "UNIQUE INDEX correio_aviso_bilhete (bilhete)," ..
+                    "INDEX correio_aviso_estado " ..
+                    "(estado,proxima_tentativa,fila_id,tipo)) ENGINE=InnoDB"
+                esta.piscina:executeAssíncrono(avisos,
+                    função(_, resultadoDosAvisos, falhaDosAvisos)
+                        fecheResultado(resultadoDosAvisos)
+                        chame(tratador,
+                            falhaDosAvisos e nulo ou verdadeiro,
+                            falhaDosAvisos, dado)
+                    fim)
+            fim)
+    fim
+
+    local função insira(esta, direção, estado, remetente, destinatários,
+                             conteúdo, tratador, dado, objetoPreparado)
+        local codificou, lista = proteja(json.cod, destinatários)
+        se não codificou então
+            chame(tratador, nulo, lista, dado)
+            retorne nulo, lista
+        fim
+        local função insiraNoBanco(objeto)
+            local agora = so.tempo()
+            local sql, parâmetros
+            se objeto então
+                sql = "INSERT INTO `" .. esta.tabela .. "` " ..
+                    "(direcao,estado,remetente,destinatarios,conteudo," ..
+                    "conteudo_objeto,tamanho,tentativas,proxima_tentativa," ..
+                    "criada_em,atualizada_em) VALUES (?,?,?,?,NULL,?,?,0,?,?,?)"
+                parâmetros = {
+                    direção, estado, remetente, lista, objeto.resumo,
+                    objeto.tamanho, agora, agora, agora
+                }
+            senão
+                -- Compatibilidade de transição para filas sem um depósito
+                -- configurado. A instalação postal oficial sempre o fornece.
+                sql = "INSERT INTO `" .. esta.tabela .. "` " ..
+                    "(direcao,estado,remetente,destinatarios,conteudo,tamanho," ..
+                    "tentativas,proxima_tentativa,criada_em,atualizada_em) " ..
+                    "VALUES (?,?,?,?,?,?,0,?,?,?)"
+                parâmetros = {
+                    direção, estado, remetente, lista, conteúdo, #conteúdo,
+                    agora, agora, agora
+                }
+            fim
+            retorne esta.piscina:executePreparadoAssíncrono(sql, parâmetros,
+                função(_, resultado, falhaSQL)
+                    local identificação = resultado e resultado:idInserido()
+                    fecheResultado(resultado)
+                    chame(tratador, falhaSQL e nulo ou identificação,
+                        falhaSQL, dado)
+                fim)
+        fim
+
+        se objetoPreparado então retorne insiraNoBanco(objetoPreparado) fim
+        se esta.depósito então
+            retorne esta.depósito:graveAssíncrono(conteúdo,
+                função(objeto, falhaDoDepósito)
+                    se não objeto então
+                        chame(tratador, nulo, falhaDoDepósito, dado)
+                        retorne
+                    fim
+                    insiraNoBanco(objeto)
+                fim)
+        fim
+        retorne insiraNoBanco(nulo)
+    fim
+
+    função fila.receba(esta, mensagem, conclua)
+        retorne insira(esta, "entrada", "recebida", mensagem.remetente,
+            mensagem.destinatários, mensagem.conteúdo, conclua)
+    fim
+
+    função fila.adicioneAssíncrono(esta, mensagem, tratador, dado)
+        se tipo(mensagem) ~= "tabela" ou tipo(mensagem.forme) ~= "função" então
+            retorne falhe("mensagem inválida; use correio.novaMensagem")
+        fim
+        local conteúdo, falhaDaFormação = mensagem:forme()
+        se não conteúdo então retorne nulo, falhaDaFormação fim
+        retorne insira(esta, "saída", "pendente", mensagem.remetente,
+            mensagem:destinatários(), conteúdo, tratador, dado)
+    fim
+
+    -- Usado quando o chamador já formou e persistiu o MIME. Isso garante que
+    -- a cópia da caixa e a fila referenciem exatamente os mesmos tacos.
+    função fila.adicioneFormadaAssíncrono(esta, mensagem, conteúdo, objeto,
+                                                  tratador, dado)
+        se tipo(mensagem) ~= "tabela" ou
+                tipo(mensagem.destinatários) ~= "função" então
+            retorne falhe("mensagem inválida; use correio.novaMensagem")
+        fim
+        se tipo(conteúdo) ~= "colar" então
+            retorne falhe("conteúdo MIME precisa ser um colar binário")
+        fim
+        se não esta.depósito então
+            retorne falhe("depósito é obrigatório para MIME já persistido")
+        fim
+        se tipo(objeto) ~= "tabela" ou tipo(objeto.resumo) ~= "colar" ou
+                #objeto.resumo ~= 64 ou
+                não objeto.resumo:procure("^[0-9a-f]+$") ou
+                objeto.tamanho ~= #conteúdo então
+            retorne falhe("objeto MIME preparado é inválido")
+        fim
+        retorne insira(esta, "saída", "pendente", mensagem.remetente,
+            mensagem:destinatários(), conteúdo, tratador, dado, objeto)
+    fim
+
+    função fila.reservePróximaAssíncrono(esta, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne falhe("tratador precisa ser uma função")
+        fim
+        local bilhete = colar.formate("%08x%08x%08x",
+            so.aleatório(), so.aleatório(), so.aleatório())
+        local agora = so.tempo()
+        local atualize = "UPDATE `" .. esta.tabela .. "` SET " ..
+            "estado='processando',bilhete=?,arrendada_ate=?,atualizada_em=? " ..
+            "WHERE estado='pendente' AND proxima_tentativa<=? " ..
+            "ORDER BY id LIMIT 1"
+        retorne esta.piscina:executePreparadoAssíncrono(atualize,
+            { bilhete, agora + esta.tempoDaReserva, agora, agora },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                se falhaSQL então chame(tratador, nulo, falhaSQL, dado); retorne fim
+                se afetadas == 0 então chame(tratador, nulo, nulo, dado); retorne fim
+                local selecione = "SELECT id,remetente,destinatarios,conteudo," ..
+                    "conteudo_objeto,tamanho,tentativas,criada_em," ..
+                    "falhas_permanentes,ultima_falha FROM `" ..
+                    esta.tabela .. "` WHERE bilhete=?"
+                esta.piscina:executePreparadoAssíncrono(selecione, { bilhete },
+                    função(_, consulta, falhaDaSeleção)
+                        se falhaDaSeleção então
+                            fecheResultado(consulta)
+                            chame(tratador, nulo, falhaDaSeleção, dado)
+                            retorne
+                        fim
+                        local linha = consulta:obterLinha()
+                        fecheResultado(consulta)
+                        se não linha então
+                            chame(tratador, nulo, "reserva MariaDB desapareceu", dado)
+                            retorne
+                        fim
+                        local função registreFalhaInterna(mensagem)
+                            esta:registreFalhaInternaAssíncrono(
+                                paraNúmero(linha[1]), mensagem,
+                                esta.limiteDeFalhasInternas,
+                                função(_, falhaDoRegistro)
+                                    chame(tratador, nulo,
+                                        falhaDoRegistro ou mensagem, dado)
+                                fim)
+                        fim
+                        local decodificou, destinatários = proteja(json.decod, linha[3])
+                        se não decodificou então
+                            registreFalhaInterna(
+                                "destinatários da fila estão corrompidos: " ..
+                                paraColar(destinatários))
+                            retorne
+                        fim
+                        local permanentes = {}
+                        se linha[9] e linha[9] ~= "" então
+                            local decodificouPermanentes, listaPermanente =
+                                proteja(json.decod, linha[9])
+                            se não decodificouPermanentes então
+                                registreFalhaInterna(
+                                    "falhas permanentes da fila estão corrompidas: " ..
+                                    paraColar(listaPermanente))
+                                retorne
+                            fim
+                            permanentes = listaPermanente
+                        fim
+                        local função entregue(conteúdo)
+                            chame(tratador, {
+                                identificação = paraNúmero(linha[1]),
+                                remetente = linha[2],
+                                destinatários = destinatários,
+                                conteúdo = conteúdo,
+                                tentativas = paraNúmero(linha[7]) ou 0,
+                                criadaEm = paraNúmero(linha[8]),
+                                falhasPermanentes = permanentes,
+                                últimaFalha = linha[10],
+                                bilhete = bilhete
+                            }, nulo, dado)
+                        fim
+                        se linha[5] então
+                            se não esta.depósito então
+                                chame(tratador, nulo,
+                                    "fila usa objeto, mas não recebeu depósito",
+                                    dado)
+                                retorne
+                            fim
+                            esta.depósito:leiaAssíncrono(
+                                linha[5], paraNúmero(linha[6]),
+                                função(conteúdo, falhaDoDepósito)
+                                    se não conteúdo então
+                                        chame(tratador, nulo,
+                                            falhaDoDepósito, dado)
+                                        retorne
+                                    fim
+                                    entregue(conteúdo)
+                                fim)
+                            retorne
+                        fim
+                        se linha[4] == nulo então
+                            registreFalhaInterna(
+                                "item da fila sem conteúdo armazenado")
+                            retorne
+                        fim
+                        entregue(linha[4])
+                    fim)
+            fim)
+    fim
+
+    função fila.marqueEntregueAssíncrono(esta, identificação, tratador, dado)
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='entregue'," ..
+            "bilhete=NULL,arrendada_ate=NULL,atualizada_em=? WHERE id=?"
+        retorne esta.piscina:executePreparadoAssíncrono(
+            sql, { so.tempo(), identificação }, função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1, falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.adieAssíncrono(esta, identificação, falhaDaEntrega,
+                                    segundos, tratador, dado)
+        segundos = segundos ou 60
+        local _, falhaDoPrazo = inteiroPositivo(segundos, "segundos", 60)
+        se falhaDoPrazo então retorne nulo, falhaDoPrazo fim
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='pendente'," ..
+            "tentativas=tentativas+1,proxima_tentativa=?,ultima_falha=?," ..
+            "bilhete=NULL,arrendada_ate=NULL,atualizada_em=? WHERE id=?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { agora + segundos, paraColar(falhaDaEntrega), agora, identificação },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1, falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.adieParcialAssíncrono(esta, identificação,
+            destinatáriosPendentes, falhasPermanentes, falhaDaEntrega,
+            segundos, tratador, dado)
+        se tipo(destinatáriosPendentes) ~= "tabela" ou
+           #destinatáriosPendentes == 0 então
+            retorne falhe("adiamento parcial exige destinatários pendentes")
+        fim
+        falhasPermanentes = falhasPermanentes ou {}
+        local okPendentes, pendentesJSON = proteja(json.cod,
+            destinatáriosPendentes)
+        se não okPendentes então retorne nulo, pendentesJSON fim
+        local okPermanentes, permanentesJSON = proteja(json.cod,
+            falhasPermanentes)
+        se não okPermanentes então retorne nulo, permanentesJSON fim
+        segundos = segundos ou 60
+        local _, falhaDoPrazo = inteiroPositivo(segundos, "segundos", 60)
+        se falhaDoPrazo então retorne nulo, falhaDoPrazo fim
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='pendente'," ..
+            "destinatarios=?,falhas_permanentes=?,tentativas=tentativas+1," ..
+            "proxima_tentativa=?,ultima_falha=?,bilhete=NULL," ..
+            "arrendada_ate=NULL,atualizada_em=? WHERE id=?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { pendentesJSON, permanentesJSON, agora + segundos,
+              paraColar(falhaDaEntrega), agora, identificação },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1,
+                    falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.marqueFalhouAssíncrono(esta, identificação, falhaDaEntrega,
+            falhasPermanentes, tratador, dado)
+        local okPermanentes, permanentesJSON = proteja(json.cod,
+            falhasPermanentes ou {})
+        se não okPermanentes então retorne nulo, permanentesJSON fim
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='falhou'," ..
+            "ultima_falha=?,falhas_permanentes=?,bilhete=NULL," ..
+            "arrendada_ate=NULL,atualizada_em=? " ..
+            "WHERE id=?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { paraColar(falhaDaEntrega), permanentesJSON,
+              so.tempo(), identificação },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1,
+                    falhaSQL, dado)
+            fim)
+    fim
+
+    local função codifiqueAviso(tipoDoAviso, detalhes)
+        se tipoDoAviso ~= "atraso" e tipoDoAviso ~= "falha" então
+            retorne nulo, "tipo do aviso deve ser atraso ou falha"
+        fim
+        se tipo(detalhes) ~= "tabela" então
+            retorne nulo, "detalhes do aviso precisam ser uma tabela"
+        fim
+        local funcionou, codificado = proteja(json.cod, detalhes)
+        se não funcionou então retorne nulo, codificado fim
+        retorne codificado
+    fim
+
+    função fila.soliciteAvisoAssíncrono(esta, identificação,
+            tipoDoAviso, detalhes, tratador, dado)
+        local codificado, falhaDoAviso = codifiqueAviso(tipoDoAviso, detalhes)
+        se não codificado então retorne nulo, falhaDoAviso fim
+        local agora = so.tempo()
+        local sql = "INSERT IGNORE INTO `" .. esta.tabelaDeAvisos .. "` " ..
+            "(fila_id,tipo,estado,detalhes,tentativas,proxima_tentativa," ..
+            "criada_em,atualizada_em) VALUES (?,?,'pendente',?,0,?,?,?)"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { identificação, tipoDoAviso, codificado, agora, agora, agora },
+            função(_, resultado, falhaSQL)
+                local inseriu = resultado e resultado:linhasAfetadas() == 1
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou {
+                    inseriu = inseriu, tipo = tipoDoAviso
+                }, falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.marqueFalhouEAviseAssíncrono(esta, identificação,
+            falhaDaEntrega, falhasPermanentes, detalhes, tratador, dado)
+        local funcionou, permanentesJSON = proteja(json.cod,
+            falhasPermanentes ou {})
+        se não funcionou então retorne nulo, permanentesJSON fim
+        local avisoJSON, falhaDoAviso = codifiqueAviso("falha", detalhes)
+        se não avisoJSON então retorne nulo, falhaDoAviso fim
+        local iniciou, falhaDaTransação =
+            esta.piscina:inicieTransaçãoAssíncrona(
+            função(_, transação, falhaAoIniciar)
+                se falhaAoIniciar então
+                    chame(tratador, nulo, falhaAoIniciar, dado); retorne
+                fim
+                local agora = so.tempo()
+                local atualize = "UPDATE `" .. esta.tabela .. "` SET " ..
+                    "estado='falhou',ultima_falha=?,falhas_permanentes=?," ..
+                    "bilhete=NULL,arrendada_ate=NULL,atualizada_em=? WHERE id=?"
+                transação:executePreparadoAssíncrono(atualize,
+                    { paraColar(falhaDaEntrega), permanentesJSON,
+                      agora, identificação },
+                    função(_, resultado, falhaDaMarca)
+                        local afetadas = resultado e
+                            resultado:linhasAfetadas() ou 0
+                        fecheResultado(resultado)
+                        se falhaDaMarca ou afetadas ~= 1 então
+                            transação:desfaçaAssíncrono(função()
+                                chame(tratador, nulo, falhaDaMarca ou
+                                    "item da fila não encontrado", dado)
+                            fim)
+                            retorne
+                        fim
+                        local inclua = "INSERT IGNORE INTO `" ..
+                            esta.tabelaDeAvisos .. "` " ..
+                            "(fila_id,tipo,estado,detalhes,tentativas," ..
+                            "proxima_tentativa,criada_em,atualizada_em) " ..
+                            "VALUES (?,'falha','pendente',?,0,?,?,?)"
+                        transação:executePreparadoAssíncrono(inclua,
+                            { identificação, avisoJSON,
+                              agora, agora, agora },
+                            função(_, inclusão, falhaDaInclusão)
+                                fecheResultado(inclusão)
+                                se falhaDaInclusão então
+                                    transação:desfaçaAssíncrono(função()
+                                        chame(tratador, nulo,
+                                            falhaDaInclusão, dado)
+                                    fim)
+                                    retorne
+                                fim
+                                transação:confirmeAssíncrono(
+                                    função(_, _, falhaDaConfirmação)
+                                        chame(tratador,
+                                            falhaDaConfirmação e nulo ou verdadeiro,
+                                            falhaDaConfirmação, dado)
+                                    fim)
+                            fim)
+                    fim)
+            fim)
+        se falhaDaTransação então
+            chame(tratador, nulo, falhaDaTransação, dado)
+        fim
+        retorne iniciou
+    fim
+
+    função fila.canceleAvisosDesatualizadosAssíncrono(esta, tratador, dado)
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabelaDeAvisos .. "` a " ..
+            "JOIN `" .. esta.tabela .. "` f ON f.id=a.fila_id " ..
+            "SET a.estado='cancelado',a.bilhete=NULL,a.arrendada_ate=NULL," ..
+            "a.atualizada_em=? WHERE a.tipo='atraso' AND " ..
+            "a.estado IN ('pendente','processando') AND " ..
+            "f.estado NOT IN ('pendente','processando')"
+        retorne esta.piscina:executePreparadoAssíncrono(sql, { agora },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas, falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.recupereAvisosExpiradosAssíncrono(esta, tratador, dado)
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabelaDeAvisos .. "` SET " ..
+            "estado='pendente',bilhete=NULL,arrendada_ate=NULL," ..
+            "atualizada_em=? WHERE estado='processando' AND arrendada_ate<?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql, { agora, agora },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas, falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.reservePróximoAvisoAssíncrono(esta, tratador, dado)
+        se tipo(tratador) ~= "função" então
+            retorne falhe("tratador precisa ser uma função")
+        fim
+        local bilhete = colar.formate("%08x%08x%08x",
+            so.aleatório(), so.aleatório(), so.aleatório())
+        local agora = so.tempo()
+        local atualize = "UPDATE `" .. esta.tabelaDeAvisos .. "` SET " ..
+            "estado='processando',bilhete=?,arrendada_ate=?,atualizada_em=? " ..
+            "WHERE estado='pendente' AND proxima_tentativa<=? " ..
+            "ORDER BY criada_em,fila_id,tipo LIMIT 1"
+        retorne esta.piscina:executePreparadoAssíncrono(atualize,
+            { bilhete, agora + esta.tempoDaReserva, agora, agora },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                se falhaSQL então chame(tratador, nulo, falhaSQL, dado); retorne fim
+                se afetadas == 0 então chame(tratador, nulo, nulo, dado); retorne fim
+                local selecione = "SELECT fila_id,tipo,detalhes,tentativas," ..
+                    "criada_em FROM `" .. esta.tabelaDeAvisos ..
+                    "` WHERE bilhete=?"
+                esta.piscina:executePreparadoAssíncrono(selecione, { bilhete },
+                    função(_, consulta, falhaDaSeleção)
+                        se falhaDaSeleção então
+                            fecheResultado(consulta)
+                            chame(tratador, nulo, falhaDaSeleção, dado)
+                            retorne
+                        fim
+                        local linha = consulta:obterLinha()
+                        fecheResultado(consulta)
+                        se não linha então
+                            chame(tratador, nulo,
+                                "reserva do aviso desapareceu", dado)
+                            retorne
+                        fim
+                        local decodificou, detalhes = proteja(json.decod, linha[3])
+                        se não decodificou ou tipo(detalhes) ~= "tabela" então
+                            local quarentena = "UPDATE `" ..
+                                esta.tabelaDeAvisos .. "` SET " ..
+                                "estado='quarentena',ultima_falha=?,bilhete=NULL," ..
+                                "arrendada_ate=NULL,atualizada_em=? " ..
+                                "WHERE fila_id=? AND tipo=?"
+                            esta.piscina:executePreparadoAssíncrono(quarentena,
+                                { paraColar(detalhes), so.tempo(),
+                                  linha[1], linha[2] }, função(_, r)
+                                    fecheResultado(r)
+                                    chame(tratador, nulo,
+                                        "detalhes do aviso estão corrompidos", dado)
+                                fim)
+                            retorne
+                        fim
+                        chame(tratador, {
+                            fila = paraNúmero(linha[1]), tipo = linha[2],
+                            detalhes = detalhes,
+                            tentativas = paraNúmero(linha[4]) ou 0,
+                            criadaEm = paraNúmero(linha[5]) ou 0,
+                            bilhete = bilhete
+                        }, nulo, dado)
+                    fim)
+            fim)
+    fim
+
+    função fila.adieAvisoAssíncrono(esta, aviso, falhaDoAviso,
+            segundos, máximoDeTentativas, tratador, dado)
+        segundos = mat.paraInteiro(segundos ou 300)
+        máximoDeTentativas = mat.paraInteiro(máximoDeTentativas ou 5)
+        se não segundos ou segundos < 60 ou
+           não máximoDeTentativas ou máximoDeTentativas < 1 então
+            retorne falhe("prazo ou limite de tentativas do aviso inválido")
+        fim
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabelaDeAvisos .. "` SET " ..
+            "estado=IF(tentativas+1>=?,'quarentena','pendente')," ..
+            "tentativas=tentativas+1,proxima_tentativa=?,ultima_falha=?," ..
+            "bilhete=NULL,arrendada_ate=NULL,atualizada_em=? " ..
+            "WHERE fila_id=? AND tipo=?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { máximoDeTentativas, agora + segundos,
+              paraColar(falhaDoAviso), agora, aviso.fila, aviso.tipo },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1,
+                    falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.quarenteneAssíncrono(esta, identificação, motivo,
+                                               tratador, dado)
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='quarentena'," ..
+            "ultima_falha=?,bilhete=NULL,arrendada_ate=NULL," ..
+            "atualizada_em=? WHERE id=?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { paraColar(motivo), agora, identificação },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1,
+                    falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.registreFalhaInternaAssíncrono(esta, identificação,
+            motivo, limite, tratador, dado)
+        limite = mat.paraInteiro(limite ou 3)
+        se não limite ou limite < 1 então
+            retorne falhe("limite de falhas internas inválido")
+        fim
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabela .. "` SET " ..
+            "estado=IF(falhas_internas+1>=?,'quarentena','pendente')," ..
+            "falhas_internas=falhas_internas+1," ..
+            "proxima_tentativa=?,ultima_falha=?,bilhete=NULL," ..
+            "arrendada_ate=NULL,atualizada_em=? WHERE id=?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { limite, agora + 300, paraColar(motivo), agora, identificação },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1,
+                    falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.listeQuarentenaAssíncrono(esta, limite, tratador, dado)
+        limite = mat.paraInteiro(limite ou 100)
+        se não limite ou limite < 1 ou limite > 1000 então
+            retorne falhe("limite da quarentena deve ficar entre 1 e 1000")
+        fim
+        local sql = "SELECT id,remetente,destinatarios,tentativas," ..
+            "falhas_internas,ultima_falha,criada_em,atualizada_em FROM `" ..
+            esta.tabela .. "` WHERE estado='quarentena' " ..
+            "ORDER BY atualizada_em DESC,id DESC LIMIT " .. limite
+        retorne esta.piscina:executeAssíncrono(sql,
+            função(_, resultado, falhaSQL)
+                se falhaSQL então
+                    fecheResultado(resultado)
+                    chame(tratador, nulo, falhaSQL, dado); retorne
+                fim
+                local itens = {}
+                enquanto verdadeiro início
+                    local linha = resultado:obterLinha()
+                    se não linha então pare fim
+                    itens[#itens + 1] = {
+                        identificação = paraNúmero(linha[1]),
+                        remetente = linha[2], destinatários = linha[3],
+                        tentativas = paraNúmero(linha[4]) ou 0,
+                        falhasInternas = paraNúmero(linha[5]) ou 0,
+                        falha = linha[6], criadaEm = paraNúmero(linha[7]),
+                        atualizadaEm = paraNúmero(linha[8])
+                    }
+                fim
+                fecheResultado(resultado)
+                chame(tratador, itens, nulo, dado)
+            fim)
+    fim
+
+    função fila.reprocesseQuarentenaAssíncrono(esta, identificação,
+                                                         tratador, dado)
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='pendente'," ..
+            "falhas_internas=0,proxima_tentativa=?,ultima_falha=NULL," ..
+            "bilhete=NULL,arrendada_ate=NULL,atualizada_em=? " ..
+            "WHERE id=? AND estado='quarentena'"
+        retorne esta.piscina:executePreparadoAssíncrono(sql,
+            { agora, agora, identificação },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas == 1,
+                    falhaSQL, dado)
+            fim)
+    fim
+
+    função fila.recupereReservasExpiradasAssíncrono(esta, tratador, dado)
+        local agora = so.tempo()
+        local sql = "UPDATE `" .. esta.tabela .. "` SET estado='pendente'," ..
+            "bilhete=NULL,arrendada_ate=NULL,atualizada_em=? " ..
+            "WHERE estado='processando' AND arrendada_ate<?"
+        retorne esta.piscina:executePreparadoAssíncrono(sql, { agora, agora },
+            função(_, resultado, falhaSQL)
+                local afetadas = resultado e resultado:linhasAfetadas() ou 0
+                fecheResultado(resultado)
+                chame(tratador, falhaSQL e nulo ou afetadas, falhaSQL, dado)
+            fim)
+    fim
+
+    retorne fila
+fim
+
+retorne correio

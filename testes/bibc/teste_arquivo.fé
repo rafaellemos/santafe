@@ -1,0 +1,148 @@
+-- Leitura e gravação binárias sem bloquear o laço GIO.
+
+módulo.caminhoC = "bibs/bibc/arquivo/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local arquivo = importe "arquivo"
+local rede = importe "rede"
+
+local raiz = "/tmp/santafe-arquivo-" .. so.tempo() .. "-" .. so.aleatório()
+local origem = raiz .. "/carta.tmp"
+local destino = raiz .. "/carta.eml"
+local conteúdo = "Santafé\0📬\r\n"
+local substituído = "Nova carta\0📨\r\n"
+local terminou = falso
+local sucesso = falso
+local detalhe = "teste não terminou"
+
+local função conclua(valor, falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = valor == verdadeiro
+    detalhe = falha ou ""
+    rede.pareLaço()
+fim
+
+arquivo.crieDiretóriosAssíncrono(raiz, função(criou, falha)
+    se não criou então conclua(falso, falha); retorne fim
+    arquivo.graveDurávelAssíncrono(origem, conteúdo, função(gravou, falhaDaGravação)
+        se não gravou então conclua(falso, falhaDaGravação); retorne fim
+        arquivo.leiaAssíncrono(origem, 1024, função(lido, falhaDaLeitura)
+            se não lido ou lido ~= conteúdo então
+                conclua(falso, falhaDaLeitura ou "conteúdo binário divergiu"); retorne
+            fim
+            arquivo.graveDurávelAssíncrono(origem, substituído,
+                função(trocou, falhaDaTroca)
+                    se não trocou então conclua(falso, falhaDaTroca); retorne fim
+                    arquivo.leiaAssíncrono(origem, 1024,
+                        função(lidoApósTroca, falhaApósTroca)
+                            se lidoApósTroca ~= substituído então
+                                conclua(falso, falhaApósTroca ou
+                                    "substituição atômica divergiu"); retorne
+                            fim
+                            local parcial = raiz .. "/ausente/parcial.eml"
+                            arquivo.graveDurávelAssíncrono(parcial, "incompleto",
+                                função(gravouIndevido, falhaEsperada)
+                                    se gravouIndevido ou não falhaEsperada então
+                                        conclua(falso,
+                                            "gravação sem diretório deveria falhar")
+                                        retorne
+                                    fim
+                                    arquivo.existeAssíncrono(parcial,
+                                        função(parcialExiste, falhaDoParcial)
+                                            se falhaDoParcial ou parcialExiste então
+                                                conclua(falso, falhaDoParcial ou
+                                                    "falha deixou arquivo parcial")
+                                                retorne
+                                            fim
+                                            arquivo.leiaAssíncrono(origem, 2,
+                                                função(indevido, falhaDoLimite)
+                                                    se indevido ou não falhaDoLimite então
+                                                        conclua(falso,
+                                                            "limite de leitura não foi aplicado")
+                                                        retorne
+                                                    fim
+                                                    arquivo.existeAssíncrono(origem,
+                                                        função(existe, falhaDaConsulta)
+                                                            se existe ~= verdadeiro então
+                                                                conclua(falso,
+                                                                    falhaDaConsulta ou
+                                                                    "arquivo gravado não existe")
+                                                                retorne
+                                                            fim
+                                                            arquivo.movaAssíncrono(origem,
+                                                                destino,
+                                                                função(moveu,
+                                                                       falhaDoMovimento)
+                                                                    se não moveu então
+                                                                        conclua(falso,
+                                                                            falhaDoMovimento)
+                                                                        retorne
+                                                                    fim
+                                                                    arquivo.existeAssíncrono(
+                                                                        origem,
+                                                                        função(aindaExiste,
+                                                                               falhaDaOrigem)
+                                                                            se falhaDaOrigem ou
+                                                                               aindaExiste então
+                                                                                conclua(falso,
+                                                                                    falhaDaOrigem ou
+                                                                                    "origem permaneceu após mover")
+                                                                                retorne
+                                                                            fim
+                                                                            arquivo.leiaAssíncrono(
+                                                                                destino, 1024,
+                                                                                função(lidoDeNovo,
+                                                                                       falhaDaSegundaLeitura)
+                                                                                    se lidoDeNovo ~=
+                                                                                       substituído então
+                                                                                        conclua(falso,
+                                                                                            falhaDaSegundaLeitura ou
+                                                                                            "destino perdeu conteúdo")
+                                                                                        retorne
+                                                                                    fim
+                                                                                    arquivo.removaAssíncrono(
+                                                                                        destino,
+                                                                                        função(removeu,
+                                                                                               falhaDaRemoção)
+                                                                                            se não removeu então
+                                                                                                conclua(falso,
+                                                                                                    falhaDaRemoção)
+                                                                                                retorne
+                                                                                            fim
+                                                                                            arquivo.existeAssíncrono(
+                                                                                                destino,
+                                                                                                função(restou,
+                                                                                                       falhaFinal)
+                                                                                                    se falhaFinal ou
+                                                                                                       restou então
+                                                                                                        conclua(falso,
+                                                                                                            falhaFinal ou
+                                                                                                            "arquivo removido ainda existe")
+                                                                                                        retorne
+                                                                                                    fim
+                                                                                                    arquivo.removaAssíncrono(
+                                                                                                        raiz,
+                                                                                                        função(_, falhaDoDiretório)
+                                                                                                            conclua(
+                                                                                                                não falhaDoDiretório,
+                                                                                                                falhaDoDiretório)
+	    fim)
+                                                                                        fim)
+                                                                                fim)
+                                                                        fim)
+                                                                fim)
+                                                        fim)
+                                                fim)
+                                        fim)
+                                fim)
+                        fim)
+                fim)
+        fim)
+        fim)
+    fim)
+fim)
+
+rede.laço()
+garanta(terminou e sucesso, detalhe)
+mostre("arquivo assíncrono: ok")

@@ -1,0 +1,88 @@
+local nomes = importe "nomes"
+local autoridade = importe "nomes.autoridade"
+local rede = importe "rede"
+
+local porta = 18760
+local servidor, falha = autoridade.novo({
+    endereço = "127.0.0.1", porta = porta,
+    zonas = { {
+        nome = "exemplo.org",
+        registros = {
+            { nome = "@", tipo = "SOA", dados = {
+                mestre = "ns1", responsável = "dns", série = 1,
+                atualização = 3600, novaTentativa = 600,
+                expiração = 86400, mínimo = 300 } },
+            { nome = "@", tipo = "NS", dados = "ns1" },
+            { nome = "ns1", tipo = "A", dados = "192.0.2.53" },
+            { nome = "www", tipo = "A", dados = "192.0.2.10" }
+        }
+    } }
+})
+garanta(servidor, falha)
+garanta(servidor:inicie())
+
+local consulta = garanta(nomes.novaConsulta("www.exemplo.org", "A", 1234, falso))
+local clienteUDP = rede.udp("IPv4")
+garanta(clienteUDP:amarre("127.0.0.1", 0))
+local clienteTCP
+local conexãoTCP
+local entradaTCP = ""
+local terminou = falso
+
+local função finalize()
+    se terminou então retorne fim
+    terminou = verdadeiro
+    se conexãoTCP então conexãoTCP:feche() fim
+    se clienteTCP então clienteTCP:feche() fim
+    clienteUDP:feche()
+    servidor:feche()
+    rede.pareLaço()
+fim
+
+local função recebaTCP(conexão)
+    conexão:recebaDadosAssíncrono(4096, função(_, dados, erroDaLeitura)
+        garanta(não erroDaLeitura, erroDaLeitura)
+        entradaTCP = entradaTCP .. dados
+        se #entradaTCP < 2 então recebaTCP(conexão); retorne fim
+        local tamanho = (entradaTCP:byte(1) << 8) | entradaTCP:byte(2)
+        se #entradaTCP < tamanho + 2 então recebaTCP(conexão); retorne fim
+        local resposta = garanta(nomes.decodifiqueMensagem(
+            entradaTCP:corte(3, tamanho + 2)
+        ))
+        garanta(resposta.identificação == 1234)
+        garanta(resposta.respostas[1].dados == "192.0.2.10")
+        finalize()
+    fim)
+fim
+
+local função testeTCP()
+    clienteTCP = rede.clienteTCP()
+    clienteTCP:definaTempoLimite(2000)
+    clienteTCP:conecteAssíncrono("127.0.0.1", porta,
+        função(_, conexão, erroDaConexão)
+            garanta(conexão, erroDaConexão)
+            conexãoTCP = conexão
+            conexão:definaTempoLimite(2000)
+            conexão:envieAssíncrono(nomes._u16(#consulta) .. consulta,
+                função(c, _, erroDoEnvio)
+                    garanta(não erroDoEnvio, erroDoEnvio)
+                    recebaTCP(c)
+                fim)
+        fim)
+fim
+
+clienteUDP:inicieRecepção(4096,
+    função(pacote, erroDaLeitura)
+        garanta(pacote, erroDaLeitura)
+        local resposta = garanta(nomes.decodifiqueMensagem(pacote))
+        garanta(resposta.identificação == 1234)
+        garanta(resposta.bandeiras.autoritativa)
+        garanta(resposta.respostas[1].dados == "192.0.2.10")
+        clienteUDP:pareRecepção()
+        testeTCP()
+    fim)
+clienteUDP:envieParaAssíncrono("127.0.0.1", porta, consulta, função() fim)
+
+rede.laço()
+garanta(terminou)
+mostre("nomes autoridade UDP/TCP: ok")

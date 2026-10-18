@@ -1,0 +1,85 @@
+-- Contrato, enquadramento, proteção e registro local do PULSO/1.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+
+local pulso = importe "pulso"
+local memória = garanta(pulso.memória(8))
+local canal = garanta(pulso.novo({
+    serviço = "teste",
+    instância = "local",
+    limiteDados = 4096
+}))
+garanta(canal:adicioneDestino(memória))
+
+local sinal = garanta(canal:sinal("autenticaçãoRecusada", {
+    endereço = "192.0.2.10",
+    usuário = "ana",
+    ativo = verdadeiro,
+    senha = "nunca registrar",
+    interno = { bilhete = "também não" }
+}, { prioridade = "alta", validade = 30 }))
+
+garanta(sinal.protocolo == "PULSO")
+garanta(sinal.versão == 1)
+garanta(sinal.origem == "teste/local")
+garanta(sinal.sequência == 1)
+garanta(sinal.dados.ativo == verdadeiro)
+garanta(sinal.dados.senha == "[protegido]")
+garanta(sinal.dados.interno.bilhete == "[protegido]")
+garanta(#memória.mensagens == 1)
+
+local leitura = garanta(canal:leitura("fila", { pendentes = 7 }))
+local operação = garanta(canal:operação("reduzaAceites", { limite = 20 }, {
+    prioridade = "crítica",
+    validade = 10
+}))
+garanta(canal:confirmação("limiteAplicado", operação.identificação, {
+    limite = 20
+}))
+garanta(canal:pulsoDeVida({ estado = "pronto" }))
+
+local quadro = garanta(pulso.codifique(leitura))
+local decodificador = garanta(pulso.novoDecodificador({ limiteMensagem = 4096 }))
+local parte1 = quadro:corte(1, 2)
+local parte2 = quadro:corte(3, 11)
+local parte3 = quadro:corte(12)
+garanta(#garanta(decodificador:alimente(parte1)) == 0)
+garanta(#garanta(decodificador:alimente(parte2)) == 0)
+local recebidas = garanta(decodificador:alimente(parte3))
+garanta(#recebidas == 1)
+garanta(recebidas[1].identificação == leitura.identificação)
+garanta(decodificador:pendente() == 0)
+
+local dois = garanta(pulso.codifique(leitura)) .. garanta(pulso.codifique(sinal))
+local lote = garanta(decodificador:alimente(dois))
+garanta(#lote == 2)
+
+local circular = {}
+circular.eu = circular
+local recusada, falhaCircular = canal:sinal("circular", circular)
+garanta(não recusada e falhaCircular:procure("circular", 1, verdadeiro))
+
+local caminho = "/tmp/santafe-pulso-teste.jsonl"
+so.remova(caminho)
+para i = 1, 8 início
+    so.remova(caminho .. "." .. so.tempo() .. "." .. i)
+fim
+local registrador = garanta(pulso.registrador(caminho, { limiteArquivo = 4096 }))
+local canalDeArquivo = garanta(pulso.novo({ serviço = "arquivo" }))
+garanta(canalDeArquivo:adicioneDestino(registrador))
+garanta(canalDeArquivo:sinal("iniciado", { porta = 25 }))
+garanta(canalDeArquivo:feche())
+
+local arquivo = garanta(es.abra(caminho, "leitura"))
+local linha = garanta(arquivo:leia("*linha"))
+arquivo:feche()
+local gravada = json.decod(linha)
+garanta(gravada.nome == "iniciado" e gravada.dados.porta == 25)
+so.remova(caminho)
+
+local estatísticas = canal:estatísticas()
+garanta(estatísticas.emitidas == 5)
+garanta(estatísticas.entregues == 5)
+garanta(canal:feche())
+
+mostre("PULSO/1: ok")

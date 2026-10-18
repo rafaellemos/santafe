@@ -1,0 +1,17 @@
+{
+    "target": "santafe_executar",
+    "cancel": {"kill": true},
+    "cmd": ["santafé", "$file"],
+    "working_dir": "$file_path",
+    "file_regex": "^(?:.*?santaf(?:é|ec): )?(.+?):([0-9]+):",
+    "selector": "source.santafe",
+    "env": {
+        "LANG": "pt_BR.UTF-8"
+    },
+    "variants": [
+        {
+            "name": "Verificar sintaxe",
+            "cmd": ["santafec", "-p", "$file"]
+        }
+    ]
+}

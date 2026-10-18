@@ -10,7 +10,7 @@ ifeq ($(PLAT),auto)
 endif
 
 CC ?= gcc
-PKGS = gio-2.0 libsodium
+PKGS = gio-2.0 libsodium openssl
 CFLAGS ?= -O2 -Wall -Wextra
 CFLAGS += -fPIC $(shell pkg-config --cflags $(PKGS)) -I../../../src
 LIBS = $(shell pkg-config --libs $(PKGS))

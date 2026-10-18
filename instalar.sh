@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 echo "Instalador Santafé"
+cd -- "$(dirname -- "$0")" || exit 1
 
 # === Cores (ANSI) ===
 VERDE_CLARO="\033[1;32m"
@@ -18,49 +19,26 @@ if [ "$EUID" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
     else
-        echo "ERRO: você não é root e não há 'sudo' disponível." >&2
-        exit 1
+        SUDO="" # instalação em prefixo próprio não requer root
     fi
 else
     SUDO=""
 fi
 
-# === Spinner genérico para rodar comandos silenciosos ===
+# === Execução visível das dependências ===
 run_with_spinner() {
     # Usa: run_with_spinner comando arg1 arg2 ...
-    # Tudo (stdout+stderr) vai para /dev/null
+    #
+    # O nome foi mantido para não quebrar os chamadores antigos, mas a saída
+    # não é mais escondida. Homebrew, MacPorts e os gerenciadores Linux podem
+    # parar esperando rede, lock ou confirmação; um spinner só faria parecer
+    # que o processo está preso em `sleep`, sem revelar a etapa responsável.
     local cmd=( "$@" )
 
-    # caracteres e cores
-    local spin_chars=( "◉" " " )
-    local colors=( "$VERDE_CLARO" "" )
-    local delay=0.6
-
-    "${cmd[@]}" >/dev/null 2>&1 &
-    local pid=$!
-
-    # Esconde cursor
-    tput civis 2>/dev/null || true
-
-    while kill -0 "$pid" 2>/dev/null; do
-        for i in 0 1; do
-            kill -0 "$pid" 2>/dev/null || break
-            local idx=$(( i % 2 ))
-            local current_color="${colors[$idx]}"
-            local current_char="${spin_chars[$i]}"
-            printf "\r\033[K${LARANJA_ESCURO}Ⓡ Resolvendo dependências... ${RESET}${current_color}${current_char}${RESET}"
-            sleep "$delay"
-        done
-    done
-
-    wait "$pid"
-    local status=$?
-
-    # Limpa linha e restaura cursor
-    printf "\r\033[K"
-    tput cnorm 2>/dev/null || true
-
-    return "$status"
+    printf "${LARANJA_ESCURO}==> Executando:${RESET}"
+    printf " %q" "${cmd[@]}"
+    printf "\n"
+    "${cmd[@]}"
 }
 
 # === Detecta gerenciador de pacotes ===
@@ -105,114 +83,107 @@ detect_pkg_manager() {
     fi
 }
 
-# === IPv4 primeiro, IPv6 de reserva (gerenciadores de pacotes Linux) ===
-# Várias VMs saem de fábrica com uma interface IPv6 só link-local (sem rota
-# real pra internet), mas o glibc por padrão prefere endereços IPv6 (RFC
-# 6724) quando o DNS devolve os dois — o gerenciador de pacotes então fica
-# minutos tentando espelhos por IPv6 inalcançável antes de cair pro IPv4 que
-# funciona. Ajustamos a precedência em /etc/gai.conf em vez de desativar IPv6
-# (Acquire::ForceIPv4 faria isso): se a rota v6 existir/voltar a existir, ela
-# continua disponível como fallback, só não é mais tentada primeiro.
-prefer_ipv4() {
-    local gai_conf="/etc/gai.conf"
-
-    if [ -f "$gai_conf" ] && grep -qE "^[[:space:]]*precedence[[:space:]]+::ffff:0:0/96" "$gai_conf" 2>/dev/null; then
-        return
-    fi
-
-    echo "precedence ::ffff:0:0/96  100" | $SUDO tee -a "$gai_conf" >/dev/null 2>&1 || true
-}
-
 # === Instalações por distro (sempre silenciosas) ===
 install_deps_apt() {
     local failed=0
-    prefer_ipv4
-    run_with_spinner "$SUDO" apt-get -qq update || failed=1
-    run_with_spinner "$SUDO" apt-get -qq install -y \
+    run_with_spinner $SUDO apt-get -qq update || failed=1
+    run_with_spinner $SUDO apt-get -qq install -y \
         build-essential \
         pkg-config \
         libglib2.0-dev \
+        glib-networking \
         libmariadb-dev \
         libsodium-dev \
+        libssl-dev \
         libreadline-dev || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências. Verifique seu gerenciador de pacotes (apt)." >&2
+        return 1
     fi
 }
 
 install_deps_dnf() {
     local failed=0
-    prefer_ipv4
-    run_with_spinner "$SUDO" dnf -q groupinstall -y "Development Tools" || failed=1
-    run_with_spinner "$SUDO" dnf -q install -y \
+    run_with_spinner $SUDO dnf -q groupinstall -y "Development Tools" || failed=1
+    run_with_spinner $SUDO dnf -q install -y \
         gcc make pkg-config \
         glib2-devel \
+        glib-networking \
         mariadb-devel \
         libsodium-devel \
+        openssl-devel \
         readline-devel || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências. Verifique seu gerenciador de pacotes (dnf)." >&2
+        return 1
     fi
 }
 
 install_deps_yum() {
     local failed=0
-    prefer_ipv4
-    run_with_spinner "$SUDO" yum -q groupinstall -y "Development Tools" || failed=1
-    run_with_spinner "$SUDO" yum -q install -y \
+    run_with_spinner $SUDO yum -q groupinstall -y "Development Tools" || failed=1
+    run_with_spinner $SUDO yum -q install -y \
         gcc make pkg-config \
         glib2-devel \
+        glib-networking \
         mariadb-devel \
         libsodium-devel \
+        openssl-devel \
         readline-devel || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências. Verifique seu gerenciador de pacotes (yum)." >&2
+        return 1
     fi
 }
 
 install_deps_zypper() {
     local failed=0
-    prefer_ipv4
-    run_with_spinner "$SUDO" zypper -q refresh || failed=1
-    run_with_spinner "$SUDO" zypper -q install -y \
+    run_with_spinner $SUDO zypper -q refresh || failed=1
+    run_with_spinner $SUDO zypper -q install -y \
         gcc make pkg-config \
         glib2-devel \
+        glib-networking \
         libmariadb-devel \
         libsodium-devel \
+        libopenssl-devel \
         readline-devel || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências. Verifique seu gerenciador de pacotes (zypper)." >&2
+        return 1
     fi
 }
 
 install_deps_pacman() {
     local failed=0
-    prefer_ipv4
-    run_with_spinner "$SUDO" pacman -Sy --noconfirm \
+    run_with_spinner $SUDO pacman -Sy --noconfirm \
         base-devel \
         pkg-config \
         glib2 \
+        glib-networking \
         mariadb-libs \
         libsodium \
+        openssl \
         readline || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências. Verifique seu gerenciador de pacotes (pacman)." >&2
+        return 1
     fi
 }
 
 install_deps_brew() {
     local failed=0
     run_with_spinner brew update || true
-    run_with_spinner brew install pkg-config glib readline mariadb-connector-c libsodium || failed=1
+    run_with_spinner brew install pkg-config glib glib-networking readline mariadb-connector-c libsodium openssl@3 || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências via brew. Rode manualmente:" >&2
-        echo "  brew install pkg-config glib readline mariadb-connector-c libsodium" >&2
+        echo "  brew install pkg-config glib glib-networking readline mariadb-connector-c libsodium openssl@3" >&2
+        return 1
     fi
 }
 
@@ -266,6 +237,7 @@ install_deps_brew_ausente() {
         [Nn]*)
             echo "Quando quiser, rode manualmente:" >&2
             echo "  $HOMEBREW_INSTALL_CMD" >&2
+            return 1
             ;;
         *)
             if run_homebrew_installer; then
@@ -273,6 +245,7 @@ install_deps_brew_ausente() {
             else
                 echo "ERRO: a instalação do Homebrew continua falhando. Instale manualmente e rode este instalador de novo:" >&2
                 echo "  $HOMEBREW_INSTALL_CMD" >&2
+                return 1
             fi
             ;;
     esac
@@ -284,11 +257,12 @@ install_deps_brew_ausente() {
 install_deps_macports() {
     local failed=0
     run_with_spinner sudo port selfupdate || true
-    run_with_spinner sudo port install pkgconfig glib2 readline mariadb libsodium || failed=1
+    run_with_spinner sudo port install pkgconfig glib2 glib-networking readline mariadb libsodium openssl3 || failed=1
 
     if [ "$failed" -ne 0 ]; then
         echo "AVISO: falha ao instalar dependências via MacPorts. Rode manualmente:" >&2
-        echo "  sudo port install pkgconfig glib2 readline mariadb libsodium" >&2
+        echo "  sudo port install pkgconfig glib2 glib-networking readline mariadb libsodium openssl3" >&2
+        return 1
     fi
 }
 
@@ -335,8 +309,8 @@ install_deps_macports_ausente() {
     if [ -z "$codename" ]; then
         echo "ERRO: não sei mapear o macOS $macos_ver pra um instalador do MacPorts automaticamente." >&2
         echo "Baixe manualmente em https://www.macports.org/install.php" >&2
-        echo "e rode: sudo port install pkgconfig glib2 readline mariadb libsodium" >&2
-        return
+        echo "e rode: sudo port install pkgconfig glib2 glib-networking readline mariadb libsodium openssl3" >&2
+        return 1
     fi
 
     asset_url=$(curl -fsSL "https://api.github.com/repos/macports/macports-base/releases/latest" 2>/dev/null \
@@ -347,15 +321,16 @@ install_deps_macports_ausente() {
     if [ -z "$asset_url" ]; then
         echo "ERRO: não achei o instalador do MacPorts para $codename automaticamente." >&2
         echo "Baixe manualmente em https://www.macports.org/install.php" >&2
-        echo "e rode: sudo port install pkgconfig glib2 readline mariadb libsodium" >&2
-        return
+        echo "e rode: sudo port install pkgconfig glib2 glib-networking readline mariadb libsodium openssl3" >&2
+        return 1
     fi
 
-    tmp_pkg="/tmp/MacPorts-${codename}.pkg"
+    tmp_pkg="$(mktemp -t santafe-macports.XXXXXXXX)" || return 1
     echo "Baixando $asset_url ..." >&2
     if ! curl -fsSL -o "$tmp_pkg" "$asset_url"; then
         echo "ERRO: falha ao baixar o instalador do MacPorts." >&2
-        return
+        rm -f -- "$tmp_pkg"
+        return 1
     fi
 
     echo "Instalando MacPorts (pode pedir sua senha do macOS)..." >&2
@@ -365,7 +340,7 @@ install_deps_macports_ausente() {
     if ! sudo installer -pkg "$tmp_pkg" -target /; then
         echo "ERRO: instalação do MacPorts falhou (veja o motivo acima)." >&2
         rm -f "$tmp_pkg"
-        return
+        return 1
     fi
     rm -f "$tmp_pkg"
 
@@ -379,6 +354,7 @@ install_deps_macports_ausente() {
     else
         echo "AVISO: MacPorts instalado, mas 'port' não entrou no PATH desta sessão." >&2
         echo "Abra um terminal novo e rode este instalador de novo." >&2
+        return 1
     fi
 }
 
@@ -387,11 +363,27 @@ install_deps_manual() {
     echo "Instale manualmente antes de continuar:" >&2
     echo "  - gcc, make, pkg-config" >&2
     echo "  - glib dev, mariadb dev, readline dev" >&2
+    echo "  - libsodium dev, OpenSSL dev, glib-networking" >&2
+    return 1
 }
 
 # === Fluxo principal ===
+dependencies_only=false
+if [[ "${1:-}" == --dependencias-apenas ]]; then
+    dependencies_only=true; shift
+fi
+if [[ "${1:-}" == --sem-dependencias ]]; then
+    resp=n; shift
+else
+    read -r -p "Instalar dependências de compilação automaticamente? [S/n] " resp
+fi
+make_args=()
+if [[ "${1:-}" == --prefixo && -n "${2:-}" ]]; then
+    make_args+=("INSTALL_TOP=$2" "SUDO_OU_SU=")
+    shift 2
+fi
+[[ $# == 0 ]] || { echo "Argumentos inválidos." >&2; exit 2; }
 
-read -r -p "Instalar dependências de compilação automaticamente? [S/n] " resp
 resp=${resp:-S}
 
 case "$resp" in
@@ -411,10 +403,18 @@ case "$resp" in
             pacman)           install_deps_pacman ;;
             *)                install_deps_manual ;;
         esac
+        resultado=$?
+        [[ "$resultado" == 0 ]] || exit "$resultado"
         ;;
 esac
 
-$SUDO make instalar
+if [[ "$dependencies_only" == true ]]; then exit 0; fi
+
+# As dependências já foram tratadas acima, ainda como usuário normal. Não
+# execute `make` inteiro sob sudo: isso faria Homebrew rodar como root e
+# esconderia novamente o ponto de uma eventual espera. Cada alvo de instalação
+# eleva somente a cópia que realmente precisa escrever em /usr/local.
+make DEPENDENCIAS=0 "${make_args[@]}" instalar
 status=$?
 
 if [ "$status" -ne 0 ]; then
@@ -422,11 +422,4 @@ if [ "$status" -ne 0 ]; then
     exit "$status"
 fi
 
-if command -v santafé >/dev/null 2>&1; then
-    santafé
-elif [ -x /usr/local/bin/santafé ]; then
-    /usr/local/bin/santafé
-else
-    echo "AVISO: 'santafé' não foi encontrado no PATH após a instalação." >&2
-    echo "Verifique se /usr/local/bin está no seu PATH." >&2
-fi
+echo "Instalação concluída. Execute santafé para abrir o terminal ou santafé-sls no editor."

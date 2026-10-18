@@ -1,0 +1,42 @@
+-- Auditoria controlada da política DMARC do próprio domínio. A carta é
+-- inofensiva e informa se uma identidade Santafé sem SPF/DKIM foi aceita.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local porta = mat.paraInteiro(
+    so.obterVariável("TESTE_CORREIO_PORTA") ou "25")
+local destinatário = so.obterVariável("TESTE_CORREIO_DESTINATARIO") ou
+    "rafael@santafé.dev.br"
+local endereço = so.obterVariável("TESTE_CORREIO_ENDERECO") ou "127.0.0.1"
+local carta = garanta(correio.novaMensagem({
+    remetente = "identidade-falsa@santafé.dev.br",
+    destinatários = { destinatário },
+    assunto = "ENSAIO CONTROLADO: identidade Santafé sem autenticação",
+    texto = "Carta inofensiva para auditar SPF, DKIM e DMARC do domínio local."
+}))
+local cliente = garanta(correio.cliente({
+    endereço = endereço, porta = porta,
+    segurança = "nenhuma", nome = "auditoria-identidade.local",
+    tempoLimite = 15000
+}))
+
+local terminou = falso
+local recusada = falso
+local detalhe
+garanta(cliente:envieAssíncrono(carta, função(resultado, falha)
+    terminou = verdadeiro
+    recusada = resultado == nulo e falha ~= nulo e
+        falha:procure("550", 1, verdadeiro) ~= nulo e
+        falha:procure("5.7.1", 1, verdadeiro) ~= nulo
+    detalhe = falha
+    cliente:feche()
+    rede.pareLaço()
+fim))
+
+rede.laço()
+garanta(terminou, "o ensaio da identidade local não terminou")
+garanta(recusada,
+    "a identidade falsa do próprio domínio não recebeu SMTP 550 5.7.1: " ..
+        paraColar(detalhe))
+mostre("Identidade Santafé falsa recusada pelo SMTP: ok")

@@ -14,8 +14,8 @@
 #define FIRST_RESERVED	257
 
 
-#if !defined(LUA_ENV)
-#define LUA_ENV		"_ENV"
+#if !defined(SANTAFE_AMBIENTE)
+#define SANTAFE_AMBIENTE	"_AMBIENTE"
 #endif
 
 

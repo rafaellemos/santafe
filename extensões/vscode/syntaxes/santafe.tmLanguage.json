@@ -1,0 +1,133 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Santafé",
+  "scopeName": "source.santafe",
+  "patterns": [
+    {
+      "include": "#comentário-longo"
+    },
+    {
+      "include": "#comentário"
+    },
+    {
+      "include": "#gabarito"
+    },
+    {
+      "include": "#colar-longo"
+    },
+    {
+      "include": "#colar-simples"
+    },
+    {
+      "include": "#função"
+    },
+    {
+      "include": "#colar"
+    },
+    {
+      "include": "#número"
+    },
+    {
+      "include": "#palavra-reservada"
+    },
+    {
+      "include": "#constante"
+    },
+    {
+      "include": "#função-da-biblioteca"
+    },
+    {
+      "include": "#operador"
+    }
+  ],
+  "repository": {
+    "comentário-longo": {
+      "name": "comment.block.santafe",
+      "begin": "--\\[(=*)\\[",
+      "end": "\\]\\1\\]"
+    },
+    "comentário": {
+      "name": "comment.line.double-dash.santafe",
+      "match": "--.*$"
+    },
+    "colar": {
+      "name": "string.quoted.double.santafe",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.santafe",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "gabarito": {
+      "name": "string.quoted.other.gabarito.santafe",
+      "begin": "`",
+      "end": "`",
+      "patterns": [
+        {
+          "name": "constant.character.escape.santafe",
+          "match": "\\\\."
+        },
+        {
+          "name": "meta.interpolation.santafe",
+          "begin": "[®Ⓡ]\\{",
+          "end": "\\}",
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
+        }
+      ]
+    },
+    "número": {
+      "name": "constant.numeric.santafe",
+      "match": "(?<![[:alnum:]_])(?:0[xX][0-9A-Fa-f]+|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)(?![[:alnum:]_])"
+    },
+    "palavra-reservada": {
+      "name": "keyword.control.santafe",
+      "match": "(?<![\\p{L}\\p{M}\\p{N}_])(?:e|pare|início|senão|fim|falso|para|função|vápara|se|em|local|nulo|não|ou|repita|retorne|então|verdadeiro|até|enquanto)(?![\\p{L}\\p{M}\\p{N}_])"
+    },
+    "constante": {
+      "name": "variable.language.santafe",
+      "match": "(?<![\\p{L}\\p{M}\\p{N}_])_(?:AMBIENTE|VERSÃO)(?![\\p{L}\\p{M}\\p{N}_])"
+    },
+    "função": {
+      "match": "(?<![\\p{L}\\p{M}\\p{N}_])(função)\\s+([\\p{L}_][\\p{L}\\p{M}\\p{N}_]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.santafe"
+        },
+        "2": {
+          "name": "entity.name.function.santafe"
+        }
+      }
+    },
+    "função-da-biblioteca": {
+      "name": "support.function.santafe",
+      "match": "(?<![\\p{L}\\p{M}\\p{N}_])(?:mostre|tipo|tamanho|octetos|carregue|importe|garanta|proteja|paraNúmero|ipares|pares)(?![\\p{L}\\p{M}\\p{N}_])"
+    },
+    "operador": {
+      "name": "keyword.operator.santafe",
+      "match": "(?:\\+|-|\\*|/|//|%|\\^|==|~=|<=|>=|<|>|=|\\.\\.|#|~|&|\\||<<|>>)"
+    },
+    "colar-longo": {
+      "name": "string.quoted.other.long.santafe",
+      "begin": "\\[(=*)\\[",
+      "end": "\\]\\1\\]"
+    },
+    "colar-simples": {
+      "name": "string.quoted.single.santafe",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.santafe",
+          "match": "\\\\."
+        }
+      ]
+    }
+  }
+}

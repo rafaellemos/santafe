@@ -1,0 +1,111 @@
+-- Protocolo assíncrono INSTREAM entre Santafé e clamd, com motor simulado.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local rede = importe "rede"
+local Antivírus = importe "correio.antivírus"
+
+local porta = 18756
+local servidor = rede.servidorTCP()
+local finalizou = falso
+local sucesso = falso
+local mensagem = "teste do antivírus não terminou"
+local aceitas = {}
+
+local função inteiro32Grande(dados, posição)
+    local a, b, c, d = dados:byte(posição, posição + 3)
+    se não d então retorne nulo fim
+    retorne ((a * 256 + b) * 256 + c) * 256 + d
+fim
+
+local função termine(ok, detalhe)
+    se finalizou então retorne fim
+    finalizou = verdadeiro
+    sucesso = ok
+    mensagem = detalhe ou ""
+    para _, conexão em ipares(aceitas) início conexão:feche() fim
+    servidor:feche()
+    rede.pareLaço()
+fim
+
+local aceitar
+aceitar = função(servidorLocal, conexão, falha)
+    se falha então termine(falso, falha); retorne fim
+    aceitas[#aceitas + 1] = conexão
+    servidorLocal:aceiteAssíncrono(aceitar)
+    conexão:definaTempoLimite(3000)
+    local entrada = ""
+    local função leia()
+        conexão:recebaDadosAssíncrono(8192, função(c, dados, falhaDaLeitura)
+            se falhaDaLeitura ou não dados então
+                termine(falso, falhaDaLeitura ou "cliente encerrou cedo")
+                retorne
+            fim
+            entrada = entrada .. dados
+            se entrada:procure("zPING\0", 1, verdadeiro) == 1 então
+                c:envieAssíncrono("PONG\0", função() c:feche() fim)
+                retorne
+            fim
+            local posiçãoDoComando = entrada:procure("zINSTREAM\0", 1, verdadeiro)
+            se posiçãoDoComando ~= 1 então leia(); retorne fim
+            local posição = #"zINSTREAM\0" + 1
+            local conteúdo = ""
+            enquanto verdadeiro início
+                local tamanho = inteiro32Grande(entrada, posição)
+                se tamanho == nulo então leia(); retorne fim
+                posição = posição + 4
+                se tamanho == 0 então
+                    local resposta = conteúdo:procure("MALICIOSO", 1, verdadeiro) e
+                        "stream: Win.Teste-Santafe FOUND\0" ou "stream: OK\0"
+                    c:envieAssíncrono(resposta, função() c:feche() fim)
+                    retorne
+                fim
+                se #entrada < posição + tamanho - 1 então leia(); retorne fim
+                conteúdo = conteúdo .. entrada:corte(posição, posição + tamanho - 1)
+                posição = posição + tamanho
+            fim
+        fim)
+    fim
+    leia()
+fim
+
+garanta(servidor:amarre("127.0.0.1", porta))
+servidor:aceiteAssíncrono(aceitar)
+
+local verificador = garanta(Antivírus.novo({
+    endereço = "127.0.0.1", porta = porta,
+    tempoLimite = 3000, limite = 1024 * 1024, tamanhoDoBloco = 4096
+}))
+
+local iniciouConferência, falhaAoConferir = verificador:confiraAssíncrono(função(pronto, falha)
+    se não pronto então termine(falso, falha); retorne fim
+    local iniciouExameLimpo, falhaAoIniciarExameLimpo =
+        verificador:examineAssíncrono("carta limpa", função(resultadoLimpo, falhaLimpa)
+        se não resultadoLimpo ou falhaLimpa ou não resultadoLimpo.limpa então
+            termine(falso, falhaLimpa ou "conteúdo limpo foi recusado"); retorne
+        fim
+        local iniciouExameRuim, falhaAoIniciarExameRuim =
+            verificador:examineAssíncrono("anexo MALICIOSO", função(resultadoRuim, falhaRuim)
+            se falhaRuim ou não resultadoRuim ou resultadoRuim.limpa ou
+               resultadoRuim.ameaça ~= "Win.Teste-Santafe" então
+                termine(falso, falhaRuim ou "ameaça não foi reconhecida"); retorne
+            fim
+            termine(verdadeiro, "ok")
+        fim)
+        se não iniciouExameRuim então
+            termine(falso, falhaAoIniciarExameRuim ou
+                "o exame malicioso não informou que foi iniciado")
+        fim
+    fim)
+    se não iniciouExameLimpo então
+        termine(falso, falhaAoIniciarExameLimpo ou
+            "o exame limpo não informou que foi iniciado")
+    fim
+fim)
+garanta(iniciouConferência, falhaAoConferir ou
+    "a conferência não informou que foi iniciada")
+
+rede.laço()
+garanta(finalizou e sucesso, mensagem)
+mostre("Correio antivírus: ok")

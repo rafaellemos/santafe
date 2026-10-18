@@ -1,0 +1,48 @@
+-- Estados de falha, reinício, remoção e retenção limitada do PULSO/1.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+
+local pulso = importe "pulso"
+local memória = garanta(pulso.memória(2))
+local canal = garanta(pulso.novo({ serviço = "teste-limites" }))
+garanta(canal:adicioneDestino(memória))
+
+local operação = garanta(canal:operação("apliqueLimite", { limite = 10 }))
+local recusa = garanta(canal:recusa(
+    "limiteRecusado", operação.identificação,
+    { motivo = "política" }, { prioridade = "alta" }))
+garanta(recusa.correlação == operação.identificação)
+garanta(pulso.valide(recusa))
+
+-- O destino em memória conserva somente as duas mensagens mais recentes.
+garanta(canal:sinal("terceira", {}))
+garanta(#memória.mensagens == 2)
+garanta(memória.descartadas == 1)
+
+garanta(canal:removaDestino(memória))
+garanta(não canal:removaDestino(memória))
+garanta(canal:sinal("semDestino", {}))
+garanta(#memória.mensagens == 2)
+garanta(canal:despeje())
+
+local decodificador = garanta(pulso.novoDecodificador({
+    limiteMensagem = 4096,
+    limiteLote = 8192
+}))
+local mensagens, falha = decodificador:alimente("\0\0\0\1x")
+garanta(não mensagens e falha:procure("tamanho", 1, verdadeiro))
+garanta(não decodificador:alimente(""))
+
+decodificador:reinicie()
+garanta(decodificador:pendente() == 0)
+local quadro = garanta(pulso.codifique(recusa, 4096))
+local recebidas = garanta(decodificador:alimente(quadro))
+garanta(#recebidas == 1)
+garanta(recebidas[1].identificação == recusa.identificação)
+
+garanta(canal:feche())
+garanta(canal:feche())
+local depois, falhaDepois = canal:sinal("fechado", {})
+garanta(não depois e falhaDepois:procure("fechado", 1, verdadeiro))
+
+mostre("PULSO/1 limites: ok")

@@ -1,0 +1,106 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" ..
+    "bibs/bibc/arquivo/?.so;bibs/bibc/mariadb/?.so;" .. módulo.caminhoC
+
+local Multibanco = importe "correio.multibanco"
+
+local chamadas = {}
+local função repositório(nome)
+    local este = {}
+    função este.confiraEstrutura(_, tratador)
+        chamadas[#chamadas + 1] = nome .. ":estrutura"
+        tratador(verdadeiro, nulo)
+    fim
+    função este.autentiqueCaixa(_, identificador, _, _, tratador)
+        chamadas[#chamadas + 1] = nome .. ":autentique:" .. identificador
+        tratador({ usuário = identificador, caixa = {
+            id = 7, endereço = identificador
+        } }, nulo)
+    fim
+    função este.existeDestinatárioLocal(_, endereço, tratador)
+        chamadas[#chamadas + 1] = nome .. ":existe:" .. endereço
+        tratador(verdadeiro, nulo)
+    fim
+    função este.recebaSMTP(_, envelope, tratador)
+        chamadas[#chamadas + 1] = nome .. ":receba"
+        tratador(#envelope.destinatários, nulo)
+    fim
+    função este.listeMensagensIMAP(_, caixaId, pasta, tratador)
+        chamadas[#chamadas + 1] = nome .. ":liste:" .. caixaId
+        tratador({ pasta = pasta }, nulo)
+    fim
+    função este.removaMensagemIMAP(_, caixaId, mensagemId, tratador)
+        chamadas[#chamadas + 1] = nome .. ":remova:" .. caixaId ..
+            ":" .. mensagemId
+        tratador({ id = mensagemId }, nulo)
+    fim
+    função este.esvazieLixeira(_, caixaId, tratador)
+        chamadas[#chamadas + 1] = nome .. ":esvazie:" .. caixaId
+        tratador({ quantidade = 1, tacosLiberados = 10 }, nulo)
+    fim
+    função este.adicioneMensagemIMAP(_, caixa, _, _, _, tratador)
+        chamadas[#chamadas + 1] = nome .. ":anexe:" .. caixa.id
+        tratador({ uid = 1 }, nulo)
+    fim
+    função este.adicioneSaída(_, caixa, _, _, tratador)
+        chamadas[#chamadas + 1] = nome .. ":saída:" .. caixa.id
+        tratador({ fila = 1 }, nulo)
+    fim
+    retorne este
+fim
+
+local santafé = repositório("santafe")
+local secundário = repositório("secundario")
+local roteador = Multibanco.novo({
+    { chave = "santafe", domínioASCII = "xn--santaf-gva.dev.br",
+      repositório = santafé },
+    { chave = "secundario", domínioASCII = "xn--domnio-5va.example",
+      repositório = secundário }
+})
+
+garanta(roteador:chaveDoEndereço("rafael@santafé.dev.br") == "santafe")
+garanta(roteador:chaveDoEndereço("maria@domínio.example") == "secundario")
+garanta(roteador:chaveDoEndereço("fora@example.org") == nulo)
+
+local identidade
+roteador:autentiqueCaixa("maria@domínio.example", "senha", "isca",
+    função(valor, falha)
+        garanta(valor, falha)
+        identidade = valor
+    fim)
+garanta(identidade.bancoPostal == "secundario")
+garanta(identidade.caixa.id == "secundario:7")
+
+roteador:listeMensagensIMAP(identidade.caixa.id, "entrada",
+    função(valor, falha) garanta(valor, falha) fim)
+roteador:removaMensagemIMAP(identidade.caixa.id, 9,
+    função(valor, falha) garanta(valor e valor.id == 9, falha) fim)
+roteador:esvazieLixeira(identidade.caixa.id,
+    função(valor, falha) garanta(valor e valor.quantidade == 1, falha) fim)
+roteador:adicioneMensagemIMAP(identidade.caixa, "rascunhos", "MIME", {},
+    função(valor, falha) garanta(valor, falha) fim)
+roteador:adicioneSaída(identidade.caixa, {}, { tabela = "correio_fila" },
+    função(valor, falha) garanta(valor, falha) fim)
+
+roteador:recebaSMTP({
+    destinatários = { "maria@domínio.example" }
+}, função(valor, falha) garanta(valor == 1, falha) fim)
+
+local misturou, falhaDaMistura
+roteador:recebaSMTP({ destinatários = {
+    "rafael@santafé.dev.br", "maria@domínio.example"
+} }, função(valor, falha)
+    misturou, falhaDaMistura = valor, falha
+fim)
+garanta(misturou == nulo e falhaDaMistura:procure("misturar") ~= nulo)
+
+local registro = colar.junte("|", tabela.desempacote(chamadas))
+garanta(registro:procure("secundario:autentique:", 1, verdadeiro))
+garanta(registro:procure("secundario:liste:7", 1, verdadeiro))
+garanta(registro:procure("secundario:remova:7:9", 1, verdadeiro))
+garanta(registro:procure("secundario:esvazie:7", 1, verdadeiro))
+garanta(registro:procure("secundario:anexe:7", 1, verdadeiro))
+garanta(registro:procure("secundario:saída:7", 1, verdadeiro))
+garanta(registro:procure("secundario:receba", 1, verdadeiro))
+
+mostre("Correio com bancos isolados por domínio: ok")

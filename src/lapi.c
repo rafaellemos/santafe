@@ -1005,7 +1005,8 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
       /* get global table from registry */
       Table *reg = hvalue(&G(L)->l_registry);
       const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
-      /* set global table as 1st upvalue of 'f' (may be LUA_ENV) */
+      /* define a tabela global como primeiro valor externo de 'f'
+         (pode ser SANTAFE_AMBIENTE) */
       setobj(L, f->upvals[0]->v, gt);
       luaC_upvalbarrier(L, f->upvals[0]);
     }

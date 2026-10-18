@@ -1,0 +1,111 @@
+-- Depósito postal por conteúdo: durabilidade, binário e integridade.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/arquivo/?.so;bibs/bibc/segredo/?.so;" ..
+    "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local Depósito = importe "correio.depósito"
+local arquivo = importe "arquivo"
+local rede = importe "rede"
+
+local raiz = "/tmp/santafe-correio-objetos-" .. so.tempo() .. "-" .. so.aleatório()
+local depósito = garanta(Depósito.novo({ raiz = raiz, limite = 4096 }))
+local conteúdo = "Carta Santafé\0📬\r\n"
+local terminou = falso
+local sucesso = falso
+local detalhe = "teste não terminou"
+
+local função conclua(valor, falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = valor == verdadeiro
+    detalhe = falha ou ""
+    rede.pareLaço()
+fim
+
+depósito:prepareAssíncrono(função(preparou, falhaDaPreparação)
+    se não preparou então conclua(falso, falhaDaPreparação); retorne fim
+    depósito:graveAssíncrono(conteúdo, função(objeto, falhaDaGravação)
+        se não objeto então conclua(falso, falhaDaGravação); retorne fim
+        se #objeto.resumo ~= 64 ou objeto.tamanho ~= #conteúdo então
+            conclua(falso, "metadados do objeto divergiram"); retorne
+        fim
+        depósito:graveAssíncrono(conteúdo,
+            função(repetido, falhaDaRepetição)
+                se não repetido ou repetido.resumo ~= objeto.resumo então
+                    conclua(falso, falhaDaRepetição ou
+                        "conteúdo idêntico recebeu outro resumo")
+                    retorne
+                fim
+                depósito:leiaAssíncrono(objeto.resumo, objeto.tamanho,
+                    função(lido, falhaDaLeitura)
+                        se lido ~= conteúdo então
+                            conclua(falso, falhaDaLeitura ou
+                                "objeto binário divergiu")
+                            retorne
+                        fim
+                        local caminho = garanta(depósito:caminhoDoObjeto(objeto.resumo))
+                        local corrompido = colar.replique("x", #conteúdo)
+                        arquivo.graveDurávelAssíncrono(caminho, corrompido,
+                            função(corrompeu, falhaDaCorrupção)
+                                se não corrompeu então
+                                    conclua(falso, falhaDaCorrupção); retorne
+                                fim
+                                depósito:leiaAssíncrono(
+                                    objeto.resumo, objeto.tamanho,
+                                    função(indevido, falhaDaIntegridade)
+                                        se indevido ou não falhaDaIntegridade ou
+                                           não falhaDaIntegridade:procure(
+                                               "integridade", 1, verdadeiro) então
+                                            conclua(falso,
+                                                "corrupção do objeto não foi detectada")
+                                            retorne
+                                        fim
+                                        arquivo.removaAssíncrono(caminho,
+                                            função(_, falhaDaRemoção)
+                                                se falhaDaRemoção então
+                                                    conclua(falso, falhaDaRemoção)
+                                                    retorne
+                                                fim
+                                                local nível2 = caminho:separe("^(.*)/[^/]+$")
+                                                local nível1 = nível2:separe("^(.*)/[^/]+$")
+                                                arquivo.removaAssíncrono(nível2,
+                                                    função(_, falha2)
+                                                        se falha2 então
+                                                            conclua(falso, falha2); retorne
+                                                        fim
+                                                        arquivo.removaAssíncrono(nível1,
+                                                            função(_, falha1)
+                                                                se falha1 então
+                                                                    conclua(falso, falha1)
+                                                                    retorne
+                                                                fim
+                                                                arquivo.removaAssíncrono(
+                                                                    depósito.diretórioDosObjetos,
+                                                                    função(_, falhaDosObjetos)
+                                                                        se falhaDosObjetos então
+                                                                            conclua(falso,
+                                                                                falhaDosObjetos)
+                                                                            retorne
+                                                                        fim
+                                                                        arquivo.removaAssíncrono(
+                                                                            raiz,
+                                                                            função(_, falhaFinal)
+                                                                                conclua(
+                                                                                    não falhaFinal,
+                                                                                    falhaFinal)
+                                                                            fim)
+                                                                    fim)
+                                                            fim)
+                                                    fim)
+                                            fim)
+                                    fim)
+                            fim)
+                    fim)
+            fim)
+    fim)
+fim)
+
+rede.laço()
+garanta(terminou e sucesso, detalhe)
+mostre("Correio depósito: ok")

@@ -1,0 +1,67 @@
+-- Variantes com permissões e conservação do dado do tratador.
+
+módulo.caminhoC = "bibs/bibc/arquivo/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local arquivo = importe "arquivo"
+local rede = importe "rede"
+
+local raiz = "/tmp/santafe-arquivo-permissoes-" .. so.tempo() .. "-" ..
+    so.aleatório()
+local pasta = raiz .. "/objetos"
+local caminho = pasta .. "/carta.eml"
+local conteúdo = "Santafé\0arquivo assíncrono\n"
+local dado = { origem = "teste" }
+local terminou = falso
+local falhaFinal
+
+local função termine(falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    falhaFinal = falha
+    rede.pareLaço()
+fim
+
+arquivo.crieDiretóriosComPermissõesAssíncrono(
+    pasta, 488, -- 0750
+    função(criou, falha, dadoRecebido)
+        se não criou ou dadoRecebido ~= dado então
+            termine(falha ou "dado da criação divergiu")
+            retorne
+        fim
+        arquivo.graveDurávelComPermissõesAssíncrono(
+            caminho, conteúdo, 416, -- 0640
+            função(gravou, falhaDaGravação, dadoDaGravação)
+                se não gravou ou dadoDaGravação ~= dado então
+                    termine(falhaDaGravação ou
+                        "dado da gravação divergiu")
+                    retorne
+                fim
+                arquivo.leiaAssíncrono(caminho, 1024,
+                    função(lido, falhaDaLeitura, dadoDaLeitura)
+                        se lido ~= conteúdo ou dadoDaLeitura ~= dado então
+                            termine(falhaDaLeitura ou
+                                "leitura binária ou dado divergiu")
+                            retorne
+                        fim
+                        arquivo.removaAssíncrono(caminho, função(_, falha)
+                            se falha então termine(falha); retorne fim
+                            arquivo.removaAssíncrono(pasta,
+                                função(_, falhaDaPasta)
+                                    se falhaDaPasta então
+                                        termine(falhaDaPasta)
+                                        retorne
+                                    fim
+                                    arquivo.removaAssíncrono(raiz,
+                                        função(_, falhaDaRaiz)
+                                            termine(falhaDaRaiz)
+                                        fim)
+                                fim)
+                        fim)
+                    fim, dado)
+            fim, dado)
+    fim, dado)
+
+rede.laço()
+garanta(terminou e não falhaFinal, falhaFinal ou "teste não terminou")
+mostre("arquivo com permissões: ok")

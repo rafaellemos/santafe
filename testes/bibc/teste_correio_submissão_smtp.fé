@@ -1,0 +1,265 @@
+-- Regressões do contrato SMTP AUTH usado pela Agência.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local credencial = colar.base64("\0rafael\0segredo-correto")
+local identidade = {
+    usuário = "rafael",
+    endereço = "rafael@teste.local",
+    caixa = { endereço = "rafael@teste.local" }
+}
+local endereçoLegado = "=?utf-8?B?am9zw6k=?=@xn--santaf-gva.dev.br"
+local endereçoInternacional = "josé@santafé.dev.br"
+local endereçoInternacionalNoCaminho = '"josé"@santafé.dev.br'
+local recebidaInternacional
+
+local servidor = garanta(correio.servidor({
+    endereço = "127.0.0.1", porta = 18764,
+    nome = "agencia.teste.local", segurança = "nenhuma",
+    permitirAutenticaçãoSemTLS = verdadeiro,
+    exigirAutenticação = verdadeiro,
+    autentique = função(usuário, senha)
+        se usuário == "rafael" e senha == "segredo-correto" então
+            retorne identidade
+        fim
+        retorne falso
+    fim,
+    autorizeRemetente = função(recebida, remetente)
+        retorne recebida == identidade e remetente == identidade.endereço
+    fim,
+    autorize = função(_, destinatário)
+        retorne destinatário == endereçoInternacional
+    fim,
+    receba = função(mensagem)
+        recebidaInternacional = mensagem
+        retorne verdadeiro
+    fim
+}))
+
+local servidorDaSequência = garanta(correio.servidor({
+    endereço = "127.0.0.1", porta = 18765,
+    nome = "sequencia.teste.local", segurança = "nenhuma",
+    permitirAutenticaçãoSemTLS = verdadeiro,
+    autentique = função() retorne verdadeiro fim,
+    receba = função()
+        retorne nulo, {
+            tipo = "conteúdo-inválido",
+            mensagem = "cabeçalho de ensaio malformado"
+        }
+    fim
+}))
+garanta(servidor:inicie())
+garanta(servidorDaSequência:inicie())
+
+local terminou = falso
+local sucesso = falso
+local detalhe = "ensaio SMTP AUTH não terminou"
+
+local função diálogo(conexão)
+    local acumulado = ""
+    local este = {}
+
+    função este.leiaResposta(_, tratador)
+        local linhas = {}
+        local código
+        local função processe()
+            enquanto verdadeiro início
+                local fimDaLinha = acumulado:procure("\r\n", 1, verdadeiro)
+                se não fimDaLinha então
+                    conexão:recebaDadosAssíncrono(4096,
+                        função(_, dados, falha)
+                            se falha então tratador(nulo, falha); retorne fim
+                            acumulado = acumulado .. dados
+                            processe()
+                        fim)
+                    retorne
+                fim
+                local linha = acumulado:corte(1, fimDaLinha - 1)
+                acumulado = acumulado:corte(fimDaLinha + 2)
+                local atual = paraNúmero(linha:corte(1, 3))
+                se não atual então
+                    tratador(nulo, "resposta SMTP sem código")
+                    retorne
+                fim
+                código = código ou atual
+                linhas[#linhas + 1] = linha
+                se linha:corte(4, 4) == " " então
+                    tratador({ código = código, linhas = linhas })
+                    retorne
+                fim
+            fim
+        fim
+        processe()
+    fim
+
+    função este.comando(esta, texto, códigoEsperado, próximo)
+        conexão:envieAssíncrono(texto .. "\r\n",
+            função(_, _, falha)
+                se falha então próximo(falha); retorne fim
+                esta:leiaResposta(função(resposta, falhaDaResposta)
+                    se falhaDaResposta então próximo(falhaDaResposta); retorne fim
+                    se resposta.código ~= códigoEsperado então
+                        próximo("comando " .. texto .. " devolveu " ..
+                            resposta.código .. ", esperado " .. códigoEsperado)
+                        retorne
+                    fim
+                    próximo()
+                fim)
+            fim)
+    fim
+    retorne este
+fim
+
+local função encerre(falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = falha == nulo
+    detalhe = falha ou "ok"
+    servidor.receptor:feche()
+    servidorDaSequência:feche()
+fim
+
+local função testeSequência()
+    local cliente = rede.clienteTCP()
+    cliente:conecteAssíncrono("127.0.0.1", 18765,
+        função(_, conexão, falha)
+            se falha então encerre(falha); retorne fim
+            local smtp = diálogo(conexão)
+            smtp:leiaResposta(função(saudação, falhaDaSaudação)
+                se falhaDaSaudação ou saudação.código ~= 220 então
+                    encerre(falhaDaSaudação ou "saudação ausente"); retorne
+                fim
+                smtp:comando("EHLO cliente.local", 250, função(f1)
+                    se f1 então encerre(f1); retorne fim
+                    smtp:comando("MAIL FROM:<rafael@teste.local>", 250,
+                        função(f2)
+                            se f2 então encerre(f2); retorne fim
+                            smtp:comando("AUTH PLAIN " .. credencial, 503,
+                                função(f3)
+                                    se f3 então encerre(f3); retorne fim
+                                    smtp:comando("RSET", 250, função(f4)
+                                        se f4 então encerre(f4); retorne fim
+                                        smtp:comando(
+                                            "AUTH PLAIN " .. credencial, 235,
+                                            função(f5)
+                                                se f5 então encerre(f5); retorne fim
+                                                smtp:comando(
+                                                    "MAIL FROM:<rafael@teste.local>",
+                                                    250, função(f6)
+                                                        se f6 então
+                                                            encerre(f6); retorne
+                                                        fim
+                                                        smtp:comando(
+                                                            "RCPT TO:<ana@exemplo.net>",
+                                                            250, função(f7)
+                                                                se f7 então
+                                                                    encerre(f7); retorne
+                                                                fim
+                                                                smtp:comando("DATA", 354,
+                                                                    função(f8)
+                                                                        se f8 então
+                                                                            encerre(f8); retorne
+                                                                        fim
+                                                                        smtp:comando(
+                                                                            "From: rafael@teste.local\r\n" ..
+                                                                            "To: ana@exemplo.net\r\n" ..
+                                                                            "Subject: inválida\r\n\r\n" ..
+                                                                            "corpo\r\n.",
+                                                                            550, função(f9)
+                                                                                conexão:feche()
+                                                                                encerre(f9)
+                                                                            fim)
+                                                                    fim)
+                                                            fim)
+                                                    fim)
+                                            fim)
+                                    fim)
+                                fim)
+                        fim)
+                fim)
+            fim)
+        fim)
+fim
+
+local cliente = rede.clienteTCP()
+cliente:conecteAssíncrono("127.0.0.1", 18764,
+    função(_, conexão, falha)
+        se falha então encerre(falha); retorne fim
+        local smtp = diálogo(conexão)
+        smtp:leiaResposta(função(saudação, falhaDaSaudação)
+            se falhaDaSaudação ou saudação.código ~= 220 então
+                encerre(falhaDaSaudação ou "saudação ausente"); retorne
+            fim
+            smtp:comando("EHLO cliente.local", 250, função(f1)
+                se f1 então encerre(f1); retorne fim
+                smtp:comando("AUTH PLAIN", 334, função(f2)
+                    se f2 então encerre(f2); retorne fim
+                    smtp:comando(credencial, 235, função(f3)
+                        se f3 então encerre(f3); retorne fim
+                        smtp:comando("AUTH PLAIN " .. credencial, 503,
+                            função(f4)
+                                se f4 então encerre(f4); retorne fim
+                                smtp:comando(
+                                    "MAIL FROM:<falsa@teste.local>", 553,
+                                    função(f5)
+                                        se f5 então encerre(f5); retorne fim
+                                        smtp:comando(
+                                            "MAIL FROM:<rafael@teste.local> SMTPUTF8",
+                                            250, função(f6)
+                                                se f6 então encerre(f6); retorne
+                                                fim
+                                                smtp:comando(
+                                                    "RCPT TO:<" .. endereçoLegado .. ">",
+                                                    550, função(f7)
+                                                        se f7 então
+                                                            encerre(f7); retorne
+                                                        fim
+                                                        smtp:comando(
+                                                    "RCPT TO:<" ..
+                                                        endereçoInternacionalNoCaminho .. ">",
+                                                    250, função(f8)
+                                                        se f8 então
+                                                            encerre(f8); retorne
+                                                        fim
+                                                        smtp:comando("DATA", 354,
+                                                        função(f9)
+                                                            se f9 então
+                                                                encerre(f9); retorne
+                                                            fim
+                                                            smtp:comando(
+                                                                "From: rafael@teste.local\r\n" ..
+                                                                "To: " .. endereçoInternacional .. "\r\n" ..
+                                                                "Subject: Unicode direto\r\n\r\n" ..
+                                                                "corpo\r\n.",
+                                                                250, função(f10)
+                                                                    conexão:feche()
+                                                                    se f10 então
+                                                                        encerre(f10)
+                                                                        retorne
+                                                                    fim
+                                                                    garanta(
+                                                                        recebidaInternacional e
+                                                                        recebidaInternacional.destinatários[1] ==
+                                                                        endereçoInternacional,
+                                                                        "destinatário Unicode não chegou intacto ao envelope")
+                                                                    garanta(
+                                                                        recebidaInternacional.smtpUTF8,
+                                                                        "envelope Unicode não marcou SMTPUTF8")
+                                                                    testeSequência()
+                                                                fim)
+                                                        fim)
+                                                    fim)
+                                                    fim)
+                                            fim)
+                                    fim)
+                            fim)
+                    fim)
+                fim)
+            fim)
+        fim)
+    fim)
+
+rede.laço()
+garanta(terminou e sucesso, detalhe)
+mostre("Correio submissão SMTP: ok")

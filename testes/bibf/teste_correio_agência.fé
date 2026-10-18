@@ -1,0 +1,169 @@
+local Agência = importe "correio.agência"
+
+local caixa = {
+    id = 7,
+    endereço = "rafael@santafé.dev.br",
+    parteLocal = "rafael",
+    domínioASCII = "xn--santaf-gva.dev.br",
+    estado = "ativa"
+}
+local identidade = {
+    id = 3, usuário = "rafael", endereço = caixa.endereço, caixa = caixa
+}
+
+local repositório = {}
+função repositório.autentiqueCaixa(_, usuário, senha, resumoIsca, tratador)
+    garanta(resumoIsca == "resumo-isca")
+    se (usuário == "rafael" ou usuário == "rafael@santafé.dev.br") e
+       senha == "segredo-correto" então
+        tratador(identidade)
+    senão
+        tratador(nulo)
+    fim
+fim
+
+local postada
+local cd = {}
+função cd.posteCarta(_, caixaRecebida, mensagem, tratador)
+    local mime = garanta(mensagem:forme())
+    postada = {
+        caixa = caixaRecebida,
+        remetente = mensagem.remetente,
+        remetenteDaCópia = mensagem.remetenteDaCópia,
+        destinatários = mensagem:destinatários(),
+        mime = mime,
+        assunto = mensagem.assunto
+    }
+    tratador({ fila = 11, mensagem = 12 })
+fim
+
+local agência = garanta(Agência.nova({
+    repositório = repositório,
+    cd = cd,
+    resumoIsca = "resumo-isca"
+}))
+
+local autenticada
+agência:autentique("rafael@santafé.dev.br", "segredo-correto",
+    função(valor, falha)
+        garanta(falha == nulo)
+        autenticada = valor
+    fim)
+garanta(autenticada == identidade)
+
+local aceito
+agência:autorizeRemetente(identidade, "rafael@xn--santaf-gva.dev.br",
+    função(valor) aceito = valor fim)
+garanta(aceito == verdadeiro,
+    "a forma Punycode da caixa autenticada foi recusada")
+agência:autorizeRemetente(identidade, "outra@santafé.dev.br",
+    função(valor) aceito = valor fim)
+garanta(aceito == falso,
+    "a Agência permitiu enviar em nome de outra caixa")
+
+local endereçoLegado = "=?utf-8?B?am9zw6k=?=@xn--santaf-gva.dev.br"
+local aceitouLegado, falhaLegada
+agência:autorizeDestinatário(identidade, caixa.endereço, endereçoLegado,
+    função(valor, falha)
+        aceitouLegado, falhaLegada = valor, falha
+    fim)
+garanta(aceitouLegado == falso e falhaLegada == "destinatário inválido",
+    "a Agência aceitou palavra MIME no endereço do destinatário")
+
+agência:autorizeDestinatário(identidade, caixa.endereço,
+    "=?utf-8?Q?jos=C3=A9?=@xn--santaf-gva.dev.br",
+    função(valor, falha)
+        aceitouLegado, falhaLegada = valor, falha
+    fim)
+garanta(aceitouLegado == falso e falhaLegada == "destinatário inválido",
+    "a Agência aceitou palavra MIME Q no endereço do destinatário")
+
+agência:autorizeDestinatário(identidade, caixa.endereço,
+    "josé@santafé.dev.br", função(valor, falha)
+        aceitouLegado, falhaLegada = valor, falha
+    fim)
+garanta(aceitouLegado == verdadeiro e falhaLegada == nulo,
+    "a Agência recusou um destinatário SMTPUTF8 válido")
+
+local identidadeInternacional = {
+    caixa = { endereço = "josé@santafé.dev.br" }
+}
+agência:autorizeRemetente(identidadeInternacional, endereçoLegado,
+    função(valor, falha)
+        aceitouLegado, falhaLegada = valor, falha
+    fim)
+garanta(aceitouLegado == falso e
+    falhaLegada:procure("não pertence", 1, verdadeiro),
+    "a Agência aceitou palavra MIME no endereço do remetente")
+
+agência:autorizeDestinatário(identidade, caixa.endereço,
+    "=?iso-8859-1?Q?jos=E9?=@xn--santaf-gva.dev.br",
+    função(valor) aceitouLegado = valor fim)
+garanta(aceitouLegado == falso,
+    "a Agência aceitou uma codificação legada fora de UTF-8")
+
+local mime = "From: Rafael <rafael@santafé.dev.br>\r\n" ..
+    "To: ana@example.net\r\n" ..
+    "Subject: Submissão autenticada\r\n" ..
+    "Message-ID: <agencia@santafé.dev.br>\r\n" ..
+    "Content-Type: text/plain; charset=utf-8\r\n\r\n" ..
+    "Olá pela Agência.\r\n"
+local resultado
+agência:receba({
+    remetente = "rafael@santafé.dev.br",
+    destinatários = { "ana@example.net" },
+    conteúdo = mime,
+    identidade = identidade,
+    smtpUTF8 = verdadeiro
+}, função(valor, falha)
+    garanta(falha == nulo)
+    resultado = valor
+fim)
+garanta(resultado e resultado.fila == 11)
+garanta(postada.caixa == caixa e postada.mime == mime)
+garanta(postada.remetente == "rafael@santafé.dev.br")
+garanta(postada.remetenteDaCópia == caixa.endereço)
+
+local recusouCabeçalho = falso
+agência:receba({
+    remetente = "rafael@santafé.dev.br",
+    destinatários = { "ana@example.net" },
+    conteúdo = mime:troque("rafael@santafé.dev.br", "falsa@example.org", 1),
+    identidade = identidade,
+    smtpUTF8 = verdadeiro
+}, função(valor, falha)
+    local mensagem = tipo(falha) == "tabela" e falha.mensagem ou falha
+    recusouCabeçalho = valor == nulo e
+        falha.tipo == "autorização-rejeitada" e
+        mensagem:procure("cabeçalho From", 1, verdadeiro) ~= nulo
+fim)
+garanta(recusouCabeçalho,
+    "a Agência aceitou um autor visível alheio à conta autenticada")
+
+local função recuseMIME(conteúdo, trechoEsperado)
+    local recusou = falso
+    agência:receba({
+        remetente = "rafael@santafé.dev.br",
+        destinatários = { "ana@example.net" },
+        conteúdo = conteúdo,
+        identidade = identidade,
+        smtpUTF8 = verdadeiro
+    }, função(valor, falha)
+        local mensagem = tipo(falha) == "tabela" e falha.mensagem ou falha
+        recusou = valor == nulo e tipo(falha) == "tabela" e
+            falha.tipo == "conteúdo-inválido" e mensagem e
+            mensagem:procure(trechoEsperado, 1, verdadeiro) ~= nulo
+    fim)
+    garanta(recusou, "a Agência aceitou MIME irrecuperável: " ..
+        trechoEsperado)
+fim
+
+recuseMIME(mime:troque("ana@example.net", "jos�@santafé.dev.br"),
+    "perdeu caracteres Unicode")
+recuseMIME(mime:troque("ana@example.net", endereçoLegado),
+    "codificação MIME dentro do endereço")
+recuseMIME(mime:troque("<agencia@santafé.dev.br>",
+    "<=?utf-8?B?YWdlbmNpYQ==?=@santafé.dev.br>"),
+    "Message-ID")
+
+mostre("Correio Agência: ok")

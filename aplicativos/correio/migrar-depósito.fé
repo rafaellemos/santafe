@@ -1,0 +1,145 @@
+#!/usr/local/bin/santafé
+
+-- Migra, de forma retomável, os LONGBLOBs postais da estrutura v1 para o
+-- depósito imutável da estrutura v2. Execute uma única instância por vez.
+
+local raiz = so.obterVariável("CORREIO_RAIZ") ou "aplicativos/correio"
+módulo.caminho = raiz .. "/fonte/?.fé;" .. raiz .. "/fonte/?/ini.fé;" ..
+    módulo.caminho
+
+local rede = importe "rede"
+local mariadb = importe "mariadb"
+local Depósito = importe "correio.depósito"
+local configuração = (importe "correio.configuração").carregue()
+
+garanta(configuração.banco.usuário,
+    "SANTAFE_MARIADB_USUARIO não foi definida")
+garanta(configuração.banco.banco,
+    "SANTAFE_MARIADB_BANCO não foi definida")
+
+local depósito = garanta(Depósito.novo(configuração.depósito))
+local piscina
+
+local função feche(resultado)
+    se resultado e tipo(resultado.feche) == "função" então resultado:feche() fim
+fim
+
+local função termineComFalha(mensagem)
+    mostre("[Migração postal] FALHOU:", mensagem)
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+    so.saia(1)
+fim
+
+local função execute(sql, parâmetros, tratador)
+    retorne piscina:executePreparadoAssíncrono(sql, parâmetros,
+        função(_, resultado, falha) tratador(resultado, falha) fim)
+fim
+
+local migrações = {
+    {
+        nome = "cartas",
+        selecione = [[SELECT id,mime FROM correio_cartas
+WHERE mime_objeto IS NULL AND mime IS NOT NULL ORDER BY id LIMIT 1]],
+        atualize = [[UPDATE correio_cartas SET mime_objeto=?,mime=NULL
+WHERE id=? AND mime_objeto IS NULL]]
+    },
+    {
+        nome = "anexos",
+        selecione = [[SELECT id,dados FROM correio_anexos
+WHERE dados_objeto IS NULL AND dados IS NOT NULL ORDER BY id LIMIT 1]],
+        atualize = [[UPDATE correio_anexos SET dados_objeto=?,dados=NULL
+WHERE id=? AND dados_objeto IS NULL]]
+    },
+    {
+        nome = "fila",
+        selecione = [[SELECT id,conteudo FROM correio_fila
+WHERE conteudo_objeto IS NULL AND conteudo IS NOT NULL ORDER BY id LIMIT 1]],
+        atualize = [[UPDATE correio_fila SET conteudo_objeto=?,conteudo=NULL
+WHERE id=? AND conteudo_objeto IS NULL]]
+    }
+}
+
+local função migreGrupo(índice, conclua)
+    local migração = migrações[índice]
+    se não migração então conclua(); retorne fim
+    local total = 0
+
+    local função próximo()
+        execute(migração.selecione, {}, função(resultado, falha)
+            se falha então feche(resultado); termineComFalha(falha); retorne fim
+            local linha = resultado e resultado:obterLinha() ou nulo
+            feche(resultado)
+            se não linha então
+                mostre("[Migração postal]", migração.nome,
+                    total, "registro(s) migrado(s)")
+                migreGrupo(índice + 1, conclua)
+                retorne
+            fim
+            local id, conteúdo = paraNúmero(linha[1]), linha[2]
+            se não id ou tipo(conteúdo) ~= "colar" então
+                termineComFalha("registro legado inválido em " ..
+                    migração.nome)
+                retorne
+            fim
+            depósito:graveAssíncrono(conteúdo,
+                função(objeto, falhaDoDepósito)
+                    se não objeto então
+                        termineComFalha(falhaDoDepósito); retorne
+                    fim
+                    execute(migração.atualize, { objeto.resumo, id },
+                        função(atualização, falhaDaAtualização)
+                            se falhaDaAtualização então
+                                feche(atualização)
+                                termineComFalha(falhaDaAtualização)
+                                retorne
+                            fim
+                            local alteradas = atualização:linhasAfetadas()
+                            feche(atualização)
+                            -- Zero indica que outra instância concluiu a mesma
+                            -- linha entre a leitura e a atualização.
+                            se alteradas == 1 então total = total + 1 fim
+                            se total > 0 e total % 100 == 0 então
+                                mostre("[Migração postal]",
+                                    migração.nome, total)
+                            fim
+                            próximo()
+                        fim)
+                fim)
+        fim)
+    fim
+
+    próximo()
+fim
+
+mariadb.criePiscinaAssíncrona(configuração.banco,
+    função(novaPiscina, falhaDaPiscina)
+        se não novaPiscina então termineComFalha(falhaDaPiscina); retorne fim
+        piscina = novaPiscina
+        execute([[SELECT versao FROM correio_migracoes
+WHERE componente='correio' ORDER BY versao DESC LIMIT 1]], {},
+            função(resultado, falhaDaEstrutura)
+                se falhaDaEstrutura então
+                    feche(resultado); termineComFalha(falhaDaEstrutura); retorne
+                fim
+                local linha = resultado e resultado:obterLinha() ou nulo
+                feche(resultado)
+                se não linha ou paraNúmero(linha[1]) ~= 2 então
+                    termineComFalha("aplique banco/migracao-2-deposito.sql")
+                    retorne
+                fim
+                depósito:prepareAssíncrono(função(preparou, falhaDoDepósito)
+                    se não preparou então
+                        termineComFalha(falhaDoDepósito); retorne
+                    fim
+                    migreGrupo(1, função()
+                        mostre("[Migração postal] concluída")
+                        piscina:feche()
+                        piscina = nulo
+                        rede.pareLaço()
+                    fim)
+                fim)
+            fim)
+    fim)
+
+rede.laço()

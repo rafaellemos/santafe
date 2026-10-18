@@ -1,0 +1,50 @@
+-- Uma recusa DMARC devolvida pelo CD torna-se uma resposta SMTP 550.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local recebimentoChamado = falso
+local servidor = garanta(correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 18758,
+    nome = "smtp.teste.local",
+    domíniosLocais = { "teste.local" },
+    receba = função(_, conclua)
+        recebimentoChamado = verdadeiro
+        conclua(nulo, {
+            tipo = "autenticação-rejeitada",
+            mensagem = "DMARC recusou o uso de exemplo.org"
+        })
+    fim
+})
+garanta(servidor:inicie())
+
+local carta = garanta(correio.novaMensagem {
+    remetente = "falsa@exemplo.org",
+    destinatários = { "ana@teste.local" },
+    texto = "conteúdo falsificado"
+})
+local cliente = garanta(correio.cliente {
+    endereço = "127.0.0.1", porta = 18758,
+    segurança = "nenhuma", nome = "cliente.teste.local"
+})
+local terminou = falso
+local rejeitou = falso
+garanta(cliente:envieAssíncrono(carta, função(resultado, falha)
+    terminou = verdadeiro
+    rejeitou = não resultado e falha ~= nulo e
+        falha:procure("550", 1, verdadeiro) ~= nulo e
+        falha:procure("5.7.1", 1, verdadeiro) ~= nulo
+    cliente:feche()
+    servidor:feche()
+fim))
+
+rede.laço()
+garanta(terminou e rejeitou,
+    "servidor SMTP não devolveu recusa permanente 550 5.7.1")
+garanta(recebimentoChamado,
+    "o ensaio não atravessou a fronteira de recebimento esperada")
+mostre("Correio autenticação SMTP: ok")

@@ -1,0 +1,36 @@
+-- Teste opcional: exige acesso UDP/TCP à porta 53 da Internet.
+-- Não faz parte de `make testar`, pois redes corporativas podem bloqueá-lo.
+
+local nomes = importe "nomes"
+local móduloResolvedor = importe "nomes.resolvedor"
+local rede = importe "rede"
+
+local resolvedor = garanta(móduloResolvedor.novo({
+    tempoLimite = 1800, tentativas = 2
+}))
+local terminou = falso
+local funcionou = falso
+
+garanta(resolvedor:resolva("example.com", "A",
+    função(resultado, falha)
+        terminou = verdadeiro
+        garanta(resultado, falha)
+        para _, registro em ipares(resultado.respostas ou {}) início
+            se registro.tipo == nomes.TIPOS.A então
+                mostre(registro.nome, registro.dados)
+                funcionou = verdadeiro
+            fim
+        fim
+        resolvedor:feche()
+        rede.pareLaço()
+    fim))
+
+rede.agende(15000, função()
+    se não terminou então
+        resolvedor:feche()
+        rede.pareLaço()
+    fim
+fim)
+rede.laço()
+garanta(terminou e funcionou, "resolução DNS pela hierarquia pública falhou")
+mostre("nomes Internet iterativo: ok")

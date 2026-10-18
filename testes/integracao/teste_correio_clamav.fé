@@ -1,0 +1,49 @@
+-- Ensaio real opcional contra clamd em 127.0.0.1:3310.
+
+local rede = importe "rede"
+local Antivírus = importe "correio.antivírus"
+
+local verificador = garanta(Antivírus.novo {
+    endereço = so.obterVariável("CORREIO_ANTIVIRUS_ENDERECO") ou "127.0.0.1",
+    porta = paraNúmero(so.obterVariável("CORREIO_ANTIVIRUS_PORTA")) ou 3310,
+    tempoLimite = 120000,
+    limite = 1024 * 1024
+})
+
+local terminou = falso
+local sucesso = falso
+local detalhe = "ensaio do ClamAV não terminou"
+local função conclua(ok, mensagem)
+    terminou = verdadeiro
+    sucesso = ok
+    detalhe = mensagem ou ""
+    rede.pareLaço()
+fim
+
+verificador:confiraAssíncrono(função(pronto, falha)
+    se não pronto então conclua(falso, falha); retorne fim
+    verificador:examineAssíncrono("Carta Santafé limpa.",
+        função(limpa, falhaLimpa)
+            se não limpa ou falhaLimpa ou não limpa.limpa então
+                conclua(falso, falhaLimpa ou "texto limpo foi recusado")
+                retorne
+            fim
+            -- Partes separadas evitam guardar a assinatura de teste inteira
+            -- no próprio arquivo-fonte.
+            local eicar = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$" ..
+                "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+            verificador:examineAssíncrono(eicar,
+                função(resultado, falhaRuim)
+                    se falhaRuim ou não resultado ou resultado.limpa então
+                        conclua(falso, falhaRuim ou
+                            "assinatura EICAR não foi reconhecida")
+                        retorne
+                    fim
+                    conclua(verdadeiro, resultado.ameaça)
+                fim)
+        fim)
+fim)
+
+rede.laço()
+garanta(terminou e sucesso, detalhe)
+mostre("ClamAV real:", detalhe)

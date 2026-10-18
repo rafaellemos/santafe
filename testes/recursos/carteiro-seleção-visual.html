@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ensaio visual da seleção do Carteiro</title>
+  <link href="/aplicativos/carteiro/estático/css/carteiro.css?v=18" rel="stylesheet">
+  <style>
+    [type="checkbox"]:not(:checked),[type="checkbox"]:checked{position:absolute;opacity:0;pointer-events:none}
+    [type="checkbox"]+label{position:relative;padding-left:35px;cursor:pointer;display:inline-block;height:25px;line-height:25px}
+    [type="checkbox"]+label:before{content:"";position:absolute;top:0;left:0;width:18px;height:18px;border:2px solid #5a5a5a;border-radius:1px;margin-top:2px;transition:.2s}
+    [type="checkbox"]:checked+label:before{top:-4px;left:-5px;width:12px;height:22px;border-top:2px solid transparent;border-left:2px solid transparent;border-right:2px solid #26a69a;border-bottom:2px solid #26a69a;transform:rotate(40deg);transform-origin:100% 100%}
+    .material-icons{font:700 11px/1 Arial,sans-serif;letter-spacing:-.5px}
+  </style>
+</head>
+<body>
+  <header class="carteiro-topo" style="background:#00695c">
+    <a class="carteiro-marca" href="#"><strong>Correio</strong><small>Santafé</small></a>
+    <div class="carteiro-conta"><span><strong>Rafael</strong><small>rafael@santafé.dev.br</small></span></div>
+  </header>
+  <div class="carteiro-corpo">
+    <aside class="carteiro-lateral"><a class="carteiro-nova" href="#">Nova mensagem</a><nav>
+      <a class="carteiro-pasta ativo" href="#">Entrada</a><a class="carteiro-pasta" href="#">Enviadas</a><a class="carteiro-pasta" href="#">Lixeira</a><a class="carteiro-pasta" href="#"><i class="material-icons">mail_outline</i>Todas</a>
+    </nav></aside>
+    <main class="carteiro-conteúdo">
+      <section class="carteiro-cabeçalho-lista"><div><h1>Entrada</h1><p>200 mensagens</p></div></section>
+      <form class="carteiro-seleção-em-lote" action="#" method="POST" data-seleção-em-lote>
+        <input type="hidden" name="escopo" value="pagina" data-escopo-seleção>
+        <input type="hidden" name="acao" value="" data-acao-lote>
+        <div class="carteiro-barra-postal">
+          <div class="carteiro-ferramentas">
+            <div class="carteiro-seletor-menu">
+              <input id="carteiro-selecionar-todas" type="checkbox" data-selecionar-todas><label for="carteiro-selecionar-todas" aria-label="Selecionar todas"></label>
+              <details class="carteiro-menu"><summary aria-label="Opções de seleção"><i class="material-icons">arrow_drop_down</i></summary><div class="carteiro-menu-conteúdo">
+                <button type="button" data-selecionar="todas">Todas</button><button type="button" data-selecionar="nenhuma">Nenhuma</button><button type="button" data-selecionar="lidas">Lidas</button><button type="button" data-selecionar="não-lidas">Não lidas</button>
+              </div></details>
+            </div>
+            <a class="carteiro-botão-ícone" href="#" aria-label="Atualizar"><i class="material-icons">refresh</i></a>
+            <div class="carteiro-ações-selecionadas" data-ações-selecionadas hidden>
+              <button class="carteiro-botão-ícone" type="button" data-executar-acao value="arquivar" title="Arquivar" aria-label="Arquivar"><i class="material-icons">archive</i></button>
+              <button class="carteiro-botão-ícone" type="button" data-executar-acao value="indesejada" title="Indesejada" aria-label="Marcar como indesejada"><i class="material-icons">report</i></button>
+              <button class="carteiro-botão-ícone" type="button" data-executar-acao value="excluir" title="Descartar" aria-label="Descartar na Lixeira"><i class="material-icons">delete</i></button>
+              <details class="carteiro-menu carteiro-menu-ações"><summary class="carteiro-botão-ícone" aria-label="Ações das cartas selecionadas"><i class="material-icons">more_vert</i></summary><div class="carteiro-menu-conteúdo"><button type="button" data-executar-acao value="lida"><i class="material-icons">drafts</i>Marcar como lida</button><button type="button" data-executar-acao value="não-lida"><i class="material-icons">markunread</i>Marcar como não lida</button><button type="button" data-executar-acao value="arquivar"><i class="material-icons">archive</i>Arquivar</button><button type="button" data-executar-acao value="excluir"><i class="material-icons">delete</i>Descartar</button><button type="button" data-executar-acao value="indesejada"><i class="material-icons">report</i>Indesejada</button></div></details>
+            </div>
+          </div>
+          <div class="carteiro-controle-página"><span>1–50 de 200</span><span class="carteiro-botão-ícone desativado"><i class="material-icons">chevron_left</i></span><a class="carteiro-botão-ícone" href="#"><i class="material-icons">chevron_right</i></a></div>
+        </div>
+        <div class="carteiro-seleção-global" data-seleção-global data-total="200" data-pasta="Entrada" hidden><span data-aviso-página>Todas as 3 conversas nesta página estão selecionadas.</span> <button type="button" data-selecionar-escopo>Selecionar todas as 200 conversas em Entrada</button><span data-aviso-total hidden>Todas as 200 conversas em Entrada estão selecionadas.</span> <button type="button" data-limpar-escopo hidden>Limpar seleção</button></div>
+        <section class="carteiro-lista">
+          <div class="carteiro-linha não-lida"><input id="carteiro-carta-1" type="checkbox" data-carta data-lida="falso"><label class="carteiro-seletor-item" for="carteiro-carta-1" aria-label="Selecionar carta"></label><a class="carteiro-item não-lida" href="#"><span class="carteiro-item-remetente">remetente-muito-comprido@subdomínio-muito-comprido.exemplo.org</span><span class="carteiro-item-assunto"><strong>Pedido recebido com assunto longo para comprovar a contenção</strong><small>Confirmação da sua solicitação.</small></span><span class="carteiro-item-data">06/09/2026 10:20</span></a></div>
+          <div class="carteiro-linha"><input id="carteiro-carta-2" type="checkbox" data-carta data-lida="verdadeiro"><label class="carteiro-seletor-item" for="carteiro-carta-2" aria-label="Selecionar carta"></label><a class="carteiro-item" href="#"><span class="carteiro-item-remetente">jose@santafé.dev.br</span><span class="carteiro-item-assunto"><strong>Teste do Carteiro</strong><small>A carta chegou corretamente.</small></span><span class="carteiro-item-data">06/09/2026 09:05</span></a></div>
+          <div class="carteiro-linha"><input id="carteiro-carta-3" type="checkbox" data-carta data-lida="verdadeiro"><label class="carteiro-seletor-item" for="carteiro-carta-3" aria-label="Selecionar carta"></label><a class="carteiro-item" href="#"><span class="carteiro-item-remetente">postmaster@google.com</span><span class="carteiro-item-assunto"><strong>Relatório DMARC</strong><small>Relatório agregado disponível.</small></span><span class="carteiro-item-data">05/09/2026 07:14</span></a></div>
+        </section>
+        <output data-resultado-teste hidden></output>
+      </form>
+    </main>
+  </div>
+  <script>
+    window.confirm = function () { return true; };
+    document.querySelector("[data-seleção-em-lote]").addEventListener("submit", function (evento) {
+      evento.preventDefault();
+      this.dataset.ultimaAcao = this.querySelector("[data-acao-lote]").value;
+      const saída = this.querySelector("[data-resultado-teste]");
+      saída.hidden = false;
+      saída.textContent = "Ação: " + this.dataset.ultimaAcao;
+    });
+  </script>
+  <script src="/aplicativos/carteiro/estático/js/carteiro.js?v=12"></script>
+</body>
+</html>

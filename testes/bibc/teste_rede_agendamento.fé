@@ -1,0 +1,14 @@
+local rede = importe "rede"
+local chamado = falso
+local agendamento = rede.agende(10, função(este, dado)
+    chamado = não este:ativo() e dado == "ok"
+    rede.pareLaço()
+fim, "ok")
+garanta(agendamento:ativo())
+rede.laço()
+garanta(chamado)
+
+local cancelado = rede.agende(1000, função() erro("não deveria executar") fim)
+garanta(cancelado:cancele())
+garanta(não cancelado:ativo())
+mostre("rede agendamento: ok")

@@ -1,0 +1,28 @@
+-- Contrato do vocabulário fundamental e do ambiente léxico.
+
+garanta(tipo(verdadeiro) == "lógico")
+garanta(tipo(falso) == "lógico")
+
+garanta(mat.tipo(3) == "inteiro")
+garanta(mat.tipo(3.0) == "flutuante")
+garanta(mat.tipo(verdadeiro) == nulo)
+
+local globais = _G
+local ambiente = {
+    garanta = garanta,
+    valorDoAmbiente = 42
+}
+
+início
+    local _AMBIENTE = ambiente
+    garanta(valorDoAmbiente == 42)
+    valorDoAmbiente = 84
+fim
+
+globais.garanta(ambiente.valorDoAmbiente == 84)
+
+-- _ENV deixou de ter significado especial e pode ser uma variável comum.
+local _ENV = "nome comum"
+garanta(_ENV == "nome comum")
+
+mostre("Linguagem: lógico e _AMBIENTE ok")

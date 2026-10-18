@@ -23,6 +23,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lunicode.h"
 
 
 
@@ -56,9 +57,14 @@
 
 
 static int str_len (lua_State *L) {
-  size_t l;
-  luaL_checklstring(L, 1, &l);
-  lua_pushinteger(L, (lua_Integer)l);
+  size_t length;
+  size_t graphemes;
+  size_t invalid;
+  const char *s = luaL_checklstring(L, 1, &length);
+  if (!luaU_graphemes(s, length, &graphemes, &invalid))
+    return luaL_error(L, "colar UTF-8 inv\xC3\xA1lido no taco %d; use octetos para dados bin\xC3\xA1rios",
+                      (int)invalid);
+  lua_pushinteger(L, (lua_Integer)graphemes);
   return 1;
 }
 
@@ -1779,13 +1785,15 @@ static int str_unbase64 (lua_State *L) {
 static int str_join (lua_State *L) {
   int n = lua_gettop(L);
   if (n < 2) return luaL_error(L, "esperados um separador e pelo menos um colar");
-  const char *sep = luaL_checkstring(L, 1);
+  size_t sep_length;
+  const char *sep = luaL_checklstring(L, 1, &sep_length);
   luaL_Buffer b;
   luaL_buffinit(L, &b);
   int i;
   for (i = 2; i <= n; i++) {
-    luaL_addvalue(&b); /* Adiciona o argumento à pilha */
-    if (i < n) luaL_addstring(&b, sep);
+    lua_pushvalue(L, i); /* conserva a ordem recebida: 2, 3, ... n */
+    luaL_addvalue(&b);
+    if (i < n) luaL_addlstring(&b, sep, sep_length);
   }
   luaL_pushresult(&b);
   return 1;
@@ -1817,38 +1825,72 @@ static int str_compress_raw (lua_State *L) {
     return 1;
 }
 
+/*
+** Limite padrão para impedir que dados zlib não confiáveis reservem memória
+** sem limite. Quem processa um arquivo maior precisa declarar o teto na
+** chamada de 'descompacte'.
+*/
+#define SANTAFE_DESCOMPACTE_LIMITE_PADRAO ((size_t)64 * 1024 * 1024)
+
+
+static size_t limite_descompactacao (lua_State *L) {
+    lua_Integer limite = luaL_optinteger(L, 2,
+                                         (lua_Integer)SANTAFE_DESCOMPACTE_LIMITE_PADRAO);
+    luaL_argcheck(L, limite > 0, 2, "limite positivo esperado");
+    luaL_argcheck(L, (lua_Unsigned)limite <= (lua_Unsigned)MAX_SIZET, 2,
+                  "limite grande demais");
+    return (size_t)limite;
+}
+
+
 /* DESCOMPACTAR: binário Zlib -> colar original */
 static int str_decompress_raw (lua_State *L) {
     size_t l;
+    size_t limite;
+    size_t capacidade;
     const char *s = luaL_checklstring(L, 1, &l);
+    limite = limite_descompactacao(L);
 
-    /* Chute inicial: 4x o tamanho comprimido */
-    uLongf destLen = l * 4;
-    if (destLen < 1024) destLen = 1024;
+    if (l > (size_t)(~(uLong)0))
+        return luaL_error(L, "dados compactados grandes demais");
+    if (limite > (size_t)(~(uLongf)0))
+        return luaL_argerror(L, 2, "limite grande demais para zlib");
 
-    unsigned char *dest = (unsigned char *)malloc(destLen);
+    /* Chute inicial: 4x o tamanho comprimido, sempre respeitando o teto. */
+    capacidade = (l > limite / 4) ? limite : l * 4;
+    if (capacidade < 1024)
+        capacidade = (limite < 1024) ? limite : 1024;
+
+    unsigned char *dest = (unsigned char *)malloc(capacidade);
     if (dest == NULL) return luaL_error(L, "mem\xC3\xB3ria insuficiente");
 
-    /* Loop para tentar descompactar. Se o buffer for pequeno, dobramos e tentamos de novo */
-    int res = uncompress(dest, &destLen, (const unsigned char *)s, l);
+    for (;;) {
+        uLongf tamanho_destino = (uLongf)capacidade;
+        int res = uncompress(dest, &tamanho_destino,
+                             (const unsigned char *)s, (uLong)l);
 
-    while (res == Z_BUF_ERROR) {
+        if (res == Z_OK) {
+            lua_pushlstring(L, (char *)dest, (size_t)tamanho_destino);
+            free(dest);
+            return 1;
+        }
+
+        if (res != Z_BUF_ERROR) {
+            free(dest);
+            return luaL_error(L, "dados corrompidos ou inv\xC3\xA1lidos (erro zlib)");
+        }
+
+        if (capacidade == limite) {
+            free(dest);
+            return luaL_error(L, "dados descompactados excedem o limite informado");
+        }
+
         free(dest);
-        destLen *= 2; /* Dobra o tamanho */
-        dest = (unsigned char *)malloc(destLen);
-        if (dest == NULL) return luaL_error(L, "mem\xC3\xB3ria insuficiente (arquivo muito grande)");
-
-        res = uncompress(dest, &destLen, (const unsigned char *)s, l);
+        capacidade = (capacidade > limite / 2) ? limite : capacidade * 2;
+        dest = (unsigned char *)malloc(capacidade);
+        if (dest == NULL)
+            return luaL_error(L, "mem\xC3\xB3ria insuficiente (arquivo muito grande)");
     }
-
-    if (res != Z_OK) {
-        free(dest);
-        return luaL_error(L, "dados corrompidos ou inv\xC3\xA1lidos (erro zlib)");
-    }
-
-    lua_pushlstring(L, (char *)dest, destLen);
-    free(dest);
-    return 1;
 }
 
 /* Função para calcular CRC32 usando a Zlib embutida */
@@ -1966,9 +2008,9 @@ static int str_gabarito (lua_State *L) {
         lua_remove(L, -2);
 
         /* Por padrão, um chunk carregado com luaL_loadbuffer só enxerga
-           GLOBAIS (seu upvalue _ENV aponta pra tabela global) — variáveis
+           GLOBAIS (seu valor externo _AMBIENTE aponta pra tabela global) — variáveis
            locais de quem escreveu o ®{...} ficariam invisíveis. Damos a ele
-           um _ENV próprio: uma tabela com as locais do chamador, e
+           um _AMBIENTE próprio: uma tabela com as locais do chamador, e
            metatabela __índice apontando pra tabela global de verdade (então
            tudo que não for local continua resolvendo como global igual
            antes). */
@@ -1993,7 +2035,7 @@ static int str_gabarito (lua_State *L) {
                 }
             }
 
-            lua_setupvalue(L, func_idx, 1); /* _ENV da função = E; consome E */
+            lua_setupvalue(L, func_idx, 1); /* _AMBIENTE da função = E; consome E */
         }
 
         lua_call(L, 0, 1);

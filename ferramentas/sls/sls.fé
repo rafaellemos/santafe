@@ -1,0 +1,268 @@
+-- SLS — Servidor de Linguagem Santafé.
+--
+-- Implementa o perfil mínimo de LSP sobre stdin/stdout. O editor envia
+-- documentos JSON-RPC; o SLS usa carregue para analisar o fonte sem executá-lo
+-- e publica diagnósticos enquanto o documento é alterado.
+
+local LIMITE_DO_QUADRO = 16 * 1024 * 1024
+local documentos = {}
+local entrada = es.entradaPadrão
+local saída = es.saídaPadrão
+local inicializado = falso
+local encerrado = falso
+
+local função escrevaQuadro(mensagem)
+    local conteúdo = garanta(json.cod(mensagem))
+    saída:escreva("Content-Length: ", octetos(conteúdo), "\r\n\r\n", conteúdo)
+    saída:esvazie()
+fim
+
+local função leiaQuadro()
+    local tamanhoDoConteúdo = nulo
+    local cabeçalhoLido = 0
+
+    enquanto verdadeiro início
+        local caracteres = {}
+        enquanto verdadeiro início
+            local caractere = entrada:leia(1)
+            se caractere == nulo então
+                se cabeçalhoLido == 0 então retorne nulo fim
+                retorne nulo, "cabeçalho LSP incompleto"
+            fim
+            cabeçalhoLido = cabeçalhoLido + 1
+            se cabeçalhoLido > 8192 então retorne nulo, "cabeçalho LSP excede 8192 bytes" fim
+            se caractere == "\n" então pare fim
+            caracteres[#caracteres + 1] = caractere
+        fim
+        local linha = tabela.concatene(caracteres)
+        -- es.leia("*linha") remove \n, mas preserva o \r de quadros LSP
+        -- escritos conforme HTTP/1.1 (CRLF).
+        se #linha > 0 e linha:corte(#linha, #linha) == "\r" então
+            linha = linha:corte(1, #linha - 1)
+        fim
+        se linha == "" então pare fim
+
+        local tamanho = linha:minúscula():separe(
+            "^content%-length:[ \t]*([0-9]+)[ \t]*$"
+        )
+        se tamanho então
+            se tamanhoDoConteúdo ~= nulo então retorne nulo, "Content-Length duplicado" fim
+            tamanhoDoConteúdo = paraNúmero(tamanho)
+        fim
+    fim
+
+    se tamanhoDoConteúdo == nulo ou tamanhoDoConteúdo < 0 ou
+       tamanhoDoConteúdo > LIMITE_DO_QUADRO então
+        retorne nulo, "Content-Length ausente ou fora do limite"
+    fim
+
+    local conteúdo = entrada:leia(tamanhoDoConteúdo)
+    se conteúdo == nulo ou octetos(conteúdo) ~= tamanhoDoConteúdo então
+        retorne nulo, "quadro LSP incompleto"
+    fim
+
+    retorne conteúdo
+fim
+
+local função responda(id, resultado)
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        id = id,
+        result = resultado
+    })
+fim
+
+local função respondaFalha(id, código, mensagem)
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        id = id ou json.valorNulo,
+        error = {
+            code = código,
+            message = mensagem
+        }
+    })
+fim
+
+local função posiçãoDaFalha(falha)
+    local linha, mensagem = falha:separe("^.-:([0-9]+): (.*)$")
+    linha = paraNúmero(linha) ou 1
+    se mensagem == nulo ou mensagem == "" então mensagem = falha fim
+
+    retorne linha - 1, mensagem
+fim
+
+local função publiqueDiagnósticos(uri, conteúdo)
+    local funçãoCompilada, falha = carregue(conteúdo, "@" .. uri, "t")
+    local diagnósticos = json.matrizVazia
+
+    se funçãoCompilada == nulo então
+        local linha, mensagem = posiçãoDaFalha(falha)
+        diagnósticos = {{
+            range = {
+                start = { line = linha, character = 0 },
+                ["end"] = { line = linha, character = 0 }
+            },
+            severity = 1,
+            source = "SLS",
+            message = mensagem
+        }}
+    fim
+
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        method = "textDocument/publishDiagnostics",
+        params = {
+            uri = uri,
+            version = documentos[uri] e documentos[uri].versão ou nulo,
+            diagnostics = diagnósticos
+        }
+    })
+fim
+
+local função textoDoDocumento(parâmetros)
+    local documento = tipo(parâmetros) == "tabela" e parâmetros.textDocument ou nulo
+    se tipo(documento) ~= "tabela" ou tipo(documento.uri) ~= "colar" então
+        retorne nulo
+    fim
+    retorne documento
+fim
+
+local função aoAbrir(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo ou tipo(documento.text) ~= "colar" então retorne fim
+
+    documentos[documento.uri] = {
+        texto = documento.text,
+        versão = documento.version
+    }
+    publiqueDiagnósticos(documento.uri, documento.text)
+fim
+
+local função aoMudar(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo então retorne fim
+
+    local mudanças = parâmetros.contentChanges
+    local última = tipo(mudanças) == "tabela" e mudanças[#mudanças] ou nulo
+    se tipo(última) ~= "tabela" ou tipo(última.text) ~= "colar" ou última.range ~= nulo então retorne fim
+    local guardado = documentos[documento.uri]
+    se guardado == nulo então retorne fim
+    se tipo(documento.version) ~= "número" ou
+       (tipo(guardado.versão) == "número" e documento.version <= guardado.versão) então retorne fim
+
+    documentos[documento.uri] = {
+        texto = última.text,
+        versão = documento.version
+    }
+    publiqueDiagnósticos(documento.uri, última.text)
+fim
+
+local função aoSalvar(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo então retorne fim
+
+    local guardado = documentos[documento.uri]
+    local conteúdo = parâmetros.text ou (guardado e guardado.texto)
+    se tipo(conteúdo) ~= "colar" então retorne fim
+
+    documentos[documento.uri] = {
+        texto = conteúdo,
+        versão = documento.version ou (guardado e guardado.versão)
+    }
+    publiqueDiagnósticos(documento.uri, conteúdo)
+fim
+
+local função aoFechar(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo então retorne fim
+
+    documentos[documento.uri] = nulo
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        method = "textDocument/publishDiagnostics",
+        params = { uri = documento.uri, diagnostics = json.matrizVazia }
+    })
+fim
+
+local função processe(pedido)
+    se tipo(pedido) ~= "tabela" ou pedido.jsonrpc ~= "2.0" ou
+       tipo(pedido.method) ~= "colar" então
+        respondaFalha(nulo, -32600, "pedido JSON-RPC inválido")
+        retorne verdadeiro
+    fim
+
+    local método = pedido.method
+    local parâmetros = pedido.params
+    se parâmetros == nulo então parâmetros = {} fim
+    local éPedido = pedido.id ~= nulo
+
+    se método == "exit" então
+        so.saia(encerrado e 0 ou 1)
+    fim
+    se tipo(parâmetros) ~= "tabela" então
+        se éPedido então respondaFalha(pedido.id, -32602, "parâmetros inválidos") fim
+        retorne verdadeiro
+    fim
+    se encerrado ou (inicializado e método == "initialize") então
+        se éPedido então respondaFalha(pedido.id, -32600, "estado LSP inválido") fim
+        retorne verdadeiro
+    fim
+    se não inicializado e método ~= "initialize" então
+        se éPedido então respondaFalha(pedido.id, -32002, "servidor não inicializado") fim
+        retorne verdadeiro
+    fim
+
+    se método == "initialize" então
+        se éPedido então
+            inicializado = verdadeiro
+            responda(pedido.id, {
+                capabilities = {
+                    positionEncoding = "utf-16",
+                    textDocumentSync = {
+                        openClose = verdadeiro,
+                        change = 1,
+                        save = { includeText = verdadeiro }
+                    }
+                },
+                serverInfo = { name = "SLS", version = "0.1.1" }
+            })
+        fim
+    senão se método == "shutdown" então
+        se éPedido então
+            encerrado = verdadeiro
+            responda(pedido.id, json.valorNulo)
+        fim
+    senão se método == "exit" então
+        retorne falso
+    senão se método == "textDocument/didOpen" então
+        aoAbrir(parâmetros)
+    senão se método == "textDocument/didChange" então
+        aoMudar(parâmetros)
+    senão se método == "textDocument/didSave" então
+        aoSalvar(parâmetros)
+    senão se método == "textDocument/didClose" então
+        aoFechar(parâmetros)
+    senão se éPedido então
+        respondaFalha(pedido.id, -32601, "método LSP ainda não implementado: " .. método)
+    fim fim fim fim fim fim fim fim
+
+    retorne verdadeiro
+fim
+
+enquanto verdadeiro início
+    local quadro, falhaDoQuadro = leiaQuadro()
+    se quadro == nulo então
+        se falhaDoQuadro então
+            es.saídaDeErroPadrão:escreva(falhaDoQuadro, "\n")
+            so.saia(1)
+        fim
+        pare
+    fim
+
+    local decodificou, pedido = proteja(json.decod, quadro)
+    se decodificou e pedido ~= nulo então
+        se não processe(pedido) então pare fim
+    senão
+        respondaFalha(nulo, -32700, "JSON inválido")
+    fim
+fim

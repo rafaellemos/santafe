@@ -1,0 +1,142 @@
+local Triagem = importe "correio.triagem"
+
+local selecionador = Triagem.nova {
+    limiteSuspeita = 4,
+    limiteIndesejada = 8,
+    bloqueados = { "fraude@hostil.test", "@bloqueado.test" }
+}
+
+local função mensagem(opções)
+    opções = opções ou {}
+    retorne {
+        cabeçalhos = opções.cabeçalhos ou {
+            from = opções.remetente ou "Pessoa <pessoa@exemplo.org>"
+        },
+        remetente = opções.remetente ou "Pessoa <pessoa@exemplo.org>",
+        responderPara = opções.responderPara ou "pessoa@exemplo.org",
+        assunto = opções.assunto ou "Relatório",
+        data = opções.data ou "Fri, 28 Aug 2026 13:00:00 -0300",
+        identificação = opções.identificação ou "<1@exemplo.org>",
+        texto = opções.texto ou "Olá",
+        html = opções.html,
+        anexos = opções.anexos ou {}
+    }
+fim
+
+local envelope = {
+    remetente = "pessoa@exemplo.org",
+    destinatários = { "rafael@santafé.dev.br" }
+}
+
+local função possuiMotivo(resultado, regra)
+    para _, motivo em ipares(resultado.motivos ou {}) início
+        se motivo.regra == regra então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+local regular = selecionador:avalie(envelope, mensagem())
+garanta(regular.classificação == "regular")
+garanta(regular.pontuaçãoDeSuspeita == 0)
+garanta(regular.pasta == "entrada")
+
+local ligaçãoLegítima = selecionador:avalie(envelope, mensagem {
+    html = '<p>O relatório está pronto.</p><a href="https://exemplo.org/relatorio">Abrir relatório</a>'
+})
+garanta(ligaçãoLegítima.classificação == "regular")
+garanta(ligaçãoLegítima.pontuaçãoDeSuspeita == 0)
+
+local marcaExplicada = selecionador:avalie(envelope, mensagem {
+    html = '&lt;a href="javascript:alert(1)"&gt;exemplo de HTML&lt;/a&gt;'
+})
+garanta(marcaExplicada.classificação == "regular",
+    "HTML apresentado como texto foi interpretado como marca ativa")
+
+local idnEquivalente = selecionador:avalie(envelope, mensagem {
+    html = '<a href="https://xn--santaf-gva.dev.br/manual">https://santafé.dev.br/manual</a>'
+})
+garanta(idnEquivalente.classificação == "regular",
+    "Punycode e Unicode equivalentes foram tratados como ligação mascarada")
+
+local redefiniçãoLegítima = selecionador:avalie(envelope, mensagem {
+    assunto = "Redefina sua senha",
+    texto = "Você pediu a redefinição da senha.",
+    html = '<a href="https://exemplo.org/redefinir">Redefinir senha</a>'
+})
+garanta(redefiniçãoLegítima.classificação == "suspeita")
+garanta(redefiniçãoLegítima.pasta == "entrada")
+garanta(possuiMotivo(redefiniçãoLegítima,
+    "pedido-de-segredo-com-ligação"))
+
+local sobRitmoElevado = selecionador:avalie({
+    remetente = envelope.remetente,
+    destinatários = envelope.destinatários,
+    vigia = { naJanela = 8, limiteNaJanela = 10, janela = 60 }
+}, mensagem())
+garanta(sobRitmoElevado.classificação == "regular",
+    "o ritmo do Vigia não pode separar sozinho uma carta")
+garanta(sobRitmoElevado.pontuaçãoDeSuspeita == 1)
+garanta(sobRitmoElevado.motivos[1].regra ==
+    "ritmo-de-conexões-elevado")
+
+local suspeita = selecionador:avalie(envelope, mensagem {
+    cabeçalhos = {}, identificação = "", data = "", assunto = ""
+})
+garanta(suspeita.classificação == "suspeita")
+garanta(suspeita.pasta == "entrada")
+garanta(#suspeita.motivos >= 1)
+
+local executável = selecionador:avalie(envelope, mensagem {
+    anexos = {{ nome = "nota.pdf.exe", tipo = "application/x-dosexec" }}
+})
+garanta(executável.classificação == "indesejada")
+garanta(executável.pasta == "indesejadas")
+garanta(executável.pontuaçãoDeSuspeita >= 8)
+
+local fisgadaMascarada = selecionador:avalie(envelope, mensagem {
+    assunto = "Ação urgente: confirme sua conta",
+    texto = "Confirme sua senha imediatamente.",
+    html = '<a href="https://acesso-hostil.example/entrar">https://exemplo.org/entrar</a>'
+})
+garanta(fisgadaMascarada.classificação == "indesejada")
+garanta(fisgadaMascarada.pasta == "indesejadas")
+garanta(possuiMotivo(fisgadaMascarada, "ligação-mascarada"))
+garanta(possuiMotivo(fisgadaMascarada,
+    "pedido-de-segredo-com-ligação"))
+
+local urlEnganosa = selecionador:avalie(envelope, mensagem {
+    html = '<a href="https&colon;&sol;&sol;exemplo.org&#64;198.51.100.10/entrar">Acessar conta</a>'
+})
+garanta(urlEnganosa.classificação == "indesejada")
+garanta(possuiMotivo(urlEnganosa, "credencial-na-ligação"))
+garanta(possuiMotivo(urlEnganosa, "ligação-por-ip"))
+
+local formulárioDeSenha = selecionador:avalie(envelope, mensagem {
+    html = '<form action="https://hostil.example/"><label>Senha<input type="password" name="senha"></label></form>'
+})
+garanta(formulárioDeSenha.classificação == "indesejada")
+garanta(possuiMotivo(formulárioDeSenha, "formulário-de-credenciais"))
+
+local programaNaLigação = selecionador:avalie(envelope, mensagem {
+    html = '<A HREF="java&#x73;cript:alert(1)">Abrir documento</A>'
+})
+garanta(programaNaLigação.classificação == "indesejada")
+garanta(possuiMotivo(programaNaLigação,
+    "ligação-com-esquema-perigoso"))
+
+local dmarcMonitorado = selecionador:avalie({
+    remetente = envelope.remetente,
+    destinatários = envelope.destinatários,
+    autenticação = { dmarc = { resultado = "falha", ação = "aceitar" } }
+}, mensagem())
+garanta(dmarcMonitorado.classificação == "regular")
+garanta(dmarcMonitorado.pontuaçãoDeSuspeita == 3)
+garanta(possuiMotivo(dmarcMonitorado,
+    "dmarc-falhou-em-observação"))
+
+local bloqueada = selecionador:avalie({
+    remetente = "fraude@hostil.test", destinatários = envelope.destinatários
+}, mensagem { remetente = "fraude@hostil.test" })
+garanta(bloqueada.classificação == "indesejada")
+
+mostre("Correio Triagem: ok")

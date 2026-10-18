@@ -1,0 +1,32 @@
+local nomes = importe "nomes"
+
+garanta(nomes.TIPOS.MX == 15)
+garanta(nomes.CLASSES.IN == 1)
+garanta(nomes.CÓDIGOS.NOME_INEXISTENTE == 3)
+garanta(nomes.nomeCanônico("WWW.Exemplo.ORG") == "www.exemplo.org.")
+
+local binário = garanta(nomes.codifiqueNome("www.exemplo.org"))
+garanta(#binário == 17 e binário:byte(1) == 3)
+local nome, próxima = nomes.decodifiqueNome(binário)
+garanta(nome == "www.exemplo.org." e próxima == 18)
+
+garanta(nomes.tipoParaNúmero("AAAA") == 28)
+garanta(nomes.nomeDoTipo(15) == "MX")
+garanta(nomes.nomeDoTipo(65000) == "65000")
+
+local pacote = garanta(nomes.codifiqueMensagem({
+    identificação = 42,
+    bandeiras = { recursãoDesejada = verdadeiro },
+    perguntas = {{ nome = "exemplo.org", tipo = "A" }}
+}))
+garanta(#pacote > 12)
+
+pacote = garanta(nomes.novaConsulta("exemplo.org", "MX", 1200, verdadeiro))
+local mensagem = garanta(nomes.decodifiqueMensagem(pacote))
+garanta(mensagem.identificação == 1200)
+garanta(mensagem.perguntas[1].nomeDoTipo == "MX")
+
+local consulta = garanta(nomes.novaConsulta("xn--santaf-gva.dev.br", "MX"))
+garanta(tipo(consulta) == "colar" e #consulta > 12)
+
+mostre("nomes exemplos do manual: ok")

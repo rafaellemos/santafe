@@ -1,0 +1,465 @@
+-- Assinatura DKIM rsa-sha256 com canonicalização relaxed/relaxed.
+-- A criptografia fica em segredo; este módulo cuida exclusivamente das
+-- regras de composição definidas pelo protocolo postal.
+
+local segredo = importe "segredo"
+local rede = importe "rede"
+
+local dkim = {}
+local CRLF = "\r\n"
+local valideSeletor
+
+local função normalizeQuebras(texto)
+    texto = texto:troque("\r\n", "\n"):troque("\r", "\n")
+    retorne texto:troque("\n", CRLF)
+fim
+
+local função separeMensagem(conteúdo)
+    conteúdo = normalizeQuebras(conteúdo)
+    local posição = conteúdo:procure(CRLF .. CRLF, 1, verdadeiro)
+    se não posição então
+        retorne nulo, nulo, "mensagem não possui separador entre cabeçalhos e corpo"
+    fim
+    retorne conteúdo:corte(1, posição - 1), conteúdo:corte(posição + 4)
+fim
+
+local função linhas(texto)
+    local resultado = {}
+    local posição = 1
+    enquanto posição <= #texto início
+        local fimDaLinha = texto:procure(CRLF, posição, verdadeiro)
+        se fimDaLinha então
+            resultado[#resultado + 1] = texto:corte(posição, fimDaLinha - 1)
+            posição = fimDaLinha + 2
+        senão
+            resultado[#resultado + 1] = texto:corte(posição)
+            posição = #texto + 1
+        fim
+    fim
+    se texto == "" então resultado[1] = "" fim
+    retorne resultado
+fim
+
+local função leiaCabeçalhos(bloco)
+    local resultado = {}
+    para _, linha em ipares(linhas(bloco)) início
+        local primeiro = linha:corte(1, 1)
+        se primeiro == " " ou primeiro == "\t" então
+            se #resultado == 0 então
+                retorne nulo, "continuação encontrada antes do primeiro cabeçalho"
+            fim
+            resultado[#resultado].valor = resultado[#resultado].valor .. CRLF .. linha
+        senão
+            local doisPontos = linha:procure(":", 1, verdadeiro)
+            se não doisPontos ou doisPontos == 1 então
+                retorne nulo, "cabeçalho inválido ao assinar DKIM"
+            fim
+            local nome = linha:corte(1, doisPontos - 1)
+            resultado[#resultado + 1] = {
+                nome = nome,
+                nomeCanônico = nome:minúscula(),
+                valor = linha:corte(doisPontos + 1)
+            }
+        fim
+    fim
+    retorne resultado
+fim
+
+local função apareEspaço(texto)
+    texto = texto:troque(CRLF .. "[ \t]+", " ")
+    texto = texto:troque("[ \t]+", " ")
+    texto = texto:troque("^[ \t]+", "")
+    retorne texto:troque("[ \t]+$", "")
+fim
+
+local função canonicalizeCabeçalho(nome, valor)
+    retorne nome:minúscula() .. ":" .. apareEspaço(valor)
+fim
+
+local função canonicalizeCorpo(corpo)
+    local preparadas = linhas(corpo)
+    para índice = 1, #preparadas início
+        preparadas[índice] = preparadas[índice]
+            :troque("[ \t]+$", "")
+            :troque("[ \t]+", " ")
+    fim
+    enquanto #preparadas > 0 e preparadas[#preparadas] == "" início
+        tabela.remova(preparadas)
+    fim
+    -- Mesmo um corpo vazio é representado por uma quebra CRLF no DKIM.
+    se #preparadas == 0 então retorne CRLF fim
+    retorne colar.junte(CRLF, tabela.desempacote(preparadas)) .. CRLF
+fim
+
+local função canonicalizeCorpoSimples(corpo)
+    local preparadas = linhas(corpo)
+    enquanto #preparadas > 0 e preparadas[#preparadas] == "" início
+        tabela.remova(preparadas)
+    fim
+    se #preparadas == 0 então retorne CRLF fim
+    retorne colar.junte(CRLF, tabela.desempacote(preparadas)) .. CRLF
+fim
+
+local função canonicalizeCabeçalhoSimples(nome, valor)
+    retorne nome .. ":" .. valor
+fim
+
+local função tags(texto)
+    local resultado = {}
+    para trecho em (texto ou ""):capture("[^;]+") início
+        local igual = trecho:procure("=", 1, verdadeiro)
+        se igual então
+            local nome = trecho:corte(1, igual - 1):apare():minúscula()
+            se nome ~= "" e resultado[nome] == nulo então
+                resultado[nome] = trecho:corte(igual + 1):apare()
+            fim
+        fim
+    fim
+    retorne resultado
+fim
+
+local função semEspaço(texto)
+    retorne (texto ou ""):troque("[ \t\r\n]", "")
+fim
+
+local função retireAssinatura(valor)
+    local posição = 1
+    enquanto posição <= #valor início
+        local pontoEVírgula = valor:procure(";", posição, verdadeiro)
+        local fimDoTrecho = pontoEVírgula e pontoEVírgula - 1 ou #valor
+        local igual = valor:procure("=", posição, verdadeiro)
+        se igual e igual <= fimDoTrecho então
+            local nome = valor:corte(posição, igual - 1):apare():minúscula()
+            se nome == "b" então
+                retorne valor:corte(1, igual) ..
+                    (pontoEVírgula e valor:corte(pontoEVírgula) ou "")
+            fim
+        fim
+        se não pontoEVírgula então pare fim
+        posição = pontoEVírgula + 1
+    fim
+    retorne valor
+fim
+
+local função decBase64(texto, nome)
+    local funcionou, resultado = proteja(colar.decBase64, semEspaço(texto))
+    se não funcionou então retorne nulo, nome .. " Base64 inválido" fim
+    retorne resultado
+fim
+
+local função selecioneCabeçalhos(cabeçalhos, nomes)
+    local usados = {}
+    local selecionados = {}
+    para _, nome em ipares(nomes) início
+        nome = nome:apare():minúscula()
+        local encontrou
+        para índice = #cabeçalhos, 1, -1 início
+            se não usados[índice] e cabeçalhos[índice].nomeCanônico == nome então
+                usados[índice] = verdadeiro
+                selecionados[#selecionados + 1] = cabeçalhos[índice]
+                encontrou = verdadeiro
+                pare
+            fim
+        fim
+        -- Um nome repetido em h= pode deliberadamente assinar uma ocorrência
+        -- inexistente; nesse caso nada é acrescentado ao resumo.
+        se não encontrou então usados["ausente:" .. nome] = verdadeiro fim
+    fim
+    retorne selecionados
+fim
+
+local função analiseChave(registro)
+    local campos = tags(registro)
+    se campos.v e campos.v:maiúscula() ~= "DKIM1" então
+        retorne nulo, "versão da chave DKIM não aceita"
+    fim
+    se campos.k e campos.k:minúscula() ~= "rsa" então
+        retorne nulo, "chave DKIM não é RSA"
+    fim
+    se campos.h então
+        local aceita = falso
+        para algoritmo em campos.h:capture("[^:]+") início
+            se algoritmo:apare():minúscula() == "sha256" então aceita = verdadeiro fim
+        fim
+        se não aceita então retorne nulo, "chave DKIM não aceita SHA-256" fim
+    fim
+    se campos.s então
+        local aceitaCorreio = falso
+        para serviço em campos.s:capture("[^:]+") início
+            serviço = serviço:apare():minúscula()
+            se serviço == "*" ou serviço == "email" então aceitaCorreio = verdadeiro fim
+        fim
+        se não aceitaCorreio então retorne nulo, "chave DKIM não serve ao correio" fim
+    fim
+    se campos.p == nulo então retorne nulo, "chave DKIM sem campo p" fim
+    se semEspaço(campos.p) == "" então retorne nulo, "chave DKIM revogada" fim
+    local pública, falha = decBase64(campos.p, "chave DKIM")
+    se não pública então retorne nulo, falha fim
+    retorne pública, nulo, campos
+fim
+
+local função domínioVálido(domínio)
+    local ascii = rede.domínioASCII((domínio ou ""):apare())
+    se não ascii ou ascii == "" ou #ascii > 253 então retorne nulo fim
+    retorne ascii:minúscula()
+fim
+
+local função verifiqueUma(conteúdo, cabeçalhos, corpo, assinatura,
+                           consulteTXT, tratador)
+    local campos = tags(assinatura.valor)
+    local domínio = domínioVálido(campos.d)
+    local seletor = campos.s e campos.s:apare() ou ""
+    local resultado = { domínio = domínio, seletor = seletor,
+        resultado = "falha" }
+    local função falhe(motivo)
+        resultado.motivo = motivo
+        tratador(resultado)
+    fim
+
+    se campos.v ~= "1" então falhe("versão DKIM não aceita"); retorne fim
+    se (campos.a ou ""):minúscula() ~= "rsa-sha256" então
+        falhe("algoritmo DKIM não aceito"); retorne
+    fim
+    se não domínio então falhe("domínio DKIM inválido"); retorne fim
+    se não valideSeletor(seletor) então falhe("seletor DKIM inválido"); retorne fim
+    se não campos.h ou não campos.bh ou não campos.b então
+        falhe("assinatura DKIM incompleta"); retorne
+    fim
+    local canonicalização = (campos.c ou "simple/simple"):minúscula()
+    local modoCabeçalho, modoCorpo = canonicalização:separe(
+        "^([^/]+)/([^/]+)$")
+    se não modoCabeçalho então
+        modoCabeçalho = canonicalização
+        modoCorpo = "simple"
+    fim
+    se (modoCabeçalho ~= "simple" e modoCabeçalho ~= "relaxed") ou
+       (modoCorpo ~= "simple" e modoCorpo ~= "relaxed") então
+        falhe("canonicalização DKIM não aceita"); retorne
+    fim
+    se campos.x então
+        local expira = mat.paraInteiro(paraNúmero(campos.x))
+        se não expira então falhe("prazo DKIM inválido"); retorne fim
+        se expira < so.tempo() então falhe("assinatura DKIM expirada"); retorne fim
+    fim
+
+    local corpoCanônico = modoCorpo == "relaxed" e
+        canonicalizeCorpo(corpo) ou canonicalizeCorpoSimples(corpo)
+    se campos.l então
+        local limite = mat.paraInteiro(paraNúmero(campos.l))
+        se não limite ou limite < 0 ou limite > #corpoCanônico então
+            falhe("limite de corpo DKIM inválido"); retorne
+        fim
+        corpoCanônico = corpoCanônico:corte(1, limite)
+    fim
+    local resumoInformado, falha = decBase64(campos.bh, "resumo do corpo DKIM")
+    se não resumoInformado então falhe(falha); retorne fim
+    local resumoCalculado = segredo.resumaSHA256(corpoCanônico)
+    se não segredo.confiraBilhete(resumoCalculado, resumoInformado) então
+        falhe("resumo do corpo DKIM não confere"); retorne
+    fim
+
+    local nomes = {}
+    para nome em campos.h:capture("[^:]+") início
+        nomes[#nomes + 1] = nome:apare():minúscula()
+    fim
+    local assinouFrom = falso
+    para _, nome em ipares(nomes) início
+        se nome == "from" então assinouFrom = verdadeiro fim
+    fim
+    se não assinouFrom então falhe("DKIM não assinou o cabeçalho From"); retorne fim
+    local selecionados = selecioneCabeçalhos(cabeçalhos, nomes)
+    local partes = {}
+    para _, cabeçalho em ipares(selecionados) início
+        se modoCabeçalho == "relaxed" então
+            partes[#partes + 1] = canonicalizeCabeçalho(
+                cabeçalho.nome, cabeçalho.valor) .. CRLF
+        senão
+            partes[#partes + 1] = canonicalizeCabeçalhoSimples(
+                cabeçalho.nome, cabeçalho.valor) .. CRLF
+        fim
+    fim
+    local valorSemAssinatura = retireAssinatura(assinatura.valor)
+    se modoCabeçalho == "relaxed" então
+        partes[#partes + 1] = canonicalizeCabeçalho(
+            assinatura.nome, valorSemAssinatura)
+    senão
+        partes[#partes + 1] = canonicalizeCabeçalhoSimples(
+            assinatura.nome, valorSemAssinatura)
+    fim
+    local assinaturaBinária
+    assinaturaBinária, falha = decBase64(campos.b, "assinatura DKIM")
+    se não assinaturaBinária então falhe(falha); retorne fim
+
+    local nomeDaChave = seletor .. "._domainkey." .. domínio
+    local iniciou, falhaImediata = consulteTXT(nomeDaChave,
+        função(registros, falhaDNS)
+            se falhaDNS então
+                resultado.resultado = "temporário"
+                resultado.motivo = "chave DKIM indisponível: " .. paraColar(falhaDNS)
+                tratador(resultado)
+                retorne
+            fim
+            se não registros ou #registros == 0 então
+                falhe("chave DKIM não encontrada"); retorne
+            fim
+            local últimaFalha = "nenhuma chave DKIM válida"
+            para _, registro em ipares(registros) início
+                local texto = tipo(registro) == "tabela" e registro.valor ou registro
+                local pública, falhaDaChave = analiseChave(texto ou "")
+                se pública então
+                    local confere, falhaCriptográfica = segredo.verifiqueRSA256(
+                        tabela.concatene(partes), assinaturaBinária, pública)
+                    se confere então
+                        resultado.resultado = "passa"
+                        resultado.motivo = nulo
+                        tratador(resultado)
+                        retorne
+                    fim
+                    últimaFalha = falhaCriptográfica ou "assinatura DKIM não confere"
+                senão
+                    últimaFalha = falhaDaChave
+                fim
+            fim
+            falhe(últimaFalha)
+        fim)
+    se iniciou == nulo e falhaImediata então
+        resultado.resultado = "temporário"
+        resultado.motivo = paraColar(falhaImediata)
+        tratador(resultado)
+    fim
+fim
+
+função dkim.verifiqueAssíncrono(conteúdo, opções, tratador)
+    opções = opções ou {}
+    se tipo(tratador) ~= "função" então
+        retorne nulo, "tratador DKIM deve ser uma função"
+    fim
+    se tipo(conteúdo) ~= "colar" então
+        retorne nulo, "conteúdo DKIM precisa ser um colar binário"
+    fim
+    conteúdo = normalizeQuebras(conteúdo)
+    local bloco, corpo, falha = separeMensagem(conteúdo)
+    se não bloco então tratador(nulo, falha); retorne verdadeiro fim
+    local cabeçalhos
+    cabeçalhos, falha = leiaCabeçalhos(bloco)
+    se não cabeçalhos então tratador(nulo, falha); retorne verdadeiro fim
+    local assinaturas = {}
+    para _, cabeçalho em ipares(cabeçalhos) início
+        se cabeçalho.nomeCanônico == "dkim-signature" então
+            assinaturas[#assinaturas + 1] = cabeçalho
+        fim
+    fim
+    se #assinaturas == 0 então
+        tratador({ resultado = "nenhum", assinaturas = {}, domínios = {} })
+        retorne verdadeiro
+    fim
+    local consulta = opções.consulteTXT ou função(nome, aoConcluir)
+        rede.consulteDNSAssíncrono(nome, "TXT",
+            { tempoLimite = opções.tempoLimite ou 5000 }, aoConcluir)
+        retorne verdadeiro
+    fim
+    local resultados, domínios = {}, {}
+    local temporário = falso
+    local função próxima(índice)
+        se índice > #assinaturas então
+            local estado = "falha"
+            para _, item em ipares(resultados) início
+                se item.resultado == "passa" então estado = "passa"; pare fim
+                se item.resultado == "temporário" então temporário = verdadeiro fim
+            fim
+            se estado ~= "passa" e temporário então estado = "temporário" fim
+            tratador({ resultado = estado, assinaturas = resultados,
+                domínios = domínios })
+            retorne
+        fim
+        verifiqueUma(conteúdo, cabeçalhos, corpo, assinaturas[índice], consulta,
+            função(resultado)
+                resultados[#resultados + 1] = resultado
+                se resultado.resultado == "passa" e resultado.domínio então
+                    domínios[#domínios + 1] = resultado.domínio
+                fim
+                próxima(índice + 1)
+            fim)
+    fim
+    próxima(1)
+    retorne verdadeiro
+fim
+
+valideSeletor = função(seletor)
+    se tipo(seletor) ~= "colar" ou seletor == "" ou #seletor > 63 então
+        retorne nulo, "seletor DKIM deve ter entre 1 e 63 tacos"
+    fim
+    se não seletor:procure("^[A-Za-z0-9][A-Za-z0-9._-]*$") então
+        retorne nulo, "seletor DKIM contém caracteres inválidos"
+    fim
+    retorne seletor
+fim
+
+local cabeçalhosPadrão = {
+    "from", "to", "cc", "reply-to", "subject", "date", "message-id",
+    "mime-version", "content-type", "content-transfer-encoding"
+}
+
+função dkim.assine(conteúdo, opções)
+    opções = opções ou {}
+    se tipo(conteúdo) ~= "colar" então
+        retorne nulo, "conteúdo DKIM precisa ser um colar binário"
+    fim
+    local domínio, falha = rede.domínioASCII(opções.domínio ou "")
+    se não domínio então retorne nulo, "domínio DKIM inválido: " .. paraColar(falha) fim
+    local seletor
+    seletor, falha = valideSeletor(opções.seletor)
+    se não seletor então retorne nulo, falha fim
+    se tipo(opções.chavePrivada) ~= "colar" ou opções.chavePrivada == "" então
+        retorne nulo, "chave privada DKIM não foi fornecida"
+    fim
+
+    -- A assinatura precisa cobrir exatamente os tacos que serão enviados.
+    -- Normalizamos aqui e devolvemos a mesma representação CRLF assinada.
+    conteúdo = normalizeQuebras(conteúdo)
+    local bloco, corpo
+    bloco, corpo, falha = separeMensagem(conteúdo)
+    se não bloco então retorne nulo, falha fim
+    local cabeçalhos
+    cabeçalhos, falha = leiaCabeçalhos(bloco)
+    se não cabeçalhos então retorne nulo, falha fim
+
+    local assinados, nomes = {}, {}
+    para _, desejado em ipares(opções.cabeçalhos ou cabeçalhosPadrão) início
+        para índice = #cabeçalhos, 1, -1 início
+            local atual = cabeçalhos[índice]
+            se atual.nomeCanônico == desejado:minúscula() então
+                assinados[#assinados + 1] =
+                    canonicalizeCabeçalho(atual.nome, atual.valor) .. CRLF
+                nomes[#nomes + 1] = atual.nomeCanônico
+                pare
+            fim
+        fim
+    fim
+    local possuiRemetente = falso
+    para _, nome em ipares(nomes) início
+        se nome == "from" então possuiRemetente = verdadeiro; pare fim
+    fim
+    se não possuiRemetente então
+        retorne nulo, "DKIM exige que o cabeçalho From seja assinado"
+    fim
+
+    local corpoCanônico = canonicalizeCorpo(corpo)
+    local resumoDoCorpo = colar.base64(segredo.resumaSHA256(corpoCanônico))
+    local valor = "v=1; a=rsa-sha256; c=relaxed/relaxed; d=" .. domínio ..
+        "; s=" .. seletor .. "; t=" .. paraColar(opções.carimbo ou so.tempo()) ..
+        "; h=" .. colar.junte(":", tabela.desempacote(nomes)) ..
+        "; bh=" .. resumoDoCorpo .. "; b="
+    local paraAssinar = tabela.concatene(assinados) ..
+        canonicalizeCabeçalho("DKIM-Signature", valor)
+    local assinatura
+    assinatura, falha = segredo.assineRSA256(paraAssinar, opções.chavePrivada)
+    se não assinatura então retorne nulo, falha fim
+    local cabeçalho = "DKIM-Signature: " .. valor .. colar.base64(assinatura)
+    se #cabeçalho > 998 então
+        retorne nulo, "cabeçalho DKIM excedeu o limite de 998 tacos"
+    fim
+    retorne cabeçalho .. CRLF .. conteúdo
+fim
+
+retorne dkim

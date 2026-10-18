@@ -1,0 +1,285 @@
+-- UIDs persistentes, sinalizadores e MIME do IMAP sobre MariaDB isolado.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/mariadb/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local função configuração(nome)
+    retorne so.obterVariável("SANTAFE_MARIADB_" .. nome) ou
+        so.obterVariável("CORREIO_TESTE_MARIADB_" .. nome)
+fim
+
+local endereço = configuração("HOST")
+local usuário = configuração("USUARIO")
+local senha = configuração("SENHA")
+local banco = configuração("BANCO")
+local porta = paraNúmero(configuração("PORTA")) ou 3306
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina CORREIO_TESTE_MARIADB_* ou SANTAFE_MARIADB_*")
+    retorne
+fim
+local senhaProtegida = so.obterVariável("SANTAFE_TESTE_SENHA_HASH")
+garanta(senhaProtegida e
+    senhaProtegida:procure("$argon2id$", 1, verdadeiro) == 1,
+    "defina SANTAFE_TESTE_SENHA_HASH com um resumo Argon2id")
+
+local mariadb = importe "mariadb"
+local Adaptador = importe "correio.mariadb"
+local rede = importe "rede"
+local piscina
+local nomeDoUsuário = so.obterVariável("SANTAFE_TESTE_USUARIO") ou
+    ("imap-" .. so.tempo() .. "-" .. so.aleatório())
+local terminou = falso
+local falhaFinal
+
+local objetos = { próximo = 0, conteúdos = {} }
+função objetos.prepareAssíncrono(_, tratador)
+    tratador(verdadeiro)
+    retorne verdadeiro
+fim
+função objetos.graveAssíncrono(este, conteúdo, tratador)
+    este.próximo = este.próximo + 1
+    local resumo = colar.replique(paraColar(este.próximo % 10), 64)
+    este.conteúdos[resumo] = conteúdo
+    tratador({ resumo = resumo, tamanho = #conteúdo })
+    retorne verdadeiro
+fim
+função objetos.leiaAssíncrono(este, resumo, tamanho, tratador)
+    local conteúdo = este.conteúdos[resumo]
+    garanta(conteúdo e #conteúdo == tamanho)
+    tratador(conteúdo)
+    retorne verdadeiro
+fim
+
+local função encerre(falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    falhaFinal = falha
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+fim
+
+local função envelope(caixa, número)
+    local identificação = "<imap-" .. número .. "@example.net>"
+    local bruto = "From: autor@example.net\r\n" ..
+        "To: " .. caixa.endereço .. "\r\n" ..
+        "Subject: Carta IMAP " .. número .. "\r\n" ..
+        "Message-ID: " .. identificação .. "\r\n" ..
+        "Content-Type: text/plain; charset=utf-8\r\n\r\n" ..
+        "Conteúdo IMAP " .. número .. ".\r\n"
+    retorne {
+        remetente = "retorno-" .. número .. "@transportador.example",
+        destinatários = { caixa.parteLocal .. "@" .. caixa.domínioASCII },
+        conteúdo = bruto,
+        triagem = { classificação = "regular", pontuaçãoDeSuspeita = 0,
+            pasta = "entrada", motivos = {} },
+        recebidaEm = so.tempo()
+    }, bruto
+fim
+
+mariadb.criePiscinaAssíncrona({
+    endereço = endereço, usuário = usuário, senha = senha,
+    banco = banco, porta = porta, mínimo = 1, máximo = 2,
+    máximoDaFila = 16, tempoDeEspera = 3000
+}, função(novaPiscina, falhaDaPiscina)
+    se não novaPiscina então encerre(falhaDaPiscina); retorne fim
+    piscina = novaPiscina
+    piscina:executePreparadoAssíncrono([[
+INSERT INTO usuarios (nome,usuario,email,senha_hash,papel,estado)
+VALUES (?,?,?,?,?,?)]], {
+        "Ensaio IMAP", nomeDoUsuário,
+        nomeDoUsuário .. "@santafé.dev.br", senhaProtegida,
+        "usuário", "ativo"
+    }, função(_, inclusão, falhaDaInclusão)
+        se falhaDaInclusão então
+            se inclusão então inclusão:feche() fim
+            encerre(falhaDaInclusão); retorne
+        fim
+        local idDoUsuário = inclusão:idInserido()
+        inclusão:feche()
+        local adaptador = Adaptador.novo(piscina, {
+            domínio = "santafé.dev.br",
+            domínioASCII = "xn--santaf-gva.dev.br"
+        }, objetos)
+        adaptador:confiraEstrutura(função(estrutura, falhaDaEstrutura)
+            se não estrutura então encerre(falhaDaEstrutura); retorne fim
+            adaptador:obtenhaOuCrieCaixa({
+                id = idDoUsuário, usuário = nomeDoUsuário,
+                nome = "Ensaio IMAP"
+            }, função(caixa, falhaDaCaixa)
+                se não caixa então encerre(falhaDaCaixa); retorne fim
+                local primeira, mimePrimeiro = envelope(caixa, 1)
+                adaptador:recebaSMTP(primeira,
+                    função(quantidade, falhaDoPrimeiro)
+                        se quantidade ~= 1 então
+                            encerre(falhaDoPrimeiro ou "primeira carta não foi inserida")
+                            retorne
+                        fim
+                        local segunda = envelope(caixa, 2)
+                        adaptador:recebaSMTP(segunda,
+                            função(quantidade2, falhaDoSegundo)
+                                se quantidade2 ~= 1 então
+                                    encerre(falhaDoSegundo ou
+                                        "segunda carta não foi inserida")
+                                    retorne
+                                fim
+                                adaptador:listeMensagensIMAP(caixa.id, "entrada",
+                                    função(estado, falhaDaLista)
+                                        se não estado então
+                                            encerre(falhaDaLista); retorne
+                                        fim
+                                        garanta(estado.quantidade == 2)
+                                        garanta(estado.próximoUID == 3)
+                                        garanta(estado.mensagens[1].uid == 1)
+                                        garanta(estado.mensagens[2].uid == 2)
+                                        local carta = estado.mensagens[1]
+                                        garanta(carta.remetente ==
+                                            "autor@example.net")
+                                        garanta(carta.remetenteEnvelope ==
+                                            "retorno-1@transportador.example")
+                                        adaptador:obtenhaMensagemIMAP(caixa.id,
+                                            carta.id,
+                                            função(completa, falhaDoMIME)
+                                                se não completa então
+                                                    encerre(falhaDoMIME); retorne
+                                                fim
+                                                garanta(completa.mime == mimePrimeiro)
+                                                adaptador:atualizeSinalizadoresIMAP(
+                                                    caixa.id, carta.id,
+                                                    { lida = verdadeiro,
+                                                      importante = verdadeiro,
+                                                      apagada = verdadeiro },
+                                                    função(atualizou, falhaDosSinais)
+                                                        se não atualizou então
+                                                            encerre(falhaDosSinais); retorne
+                                                        fim
+                                                        adaptador:obtenhaMensagemIMAP(
+                                                            caixa.id, carta.id,
+                                                            função(marcada, falhaDaMarca)
+                                                                se não marcada então
+                                                                    encerre(falhaDaMarca); retorne
+                                                                fim
+                                                                garanta(marcada.apagadaNoIMAP)
+                                                                adaptador:movaMensagemIMAP(
+                                                                    caixa.id, carta.id, "lixeira",
+                                                                    função(movida, falhaDoMovimento)
+                                                                        se não movida então
+                                                                            encerre(falhaDoMovimento); retorne
+                                                                        fim
+                                                                        garanta(movida.uid == 1)
+                                                                        local terceira = envelope(caixa, 3)
+                                                                        adaptador:recebaSMTP(terceira,
+                                                                    função(q3, falhaDoTerceiro)
+                                                                        se q3 ~= 1 então
+                                                                            encerre(falhaDoTerceiro); retorne
+                                                                        fim
+                                                                        adaptador:listeMensagensIMAP(
+                                                                            caixa.id, "entrada",
+                                                                            função(final, falhaFinalDaLista)
+                                                                                se não final então
+                                                                                    encerre(falhaFinalDaLista); retorne
+                                                                                fim
+                                                                                garanta(final.quantidade == 2)
+                                                                                garanta(final.próximoUID == 4)
+                                                                                garanta(final.mensagens[1].uid == 2)
+                                                                                garanta(final.mensagens[2].uid == 3)
+                                                                                adaptador:listeMensagensIMAP(
+                                                                                    caixa.id, "lixeira",
+                                                                                    função(lixeira, falhaDaLixeira)
+                                                                                        se não lixeira então
+                                                                                            encerre(falhaDaLixeira); retorne
+                                                                                        fim
+                                                                                        garanta(lixeira.quantidade == 1)
+                                                                                        garanta(lixeira.próximoUID == 2)
+                                                                                        garanta(lixeira.mensagens[1].uid == 1)
+                                                                                        garanta(lixeira.mensagens[1].lida)
+                                                                                        garanta(lixeira.mensagens[1].importante)
+                                                                                        garanta(não lixeira.mensagens[1].apagadaNoIMAP)
+                                                                                        adaptador:removaMensagemIMAP(
+                                                                                            caixa.id,
+                                                                                            lixeira.mensagens[1].id,
+                                                                                            função(removida, falhaDaRemoção)
+                                                                                                se não removida então
+                                                                                                    encerre(falhaDaRemoção); retorne
+                                                                                                fim
+                                                                                                garanta(removida.tacosLiberados > 0)
+                                                                                                adaptador:movaMensagemIMAP(
+                                                                                                    caixa.id,
+                                                                                                    final.mensagens[1].id,
+                                                                                                    "lixeira",
+                                                                                                    função(movidaDeNovo, falhaDoSegundoMovimento)
+                                                                                                        se não movidaDeNovo então
+                                                                                                            encerre(falhaDoSegundoMovimento); retorne
+                                                                                                        fim
+                                                                                                        adaptador:esvazieLixeira(
+                                                                                                            caixa.id,
+                                                                                                            função(esvaziada, falhaDoEsvaziamento)
+                                                                                                                se não esvaziada então
+                                                                                                                    encerre(falhaDoEsvaziamento); retorne
+                                                                                                                fim
+                                                                                                                garanta(esvaziada.quantidade == 1)
+                                                                                                                garanta(esvaziada.tacosLiberados > 0)
+                                                                                                                adaptador:listeMensagensIMAP(
+                                                                                                                    caixa.id, "lixeira",
+                                                                                                                    função(vazia, falhaDaListaVazia)
+                                                                                                                        se não vazia então
+                                                                                                                            encerre(falhaDaListaVazia); retorne
+                                                                                                                        fim
+                                                                                                                        garanta(vazia.quantidade == 0)
+                                                                                                                        adaptador:copieMensagensIMAP(
+                                                                                                                            caixa.id,
+                                                                                                                            { final.mensagens[2].id },
+                                                                                                                            "arquivadas",
+                                                                                                                            função(copiada, falhaDaCópia)
+                                                                                                                                se não copiada então
+                                                                                                                                    encerre(falhaDaCópia); retorne
+                                                                                                                                fim
+                                                                                                                                garanta(copiada.validadeUID)
+                                                                                                                                garanta(#copiada.cópias == 1)
+                                                                                                                                garanta(copiada.cópias[1].uid == 1)
+                                                                                                                                adaptador:listeMensagensIMAP(
+                                                                                                                                    caixa.id, "arquivadas",
+                                                                                                                                    função(arquivadas, falhaDasArquivadas)
+                                                                                                                                        se não arquivadas então
+                                                                                                                                            encerre(falhaDasArquivadas); retorne
+                                                                                                                                        fim
+                                                                                                                                        garanta(arquivadas.quantidade == 1)
+                                                                                                                                        garanta(arquivadas.mensagens[1].uid == 1)
+                                                                                                                                        adaptador:obtenhaMensagemIMAP(
+                                                                                                                                            caixa.id,
+                                                                                                                                            arquivadas.mensagens[1].id,
+                                                                                                                                            função(cópia, falhaDaLeituraDaCópia)
+                                                                                                                                                se não cópia então
+                                                                                                                                                    encerre(falhaDaLeituraDaCópia); retorne
+                                                                                                                                                fim
+                                                                                                                                                garanta(cópia.assunto == "Carta IMAP 3")
+                                                                                                                                                garanta(cópia.pasta == "arquivadas")
+                                                                                                                                                garanta(cópia.uid == 1)
+                                                                                                                                                garanta(cópia.mime:procure(
+                                                                                                                                                    "Conteúdo IMAP 3.", 1, verdadeiro))
+                                                                                                                                                mostre("Correio IMAP MariaDB: ok")
+                                                                                                                                                encerre()
+                                                                                                                                            fim)
+                                                                                                                                    fim)
+                                                                                                                            fim)
+                                                                                                                    fim)
+                                                                                                            fim)
+                                                                                                    fim)
+                                                                                            fim)
+                                                                                    fim)
+                                                                            fim)
+                                                                    fim)
+                                                                    fim)
+                                                            fim)
+                                                    fim)
+                                            fim)
+                                    fim)
+                            fim)
+                    fim)
+            fim)
+        fim)
+    fim)
+fim)
+
+rede.laço()
+garanta(terminou e falhaFinal == nulo, falhaFinal)

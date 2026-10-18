@@ -1,0 +1,24 @@
+[Unit]
+Description=Carteiro Santafé (interface web Caminheiro)
+After=network-online.target mariadb.service
+Wants=network-online.target mariadb.service
+
+[Service]
+Type=simple
+User=carteiro
+Group=carteiro
+SupplementaryGroups=correio
+WorkingDirectory=/opt/carteiro
+EnvironmentFile=/etc/santafe/carteiro.env
+EnvironmentFile=/etc/santafe/correio.env
+ExecStart=/usr/local/bin/santafé /opt/carteiro/carteiro.fé
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/santafé /var/lib/santafé/correio
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lunicode.h"
 
 
 static int luaB_print (lua_State *L) {
@@ -143,11 +144,36 @@ static int luaB_rawequal (lua_State *L) {
 }
 
 
-static int luaB_rawlen (lua_State *L) {
+static int luaB_len (lua_State *L) {
   int t = lua_type(L, 1);
-  luaL_argcheck(L, t == LUA_TTABLE || t == LUA_TSTRING, 1,
-                   "tabela ou colar esperado");
-  lua_pushinteger(L, lua_rawlen(L, 1));
+  if (t == LUA_TSTRING) {
+    size_t length;
+    size_t graphemes;
+    size_t invalid;
+    const char *s = lua_tolstring(L, 1, &length);
+    if (!luaU_graphemes(s, length, &graphemes, &invalid))
+      return luaL_error(L, "colar UTF-8 inv\xC3\xA1lido no taco %d; use octetos para dados bin\xC3\xA1rios",
+                        (int)invalid);
+    lua_pushinteger(L, (lua_Integer)graphemes);
+  }
+  else {
+    luaL_argcheck(L, t == LUA_TTABLE, 1, "tabela ou colar esperado");
+    /*
+    ** A medida de uma tabela segue exatamente o operador '#': ela mede a
+    ** parte sequencial, sem transformar uma consulta cotidiana em uma
+    ** varredura de todas as chaves de uma tabela associativa ou esparsa.
+    */
+    lua_pushinteger(L, luaL_len(L, 1));
+  }
+  return 1;
+}
+
+
+static int luaB_octets (lua_State *L) {
+  size_t length;
+  luaL_argcheck(L, lua_type(L, 1) == LUA_TSTRING, 1, "colar esperado");
+  luaL_checklstring(L, 1, &length);
+  lua_pushinteger(L, (lua_Integer)length);
   return 1;
 }
 
@@ -255,15 +281,11 @@ static int ipairsaux (lua_State *L) {
 ** (The given "table" may not be a table.)
 */
 static int luaB_ipairs (lua_State *L) {
-#if defined(LUA_COMPAT_IPAIRS)
-  return pairsmeta(L, LUA_MM_IPARES, 1, ipairsaux);
-#else
   luaL_checkany(L, 1);
   lua_pushcfunction(L, ipairsaux);  /* iteration function */
   lua_pushvalue(L, 1);  /* state */
   lua_pushinteger(L, 0);  /* initial value */
   return 3;
-#endif
 }
 
 
@@ -459,15 +481,13 @@ static const luaL_Reg base_funcs[] = {
   {"ipares", luaB_ipairs},
   {"carregueArquivo", luaB_loadfile},
   {"carregue", luaB_load},
-#if defined(LUA_COMPAT_LOADSTRING)
-  {"carregueColar", luaB_load},
-#endif
   {"pr\xC3\xB3ximo", luaB_next},       /* próximo */
   {"pares", luaB_pairs},
   {"proteja", luaB_pcall},
   {"mostre", luaB_print},
   {"igual", luaB_rawequal},
-  {"tamanho", luaB_rawlen},
+  {"tamanho", luaB_len},
+  {"octetos", luaB_octets},
   {"obter", luaB_rawget},
   {"defina", luaB_rawset},
   {"selecione", luaB_select},

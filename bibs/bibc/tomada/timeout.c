@@ -8,6 +8,7 @@
 #include "timeout.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <limits.h>
 #include <float.h>
 
@@ -149,24 +150,18 @@ int timeout_open(lua_State *L) {
 
 /*-------------------------------------------------------------------------*\
 * Sets timeout values for IO operations
-* Lua Input: base, time [, mode]
-*   time: time out value in seconds
-*   mode: "b" for block timeout, "t" for total timeout. (default: b)
+ * Entrada Fé: objeto, segundos [, tipo]
+ *   tipo: "bloqueio" ou "total" (padrão: "bloqueio").
 \*-------------------------------------------------------------------------*/
 int timeout_meth_settimeout(lua_State *L, p_timeout tm) {
     double t = luaL_optnumber(L, 2, -1);
-    const char *mode = luaL_optstring(L, 3, "b");
-    switch (*mode) {
-        case 'b':
-            tm->block = t;
-            break;
-        case 'r': case 't':
-            tm->total = t;
-            break;
-        default:
-            luaL_argcheck(L, 0, 3, "modo de tempo esgotado inv\xC3\xA1lido");
-            break;
-    }
+    const char *tipo = luaL_optstring(L, 3, "bloqueio");
+    if (strcmp(tipo, "bloqueio") == 0)
+        tm->block = t;
+    else if (strcmp(tipo, "total") == 0)
+        tm->total = t;
+    else
+        luaL_argerror(L, 3, "tipo de tempo esgotado inv\xC3\xA1lido");
     lua_pushnumber(L, 1);
     return 1;
 }

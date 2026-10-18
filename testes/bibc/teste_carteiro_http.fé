@@ -1,0 +1,1312 @@
+-- Integração real HTTP do Carteiro com repositório em memória.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminho = "aplicativos/carteiro/fonte/?.fé;" ..
+    "aplicativos/carteiro/fonte/?/ini.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" .. módulo.caminhoC
+
+local rede = importe "rede"
+local segredo = importe "segredo"
+local correio = importe "correio"
+local pulso = importe "pulso"
+local Carteiro = importe "carteiro"
+local Aplicação = importe "carteiro.aplicação"
+local util = importe "carteiro.web"
+
+garanta(util.endereçoLegível("josé@xn--santaf-gva.dev.br") ==
+    "josé@santafé.dev.br", "endereço simples não ficou legível")
+garanta(util.endereçoLegível("José <josé@xn--santaf-gva.dev.br>") ==
+    "José <josé@santafé.dev.br>", "nome de apresentação foi alterado")
+local htmlSeguro = util.htmlSeguroDoCompositor(
+    "<p><strong>Olá</strong><img src=x><script>alert(1)</script></p>")
+garanta(htmlSeguro:procure("<p><strong>Olá</strong>", 1, verdadeiro))
+garanta(não htmlSeguro:procure("<img", 1, verdadeiro))
+garanta(não htmlSeguro:procure("<script>", 1, verdadeiro))
+garanta(htmlSeguro:procure("&lt;script&gt;", 1, verdadeiro))
+
+local bilhete = "sessão-carteiro-teste"
+local resumoEsperado = segredo.resumaBilhete(bilhete)
+local csrf = "csrf-carteiro-teste"
+local usuário = {
+    id = 7, nome = "Rafael", usuário = "rafael",
+    correio = "rafael@santafé.dev.br", csrf = csrf, papel = "usuário"
+}
+local caixa = {
+    id = 11, usuárioId = 7, parteLocal = "rafael",
+    domínioASCII = "xn--santaf-gva.dev.br",
+    endereço = "rafael@santafé.dev.br", nome = "Rafael",
+    estado = "ativa", cota = 1024 * 1024
+}
+
+local consultas = {}
+local enviou = falso
+local enviouHTML = falso
+local respondeu = falso
+local encaminhou = falso
+local marcou = falso
+local marcouNãoLida = falso
+local confiou = falso
+local revogou = falso
+local regraSalva = falso
+local regraRemovida = falso
+local lixeiraEsvaziada = falso
+local decisãoDaTriagem = "nenhuma"
+local pastaDaTriagem = "entrada"
+local pastaMovida
+local movimentosParaLixeira = 0
+local restauraçãoOferecida = falso
+local repositório = {}
+local remetentesConfiáveis = {}
+local regrasDaTriagem = {}
+
+local função mensagemHTMLDeSaída(id, resumo, criadaEm)
+    retorne {
+        id = id, direção = "saida", pasta = "enviadas",
+        identificação = "<saida-" .. id .. "@xn--santaf-gva.dev.br>",
+        remetente = "rafael@xn--santaf-gva.dev.br",
+        destinatários = { ["para"] = { "ana@exemplo.org" } },
+        assunto = "Conversa HTML de saída", resumo = resumo,
+        texto = "Versão em texto da carta " .. id,
+        html = "<p>Carta formatada " .. id .. "</p>" ..
+            "<img src=\"https://rastreador.exemplo/" .. id .. ".png\">",
+        tamanho = 80, lida = verdadeiro, importante = falso,
+        estadoDaEntrega = "entregue", criadaEm = criadaEm,
+        atualizadaEm = criadaEm, anexos = {}
+    }
+fim
+
+função repositório.obtenhaUsuárioPorSessão(_, resumo, tratador)
+    garanta(resumo == resumoEsperado, "resumo do bilhete divergiu")
+    tratador(usuário, nulo)
+fim
+
+função repositório.obtenhaOuCrieCaixa(_, recebido, tratador)
+    garanta(recebido.id == usuário.id)
+    tratador(caixa, nulo)
+fim
+
+função repositório.listeMensagens(_, caixaId, pasta, busca, limite,
+                                             deslocamento, tratador)
+    se tipo(deslocamento) == "função" então
+        tratador, deslocamento = deslocamento, 0
+    fim
+    consultas[#consultas + 1] = {
+        pasta = pasta, busca = busca, limite = limite,
+        deslocamento = deslocamento
+    }
+    garanta(caixaId == caixa.id)
+    tratador({ {
+        id = 41, direção = "entrada", pasta = pasta,
+        identificação = "<original@exemplo.org>",
+        remetente = "ana@exemplo.org",
+        responderPara = "respostas@exemplo.org",
+        destinatários = { ["para"] = { "josé@xn--santaf-gva.dev.br" } },
+        assunto = "Mensagem de integração", resumo = "Olá pelo Carteiro",
+        texto = "Olá pelo Carteiro", html = nulo, tamanho = 18,
+        lida = falso, importante = falso, estadoDaEntrega = "recebida",
+        criadaEm = 1700000000, atualizadaEm = 1700000000,
+        remetentesNaConversa = { "Ana <ana@exemplo.org>",
+            "Bruno <bruno@exemplo.org>" },
+        anexosNaConversa = {
+            { mensagemId = 41, id = 11, nome = "relatório final.pdf",
+                tipo = "application/pdf", tamanho = 23 },
+            { mensagemId = 41, id = 10, nome = "imagem.png",
+                tipo = "image/png", tamanho = 8 },
+            { mensagemId = 41, id = 9, nome = "ação.bin",
+                tipo = "application/octet-stream", tamanho = 7 }
+        }
+    } }, nulo, { temPróxima = deslocamento < 100 })
+fim
+
+função repositório.conteMensagens(_, caixaId, pasta, busca, tratador)
+    garanta(caixaId == caixa.id)
+    garanta(pasta == "entrada" ou pasta == "todas" ou pasta == "enviadas" ou
+        pasta == "rascunhos" ou pasta == "arquivadas" ou
+        pasta == "indesejadas" ou pasta == "lixeira")
+    tratador(pasta == "entrada" e 18733 ou 200, nulo)
+fim
+
+função repositório.listeMensagensParaAção(_, caixaId, pasta, busca, tratador)
+    garanta(caixaId == caixa.id)
+    tratador({ { id = 41, direção = "entrada", pasta = pasta } }, nulo)
+fim
+
+função repositório.obtenhaMensagem(_, caixaId, id, tratador)
+    garanta(caixaId == caixa.id)
+    se id == 42 ou id == 43 então
+        tratador(mensagemHTMLDeSaída(id,
+            id == 42 e "Primeira carta formatada" ou
+                "Segunda carta formatada",
+            id == 42 e 1700000100 ou 1700000200), nulo)
+        retorne
+    fim
+    garanta(id == 41)
+    tratador({
+        id = 41, direção = "entrada", pasta = pastaDaTriagem,
+        identificação = "<original@exemplo.org>",
+        remetente = "ana@exemplo.org",
+        responderPara = "respostas@exemplo.org",
+        destinatários = { ["para"] = { "josé@xn--santaf-gva.dev.br" } },
+        assunto = "Mensagem de integração", resumo = "Olá pelo Carteiro",
+        texto = "Olá pelo Carteiro",
+        html = "<p>Olá pelo <strong>Carteiro</strong>.</p>" ..
+            "<script>parent.document.body.innerHTML='violado'</script>" ..
+            "<img src=\"https://rastreador.exemplo/pixel.png\">",
+        tamanho = 18,
+        lida = falso, importante = falso, estadoDaEntrega = "recebida",
+        criadaEm = 1700000000, atualizadaEm = 1700000000,
+        remetenteEnvelope = "retorno@exemplo.org",
+        resultadoSPF = "nenhum", resultadoDKIM = "passa",
+        resultadoDMARC = "passa", domínioDoAutor = "exemplo.org",
+        políticaDMARC = "rejeitar", açãoDMARC = "aceitar",
+        classificaçãoDaTriagem = "suspeita", pontuaçãoDeSuspeita = 4,
+        motivosDaTriagem = {{ regra = "ensaio", pontos = 4,
+            descrição = "sinal automático do ensaio" }},
+        decisãoDoUsuário = decisãoDaTriagem,
+        regraDaTriagem = decisãoDaTriagem ~= "nenhuma" e
+            "endereco:ana@exemplo.org" ou nulo,
+        anexos = {
+            { id = 9, nome = "ação.bin", tipo = "application/octet-stream", tamanho = 7 },
+            { id = 10, nome = "imagem.png", tipo = "image/png", tamanho = 8 },
+            { id = 11, nome = "relatório final.pdf", tipo = "application/pdf", tamanho = 23 }
+        }
+    }, nulo)
+fim
+
+função repositório.listeMensagensDaConversa(este, caixaId, pasta, id,
+                                                           tratador)
+    garanta(pasta == "entrada" ou pasta == "todas" ou pasta == "enviadas" ou
+        pasta == "rascunhos" ou pasta == "arquivadas" ou
+        pasta == "indesejadas" ou pasta == "lixeira")
+    se id == 42 então
+        tratador({
+            mensagemHTMLDeSaída(42, "Primeira carta formatada", 1700000100),
+            mensagemHTMLDeSaída(43, "Segunda carta formatada", 1700000200)
+        }, nulo)
+        retorne
+    fim
+    este:obtenhaMensagem(caixaId, id, função(mensagem, falha)
+        tratador(mensagem e { mensagem } ou {}, falha)
+    fim)
+fim
+
+função repositório.obtenhaMensagemIMAP(este, caixaId, id, tratador)
+    este:obtenhaMensagem(caixaId, id, função(mensagem, falha)
+        se mensagem então
+            mensagem.mime = "From: ana@exemplo.org\r\n" ..
+                "To: jose@exemplo.org\r\nSubject: Mensagem de integração\r\n" ..
+                "\r\nOlá pelo Carteiro\r\n"
+        fim
+        tratador(mensagem, falha)
+    fim)
+fim
+
+função repositório.marqueLida(_, caixaId, id, tratador)
+    garanta(caixaId == caixa.id e id == 41)
+    marcou = verdadeiro
+    tratador(verdadeiro, nulo)
+fim
+
+função repositório.marqueNãoLida(_, caixaId, id, tratador)
+    garanta(caixaId == caixa.id e id == 41)
+    marcouNãoLida = verdadeiro
+    tratador(verdadeiro, nulo)
+fim
+
+função repositório.obtenhaAnexo(_, caixaId, mensagemId, anexoId, tratador)
+    garanta(caixaId == caixa.id e mensagemId == 41)
+    se anexoId == 9 então
+        tratador({ nome = "ação.bin", tipo = "application/octet-stream",
+            tamanho = 7, dados = "ABC\0DEF" }, nulo)
+        retorne
+    fim
+    se anexoId == 10 então
+        tratador({ nome = "imagem.png", tipo = "image/png",
+            tamanho = 8, dados = "\137PNG\r\n\26\n" }, nulo)
+        retorne
+    fim
+    garanta(anexoId == 11)
+    tratador({ nome = "relatório final.pdf", tipo = "application/pdf",
+        tamanho = 23, dados = "%PDF-1.4\n%%EOF\n" }, nulo)
+fim
+
+função repositório.adicioneSaída(_, caixaRecebida, mensagem, _, tratador)
+    garanta(caixaRecebida.id == caixa.id)
+    local mime, falha = mensagem:forme()
+    garanta(mime, falha)
+    local lida
+    lida, falha = correio.leiaMensagem(mime)
+    garanta(lida, falha)
+    se lida.cabeçalhos["in-reply-to"] então
+        garanta(lida.texto == "Obrigado",
+            "corpo da resposta não entrou no MIME")
+        garanta(lida.cabeçalhos["in-reply-to"] == "<original@exemplo.org>")
+        garanta(lida.cabeçalhos.references == "<original@exemplo.org>")
+        respondeu = verdadeiro
+    senão se lida.assunto == "Encaminhada: Mensagem de integração" então
+        garanta(lida.texto == "Segue a carta encaminhada",
+            "corpo editado do encaminhamento não entrou no MIME")
+        garanta(#lida.anexos == 3,
+            "anexos originais não acompanharam o encaminhamento")
+        garanta(lida.anexos[1].nome == "ação.bin" e
+            lida.anexos[1].dados == "ABC\0DEF")
+        garanta(lida.anexos[2].nome == "imagem.png" e
+            lida.anexos[2].tipo == "image/png")
+        garanta(lida.anexos[3].nome == "relatório final.pdf" e
+            lida.anexos[3].tipo == "application/pdf")
+        encaminhou = verdadeiro
+    senão se lida.assunto == "HTML seguro" então
+        garanta(lida.texto == "Mensagem formatada")
+        garanta(lida.html:procure("<strong>Formatada</strong>", 1, verdadeiro))
+        garanta(não lida.html:procure("<script>", 1, verdadeiro))
+        garanta(lida.html:procure("&lt;script&gt;", 1, verdadeiro))
+        enviouHTML = verdadeiro
+    senão
+        garanta(lida.texto == "Mensagem enviada pelo teste",
+            "corpo não entrou no MIME")
+    fim fim fim
+    enviou = verdadeiro
+    tratador({ mensagem = 42, fila = 3 }, nulo)
+fim
+
+função repositório.movaMensagem(_, caixaId, id, pasta, tratador)
+    garanta(caixaId == caixa.id e id == 41)
+    pastaMovida = pasta
+    se pasta == "lixeira" então
+        movimentosParaLixeira = movimentosParaLixeira + 1
+    fim
+    tratador(verdadeiro, nulo)
+fim
+
+função repositório.esvazieLixeira(_, caixaId, tratador)
+    garanta(caixaId == caixa.id)
+    lixeiraEsvaziada = verdadeiro
+    tratador({ quantidade = 1, tacosLiberados = 18 }, nulo)
+fim
+
+função repositório.remetenteConfiável(_, caixaId, remetente, tratador)
+    garanta(caixaId == caixa.id)
+    tratador(remetentesConfiáveis[remetente:minúscula()] == verdadeiro, nulo)
+fim
+
+função repositório.confieNoRemetente(_, caixaId, remetente, tratador)
+    garanta(caixaId == caixa.id)
+    remetentesConfiáveis[remetente:minúscula()] = verdadeiro
+    confiou = verdadeiro
+    tratador(verdadeiro, nulo)
+fim
+
+função repositório.deixeDeConfiarNoRemetente(_, caixaId, remetente, tratador)
+    garanta(caixaId == caixa.id)
+    remetentesConfiáveis[remetente:minúscula()] = nulo
+    revogou = verdadeiro
+    tratador(verdadeiro, nulo)
+fim
+
+função repositório.listeRegrasDaTriagem(_, caixaId, tratador)
+    garanta(caixaId == caixa.id)
+    local regras = {}
+    para _, regra em pares(regrasDaTriagem) início
+        regras[#regras + 1] = regra
+    fim
+    tratador(regras, nulo)
+fim
+
+função repositório.salveRegraDaTriagem(_, caixaId, escopo, valor,
+                                                  decisão, tratador)
+    garanta(caixaId == caixa.id)
+    local regra = { escopo = escopo, valor = valor:minúscula(), decisão = decisão }
+    regrasDaTriagem[escopo .. ":" .. regra.valor] = regra
+    regraSalva = verdadeiro
+    tratador(regra, nulo)
+fim
+
+função repositório.removaRegraDaTriagem(_, caixaId, escopo, valor, tratador)
+    garanta(caixaId == caixa.id)
+    regrasDaTriagem[escopo .. ":" .. valor:minúscula()] = nulo
+    regraRemovida = verdadeiro
+    tratador(verdadeiro, nulo)
+fim
+
+função repositório.decidaTriagemDaCarta(_, caixaId, id, decisão, tratador)
+    garanta(caixaId == caixa.id e id == 41)
+    decisãoDaTriagem = decisão
+    pastaDaTriagem = decisão == "regular" e "entrada" ou "indesejadas"
+    regrasDaTriagem["endereço:ana@exemplo.org"] = {
+        escopo = "endereço", valor = "ana@exemplo.org",
+        decisão = decisão == "regular" e "permitir" ou "separar"
+    }
+    tratador({
+        pasta = pastaDaTriagem, decisão = decisão,
+        escopo = "endereço", valor = "ana@exemplo.org"
+    }, nulo)
+fim
+
+local configuração = {
+    domínio = "santafé.dev.br", domínioASCII = "xn--santaf-gva.dev.br",
+    limiteLista = 50, limiteDestinatários = 10,
+    limiteAnexo = 1024 * 1024
+}
+local cd = {}
+função cd.posteCarta(_, caixaRecebida, dados, tratador)
+    local mensagem, falha = correio.novaMensagem(dados)
+    se não mensagem então tratador(nulo, falha); retorne fim
+    retorne repositório:adicioneSaída(
+        caixaRecebida, mensagem, { tabela = "correio_fila" }, tratador)
+fim
+local núcleoDoCarteiro = Carteiro.novo({ caixas = repositório, cd = cd })
+local memóriaPULSO = garanta(pulso.memória(256))
+local canalPULSO = garanta(pulso.novo({ serviço = "teste-carteiro-http" }))
+garanta(canalPULSO:adicioneDestino(memóriaPULSO))
+local ap = Aplicação.crie {
+    carteiro = núcleoDoCarteiro,
+    configuração = configuração,
+    pulso = canalPULSO,
+    estado = { falha = nulo }
+}
+
+local porta = 18754
+local cliente = rede.clienteTCP()
+local conexãoCliente
+local terminou = falso
+local sucesso = falso
+local mensagemFinal = "teste HTTP do Carteiro não terminou"
+
+local função concluir(funcionou, detalhe)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    sucesso = funcionou
+    mensagemFinal = detalhe ou ""
+    se conexãoCliente então conexãoCliente:feche() fim
+    cliente:feche()
+    ap.encerre()
+fim
+
+local função pedido(método, caminho, corpo, tipoDoConteúdo, autenticado)
+    corpo = corpo ou ""
+    local cabeçalhos = método .. " " .. caminho .. " HTTP/1.1\r\n" ..
+        "Host: local\r\nConnection: close\r\n"
+    se autenticado então
+        cabeçalhos = cabeçalhos .. "Cookie: sf_sessao=" .. bilhete .. "\r\n"
+    fim
+    se tipoDoConteúdo então
+        cabeçalhos = cabeçalhos .. "Content-Type: " .. tipoDoConteúdo .. "\r\n"
+    fim
+    se #corpo > 0 então
+        cabeçalhos = cabeçalhos .. "Content-Length: " .. #corpo .. "\r\n"
+    fim
+    retorne cabeçalhos .. "\r\n" .. corpo
+fim
+
+local testes = {
+    {
+        nome = "redireciona quem não entrou",
+        pedido = pedido("GET", "/carteiro/entrada"),
+        trechos = { "HTTP/1.1 303", "Location: /entrar?destino=/carteiro/" }
+    },
+    {
+        nome = "lista autenticada e preserva a pasta da rota",
+        pedido = pedido("GET",
+            "/carteiro/enviadas?busca=integração&pagina=2",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            local posiçãoDaLixeira = resposta:procure(
+                'href="/carteiro/lixeira"', 1, verdadeiro)
+            local posiçãoDeTodas = resposta:procure(
+                'href="/carteiro/todas"', 1, verdadeiro)
+            local posiçãoDeArquivadas = resposta:procure(
+                'class="carteiro-pasta" href="/carteiro/arquivadas"',
+                1, verdadeiro)
+            local inícioDoMenu = resposta:procure(
+                'aria-label="Ações das cartas selecionadas"', 1, verdadeiro)
+            local posiçãoLida = resposta:procure(
+                'data-executar-acao value="lida"', inícioDoMenu ou 1, verdadeiro)
+            local posiçãoNãoLida = resposta:procure(
+                'data-executar-acao value="não-lida"', inícioDoMenu ou 1, verdadeiro)
+            local posiçãoArquivar = resposta:procure(
+                'data-executar-acao value="arquivar"', inícioDoMenu ou 1, verdadeiro)
+            local posiçãoDescartar = resposta:procure(
+                'data-executar-acao value="excluir"', inícioDoMenu ou 1, verdadeiro)
+            local posiçãoIndesejada = resposta:procure(
+                'data-executar-acao value="indesejada"', inícioDoMenu ou 1, verdadeiro)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure("<strong>Correio</strong>", 1, verdadeiro) e
+                resposta:procure(
+                    '/carteiro/estático/css/carteiro.css?v=32',
+                    1, verdadeiro) e
+                resposta:procure(
+                    '/carteiro/estático/js/carteiro.js?v=19',
+                    1, verdadeiro) e
+                resposta:procure('data-visualizador-imagem', 1, verdadeiro) e
+                não resposta:procure(
+                    "<strong>Carteiro</strong><small>Santafé</small>",
+                    1, verdadeiro) e
+                resposta:procure("Enviadas", 1, verdadeiro) e
+                resposta:procure("Mensagem de integração", 1, verdadeiro) e
+                resposta:procure("Ana &lt;ana@exemplo.org&gt;, Bruno &lt;bruno@exemplo.org&gt;",
+                    1, verdadeiro) e
+                resposta:procure("relatório final.pdf", 1, verdadeiro) e
+                resposta:procure('aria-label="Ícone PDF"', 1, verdadeiro) e
+                resposta:procure('aria-label="Ícone PNG', 1, verdadeiro) e
+                não resposta:procure("<b>PDF.</b>", 1, verdadeiro) e
+                não resposta:procure("<b>PNG.</b>", 1, verdadeiro) e
+                resposta:procure("Mais 1…", 1, verdadeiro) e
+                resposta:procure('data-visualizar-anexo', 1, verdadeiro) e
+                resposta:procure("Opções de seleção", 1, verdadeiro) e
+                resposta:procure('id="carteiro-selecionar-todas"',
+                    1, verdadeiro) e
+                resposta:procure('for="carteiro-selecionar-todas"',
+                    1, verdadeiro) e
+                resposta:procure('data-selecionar="lidas"', 1, verdadeiro) e
+                resposta:procure('data-selecionar="não-lidas"', 1, verdadeiro) e
+                resposta:procure(">refresh</i>", 1, verdadeiro) e
+                resposta:procure(">archive</i>", 1, verdadeiro) e
+                resposta:procure(">report</i>", 1, verdadeiro) e
+                resposta:procure(">markunread</i>", 1, verdadeiro) e
+                resposta:procure(">drafts</i>Marcar como lida", 1, verdadeiro) e
+                resposta:procure(">mail_outline</i><span>Todas", 1, verdadeiro) e
+                resposta:procure(">Descartar</button>", 1, verdadeiro) e
+                resposta:procure('aria-label="Ações das cartas selecionadas"',
+                    1, verdadeiro) e
+                resposta:procure('value="arquivar" title="Arquivar"',
+                    1, verdadeiro) e
+                resposta:procure('value="indesejada" title="Indesejada"',
+                    1, verdadeiro) e
+                resposta:procure('value="excluir" title="Descartar"',
+                    1, verdadeiro) e
+                não resposta:procure(">move_to_inbox</i>", 1, verdadeiro) e
+                não resposta:procure(">drive_file_move</i>", 1, verdadeiro) e
+                não resposta:procure("data-ação-leitura-rápida",
+                    1, verdadeiro) e
+                não resposta:procure('value="mover:', 1, verdadeiro) e
+                resposta:procure('data-ações-selecionadas hidden',
+                    1, verdadeiro) e
+                resposta:procure('name="acao" value="" data-acao-lote',
+                    1, verdadeiro) e
+                inícioDoMenu e posiçãoLida e posiçãoNãoLida e posiçãoArquivar e
+                posiçãoDescartar e posiçãoIndesejada e
+                posiçãoLida < posiçãoNãoLida e
+                posiçãoNãoLida < posiçãoArquivar e
+                posiçãoArquivar < posiçãoDescartar e
+                posiçãoDescartar < posiçãoIndesejada e
+                resposta:procure("51–51 de 200", 1, verdadeiro) e
+                resposta:procure("Selecionar todas as 200 conversas em Enviadas",
+                    1, verdadeiro) e
+                resposta:procure('name="carta_41" value="41"', 1, verdadeiro) e
+                resposta:procure('for="carteiro-carta-41"', 1, verdadeiro) e
+                resposta:procure('mensagens/41?pasta=enviadas&amp;posicao=51' ..
+                    '&amp;total=200', 1, verdadeiro) e
+                resposta:procure(
+                    'href="/carteiro/enviadas?busca=integra%C3%A7%C3%A3o"',
+                    1, verdadeiro) e
+                resposta:procure(
+                    'href="/carteiro/enviadas?busca=integra%C3%A7%C3%A3o&amp;pagina=3"',
+                    1, verdadeiro) e
+                resposta:procure(
+                    'action="/carteiro/mensagens/acao-em-lote"',
+                    1, verdadeiro) e
+                posiçãoDaLixeira e posiçãoDeTodas e
+                posiçãoDeTodas > posiçãoDaLixeira e
+                não posiçãoDeArquivadas e
+                consultas[#consultas].pasta == "enviadas" e
+                consultas[#consultas].busca == "integração" e
+                consultas[#consultas].deslocamento == 50
+        fim
+    },
+    {
+        nome = "oferece a caixa virtual com todas as mensagens",
+        pedido = pedido("GET", "/carteiro/todas", "", nulo, verdadeiro),
+        trechos = { "HTTP/1.1 200", ">Todas</span>",
+            'href="/carteiro/todas"', "1–1 de 200" }
+    },
+    {
+        nome = "formata e oferece a seleção integral de uma caixa grande",
+        pedido = pedido("GET", "/carteiro/entrada", "", nulo, verdadeiro),
+        trechos = { "HTTP/1.1 200", "1–1 de 18.733",
+            "Selecionar todas as 18.733 conversas em Entrada" }
+    },
+    {
+        nome = "mantém a rota física sem expor Arquivadas na navegação",
+        pedido = pedido("GET", "/carteiro/arquivadas", "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure("<h1>Arquivadas</h1>", 1, verdadeiro) e
+                não resposta:procure(
+                    'class="carteiro-pasta" href="/carteiro/arquivadas"',
+                    1, verdadeiro) e
+                consultas[#consultas].pasta == "arquivadas"
+        fim
+    },
+    {
+        nome = "abre compositor",
+        pedido = pedido("GET", "/carteiro/nova", "", nulo, verdadeiro),
+        trechos = { "Nova mensagem", 'name="csrf"', "csrf-carteiro-teste",
+            'data-modo-compositor="html"', 'data-editor-html',
+            'name="html"', "Formatação da mensagem" }
+    },
+    {
+        nome = "abre as regras pessoais da triagem",
+        pedido = pedido("GET", "/carteiro/triagem", "", nulo, verdadeiro),
+        trechos = { "HTTP/1.1 200", "Triagem", "Endereço exato",
+            "A regra de endereço prevalece sobre a de domínio" }
+    },
+    {
+        nome = "abre o configurador autenticado",
+        pedido = pedido("GET", "/carteiro/configurar", "", nulo, verdadeiro),
+        trechos = { "HTTP/1.1 200", "Configurar este aparelho",
+            "Baixar para iPhone/iPad", "Baixar para Mac",
+            "xn--santaf-gva.dev.br", "993", "465",
+            "587", "O perfil não contém sua senha" }
+    },
+    {
+        nome = "entrega perfil Apple sem senha",
+        pedido = pedido("GET",
+            "/carteiro/configurar/correio-santafe.mobileconfig",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure("Content-Type: application/x-apple-aspen-config", 1, verdadeiro) e
+                resposta:procure('filename="correio-santafe.mobileconfig"', 1, verdadeiro) e
+                resposta:procure("Cache-Control: private, no-store", 1, verdadeiro) e
+                resposta:procure("com.apple.mail.managed", 1, verdadeiro) e
+                resposta:procure("<integer>993</integer>", 1, verdadeiro) e
+                resposta:procure("<integer>465</integer>", 1, verdadeiro) e
+                resposta:procure("<string>System</string>", 1, verdadeiro) e
+                resposta:procure("<key>TargetDeviceType</key>", 1, verdadeiro) e
+                resposta:procure("<integer>1</integer>", 1, verdadeiro) e
+                resposta:procure("rafael@santafé.dev.br", 1, verdadeiro) e
+                não resposta:procure("EmailAccountPassword", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "entrega perfil próprio do Mac sem senha",
+        pedido = pedido("GET",
+            "/carteiro/configurar/correio-santafe-mac.mobileconfig",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure("Content-Type: application/x-apple-aspen-config", 1, verdadeiro) e
+                resposta:procure('filename="correio-santafe-mac.mobileconfig"', 1, verdadeiro) e
+                resposta:procure("Cache-Control: private, no-store", 1, verdadeiro) e
+                resposta:procure("com.apple.mail.managed", 1, verdadeiro) e
+                resposta:procure("<string>User</string>", 1, verdadeiro) e
+                resposta:procure("<key>TargetDeviceType</key>", 1, verdadeiro) e
+                resposta:procure("<integer>5</integer>", 1, verdadeiro) e
+                não resposta:procure("EmailAccountPassword", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "salva regra pessoal com proteção CSRF",
+        pedido = pedido("POST", "/carteiro/triagem/regras",
+            "csrf=csrf-carteiro-teste&escopo=dom%C3%ADnio&" ..
+            "valor=Exemplo.ORG&decis%C3%A3o=separar",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/triagem", 1, verdadeiro) e
+                regraSalva
+        fim
+    },
+    {
+        nome = "lista a regra pessoal salva",
+        pedido = pedido("GET", "/carteiro/triagem", "", nulo, verdadeiro),
+        trechos = { "exemplo.org", "Separar em indesejadas", "Remover" }
+    },
+    {
+        nome = "remove regra pessoal com proteção CSRF",
+        pedido = pedido("POST", "/carteiro/triagem/regras/remover",
+            "csrf=csrf-carteiro-teste&escopo=dom%C3%ADnio&valor=exemplo.org",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/triagem", 1, verdadeiro) e
+                regraRemovida
+        fim
+    },
+    {
+        nome = "enfileira mensagem",
+        pedido = pedido("POST", "/carteiro/enviar",
+            "csrf=csrf-carteiro-teste&para=ana%40exemplo.org&" ..
+            "assunto=Teste&texto=Mensagem+enviada+pelo+teste",
+            "application/x-www-form-urlencoded", verdadeiro),
+        trechos = { "HTTP/1.1 303", "Location: /carteiro/enviadas" }
+    },
+    {
+        nome = "enfileira HTML reduzido e seguro",
+        pedido = pedido("POST", "/carteiro/enviar",
+            "csrf=csrf-carteiro-teste&para=ana%40exemplo.org&" ..
+            "assunto=HTML+seguro&texto=Mensagem+formatada&" ..
+            "html=%3Cp%3E%3Cstrong%3EFormatada%3C%2Fstrong%3E" ..
+            "%3Cscript%3Ealert%281%29%3C%2Fscript%3E%3C%2Fp%3E",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/enviadas",
+                1, verdadeiro) e enviouHTML
+        fim
+    },
+    {
+        nome = "prepara resposta encadeada",
+        pedido = pedido("GET", "/carteiro/mensagens/41/responder", "", nulo, verdadeiro),
+        trechos = { "Resposta: Mensagem de integração", "respostas@exemplo.org",
+            'name="respostaA" value="&lt;original@exemplo.org&gt;"',
+            "&gt; Olá pelo Carteiro" }
+    },
+    {
+        nome = "enfileira resposta encadeada",
+        pedido = pedido("POST", "/carteiro/enviar",
+            "csrf=csrf-carteiro-teste&para=respostas%40exemplo.org&" ..
+            "assunto=Resposta%3A+Mensagem+de+integra%C3%A7%C3%A3o&" ..
+            "texto=Obrigado&respostaA=%3Coriginal%40exemplo.org%3E",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/enviadas", 1, verdadeiro) e
+                respondeu
+        fim
+    },
+    {
+        nome = "prepara encaminhamento com anexos originais",
+        pedido = pedido("GET", "/carteiro/mensagens/41/encaminhar", "", nulo, verdadeiro),
+        trechos = { "Encaminhar", "Encaminhada: Mensagem de integração",
+            'name="encaminharDe" value="41"',
+            "3 anexo(s) da carta original serão incluídos automaticamente." }
+    },
+    {
+        nome = "prepara o encaminhamento da conversa inteira",
+        pedido = pedido("GET",
+            "/carteiro/conversas/41/encaminhar?pasta=entrada",
+            "", nulo, verdadeiro),
+        trechos = { "HTTP/1.1 200", "Encaminhada: Mensagem de integração",
+            "Conversa encaminhada", "De: ana@exemplo.org",
+            "Olá pelo Carteiro" }
+    },
+    {
+        nome = "enfileira encaminhamento com anexos originais",
+        pedido = pedido("POST", "/carteiro/enviar",
+            "csrf=csrf-carteiro-teste&para=maria%40exemplo.org&" ..
+            "assunto=Encaminhada%3A+Mensagem+de+integra%C3%A7%C3%A3o&" ..
+            "texto=Segue+a+carta+encaminhada&encaminharDe=41",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/enviadas", 1, verdadeiro) e
+                encaminhou
+        fim
+    },
+    {
+        nome = "abre e marca mensagem",
+        pedido = pedido("GET",
+            "/carteiro/mensagens/41?pasta=entrada&posicao=9&total=18745",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Mensagem de integração", 1, verdadeiro) e
+                resposta:procure("josé@santafé.dev.br", 1, verdadeiro) e
+                não resposta:procure("josé@xn--santaf-gva.dev.br", 1, verdadeiro) e
+                resposta:procure("ação.bin", 1, verdadeiro) e
+                resposta:procure("relatório final.pdf", 1, verdadeiro) e
+                resposta:procure('aria-label="Ícone PDF"', 1, verdadeiro) e
+                resposta:procure('aria-label="Ícone PNG', 1, verdadeiro) e
+                resposta:procure("/anexos/10/visualizar", 1, verdadeiro) e
+                resposta:procure("/anexos/11/visualizar", 1, verdadeiro) e
+                resposta:procure("data-imprimir-anexo", 1, verdadeiro) e
+                resposta:procure("Formatação bloqueada", 1, verdadeiro) e
+                resposta:procure("Olá pelo Carteiro", 1, verdadeiro) e
+                resposta:procure("Confiar no remetente", 1, verdadeiro) e
+                resposta:procure("Denunciar Indesejada", 1, verdadeiro) e
+                resposta:procure("Denunciar Fisgada", 1, verdadeiro) e
+                resposta:procure("Marcar como não lidas a partir daqui",
+                    1, verdadeiro) e
+                resposta:procure("Bloquear &ldquo;ana&rdquo;", 1, verdadeiro) e
+                resposta:procure("Filtrar as mensagens assim", 1, verdadeiro) e
+                resposta:procure("Imprimir", 1, verdadeiro) e
+                resposta:procure("Baixar mensagem", 1, verdadeiro) e
+                resposta:procure("Mostrar original", 1, verdadeiro) e
+                resposta:procure('action="/carteiro/conversas/41/acao"',
+                    1, verdadeiro) e
+                resposta:procure('data-carta-fixa', 1, verdadeiro) e
+                não resposta:procure('data-alternar-carta', 1, verdadeiro) e
+                não resposta:procure('data-expandir-conversa', 1, verdadeiro) e
+                não resposta:procure('data-recolher-conversa', 1, verdadeiro) e
+                resposta:procure('class="carteiro-carta-detalhes"',
+                    1, verdadeiro) e
+                resposta:procure('carteiro-remetente-recolhido',
+                    1, verdadeiro) e
+                resposta:procure('carteiro-remetente-recolhido"><strong>' ..
+                    'ana@exemplo.org</strong>', 1, verdadeiro) e
+                resposta:procure('carteiro-carta-data-recolhida',
+                    1, verdadeiro) e
+                resposta:procure('ter., 14 de nov. de 2023, 19:13',
+                    1, verdadeiro) e
+                resposta:procure('>new_releases</i>', 1, verdadeiro) e
+                resposta:procure('class="carteiro-conversa-controles"',
+                    1, verdadeiro) e
+                não resposta:procure('<nav aria-label="Controles da conversa"',
+                    1, verdadeiro) e
+                resposta:procure("SPF: não informado", 1, verdadeiro) e
+                resposta:procure("DKIM: passou", 1, verdadeiro) e
+                resposta:procure("DMARC: passou", 1, verdadeiro) e
+                resposta:procure("Triagem:", 1, verdadeiro) e
+                resposta:procure("Identidade postal verificada", 1, verdadeiro) e
+                resposta:procure('/mensagens/41/imprimir', 1, verdadeiro) e
+                resposta:procure('/conversas/41/imprimir?pasta=entrada',
+                    1, verdadeiro) e
+                resposta:procure('title="Mover para"', 1, verdadeiro) e
+                resposta:procure("Filtrar mensagens assim", 1, verdadeiro) e
+                resposta:procure("Encaminhar tudo", 1, verdadeiro) e
+                resposta:procure('name="acao" value="não-lida"',
+                    1, verdadeiro) e
+                resposta:procure("9 de 18.745", 1, verdadeiro) e
+                resposta:procure("1 carta", 1, verdadeiro) e
+                não resposta:procure("data-confirma", 1, verdadeiro) e
+                não resposta:procure("Avaliação automática", 1, verdadeiro) e
+                não resposta:procure("Autenticação postal", 1, verdadeiro) e
+                não resposta:procure("/mensagens/41/corpo-html", 1, verdadeiro) e
+                não resposta:procure('title="Corpo HTML da carta"',
+                    1, verdadeiro) e
+                não resposta:procure("parent.document.body", 1, verdadeiro) e
+                resposta:procure("Responder", 1, verdadeiro) e
+                resposta:procure('<footer class="carteiro-conversa-rodapé"',
+                    1, verdadeiro) e
+                resposta:procure('aria-label="Ações ao final da conversa"',
+                    1, verdadeiro) e
+                resposta:procure('carteiro-conversa-rodapé-botão',
+                    1, verdadeiro) e
+                não resposta:procure('<option value="enviadas">', 1, verdadeiro) e
+                não resposta:procure('<option value="rascunhos">', 1, verdadeiro) e marcou
+        fim
+    },
+    {
+        nome = "oferece controles HTML em cada carta da conversa",
+        pedido = pedido("GET", "/carteiro/mensagens/42?pasta=enviadas",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Conversa HTML de saída", 1, verdadeiro) e
+                resposta:procure("mostrarHTML=42", 1, verdadeiro) e
+                resposta:procure("mostrarHTML=43", 1, verdadeiro) e
+                não resposta:procure("/mensagens/42/corpo-html", 1, verdadeiro) e
+                não resposta:procure("/mensagens/43/corpo-html", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "abre somente o HTML escolhido e oferece suas imagens",
+        pedido = pedido("GET",
+            "/carteiro/mensagens/42?pasta=enviadas&mostrarHTML=43",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("mostrarHTML=42", 1, verdadeiro) e
+                resposta:procure("mostrarExterno=43", 1, verdadeiro) e
+                resposta:procure("/mensagens/43/corpo-html?mostrar=1",
+                    1, verdadeiro) e
+                não resposta:procure("/mensagens/42/corpo-html", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "arquiva a conversa inteira pela barra do leitor",
+        pedido = pedido("POST", "/carteiro/conversas/41/acao",
+            "csrf=csrf-carteiro-teste&pasta=entrada&acao=arquivar",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/entrada", 1, verdadeiro) e
+                pastaMovida == "arquivadas"
+        fim
+    },
+    {
+        nome = "marca a conversa inteira como não lida pela barra",
+        pedido = pedido("POST", "/carteiro/conversas/41/acao",
+            "csrf=csrf-carteiro-teste&pasta=entrada&acao=n%C3%A3o-lida",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/entrada", 1, verdadeiro) e
+                marcouNãoLida
+        fim
+    },
+    {
+        nome = "marca a conversa como não lida a partir da carta",
+        pedido = pedido("POST", "/carteiro/mensagens/41/acao",
+            "csrf=csrf-carteiro-teste&pasta=entrada&acao=n%C3%A3o-lida-daqui",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/entrada",
+                    1, verdadeiro) e marcouNãoLida
+        fim
+    },
+    {
+        nome = "marca carta e remetente como indesejados",
+        pedido = pedido("POST", "/carteiro/mensagens/41/triagem",
+            "csrf=csrf-carteiro-teste&decis%C3%A3o=indesejada",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/indesejadas",
+                1, verdadeiro) e decisãoDaTriagem == "indesejada"
+        fim
+    },
+    {
+        nome = "mantém a decisão pessoal nos detalhes do remetente",
+        pedido = pedido("GET", "/carteiro/mensagens/41", "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Mensagem de integração", 1, verdadeiro) e
+                não resposta:procure("Sua decisão:", 1, verdadeiro) e
+                resposta:procure("pontuação 4", 1, verdadeiro) e
+                resposta:procure("decisão pessoal: indesejada", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "corrige falso positivo e cria permissão pessoal",
+        pedido = pedido("POST", "/carteiro/mensagens/41/triagem",
+            "csrf=csrf-carteiro-teste&decis%C3%A3o=regular",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/entrada", 1, verdadeiro) e
+                decisãoDaTriagem == "regular"
+        fim
+    },
+    {
+        nome = "impede abrir HTML diretamente sem confiança",
+        pedido = pedido("GET", "/carteiro/mensagens/41/corpo-html?mostrar=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 403", 1, verdadeiro) e
+                resposta:procure("Confie no remetente", 1, verdadeiro) e
+                não resposta:procure("<strong>Carteiro</strong>", 1, verdadeiro) e
+                não resposta:procure("parent.document.body", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "confia no endereço sem mostrar conteúdo",
+        pedido = pedido("POST", "/carteiro/mensagens/41/remetente/confiar",
+            "csrf=csrf-carteiro-teste",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/mensagens/41", 1, verdadeiro) e
+                confiou
+        fim
+    },
+    {
+        nome = "remetente confiável ainda pede confirmação",
+        pedido = pedido("GET", "/carteiro/mensagens/41", "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Formatação oculta", 1, verdadeiro) e
+                resposta:procure("Mostrar formatação", 1, verdadeiro) e
+                resposta:procure("mostrarHTML=41", 1, verdadeiro) e
+                não resposta:procure("/corpo-html?mostrar=1", 1, verdadeiro) e
+                não resposta:procure('title="Corpo HTML da carta"',
+                    1, verdadeiro)
+        fim
+    },
+    {
+        nome = "confirma o HTML somente nesta abertura",
+        pedido = pedido("GET", "/carteiro/mensagens/41?mostrarHTML=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("/corpo-html?mostrar=1", 1, verdadeiro) e
+                resposta:procure("Mostrar imagens", 1, verdadeiro) e
+                resposta:procure("<iframe", 1, verdadeiro) e
+                resposta:procure("Imagens externas", 1, verdadeiro) e
+                não resposta:procure("/corpo-html?mostrar=1&amp;externo=1",
+                    1, verdadeiro)
+        fim
+    },
+    {
+        nome = "exibe HTML isolado para remetente confiável",
+        pedido = pedido("GET", "/carteiro/mensagens/41/corpo-html?mostrar=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure('<base target="_blank">', 1, verdadeiro) e
+                resposta:procure("X-Frame-Options: SAMEORIGIN", 1, verdadeiro) e
+                resposta:procure("Referrer-Policy: no-referrer", 1, verdadeiro) e
+                resposta:procure("default-src 'none'", 1, verdadeiro) e
+                resposta:procure("script-src 'none'", 1, verdadeiro) e
+                resposta:procure("connect-src 'none'", 1, verdadeiro) e
+                resposta:procure("img-src data:", 1, verdadeiro) e
+                resposta:procure("form-action 'none'", 1, verdadeiro) e
+                resposta:procure("<strong>Carteiro</strong>", 1, verdadeiro) e
+                resposta:procure("parent.document.body", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "confirma conteúdo externo somente nesta carta",
+        pedido = pedido("GET",
+            "/carteiro/mensagens/41?mostrarHTML=1&mostrarExterno=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("/corpo-html?mostrar=1&amp;externo=1",
+                    1, verdadeiro) e
+                não resposta:procure("visível somente nesta abertura",
+                    1, verdadeiro) e
+                não resposta:procure("imagens externas liberadas nesta abertura",
+                    1, verdadeiro)
+        fim
+    },
+    {
+        nome = "libera apenas imagens HTTPS para remetente confiável",
+        pedido = pedido("GET",
+            "/carteiro/mensagens/41/corpo-html?mostrar=1&externo=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("img-src https: data:", 1, verdadeiro) e
+                resposta:procure('<base target="_blank">', 1, verdadeiro) e
+                resposta:procure("script-src 'none'", 1, verdadeiro) e
+                resposta:procure("form-action 'none'", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "libera imagens da carta enviada escolhida",
+        pedido = pedido("GET",
+            "/carteiro/mensagens/43/corpo-html?mostrar=1&externo=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure("img-src https: data:", 1, verdadeiro) e
+                resposta:procure("rastreador.exemplo/43.png", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "deixa de confiar no remetente",
+        pedido = pedido("POST",
+            "/carteiro/mensagens/41/remetente/deixar-de-confiar",
+            "csrf=csrf-carteiro-teste",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e revogou e
+                não remetentesConfiáveis["ana@exemplo.org"]
+        fim
+    },
+    {
+        nome = "revoga a permissão de conteúdo externo imediatamente",
+        pedido = pedido("GET",
+            "/carteiro/mensagens/41/corpo-html?mostrar=1&externo=1",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 403", 1, verdadeiro) e
+                resposta:procure("Confie no remetente", 1, verdadeiro) e
+                não resposta:procure("img-src https: data:", 1, verdadeiro) e
+                não resposta:procure("<strong>Carteiro</strong>", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "mantém HTML bloqueado depois de revogar",
+        pedido = pedido("GET", "/carteiro/mensagens/41/corpo-html",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 403", 1, verdadeiro) e
+                resposta:procure("mensagem formatada permanece protegida",
+                    1, verdadeiro) e
+                não resposta:procure("<strong>Carteiro</strong>", 1, verdadeiro) e
+                não resposta:procure("parent.document.body", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "exibe imagem segura no corpo",
+        pedido = pedido("GET", "/carteiro/mensagens/41/anexos/10/visualizar",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Content-Type: image/png", 1, verdadeiro) e
+                resposta:procure("Content-Disposition: inline", 1, verdadeiro) e
+                resposta:procure("\137PNG\r\n\26\n", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "exibe PDF seguro no visualizador",
+        pedido = pedido("GET", "/carteiro/mensagens/41/anexos/11/visualizar",
+            "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Content-Type: application/pdf", 1, verdadeiro) e
+                resposta:procure("Content-Disposition: inline", 1, verdadeiro) e
+                resposta:procure("X-Frame-Options: SAMEORIGIN", 1, verdadeiro) e
+                resposta:procure("frame-ancestors 'self'", 1, verdadeiro) e
+                resposta:procure("%PDF-1.4", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "baixa anexo binário",
+        pedido = pedido("GET", "/carteiro/mensagens/41/anexos/9", "", nulo, verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Content-Type: application/octet-stream", 1, verdadeiro) e
+                resposta:procure("filename*=UTF-8''a%C3%A7%C3%A3o.bin", 1, verdadeiro) e
+                resposta:procure("ABC\0DEF", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "baixa a mensagem MIME preservada",
+        pedido = pedido("GET", "/carteiro/mensagens/41/baixar", "", nulo,
+            verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Content-Type: message/rfc822", 1, verdadeiro) e
+                resposta:procure("Content-Disposition: attachment", 1, verdadeiro) e
+                resposta:procure("From: ana@exemplo.org", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "mostra o original como texto inerte",
+        pedido = pedido("GET", "/carteiro/mensagens/41/original", "", nulo,
+            verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Content-Type: text/plain; charset=utf-8",
+                    1, verdadeiro) e
+                resposta:procure("Content-Disposition: inline", 1, verdadeiro) e
+                resposta:procure("Subject: Mensagem de integração", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "monta a impressão integral de uma carta em documento inerte",
+        pedido = pedido("GET", "/carteiro/mensagens/41/imprimir", "", nulo,
+            verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 200", 1, verdadeiro) e
+                resposta:procure("Content-Disposition: inline", 1, verdadeiro) e
+                resposta:procure("Cache-Control: private, no-store",
+                    1, verdadeiro) e
+                resposta:procure("script-src 'none'", 1, verdadeiro) e
+                resposta:procure("sandbox allow-modals", 1, verdadeiro) e
+                resposta:procure("Olá pelo Carteiro", 1, verdadeiro) e
+                resposta:procure("ação.bin", 1, verdadeiro) e
+                resposta:procure("imagem.png", 1, verdadeiro) e
+                não resposta:procure("carteiro-lateral", 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "monta a impressão integral da conversa",
+        pedido = pedido("GET",
+            "/carteiro/conversas/41/imprimir?pasta=entrada", "", nulo,
+            verdadeiro),
+        trechos = { "HTTP/1.1 200", "Mensagem de integração",
+            "Olá pelo Carteiro", "ação.bin", "sandbox allow-modals" }
+    },
+    {
+        nome = "recusa cruzar entrada e enviadas",
+        pedido = pedido("POST", "/carteiro/mensagens/41/mover",
+            "csrf=csrf-carteiro-teste&pasta=enviadas",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 422", 1, verdadeiro) e
+                resposta:procure("direção da carta", 1, verdadeiro) e
+                pastaMovida == "arquivadas"
+        fim
+    },
+    {
+        nome = "move com proteção CSRF",
+        pedido = pedido("POST", "/carteiro/mensagens/41/mover",
+            "csrf=csrf-carteiro-teste&pasta=lixeira",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("Location: /carteiro/lixeira", 1, verdadeiro) e
+                pastaMovida == "lixeira"
+        fim
+    },
+    {
+        nome = "arquiva pela nova barra postal",
+        pedido = pedido("POST", "/carteiro/mensagens/acao-em-lote",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=entrada&pagina=1&" ..
+            "escopo=pagina&acao=arquivar&carta_41=41",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/entrada", 1, verdadeiro) e
+                pastaMovida == "arquivadas"
+        fim
+    },
+    {
+        nome = "marca como lidas todas as cartas do escopo no servidor",
+        pedido = pedido("POST", "/carteiro/mensagens/acao-em-lote",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=todas&pagina=1&" ..
+            "escopo=todas&acao=lida",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/todas", 1, verdadeiro) e
+                marcou
+        fim
+    },
+    {
+        nome = "marca como não lida a seleção da página",
+        pedido = pedido("POST", "/carteiro/mensagens/acao-em-lote",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=entrada&pagina=1&" ..
+            "escopo=pagina&acao=n%C3%A3o-lida&carta_41=41",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/entrada", 1, verdadeiro) e
+                marcouNãoLida
+        fim
+    },
+    {
+        nome = "move a seleção da página para a lixeira",
+        pedido = pedido("POST", "/carteiro/mensagens/mover-para-lixeira",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=entrada&" ..
+            "busca=integra%C3%A7%C3%A3o&pagina=2&carta_41=41",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure(
+                    "Location: /carteiro/entrada?busca=integra%C3%A7%C3%A3o&pagina=2",
+                    1, verdadeiro) e
+                consultas[#consultas].deslocamento == 50 e
+                movimentosParaLixeira == 2
+        fim
+    },
+    {
+        nome = "recusa carta que não estava visível na página",
+        pedido = pedido("POST", "/carteiro/mensagens/mover-para-lixeira",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=entrada&carta_99=99",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 422", 1, verdadeiro) e
+                resposta:procure("somente cartas visíveis", 1, verdadeiro) e
+                movimentosParaLixeira == 2
+        fim
+    },
+    {
+        nome = "recusa lote sem cartas selecionadas",
+        pedido = pedido("POST", "/carteiro/mensagens/mover-para-lixeira",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=entrada",
+            "application/x-www-form-urlencoded", verdadeiro),
+        trechos = { "HTTP/1.1 422", "Selecione ao menos uma carta desta página" }
+    },
+    {
+        nome = "oferece seleção, restauração e esvaziamento na lixeira",
+        pedido = pedido("GET", "/carteiro/lixeira", "", nulo, verdadeiro),
+        verificar = função(resposta)
+            restauraçãoOferecida =
+                resposta:procure('data-executar-acao value="restaurar"',
+                    1, verdadeiro) ~= nulo
+            retorne resposta:procure("Esvaziar lixeira", 1, verdadeiro) e
+                resposta:procure('action="/carteiro/lixeira/esvaziar"',
+                    1, verdadeiro) e
+                resposta:procure("Esta ação não pode ser desfeita",
+                    1, verdadeiro) e restauraçãoOferecida e
+                resposta:procure('title="Restaurar em Todas"',
+                    1, verdadeiro) e
+                resposta:procure('name="carta_41" value="41"',
+                    1, verdadeiro) e
+                resposta:procure('for="carteiro-carta-41"', 1, verdadeiro)
+        fim
+    },
+    {
+        nome = "restaura cartas selecionadas da lixeira em Todas",
+        pedido = pedido("POST", "/carteiro/mensagens/acao-em-lote",
+            "csrf=csrf-carteiro-teste&pastaDeOrigem=lixeira&pagina=1&" ..
+            "escopo=pagina&acao=restaurar&carta_41=41",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/lixeira", 1, verdadeiro) e
+                pastaMovida == "arquivadas"
+        fim
+    },
+    {
+        nome = "esvazia a lixeira com proteção CSRF",
+        pedido = pedido("POST", "/carteiro/lixeira/esvaziar",
+            "csrf=csrf-carteiro-teste",
+            "application/x-www-form-urlencoded", verdadeiro),
+        verificar = função(resposta)
+            retorne resposta:procure("HTTP/1.1 303", 1, verdadeiro) e
+                resposta:procure("Location: /carteiro/lixeira", 1, verdadeiro) e
+                lixeiraEsvaziada
+        fim
+    },
+    {
+        nome = "estado público",
+        pedido = pedido("GET", "/carteiro/estado"),
+        trechos = { "HTTP/1.1 200", '"serviço":"carteiro"', '"estado":"pronto"' }
+    }
+}
+
+local índice = 0
+local executePróximo
+
+executePróximo = função()
+    índice = índice + 1
+    local teste = testes[índice]
+    se não teste então
+        concluir(enviou e respondeu e encaminhou e marcou e marcouNãoLida e
+            confiou e revogou e
+            regraSalva e regraRemovida e decisãoDaTriagem == "regular" e
+            pastaMovida == "arquivadas" e movimentosParaLixeira == 2 e
+            restauraçãoOferecida e
+            lixeiraEsvaziada,
+            "efeitos esperados do Carteiro não ocorreram")
+        retorne
+    fim
+    cliente:definaTempoLimite(3000)
+    cliente:conecteAssíncrono("127.0.0.1", porta, função(_, conexão, falha)
+        se falha então concluir(falso, teste.nome .. ": " .. falha); retorne fim
+        conexãoCliente = conexão
+        conexão:definaTempoLimite(3000)
+        conexão:envieAssíncrono(teste.pedido, função(c, _, falhaDoEnvio)
+            se falhaDoEnvio então
+                concluir(falso, teste.nome .. ": " .. falhaDoEnvio); retorne
+            fim
+            c:recebaDadosAssíncrono(65536, função(_, resposta, falhaDaLeitura)
+                se falhaDaLeitura então
+                    concluir(falso, teste.nome .. ": " .. falhaDaLeitura); retorne
+                fim
+                local passou = verdadeiro
+                se teste.verificar então
+                    passou = não não teste.verificar(resposta)
+                senão
+                    para _, trecho em ipares(teste.trechos) início
+                        se não resposta:procure(trecho, 1, verdadeiro) então
+                            passou = falso; pare
+                        fim
+                    fim
+                fim
+                se não passou então
+                    concluir(falso, teste.nome .. ": " .. resposta); retorne
+                fim
+                conexãoCliente:feche()
+                conexãoCliente = nulo
+                executePróximo()
+            fim)
+        fim)
+    fim)
+fim
+
+local escutou, falhaDaEscuta = ap.escute(porta, {
+    endereço = "127.0.0.1", tempoLimite = 3000,
+    limiteCabeçalhos = 16384, limiteCorpo = 2 * 1024 * 1024
+}, executePróximo)
+
+garanta(escutou, falhaDaEscuta)
+garanta(terminou e sucesso, mensagemFinal)
+local salvouRegraNoPULSO, registrouDecisãoNoPULSO = falso, falso
+local registrouLixeiraNoPULSO, registrouLoteNoPULSO = falso, falso
+local registrouRestauraçãoNoPULSO = falso
+para _, acontecimento em ipares(memóriaPULSO.mensagens) início
+    se acontecimento.nome == "carteiro.triagem.regraSalva" então
+        salvouRegraNoPULSO = verdadeiro
+    fim
+    se acontecimento.nome == "carteiro.triagem.decisãoDoUsuário" então
+        registrouDecisãoNoPULSO = verdadeiro
+        garanta(acontecimento.dados.carta == 41)
+        garanta(acontecimento.dados.conteúdo == nulo,
+            "PULSO recebeu indevidamente o conteúdo da carta")
+    fim
+    se acontecimento.nome == "carteiro.lixeiraEsvaziada" então
+        registrouLixeiraNoPULSO = verdadeiro
+        garanta(acontecimento.dados.quantidade == 1)
+        garanta(acontecimento.dados.tacosLiberados == 18)
+        garanta(acontecimento.dados.conteúdo == nulo,
+            "PULSO recebeu indevidamente o conteúdo da lixeira")
+    fim
+    se acontecimento.nome == "carteiro.cartasMovidasParaLixeira" então
+        registrouLoteNoPULSO = verdadeiro
+        garanta(acontecimento.dados.quantidade == 1)
+        garanta(acontecimento.dados.pastaDeOrigem == "entrada")
+        garanta(acontecimento.dados.cartas == nulo,
+            "PULSO recebeu indevidamente as identificações das cartas")
+    fim
+    se acontecimento.nome == "carteiro.cartasRestauradas" então
+        registrouRestauraçãoNoPULSO = verdadeiro
+        garanta(acontecimento.dados.quantidade == 1)
+        garanta(acontecimento.dados.destino == "todas")
+        garanta(acontecimento.dados.cartas == nulo,
+            "PULSO recebeu indevidamente as identificações restauradas")
+    fim
+fim
+garanta(salvouRegraNoPULSO e registrouDecisãoNoPULSO e
+    registrouLixeiraNoPULSO e registrouLoteNoPULSO e
+    registrouRestauraçãoNoPULSO,
+    "acontecimentos PULSO do Carteiro não foram emitidos")
+canalPULSO:feche()
+mostre("Carteiro HTTP: ok")

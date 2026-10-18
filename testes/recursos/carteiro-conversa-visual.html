@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ensaio visual das conversas do Carteiro</title>
+  <link href="../../site-sfdev/materialize/css/materialize.css" rel="stylesheet">
+  <link href="../../site-sfdev/materialize/css/material-icons.css" rel="stylesheet">
+  <link href="../../aplicativos/carteiro/estático/css/carteiro.css?v=22" rel="stylesheet">
+</head>
+<body>
+  <header class="carteiro-topo">
+    <a class="carteiro-marca" href="#"><i class="material-icons">local_post_office</i><strong>Correio</strong><small>Santafé</small></a>
+    <div class="carteiro-conta"><span><strong>Rafael</strong><small>rafael@santafé.dev.br</small></span></div>
+  </header>
+  <div class="carteiro-corpo">
+    <aside class="carteiro-lateral"><a class="btn amber darken-3 carteiro-nova" href="#"><i class="material-icons left">edit</i>Nova mensagem</a><nav>
+      <a class="carteiro-pasta ativo" href="#"><i class="material-icons">inbox</i><span>Entrada</span></a>
+      <a class="carteiro-pasta" href="#"><i class="material-icons">send</i><span>Enviadas</span></a>
+      <a class="carteiro-pasta" href="#"><i class="material-icons">drafts</i><span>Rascunhos</span></a>
+      <a class="carteiro-pasta" href="#"><i class="material-icons">report</i><span>Indesejadas</span></a>
+      <a class="carteiro-pasta" href="#"><i class="material-icons">delete</i><span>Lixeira</span></a>
+      <a class="carteiro-pasta" href="#"><i class="material-icons">mail_outline</i><span>Todas</span></a>
+    </nav></aside>
+    <main class="carteiro-conteúdo">
+      <section class="carteiro-painel carteiro-conversa">
+        <div class="carteiro-painel-título carteiro-conversa-ferramentas">
+          <div class="carteiro-conversa-ações">
+            <a class="carteiro-botão-ícone" href="#" title="Voltar"><i class="material-icons">arrow_back</i></a>
+            <button class="carteiro-botão-ícone" title="Arquivar"><i class="material-icons">archive</i></button>
+            <button class="carteiro-botão-ícone" title="Indesejada"><i class="material-icons">report</i></button>
+            <button class="carteiro-botão-ícone" title="Descartar"><i class="material-icons">delete</i></button>
+            <button class="carteiro-botão-ícone" title="Marcar como não lida"><i class="material-icons">markunread</i></button>
+            <button class="carteiro-botão-ícone" title="Mover para"><i class="material-icons">move_to_inbox</i></button>
+            <button class="carteiro-botão-ícone" title="Mais"><i class="material-icons">more_vert</i></button>
+          </div>
+          <span class="carteiro-conversa-paginação">9 de 18.745</span>
+        </div>
+        <header class="carteiro-conversa-título"><div><h1>Mensagem de boas-vindas</h1><span>3 cartas</span></div><div class="carteiro-conversa-controles" aria-label="Controles da conversa"><button class="carteiro-botão-ícone" type="button" data-expandir-conversa><i class="material-icons">unfold_more</i></button><button class="carteiro-botão-ícone" type="button" data-recolher-conversa hidden><i class="material-icons">unfold_less</i></button><a class="carteiro-botão-ícone" href="/carteiro/conversas/381/imprimir?pasta=entrada" target="_blank" data-imprimir-carta><i class="material-icons">print</i></a></div></header>
+        <div class="carteiro-conversa-cartas">
+          <article class="carteiro-carta-conversa" data-carta-conversa="381">
+            <header><div class="carteiro-carta-alternador" role="button" tabindex="0" data-alternar-carta aria-expanded="false"><span class="carteiro-avatar">R</span><span class="carteiro-carta-resumo"><span class="carteiro-remetente carteiro-remetente-aberto"><strong>Rafael Lemos</strong><i class="material-icons carteiro-remetente-verificado">new_releases</i><span>&lt;rafael@telemulti.net&gt;</span></span><span class="carteiro-remetente carteiro-remetente-recolhido"><strong>Rafael Lemos</strong><i class="material-icons carteiro-remetente-verificado">new_releases</i></span><span class="carteiro-carta-data carteiro-carta-data-aberta"><time>5 de set. de 2026, 08:32 <small>(há 9 horas)</small></time></span><span class="carteiro-carta-data carteiro-carta-data-recolhida"><time>sáb., 5 de set., 08:32 <small>(há 3 dias)</small></time></span><small class="carteiro-carta-prévia">Olá, bem-vindo ao novo Carteiro.</small></span></div><div class="carteiro-carta-ferramentas"><a class="carteiro-botão-ícone"><i class="material-icons">reply</i></a><a class="carteiro-botão-ícone"><i class="material-icons">forward</i></a><details class="carteiro-menu carteiro-menu-carta"><summary class="carteiro-botão-ícone"><i class="material-icons">more_vert</i></summary><div class="carteiro-menu-conteúdo"><button>Responder</button><button>Encaminhar</button><button>Excluir</button><button>Marcar como não lidas a partir daqui</button><button>Bloquear &ldquo;Rafael Lemos&rdquo;</button><button>Denunciar Indesejada</button><button>Denunciar Fisgada</button><button>Filtrar as mensagens assim</button><button>Imprimir</button><button>Baixar mensagem</button><button>Mostrar original</button></div></details></div></header>
+            <div class="carteiro-carta-corpo" data-corpo-carta hidden></div>
+          </article>
+          <article class="carteiro-carta-conversa" data-carta-conversa="382">
+            <header><div class="carteiro-carta-alternador" role="button" tabindex="0" data-alternar-carta aria-expanded="false"><span class="carteiro-avatar">R</span><span class="carteiro-carta-resumo"><span class="carteiro-remetente carteiro-remetente-aberto"><span>&lt;rafael@santafé.dev.br&gt;</span></span><span class="carteiro-remetente carteiro-remetente-recolhido"><strong>rafael@santafé.dev.br</strong></span><span class="carteiro-carta-data carteiro-carta-data-aberta"><time>5 de set. de 2026, 14:01 <small>(há 3 horas)</small></time></span><span class="carteiro-carta-data carteiro-carta-data-recolhida"><time>sáb., 5 de set., 14:01 <small>(há 3 dias)</small></time></span><small class="carteiro-carta-prévia">Obrigado. Esta é a primeira resposta da conversa.</small></span></div><div class="carteiro-carta-ferramentas"><a class="carteiro-botão-ícone"><i class="material-icons">reply</i></a><a class="carteiro-botão-ícone"><i class="material-icons">forward</i></a><details class="carteiro-menu carteiro-menu-carta"><summary class="carteiro-botão-ícone"><i class="material-icons">more_vert</i></summary><div class="carteiro-menu-conteúdo"><button>Responder</button><button>Encaminhar</button><button>Excluir</button><button>Marcar como não lidas a partir daqui</button><button>Imprimir</button><button>Baixar mensagem</button><button>Mostrar original</button></div></details></div></header>
+            <div class="carteiro-carta-corpo" data-corpo-carta hidden></div>
+          </article>
+          <article class="carteiro-carta-conversa aberta" data-carta-conversa="383" data-carta-fixa>
+            <header><div class="carteiro-carta-identidade"><span class="carteiro-avatar">R</span><span class="carteiro-carta-resumo"><span class="carteiro-remetente carteiro-remetente-aberto"><strong>Rafael Lemos</strong><i class="material-icons carteiro-remetente-verificado">new_releases</i><span>&lt;rafael@telemulti.net&gt;</span></span><span class="carteiro-remetente carteiro-remetente-recolhido"><strong>Rafael Lemos</strong><i class="material-icons carteiro-remetente-verificado">new_releases</i></span><span class="carteiro-carta-data carteiro-carta-data-aberta"><time>5 de set. de 2026, 17:29 <small>(há 12 minutos)</small></time></span><span class="carteiro-carta-data carteiro-carta-data-recolhida"><time>sáb., 5 de set., 17:29 <small>(há 3 dias)</small></time></span><details class="carteiro-carta-detalhes" data-não-alternar><summary>para mim<i class="material-icons">arrow_drop_down</i></summary><dl><div><dt>de:</dt><dd>Rafael Lemos &lt;rafael@telemulti.net&gt;</dd></div><div><dt>a:</dt><dd>rafael@santafé.dev.br</dd></div><div><dt>data:</dt><dd>05/09/2026 17:29</dd></div><div><dt>autenticação:</dt><dd>SPF: passou; DKIM: passou; DMARC: passou</dd></div></dl></details></span></div><div class="carteiro-carta-ferramentas"><a class="carteiro-botão-ícone"><i class="material-icons">reply</i></a><a class="carteiro-botão-ícone"><i class="material-icons">forward</i></a><details class="carteiro-menu carteiro-menu-carta"><summary class="carteiro-botão-ícone"><i class="material-icons">more_vert</i></summary><div class="carteiro-menu-conteúdo"><button>Responder</button><button>Encaminhar</button><button>Excluir</button><button>Marcar como não lidas a partir daqui</button><button>Bloquear &ldquo;Rafael Lemos&rdquo;</button><button>Denunciar Indesejada</button><button>Denunciar Fisgada</button><button>Filtrar as mensagens assim</button><button>Imprimir</button><button>Baixar mensagem</button><button>Mostrar original</button></div></details></div></header>
+            <div class="carteiro-carta-corpo" data-corpo-carta><div class="carteiro-html-controle"><span>Imagens externas ocultas.</span><a href="#">Mostrar imagens</a></div><div class="carteiro-texto">Olá, Rafael.\n\nSegue o documento solicitado para conferência.</div><section class="carteiro-anexos carteiro-anexos-compactos"><a class="carteiro-anexo-item"><i class="material-icons">attachment</i><span>documento.pdf<small>80,5 KB</small></span></a></section></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="../../aplicativos/carteiro/estático/js/carteiro.js?v=15"></script>
+</body>
+</html>

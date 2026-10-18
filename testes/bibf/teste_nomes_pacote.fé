@@ -1,0 +1,61 @@
+local nomes = importe "nomes"
+
+local mensagem = {
+    identificação = 0xBEEF,
+    bandeiras = { resposta = verdadeiro, autoritativa = verdadeiro },
+    perguntas = { { nome = "exemplo.org", tipo = "A" } },
+    respostas = {
+        { nome = "exemplo.org", tipo = "A", ttl = 300, dados = "192.0.2.10" },
+        { nome = "exemplo.org", tipo = "AAAA", ttl = 300,
+            dados = "2001:db8::10" },
+        { nome = "exemplo.org", tipo = "MX", ttl = 300,
+            dados = { preferência = 10, troca = "correio.exemplo.org" } },
+        { nome = "exemplo.org", tipo = "TXT", ttl = 300,
+            dados = { "v=spf1", " -all" } },
+        { nome = "_servico._tcp.exemplo.org", tipo = "SRV", ttl = 300,
+            dados = { prioridade = 1, peso = 2, porta = 443,
+                alvo = "www.exemplo.org" } },
+        { nome = "exemplo.org", tipo = "CAA", ttl = 300,
+            dados = { bandeiras = 0, etiqueta = "issue",
+                valor = "letsencrypt.org" } },
+        -- Tipos DNSSEC ainda não são interpretados, mas atravessam o
+        -- codificador sem perda para que o protocolo continue extensível.
+        { nome = "exemplo.org", tipo = "DS", ttl = 300,
+            dados = "\18\52\8\2\170\187\204\221" }
+    }
+}
+
+local pacote, falha = nomes.codifiqueMensagem(mensagem)
+garanta(pacote, falha)
+local lida
+lida, falha = nomes.decodifiqueMensagem(pacote)
+garanta(lida, falha)
+garanta(lida.identificação == 0xBEEF)
+garanta(lida.bandeiras.autoritativa)
+garanta(lida.respostas[1].dados == "192.0.2.10")
+garanta(lida.respostas[2].dados == "2001:db8:0:0:0:0:0:10")
+garanta(lida.respostas[3].dados.preferência == 10)
+garanta(lida.respostas[3].dados.troca == "correio.exemplo.org.")
+garanta(lida.respostas[4].dados[1] == "v=spf1")
+garanta(lida.respostas[5].dados.porta == 443)
+garanta(lida.respostas[6].dados.etiqueta == "issue")
+garanta(lida.respostas[7].nomeDoTipo == "DS")
+garanta(lida.respostas[7].dados == "\18\52\8\2\170\187\204\221")
+
+-- Nome comprimido: a segunda pergunta aponta para "exemplo.org" iniciado no taco 13.
+local consulta = garanta(nomes.novaConsulta("exemplo.org", "A", 7, falso))
+local cabeçalhoDuplo = consulta:corte(1, 4) .. "\0\2" .. consulta:corte(7, 12)
+local comprimida = cabeçalhoDuplo .. consulta:corte(13) ..
+    "\192\12" .. "\0\1\0\1"
+local mensagemComprimida = garanta(nomes.decodifiqueMensagem(comprimida))
+garanta(mensagemComprimida.perguntas[2].nome == "exemplo.org.")
+
+local ruim, erroDNS = nomes.decodifiqueMensagem("\0\1")
+garanta(ruim == nulo e erroDNS:procure("truncada", 1, verdadeiro))
+
+-- Tipos conhecidos não podem esconder cargas com comprimento impossível.
+local aTruncado = "\0\1\128\0\0\0\0\1\0\0\0\0" ..
+    "\0\0\1\0\1\0\0\0\0\0\3abc"
+ruim, erroDNS = nomes.decodifiqueMensagem(aTruncado)
+garanta(ruim == nulo e erroDNS:procure("4 tacos", 1, verdadeiro))
+mostre("nomes pacote: ok")

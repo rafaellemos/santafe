@@ -34,7 +34,7 @@ fi
 CORE=(
   lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c
   lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c
-  ltm.c lundump.c lvm.c lzio.c
+  ltm.c lunicode.c lundump.c lvm.c lzio.c
 )
 
 LIBS=(
@@ -60,8 +60,6 @@ emcc \
   "${JSON[@]}" \
   -I. \
   -O2 \
-  -DLUA_COMPAT_MAXN \
-  -DLUA_COMPAT_MATHLIB \
   -D'lua_writestring(s,l)=sf_wasm_writestring(s,l)' \
   -D'lua_writeline()=sf_wasm_writeline()' \
   --no-entry \

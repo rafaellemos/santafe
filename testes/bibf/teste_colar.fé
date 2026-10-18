@@ -1,0 +1,52 @@
+-- Regressão: colar.junte deve conservar a ordem dos argumentos.
+garanta(colar.junte(",", "a", "b", "c") == "a,b,c")
+garanta(colar.junte(" / ", "primeiro", "segundo") == "primeiro / segundo")
+
+-- Texto é medido em grafemas; # e octetos permanecem medidas de armazenamento.
+garanta(colar.tamanho("ação") == 4)
+garanta(tamanho("é") == 1)
+garanta(colar.tamanho("👩🏽‍💻") == 1)
+garanta(tamanho("👨‍👩‍👧‍👦") == 1)
+garanta(tamanho("🇧🇷") == 1)
+garanta(tamanho("한") == 1)
+garanta(tamanho("का") == 1)
+garanta(tamanho("\r\n") == 1)
+garanta(octetos("ação") == #"ação")
+garanta(octetos("ação") == 6)
+garanta(octetos("a\0") == 2)
+garanta(tamanho({10, 20, 30}) == 3)
+garanta(tamanho({ nome = "Ana" }) == 0)
+
+local esparsa = {10, nulo, 30, nome = "Ana"}
+garanta(tamanho(esparsa) == #esparsa)
+garanta(tabela.maiorÍndice(esparsa) == 3)
+garanta(tabela.maiorN == nulo)
+
+local comTamanho = definaMetatabela({ valor = 9 }, {
+    __tamanho = função(valor) retorne valor.valor fim
+})
+garanta(tamanho(comTamanho) == #comTamanho)
+garanta(tamanho(comTamanho) == 9)
+
+local expansível = ("a"):replique(2048)
+local compactado = colar.compacte(expansível)
+garanta(colar.descompacte(compactado, 4096) == expansível)
+local okLimite, falhaLimite = proteja(função()
+    retorne colar.descompacte(compactado, 128)
+fim)
+garanta(não okLimite)
+garanta(falhaLimite:procure("limite", 1, verdadeiro))
+
+local ok, falha = proteja(função()
+    retorne tamanho("\255")
+fim)
+garanta(não ok)
+garanta(falha:procure("use octetos", 1, verdadeiro))
+
+local okNumero, falhaNumero = proteja(função()
+    retorne octetos(256)
+fim)
+garanta(não okNumero)
+garanta(falhaNumero:procure("colar esperado", 1, verdadeiro))
+
+mostre("colar.junte, grafemas e octetos: ok")

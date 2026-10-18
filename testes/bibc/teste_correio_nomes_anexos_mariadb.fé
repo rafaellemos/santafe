@@ -1,0 +1,96 @@
+-- Recupera nomes RFC 2231 sem tocar no conteúdo imutável dos anexos.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" ..
+    módulo.caminhoC
+
+local Adaptador = importe "correio.mariadb"
+
+local mime = tabela.concatene({
+    "From: Ana <ana@exemplo.org>",
+    "To: Rafael <rafael@santafé.dev.br>",
+    "Subject: Documento",
+    "Content-Type: multipart/mixed; boundary=nome-historico",
+    "",
+    "--nome-historico",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "Documento anexo.",
+    "--nome-historico",
+    "Content-Type: application/pdf",
+    "Content-Disposition: attachment;",
+    " filename*0*=UTF-8''relat%C3%B3rio%20de%20;",
+    " filename*1*=setembro.pdf",
+    "Content-Transfer-Encoding: base64",
+    "",
+    "JVBERi0xLjQK",
+    "--nome-historico--"
+}, "\r\n")
+
+local função resultado(linhas, alteradas)
+    local índice = 0
+    local este = {}
+    função este.obterLinha()
+        índice = índice + 1
+        retorne linhas[índice]
+    fim
+    função este.linhasAfetadas() retorne alteradas ou 0 fim
+    função este.feche() fim
+    retorne este
+fim
+
+local piscina = { confirmou = falso, desfez = falso, atualização = nulo }
+
+função piscina.executePreparadoAssíncrono(esta, sql, parâmetros, tratador)
+    local resposta
+    se sql:procure("SELECT DISTINCT c.id", 1, verdadeiro) então
+        resposta = resultado({ { 384, mime, nulo, #mime } })
+    senão se sql:procure("SELECT id,nome,tipo,tamanho", 1, verdadeiro) então
+        resposta = resultado({ {
+            35, "anexo-1", "application/pdf", 9
+        } })
+    senão se sql:procure("UPDATE correio_anexos", 1, verdadeiro) então
+        esta.atualização = parâmetros
+        resposta = resultado({}, 1)
+    senão
+        erro("SQL inesperado no ensaio: " .. sql)
+    fim fim fim
+    tratador(esta, resposta, nulo)
+    retorne verdadeiro
+fim
+
+função piscina.inicieTransaçãoAssíncrona(esta, tratador)
+    tratador(esta, esta, nulo)
+    retorne verdadeiro
+fim
+
+função piscina.confirmeAssíncrono(esta, tratador)
+    esta.confirmou = verdadeiro
+    tratador(esta, verdadeiro, nulo)
+    retorne verdadeiro
+fim
+
+função piscina.desfaçaAssíncrono(esta, tratador)
+    esta.desfez = verdadeiro
+    tratador(esta, verdadeiro, nulo)
+    retorne verdadeiro
+fim
+
+local repositório = Adaptador.novo(piscina, {}, {})
+local estatísticas, falha
+repositório:recupereNomesOriginaisDosAnexos(
+    função(valor, erroDaRecuperação)
+        estatísticas, falha = valor, erroDaRecuperação
+    fim)
+
+garanta(não falha, falha)
+garanta(estatísticas.cartas == 1 e estatísticas.candidatos == 1 e
+    estatísticas.corrigidos == 1 e estatísticas.ignorados == 0)
+garanta(piscina.confirmou e não piscina.desfez,
+    "a recuperação dos nomes não foi confirmada")
+garanta(piscina.atualização[1] == "relatório de setembro.pdf" e
+    piscina.atualização[2] == 35 e piscina.atualização[3] == 384 e
+    piscina.atualização[4] == "anexo-1",
+    "o nome original não foi aplicado ao anexo correto")
+
+mostre("Correio nomes de anexos RFC 2231: ok")

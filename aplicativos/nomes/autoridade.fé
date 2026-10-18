@@ -1,0 +1,51 @@
+#!/usr/local/bin/santafé
+
+local autoridade = importe "nomes.autoridade"
+
+local arquivoDasZonas = so.obterVariável("NOMES_ZONAS_ARQUIVO") ou
+    "/etc/santafe-nomes/zonas.fé"
+local definição = executeArquivo(arquivoDasZonas)
+garanta(tipo(definição) == "tabela",
+    "o arquivo de zonas precisa devolver uma tabela")
+
+local chavePrivada
+local caminhoDaChave = so.obterVariável("NOMES_DNSSEC_CHAVE")
+se caminhoDaChave e caminhoDaChave ~= "" então
+    local arquivo, falhaDaChave = es.abra(caminhoDaChave, "leitura")
+    garanta(arquivo, falhaDaChave)
+    chavePrivada = arquivo:leia("*tudo")
+    arquivo:feche()
+    garanta(chavePrivada e #chavePrivada > 0,
+        "a chave privada DNSSEC está vazia")
+    para _, zona em ipares(definição.zonas ou definição) início
+        se zona.dnssec então
+            se tipo(zona.dnssec) ~= "tabela" então zona.dnssec = {} fim
+            zona.dnssec.chavePrivada = chavePrivada
+        fim
+    fim
+fim
+
+local endereço = so.obterVariável("NOMES_AUTORIDADE_ENDERECO") ou "0.0.0.0"
+local porta = paraNúmero(so.obterVariável("NOMES_AUTORIDADE_PORTA") ou "53")
+local servidor, falha = autoridade.novo({
+    endereço = endereço,
+    porta = porta,
+    zonas = definição.zonas ou definição,
+    máximoUDP = paraNúmero(so.obterVariável("NOMES_MAXIMO_UDP") ou "1232"),
+    máximoTCP = paraNúmero(
+        so.obterVariável("NOMES_AUTORIDADE_MAXIMO_TCP") ou "256"),
+    limiteDeTaxa = {
+        porSegundo = paraNúmero(
+            so.obterVariável("NOMES_AUTORIDADE_POR_SEGUNDO") ou "200"),
+        explosão = paraNúmero(
+            so.obterVariável("NOMES_AUTORIDADE_EXPLOSAO") ou "400")
+    },
+    aoFalhar = função(erroDNS) mostre("[Nomes — autoridade]", erroDNS) fim
+})
+garanta(servidor, falha)
+chavePrivada = nulo
+mostre("Autoridade de nomes escutando em " .. endereço .. ":" .. porta)
+para _, registroDS em ipares(servidor.registrosDS) início
+    mostre("DNSSEC DS:", registroDS)
+fim
+garanta(servidor:escute())

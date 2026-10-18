@@ -1,0 +1,8 @@
+<snippet>
+    <content><![CDATA[para ${1:índice} = ${2:1}, ${3:10} início
+    ${0}
+fim]]></content>
+    <tabTrigger>para</tabTrigger>
+    <scope>source.santafe</scope>
+    <description>laço para</description>
+</snippet>

@@ -1,0 +1,27 @@
+local correio = importe "correio"
+local pulso = importe "pulso"
+
+local canalPULSO = garanta(pulso.novo {
+    serviço = "correio",
+    instância = "smtp-local"
+})
+canalPULSO:adicioneDestino(
+    garanta(pulso.registrador("correio.pulso.jsonl"))
+)
+
+-- Exemplo local, sem TLS e sem autenticação. Não exponha esta configuração
+-- à Internet. Somente o domínio teste.local é aceito.
+local fila = correio.filaMemória(100)
+local servidor = garanta(correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 2525,
+    nome = "smtp.teste.local",
+    domíniosLocais = { "teste.local" },
+    pulso = canalPULSO,
+    receba = função(mensagem, conclua)
+        fila:receba(mensagem, conclua)
+    fim
+})
+
+mostre("Correio local escutando em 127.0.0.1:2525")
+garanta(servidor:escute())

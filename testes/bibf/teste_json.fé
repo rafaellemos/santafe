@@ -1,0 +1,9 @@
+-- A tabela vazia é ambígua em JSON. O marcador permite declarar uma matriz
+-- vazia de maneira explícita sem alterar a semântica de tabelas Santafé.
+
+garanta(json.cod({}) == "{}")
+garanta(json.cod(json.matrizVazia) == "[]")
+garanta(json.cod({ diagnósticos = json.matrizVazia }) ==
+    '{"diagnósticos":[]}')
+
+mostre("JSON matriz vazia: ok")

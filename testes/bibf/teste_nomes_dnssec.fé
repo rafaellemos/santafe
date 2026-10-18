@@ -1,0 +1,91 @@
+local nomes = importe "nomes"
+local autoridade = importe "nomes.autoridade"
+
+local caminho = so.obterVariável("NOMES_DNSSEC_CHAVE_TESTE")
+se não caminho ou caminho == "" então
+    mostre("IGNORADO: defina NOMES_DNSSEC_CHAVE_TESTE com uma chave RSA PEM")
+    retorne
+fim
+local arquivo = garanta(es.abra(caminho, "leitura"))
+local chave = arquivo:leia("*tudo")
+arquivo:feche()
+
+local servidor = garanta(autoridade.novo({
+    endereço = "127.0.0.1", porta = 15353,
+    zonas = {{
+        nome = "exemplo.test.", ttlPadrão = 300,
+        dnssec = { chavePrivada = chave, carimbo = 1787875200 },
+        registros = {
+            { nome = "@", tipo = "SOA", dados = {
+                mestre = "ns1", responsável = "dns",
+                série = 2026082801, atualização = 3600,
+                novaTentativa = 900, expiração = 604800, mínimo = 300
+            } },
+            { nome = "@", tipo = "NS", dados = "ns1" },
+            { nome = "ns1", tipo = "A", dados = "192.0.2.53" },
+            { nome = "@", tipo = "A", dados = "192.0.2.1" },
+            { nome = "www", tipo = "A", dados = "192.0.2.2" },
+            { nome = "@", tipo = "TXT", dados = "dnssec santafé" }
+        }
+    }}
+}))
+chave = nulo
+
+garanta(#servidor.registrosDS == 1)
+garanta(servidor.registrosDS[1]:separe(
+    "^exemplo%.test%. IN DS %d+ 8 2 [0-9A-F]+$"))
+
+local função consulte(nome, tipoDoRegistro, comDNSSEC)
+    local adicionais = {}
+    se comDNSSEC então
+        adicionais[1] = { nome = ".", tipo = nomes.TIPOS.OPT,
+            classe = 1232, ttl = 0x8000, dados = "" }
+    fim
+    local consulta = garanta(nomes.codifiqueMensagem({
+        identificação = 0x5346,
+        bandeiras = { recursãoDesejada = falso },
+        perguntas = {{ nome = nome, tipo = tipoDoRegistro, classe = 1 }},
+        adicionais = adicionais
+    }))
+    local resposta = garanta(servidor:responda(consulta, "UDP"))
+    retorne garanta(nomes.decodifiqueMensagem(resposta))
+fim
+
+local função conte(lista, tipoDoRegistro, tipoCoberto)
+    local quantidade = 0
+    para _, registro em ipares(lista) início
+        se registro.tipo == tipoDoRegistro e
+           (não tipoCoberto ou
+            ((registro.dadosCrus:byte(1) << 8) |
+             registro.dadosCrus:byte(2)) == tipoCoberto) então
+            quantidade = quantidade + 1
+        fim
+    fim
+    retorne quantidade
+fim
+
+local simples = consulte("www.exemplo.test.", "A", falso)
+garanta(conte(simples.respostas, nomes.TIPOS.A) == 1)
+garanta(conte(simples.respostas, nomes.TIPOS.RRSIG) == 0)
+
+local segura = consulte("www.exemplo.test.", "A", verdadeiro)
+garanta(conte(segura.respostas, nomes.TIPOS.A) == 1)
+garanta(conte(segura.respostas, nomes.TIPOS.RRSIG, nomes.TIPOS.A) == 1)
+garanta(conte(segura.adicionais, nomes.TIPOS.OPT) == 1)
+
+local chaves = consulte("exemplo.test.", "DNSKEY", verdadeiro)
+garanta(conte(chaves.respostas, nomes.TIPOS.DNSKEY) == 1)
+garanta(conte(chaves.respostas, nomes.TIPOS.RRSIG, nomes.TIPOS.DNSKEY) == 1)
+
+local inexistente = consulte("ausente.exemplo.test.", "A", verdadeiro)
+garanta(inexistente.bandeiras.códigoDeResposta ==
+    nomes.CÓDIGOS.NOME_INEXISTENTE)
+garanta(conte(inexistente.autoridades, nomes.TIPOS.SOA) == 1)
+garanta(conte(inexistente.autoridades, nomes.TIPOS.NSEC) >= 1)
+garanta(conte(inexistente.autoridades, nomes.TIPOS.RRSIG,
+    nomes.TIPOS.SOA) == 1)
+garanta(conte(inexistente.autoridades, nomes.TIPOS.RRSIG,
+    nomes.TIPOS.NSEC) >= 1)
+
+mostre(servidor.registrosDS[1])
+mostre("nomes DNSSEC: ok")

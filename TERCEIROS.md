@@ -35,3 +35,10 @@ Referência oficial: <https://www.fpdf.org/en/FAQ.php>
 ## Noto Sans
 
 A biblioteca `rpdf` inclui `NotoSans-Regular.ttf`, distribuída sob a SIL Open Font License. A licença acompanha a fonte em `bibs/bibf/rpdf/fontes/OFL.txt`.
+
+## Unicode 17.0.0
+
+As propriedades e os testes de segmentação em grafemas vêm do Unicode Character
+Database 17.0.0. Os arquivos originais, seus avisos de autoria e a licença Unicode
+estão em `ferramentas/unicode/17.0.0/`. A tabela C é reproduzida pelo gerador
+`ferramentas/gerar_unicode.py`, sem depender de acesso à rede.

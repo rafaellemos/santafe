@@ -352,9 +352,9 @@ static int meth_listen(lua_State *L)
 static int meth_shutdown(lua_State *L)
 {
     /* SHUT_RD,  SHUT_WR,  SHUT_RDWR  have  the value 0, 1, 2, so we can use method index directly */
-    static const char* methods[] = { "receive", "send", "both", NULL };
+    static const char* methods[] = { "recebimento", "envio", "ambos", NULL };
     p_tcp tcp = (p_tcp) auxiliar_checkclass(L, "tcp{client}", 1);
-    int how = luaL_checkoption(L, 2, "both", methods);
+    int how = luaL_checkoption(L, 2, "ambos", methods);
     socket_shutdown(&tcp->sock, how);
     lua_pushnumber(L, 1);
     return 1;

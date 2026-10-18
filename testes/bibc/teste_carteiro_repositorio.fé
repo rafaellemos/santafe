@@ -1,0 +1,360 @@
+-- Orquestração transacional do repositório do Carteiro sem banco externo.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminho = "aplicativos/carteiro/fonte/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/arquivo/?.so;bibs/bibc/segredo/?.so;" ..
+    "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local correio = importe "correio"
+local Repositório = importe "correio.mariadb"
+
+local função depósitoFalso()
+    local este = { gravações = {}, leituras = {} }
+    função este.prepareAssíncrono(_, tratador, dado)
+        tratador(verdadeiro, nulo, dado)
+        retorne verdadeiro
+    fim
+    função este.graveAssíncrono(esta, conteúdo, tratador, dado)
+        esta.gravações[#esta.gravações + 1] = conteúdo
+        tratador({
+            resumo = colar.replique("a", 64),
+            tamanho = #conteúdo
+        }, nulo, dado)
+        retorne verdadeiro
+    fim
+    função este.leiaAssíncrono(esta, resumo, tamanho, tratador, dado)
+        esta.leituras[#esta.leituras + 1] = { resumo, tamanho }
+        tratador(esta.gravações[1], nulo, dado)
+        retorne verdadeiro
+    fim
+    retorne este
+fim
+
+local função resultado(opções)
+    opções = opções ou {}
+    local este = { linhas = opções.linhas ou {}, índice = 0, fechado = falso }
+    função este.idInserido(_) retorne opções.id ou 0 fim
+    função este.linhasAfetadas(_) retorne opções.alteradas ou 0 fim
+    função este.obterLinha(esta)
+        esta.índice = esta.índice + 1
+        retorne esta.linhas[esta.índice]
+    fim
+    função este.feche(esta) esta.fechado = verdadeiro; retorne verdadeiro fim
+    retorne este
+fim
+
+local função piscinaFalsa(modo)
+    local piscina = {
+        modo = modo, comandos = {}, confirmou = falso,
+        desfez = falso, inserçõesDeMensagem = 0, remetentesConfiáveis = {},
+        regrasDaTriagem = {}, históricoDaTriagem = {},
+        próximosUID = {},
+        cartaEntrada = { remetente = "ana@exemplo.org", direção = "entrada" }
+    }
+    local transação = {}
+
+    função transação.executePreparadoAssíncrono(_, sql, parâmetros, tratador)
+        piscina.comandos[#piscina.comandos + 1] = { sql = sql, parâmetros = parâmetros }
+        local resposta
+        se sql:procure("SELECT versao FROM correio_migracoes", 1, verdadeiro) então
+            resposta = resultado { linhas = { {
+                sql:procure("componente='carteiro'", 1, verdadeiro) e "2" ou "11"
+            } } }
+        senão se sql:procure("SELECT 1 FROM correio_remetentes_confiaveis",
+            1, verdadeiro) então
+            resposta = resultado { linhas = piscina.remetentesConfiáveis[parâmetros[2]] e
+                { { "1" } } ou {} }
+        senão se sql:procure("INSERT INTO correio_remetentes_confiaveis",
+            1, verdadeiro) então
+            piscina.remetentesConfiáveis[parâmetros[2]] = verdadeiro
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("DELETE FROM correio_remetentes_confiaveis",
+            1, verdadeiro) então
+            piscina.remetentesConfiáveis[parâmetros[2]] = nulo
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("SELECT escopo,valor,decisao\nFROM",
+            1, verdadeiro) então
+            local exata = piscina.regrasDaTriagem["endereco:" .. parâmetros[2]]
+            local domínio = piscina.regrasDaTriagem["dominio:" .. parâmetros[3]]
+            local regra = exata ou domínio
+            resposta = resultado { linhas = regra e {{
+                regra.escopo, regra.valor, regra.decisão
+            }} ou {} }
+        senão se sql:procure("SELECT escopo,valor,decisao,",
+            1, verdadeiro) então
+            local linhas = {}
+            para _, regra em pares(piscina.regrasDaTriagem) início
+                linhas[#linhas + 1] = {
+                    regra.escopo, regra.valor, regra.decisão, "1700000000",
+                    "1700000001"
+                }
+            fim
+            resposta = resultado { linhas = linhas }
+        senão se sql:procure("INSERT INTO correio_regras_triagem",
+            1, verdadeiro) então
+            local escopo, valor, decisão
+            se sql:procure("'endereco'", 1, verdadeiro) então
+                escopo, valor, decisão = "endereco", parâmetros[2], parâmetros[3]
+            senão
+                escopo, valor, decisão = parâmetros[2], parâmetros[3],
+                    parâmetros[4]
+            fim
+            piscina.regrasDaTriagem[escopo .. ":" .. valor] = {
+                escopo = escopo, valor = valor, decisão = decisão
+            }
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("DELETE FROM correio_regras_triagem",
+            1, verdadeiro) então
+            piscina.regrasDaTriagem[parâmetros[2] .. ":" .. parâmetros[3]] = nulo
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("INSERT INTO correio_historico_triagem",
+            1, verdadeiro) então
+            piscina.históricoDaTriagem[#piscina.históricoDaTriagem + 1] = parâmetros
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("SELECT remetente,direcao", 1, verdadeiro) então
+            resposta = resultado { linhas = piscina.cartaEntrada e {{
+                piscina.cartaEntrada.remetente, piscina.cartaEntrada.direção
+            }} ou {} }
+        senão se sql:procure("INSERT INTO correio_pastas_imap",
+            1, verdadeiro) então
+            local chave = parâmetros[1] .. ":" .. parâmetros[2]
+            se não piscina.próximosUID[chave] então
+                piscina.próximosUID[chave] = 1
+            fim
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("SELECT proximo_uid FROM correio_pastas_imap",
+            1, verdadeiro) então
+            local chave = parâmetros[1] .. ":" .. parâmetros[2]
+            resposta = resultado { linhas = {{
+                paraColar(piscina.próximosUID[chave] ou 1)
+            }} }
+        senão se sql:procure("UPDATE correio_pastas_imap",
+            1, verdadeiro) então
+            local chave = parâmetros[1] .. ":" .. parâmetros[2]
+            piscina.próximosUID[chave] =
+                (piscina.próximosUID[chave] ou 1) + 1
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("UPDATE correio_cartas", 1, verdadeiro) então
+            piscina.cartaEntrada.pasta = parâmetros[1]
+            piscina.cartaEntrada.decisão = parâmetros[2]
+            piscina.cartaEntrada.regra = parâmetros[3]
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("INSERT INTO `correio_fila`", 1, verdadeiro) então
+            resposta = resultado { id = 701, alteradas = 1 }
+        senão se sql:procure("UPDATE correio_caixas", 1, verdadeiro) então
+            resposta = resultado { alteradas = modo == "cota-cheia" e 0 ou 1 }
+        senão se sql:procure("INSERT INTO correio_cartas", 1, verdadeiro) então
+            piscina.inserçõesDeMensagem = piscina.inserçõesDeMensagem + 1
+            resposta = resultado { id = 801 + piscina.inserçõesDeMensagem, alteradas = 1 }
+        senão se sql:procure("SELECT id FROM correio_caixas", 1, verdadeiro) então
+            resposta = resultado { linhas = { { "11" } } }
+        senão
+            erro("SQL inesperado no teste: " .. sql)
+fim fim fim fim fim fim fim fim fim fim fim fim fim fim fim fim fim fim
+        tratador(transação, resposta, nulo)
+        retorne verdadeiro
+    fim
+
+    função transação.confirmeAssíncrono(_, tratador)
+        piscina.confirmou = verdadeiro
+        tratador(transação, verdadeiro, nulo)
+        retorne verdadeiro
+    fim
+
+    função transação.desfaçaAssíncrono(_, tratador)
+        piscina.desfez = verdadeiro
+        tratador(transação, verdadeiro, nulo)
+        retorne verdadeiro
+    fim
+
+    função piscina.executePreparadoAssíncrono(_, sql, parâmetros, tratador)
+        retorne transação:executePreparadoAssíncrono(sql, parâmetros, tratador)
+    fim
+
+    função piscina.inicieTransaçãoAssíncrona(_, tratador)
+        tratador(piscina, transação, nulo)
+        retorne verdadeiro
+    fim
+
+    retorne piscina
+fim
+
+local configuração = {
+    domínio = "santafé.dev.br",
+    domínioASCII = "xn--santaf-gva.dev.br"
+}
+local caixa = { id = 11, endereço = "rafael@santafé.dev.br" }
+local fila = { tabela = "correio_fila" }
+
+local mensagem = garanta(correio.novaMensagem {
+    remetente = caixa.endereço,
+    destinatários = { "ana@exemplo.org" },
+    assunto = "Transação do Carteiro",
+    texto = "Mensagem persistente",
+    cabeçalhos = { ["Reply-To"] = "respostas@exemplo.org" }
+})
+
+local piscina = piscinaFalsa("normal")
+local objetos = depósitoFalso()
+local repositório = Repositório.novo(piscina, configuração, objetos)
+local estrutura
+repositório:confiraEstrutura(função(valor, falhaDaEstrutura)
+    garanta(não falhaDaEstrutura, falhaDaEstrutura)
+    estrutura = valor
+fim)
+garanta(estrutura == verdadeiro, "versão da estrutura postal não foi aceita")
+local estruturaDoCarteiro
+repositório:confiraEstruturaDoCarteiro(função(valor, falhaDaEstrutura)
+    garanta(não falhaDaEstrutura, falhaDaEstrutura)
+    estruturaDoCarteiro = valor
+fim)
+garanta(estruturaDoCarteiro == verdadeiro,
+    "versão da estrutura do Carteiro não foi aceita")
+local confiança
+repositório:remetenteConfiável(caixa.id, "ANA@EXEMPLO.ORG",
+    função(valor, falhaDaConfiança)
+        garanta(não falhaDaConfiança, falhaDaConfiança)
+        confiança = valor
+    fim)
+garanta(confiança == falso, "remetente nasceu confiável")
+repositório:confieNoRemetente(caixa.id, "ANA@EXEMPLO.ORG",
+    função(valor, falhaDaConfiança)
+        garanta(valor e não falhaDaConfiança, falhaDaConfiança)
+    fim)
+repositório:remetenteConfiável(caixa.id, "ana@exemplo.org",
+    função(valor) confiança = valor fim)
+garanta(confiança == verdadeiro, "confiança não foi persistida")
+repositório:deixeDeConfiarNoRemetente(caixa.id, "ana@exemplo.org",
+    função(valor, falhaDaConfiança)
+        garanta(valor e não falhaDaConfiança, falhaDaConfiança)
+    fim)
+repositório:remetenteConfiável(caixa.id, "ana@exemplo.org",
+    função(valor) confiança = valor fim)
+garanta(confiança == falso, "revogação da confiança falhou")
+
+local regraSalva
+repositório:salveRegraDaTriagem(caixa.id, "domínio", "EXEMPLO.ORG",
+    "permitir", função(valor, falhaDaRegra)
+        garanta(não falhaDaRegra, falhaDaRegra)
+        regraSalva = valor
+    fim)
+garanta(regraSalva e regraSalva.escopo == "domínio" e
+    regraSalva.valor == "exemplo.org" e regraSalva.decisão == "permitir")
+repositório:salveRegraDaTriagem(caixa.id, "endereço", "ANA@EXEMPLO.ORG",
+    "separar", função(valor, falhaDaRegra)
+        garanta(valor e não falhaDaRegra, falhaDaRegra)
+    fim)
+local regras
+repositório:listeRegrasDaTriagem(caixa.id, função(valor, falhaDasRegras)
+    garanta(não falhaDasRegras, falhaDasRegras)
+    regras = valor
+fim)
+garanta(#regras == 2, "regras pessoais não foram listadas")
+repositório:removaRegraDaTriagem(caixa.id, "domínio", "exemplo.org",
+    função(valor, falhaDaRemoção)
+        garanta(valor e não falhaDaRemoção, falhaDaRemoção)
+    fim)
+repositório:listeRegrasDaTriagem(caixa.id, função(valor) regras = valor fim)
+garanta(#regras == 1 e regras[1].escopo == "endereço",
+    "remoção da regra de domínio falhou")
+
+local decisãoPessoal
+repositório:decidaTriagemDaCarta(caixa.id, 44, "regular",
+    função(valor, falhaDaDecisão)
+        garanta(não falhaDaDecisão, falhaDaDecisão)
+        decisãoPessoal = valor
+    fim)
+garanta(decisãoPessoal e decisãoPessoal.pasta == "entrada")
+garanta(piscina.cartaEntrada.decisão == "regular" e
+    piscina.regrasDaTriagem["endereco:ana@exemplo.org"].decisão == "permitir")
+garanta(#piscina.históricoDaTriagem >= 4,
+    "alterações de triagem não foram auditadas")
+local saída, falha
+repositório:adicioneSaída(caixa, mensagem, fila,
+    função(resultadoDaSaída, falhaDaSaída)
+        saída, falha = resultadoDaSaída, falhaDaSaída
+    fim)
+garanta(saída e não falha, falha)
+garanta(saída.fila == 701 e saída.mensagem == 802)
+garanta(piscina.confirmou e não piscina.desfez,
+    "envio válido não confirmou a transação")
+garanta(piscina.inserçõesDeMensagem == 1)
+garanta(#objetos.gravações == 1,
+    "a carta e a fila deveriam compartilhar uma única gravação MIME")
+para _, comando em ipares(piscina.comandos) início
+    se comando.sql:procure("INSERT INTO `correio_fila`", 1, verdadeiro) então
+        garanta(comando.parâmetros[5] == colar.replique("a", 64),
+            "fila não recebeu o resumo do objeto")
+        garanta(comando.parâmetros[6] == #objetos.gravações[1],
+            "fila não recebeu o tamanho do objeto")
+    fim
+fim
+
+local cheia = piscinaFalsa("cota-cheia")
+local repositórioCheio = Repositório.novo(
+    cheia, configuração, depósitoFalso())
+local recusada, falhaDaCota
+repositórioCheio:adicioneSaída(caixa, mensagem, fila,
+    função(resultadoDaSaída, falhaDaSaída)
+        recusada, falhaDaCota = resultadoDaSaída, falhaDaSaída
+    fim)
+garanta(não recusada e falhaDaCota == "cota da caixa postal excedida")
+garanta(cheia.desfez e não cheia.confirmou,
+    "cota cheia não desfez a fila da mesma transação")
+garanta(cheia.inserçõesDeMensagem == 0)
+
+local recebimento = piscinaFalsa("normal")
+recebimento.regrasDaTriagem["dominio:exemplo.org"] = {
+    escopo = "dominio", valor = "exemplo.org", decisão = "permitir"
+}
+recebimento.regrasDaTriagem["endereco:ana@exemplo.org"] = {
+    escopo = "endereco", valor = "ana@exemplo.org", decisão = "separar"
+}
+local repositórioDeEntrada = Repositório.novo(
+    recebimento, configuração, depósitoFalso())
+local mensagemDeEntrada = garanta(correio.novaMensagem {
+    remetente = "ana@exemplo.org",
+    destinatários = { caixa.endereço },
+    assunto = "Entrada pelo transportador",
+    texto = "Mensagem recebida",
+    cabeçalhos = { ["Reply-To"] = "respostas@exemplo.org" }
+})
+local mime = garanta(mensagemDeEntrada:forme())
+local recebidas, falhaDaEntrada
+repositórioDeEntrada:recebaSMTP({
+    remetente = "retorno@transportador.example",
+    destinatários = { caixa.endereço, caixa.endereço },
+    conteúdo = mime,
+    recebidaEm = 1700000000
+}, função(quantidade, falhaRecebida)
+    recebidas, falhaDaEntrada = quantidade, falhaRecebida
+fim)
+garanta(recebidas == 1 e não falhaDaEntrada, falhaDaEntrada)
+garanta(recebimento.inserçõesDeMensagem == 1,
+    "RCPT TO repetido duplicou a mensagem na caixa")
+garanta(recebimento.confirmou e não recebimento.desfez)
+local últimaInserção
+para _, comando em ipares(recebimento.comandos) início
+    se comando.sql:procure("INSERT INTO correio_cartas", 1, verdadeiro) então
+        últimaInserção = comando
+    fim
+fim
+garanta(últimaInserção e últimaInserção.parâmetros[21] ==
+        "respostas@exemplo.org",
+    "Reply-To não foi preservado para o Carteiro")
+garanta(últimaInserção.parâmetros[6] == "ana@exemplo.org",
+    "o autor visível do cabeçalho From não foi preservado")
+garanta(últimaInserção.parâmetros[34] ==
+        "retorno@transportador.example",
+    "o remetente técnico do envelope SMTP não foi preservado: " ..
+        paraColar(últimaInserção.parâmetros[34]))
+garanta(últimaInserção.parâmetros[4] == "indesejadas" e
+    últimaInserção.parâmetros[31] == "indesejada" e
+    últimaInserção.parâmetros[32] ==
+        "endereco:ana@exemplo.org",
+    "regra exata não prevaleceu sobre a regra do domínio")
+garanta(últimaInserção.parâmetros[22] == "regular" e
+    últimaInserção.parâmetros[23] == 0,
+    "a regra pessoal alterou indevidamente a avaliação automática")
+
+mostre("Carteiro repositório: ok")

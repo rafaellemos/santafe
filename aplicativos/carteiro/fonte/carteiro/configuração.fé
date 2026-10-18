@@ -1,0 +1,34 @@
+local base = importe "correio.configuração"
+
+local configuração = {}
+
+local função inteiro(nome, padrão, mínimo, máximo)
+    local texto = so.obterVariável(nome)
+    se não texto ou texto == "" então retorne padrão fim
+    local valor = paraNúmero(texto)
+    valor = valor e mat.paraInteiro(valor) ou nulo
+    garanta(valor e valor >= mínimo e valor <= máximo,
+        nome .. " deve ser um inteiro entre " .. mínimo .. " e " .. máximo)
+    retorne valor
+fim
+
+função configuração.carregue()
+    local valores = base.carregue()
+    valores.endereço = so.obterVariável("CARTEIRO_ENDERECO") ou "127.0.0.1"
+    valores.porta = inteiro("CARTEIRO_PORTA", 7100, 1, 65535)
+    valores.prefixo = "/carteiro"
+    valores.limiteAnexo = inteiro(
+        "CARTEIRO_LIMITE_ANEXO", 25 * 1024 * 1024, 1024, 25 * 1024 * 1024)
+    valores.limiteLista = inteiro("CARTEIRO_LIMITE_LISTA", 50, 10, 100)
+    valores.pulsoArquivoCarteiro = so.obterVariável("CARTEIRO_PULSO_ARQUIVO") ou
+        "/var/log/santafé/carteiro.pulso"
+    valores.marcaCarteiro = so.obterVariável("CARTEIRO_MARCA") ou "Santafé"
+    valores.inícioCarteiro = so.obterVariável("CARTEIRO_INICIO") ou "/"
+    valores.estiloCarteiro = so.obterVariável("CARTEIRO_ESTILO")
+    valores.íconeCarteiro = so.obterVariável("CARTEIRO_ICONE")
+    valores.corDoTemaCarteiro = so.obterVariável("CARTEIRO_COR_DO_TEMA") ou
+        "#00695c"
+    retorne valores
+fim
+
+retorne configuração

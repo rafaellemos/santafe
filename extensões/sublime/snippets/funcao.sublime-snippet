@@ -1,0 +1,8 @@
+<snippet>
+    <content><![CDATA[função ${1:nome}(${2}) início
+    ${0}
+fim]]></content>
+    <tabTrigger>função</tabTrigger>
+    <scope>source.santafe</scope>
+    <description>função Santafé</description>
+</snippet>

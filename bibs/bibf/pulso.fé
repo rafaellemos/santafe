@@ -1,0 +1,676 @@
+-- PULSO - Protocolo Unificado de Leituras, Sinais e Operações.
+--
+-- O núcleo do protocolo é independente de transporte. Nesta primeira versão,
+-- ele produz envelopes validados, distribui eventos para destinos locais,
+-- registra em JSON por linha e codifica o perfil binário PULSO/1.
+
+local pulso = {
+    nome = "PULSO",
+    versão = 1
+}
+
+local LIMITE_MENSAGEM = 1024 * 1024
+local LIMITE_DADOS = 64 * 1024
+local LIMITE_PROFUNDIDADE = 12
+local LIMITE_ITENS = 2048
+local LIMITE_FILA = 1024
+
+local tiposAceitos = {
+    leitura = verdadeiro,
+    sinal = verdadeiro,
+    operação = verdadeiro,
+    confirmação = verdadeiro,
+    recusa = verdadeiro,
+    pulsoDeVida = verdadeiro
+}
+
+local prioridades = {
+    baixa = 1,
+    normal = 2,
+    alta = 3,
+    crítica = 4
+}
+
+local camposSigilososPadrão = {
+    senha = verdadeiro,
+    password = verdadeiro,
+    auth = verdadeiro,
+    autorização = verdadeiro,
+    authorization = verdadeiro,
+    bilhete = verdadeiro,
+    token = verdadeiro,
+    segredo = verdadeiro,
+    chavePrivada = verdadeiro,
+    chaveprivada = verdadeiro,
+    privateKey = verdadeiro,
+    privatekey = verdadeiro
+}
+
+local função inteiroPositivo(valor, nome, padrão)
+    se valor == nulo então valor = padrão fim
+    se mat.paraInteiro(valor) == nulo ou valor <= 0 então
+        retorne nulo, nome .. " deve ser um inteiro positivo"
+    fim
+    retorne valor
+fim
+
+local função colarNãoVazio(valor, nome)
+    se tipo(valor) ~= "colar" ou valor == "" então
+        retorne nulo, nome .. " deve ser um colar não vazio"
+    fim
+    retorne valor
+fim
+
+local função copieConjunto(origem)
+    local destino = {}
+    para chave, valor em pares(origem ou {}) início
+        se tipo(chave) == "número" então
+            destino[valor] = verdadeiro
+        senão
+            destino[chave] = valor e verdadeiro ou falso
+        fim
+    fim
+    retorne destino
+fim
+
+local função chaveSigilosa(chave, campos)
+    se tipo(chave) ~= "colar" então retorne falso fim
+    retorne campos[chave] ou campos[chave:minúscula()] ou falso
+fim
+
+local função copieDados(valor, estado, profundidade)
+    local espécie = tipo(valor)
+    se valor == nulo ou espécie == "lógico" ou espécie == "colar" então
+        retorne valor
+    fim
+    se espécie == "número" então
+        se valor ~= valor ou valor == mat.infinito ou valor == -mat.infinito então
+            retorne nulo, "dados do PULSO não aceitam números inválidos"
+        fim
+        retorne valor
+    fim
+    se espécie ~= "tabela" então
+        retorne nulo, "dados do PULSO não aceitam valores do tipo " .. espécie
+    fim
+    se profundidade > estado.limiteProfundidade então
+        retorne nulo, "dados do PULSO excederam a profundidade permitida"
+    fim
+    se estado.visitadas[valor] então
+        retorne nulo, "dados do PULSO contêm uma referência circular"
+    fim
+
+    estado.visitadas[valor] = verdadeiro
+    local cópia = {}
+    para chave, item em pares(valor) início
+        estado.itens = estado.itens + 1
+        se estado.itens > estado.limiteItens então
+            estado.visitadas[valor] = nulo
+            retorne nulo, "dados do PULSO excederam a quantidade de itens permitida"
+        fim
+        local tipoDaChave = tipo(chave)
+        se tipoDaChave ~= "colar" e tipoDaChave ~= "número" então
+            estado.visitadas[valor] = nulo
+            retorne nulo, "chaves dos dados do PULSO devem ser colares ou números"
+        fim
+        se chaveSigilosa(chave, estado.camposSigilosos) então
+            cópia[chave] = "[protegido]"
+        senão
+            local copiado, falha = copieDados(item, estado, profundidade + 1)
+            se falha então
+                estado.visitadas[valor] = nulo
+                retorne nulo, falha
+            fim
+            cópia[chave] = copiado
+        fim
+    fim
+    estado.visitadas[valor] = nulo
+    retorne cópia
+fim
+
+local função dadosProtegidos(dados, opções)
+    se dados == nulo então dados = {} fim
+    se tipo(dados) ~= "tabela" então
+        retorne nulo, "dados do PULSO devem ser uma tabela"
+    fim
+
+    local campos = copieConjunto(camposSigilososPadrão)
+    para chave, valor em pares(opções.camposSigilosos ou {}) início
+        se tipo(chave) == "número" então campos[valor] = verdadeiro
+        senão campos[chave] = valor e verdadeiro ou falso fim
+    fim
+
+    retorne copieDados(dados, {
+        visitadas = {},
+        itens = 0,
+        limiteItens = opções.limiteItens,
+        limiteProfundidade = opções.limiteProfundidade,
+        camposSigilosos = campos
+    }, 1)
+fim
+
+local função hexadecimal32(valor)
+    retorne colar.formate("%08x", valor & 0xFFFFFFFF)
+fim
+
+local função novaIdentificação(sequência)
+    retorne hexadecimal32(so.tempo()) .. "-" ..
+        hexadecimal32(so.aleatório()) .. "-" ..
+        hexadecimal32(so.aleatório()) .. "-" ..
+        hexadecimal32(sequência)
+fim
+
+local função valideEnvelope(mensagem)
+    se tipo(mensagem) ~= "tabela" então
+        retorne nulo, "mensagem PULSO deve ser uma tabela"
+    fim
+    se mensagem.protocolo ~= "PULSO" então
+        retorne nulo, "protocolo da mensagem não é PULSO"
+    fim
+    se mensagem.versão ~= 1 então
+        retorne nulo, "versão PULSO não aceita: " .. paraColar(mensagem.versão)
+    fim
+    se não tiposAceitos[mensagem.tipo] então
+        retorne nulo, "tipo de mensagem PULSO não aceito"
+    fim
+    local _, falha = colarNãoVazio(mensagem.identificação, "identificação")
+    se falha então retorne nulo, falha fim
+    _, falha = colarNãoVazio(mensagem.origem, "origem")
+    se falha então retorne nulo, falha fim
+    _, falha = colarNãoVazio(mensagem.nome, "nome")
+    se falha então retorne nulo, falha fim
+    se mat.paraInteiro(mensagem.sequência) == nulo ou mensagem.sequência < 1 então
+        retorne nulo, "sequência PULSO inválida"
+    fim
+    se mat.paraInteiro(mensagem.carimboDeHora) == nulo ou mensagem.carimboDeHora < 0 então
+        retorne nulo, "carimbo de hora PULSO inválido"
+    fim
+    se mat.paraInteiro(mensagem.validade) == nulo ou mensagem.validade < 1 então
+        retorne nulo, "validade PULSO inválida"
+    fim
+    se não prioridades[mensagem.prioridade] então
+        retorne nulo, "prioridade PULSO inválida"
+    fim
+    se tipo(mensagem.dados) ~= "tabela" então
+        retorne nulo, "dados da mensagem PULSO devem ser uma tabela"
+    fim
+    retorne verdadeiro
+fim
+
+função pulso.valide(mensagem)
+    retorne valideEnvelope(mensagem)
+fim
+
+local função codifiqueJSON(mensagem, limite)
+    local válida, falha = valideEnvelope(mensagem)
+    se não válida então retorne nulo, falha fim
+    local funcionou, conteúdo = proteja(json.cod, mensagem)
+    se não funcionou então retorne nulo, conteúdo fim
+    se #conteúdo > limite então
+        retorne nulo, "mensagem PULSO excedeu o limite de " .. limite .. " tacos"
+    fim
+    retorne conteúdo
+fim
+
+local função inteiro32Grande(valor)
+    retorne colar.caractere(
+        (valor >> 24) & 0xFF,
+        (valor >> 16) & 0xFF,
+        (valor >> 8) & 0xFF,
+        valor & 0xFF
+    )
+fim
+
+local função leiaInteiro32Grande(dados)
+    local a, b, c, d = dados:byte(1, 4)
+    retorne ((a * 256 + b) * 256 + c) * 256 + d
+fim
+
+função pulso.codifique(mensagem, limite)
+    limite = limite ou LIMITE_MENSAGEM
+    local válido, falha = inteiroPositivo(limite, "limite", LIMITE_MENSAGEM)
+    se não válido então retorne nulo, falha fim
+    local conteúdo
+    conteúdo, falha = codifiqueJSON(mensagem, limite)
+    se não conteúdo então retorne nulo, falha fim
+    retorne inteiro32Grande(#conteúdo) .. conteúdo
+fim
+
+função pulso.novoDecodificador(opções)
+    opções = opções ou {}
+    se tipo(opções) ~= "tabela" então
+        retorne nulo, "opções do decodificador devem ser uma tabela"
+    fim
+    local limite, falha = inteiroPositivo(
+        opções.limiteMensagem, "limiteMensagem", LIMITE_MENSAGEM
+    )
+    se não limite então retorne nulo, falha fim
+    local limiteLote
+    limiteLote, falha = inteiroPositivo(
+        opções.limiteLote, "limiteLote", limite * 4
+    )
+    se não limiteLote então retorne nulo, falha fim
+    se limiteLote < limite + 4 então
+        retorne nulo, "limiteLote deve comportar pelo menos uma mensagem completa"
+    fim
+
+    local decodificador = {
+        limiteMensagem = limite,
+        limiteLote = limiteLote,
+        acumulado = "",
+        falhou = falso
+    }
+
+    função decodificador.alimente(este, fragmento)
+        se este.falhou então
+            retorne nulo, "decodificador PULSO precisa ser reiniciado"
+        fim
+        se tipo(fragmento) ~= "colar" então
+            retorne nulo, "fragmento PULSO deve ser um colar binário"
+        fim
+        se #este.acumulado + #fragmento > este.limiteLote então
+            este.falhou = verdadeiro
+            este.acumulado = ""
+            retorne nulo, "lote PULSO excedeu o limite de memória do decodificador"
+        fim
+
+        este.acumulado = este.acumulado .. fragmento
+        local mensagens = {}
+        enquanto #este.acumulado >= 4 início
+            local tamanho = leiaInteiro32Grande(este.acumulado)
+            se tamanho < 2 ou tamanho > este.limiteMensagem então
+                este.falhou = verdadeiro
+                este.acumulado = ""
+                retorne nulo, "tamanho de mensagem PULSO inválido"
+            fim
+            se #este.acumulado < tamanho + 4 então pare fim
+
+            local conteúdo = este.acumulado:corte(5, tamanho + 4)
+            este.acumulado = este.acumulado:corte(tamanho + 5)
+            local funcionou, mensagem = proteja(json.decod, conteúdo)
+            se não funcionou então
+                este.falhou = verdadeiro
+                este.acumulado = ""
+                retorne nulo, "JSON PULSO inválido: " .. paraColar(mensagem)
+            fim
+            local válida, falhaDaMensagem = valideEnvelope(mensagem)
+            se não válida então
+                este.falhou = verdadeiro
+                este.acumulado = ""
+                retorne nulo, falhaDaMensagem
+            fim
+            tabela.insira(mensagens, mensagem)
+        fim
+        retorne mensagens
+    fim
+
+    função decodificador.reinicie(este)
+        este.acumulado = ""
+        este.falhou = falso
+        retorne este
+    fim
+
+    função decodificador.pendente(este)
+        retorne #este.acumulado
+    fim
+
+    retorne decodificador
+fim
+
+local função prepareOpções(opções)
+    local preparadas = {}
+    local falha
+    preparadas.limiteFila, falha = inteiroPositivo(
+        opções.limiteFila, "limiteFila", LIMITE_FILA
+    )
+    se falha então retorne nulo, falha fim
+    preparadas.limiteDados, falha = inteiroPositivo(
+        opções.limiteDados, "limiteDados", LIMITE_DADOS
+    )
+    se falha então retorne nulo, falha fim
+    preparadas.limiteProfundidade, falha = inteiroPositivo(
+        opções.limiteProfundidade, "limiteProfundidade", LIMITE_PROFUNDIDADE
+    )
+    se falha então retorne nulo, falha fim
+    preparadas.limiteItens, falha = inteiroPositivo(
+        opções.limiteItens, "limiteItens", LIMITE_ITENS
+    )
+    se falha então retorne nulo, falha fim
+    preparadas.camposSigilosos = opções.camposSigilosos ou {}
+    retorne preparadas
+fim
+
+função pulso.novo(opções)
+    opções = opções ou {}
+    se tipo(opções) ~= "tabela" então
+        retorne nulo, "opções do PULSO devem ser uma tabela"
+    fim
+    local serviço, falha = colarNãoVazio(opções.serviço, "serviço")
+    se não serviço então retorne nulo, falha fim
+    local instância = opções.instância ou "principal"
+    se não colarNãoVazio(instância, "instância") então
+        retorne nulo, "instância deve ser um colar não vazio"
+    fim
+    local preparadas
+    preparadas, falha = prepareOpções(opções)
+    se não preparadas então retorne nulo, falha fim
+
+    local canal = {
+        serviço = serviço,
+        instância = instância,
+        origem = serviço .. "/" .. instância,
+        destinos = {},
+        sequência = 0,
+        fila = {},
+        inícioDaFila = 1,
+        fimDaFila = 0,
+        emitindo = falso,
+        fechado = falso,
+        opções = preparadas,
+        contadores = {
+            emitidas = 0,
+            entregues = 0,
+            recusadas = 0,
+            falhasDeDestino = 0
+        }
+    }
+
+    função canal.adicioneDestino(este, destino)
+        se este.fechado então retorne nulo, "canal PULSO fechado" fim
+        se tipo(destino) ~= "tabela" ou tipo(destino.envie) ~= "função" então
+            retorne nulo, "destino PULSO deve fornecer envie(este, mensagem)"
+        fim
+        tabela.insira(este.destinos, destino)
+        retorne destino
+    fim
+
+    função canal.removaDestino(este, destino)
+        para índice, atual em ipares(este.destinos) início
+            se atual == destino então
+                tabela.remova(este.destinos, índice)
+                retorne verdadeiro
+            fim
+        fim
+        retorne falso
+    fim
+
+    função canal.despeje(este)
+        se este.emitindo então retorne verdadeiro fim
+        este.emitindo = verdadeiro
+        local primeiraFalha
+
+        enquanto este.inícioDaFila <= este.fimDaFila início
+            local mensagem = este.fila[este.inícioDaFila]
+            este.fila[este.inícioDaFila] = nulo
+            este.inícioDaFila = este.inícioDaFila + 1
+
+            para _, destino em ipares(este.destinos) início
+                local chamou, entregue, falhaDoDestino = proteja(
+                    destino.envie, destino, mensagem
+                )
+                se não chamou então
+                    falhaDoDestino = entregue
+                    entregue = nulo
+                fim
+                se entregue então
+                    este.contadores.entregues = este.contadores.entregues + 1
+                senão
+                    este.contadores.falhasDeDestino =
+                        este.contadores.falhasDeDestino + 1
+                    primeiraFalha = primeiraFalha ou
+                        ((destino.nome ou "destino") .. ": " ..
+                        paraColar(falhaDoDestino ou "entrega recusada"))
+                fim
+            fim
+        fim
+
+        este.inícioDaFila = 1
+        este.fimDaFila = 0
+        este.emitindo = falso
+        retorne verdadeiro, primeiraFalha
+    fim
+
+    função canal.emita(este, tipoDaMensagem, nome, dados, opçõesDaMensagem)
+        se este.fechado então retorne nulo, "canal PULSO fechado" fim
+        se não tiposAceitos[tipoDaMensagem] então
+            retorne nulo, "tipo de mensagem PULSO não aceito: " ..
+                paraColar(tipoDaMensagem)
+        fim
+        local nomeVálido, falhaDoNome = colarNãoVazio(nome, "nome")
+        se não nomeVálido então retorne nulo, falhaDoNome fim
+        opçõesDaMensagem = opçõesDaMensagem ou {}
+        se tipo(opçõesDaMensagem) ~= "tabela" então
+            retorne nulo, "opções da mensagem devem ser uma tabela"
+        fim
+
+        local protegidos, falhaDosDados = dadosProtegidos(dados, este.opções)
+        se não protegidos então retorne nulo, falhaDosDados fim
+        local codificou, dadosCodificados = proteja(json.cod, protegidos)
+        se não codificou então retorne nulo, dadosCodificados fim
+        se #dadosCodificados > este.opções.limiteDados então
+            retorne nulo, "dados do PULSO excederam o limite de " ..
+                este.opções.limiteDados .. " tacos"
+        fim
+
+        local prioridade = opçõesDaMensagem.prioridade ou "normal"
+        se não prioridades[prioridade] então
+            retorne nulo, "prioridade PULSO não aceita"
+        fim
+        local validade, falhaDaValidade = inteiroPositivo(
+            opçõesDaMensagem.validade, "validade", 300
+        )
+        se não validade então retorne nulo, falhaDaValidade fim
+
+        se este.fimDaFila - este.inícioDaFila + 1 >= este.opções.limiteFila então
+            este.contadores.recusadas = este.contadores.recusadas + 1
+            retorne nulo, "fila do PULSO atingiu o limite"
+        fim
+
+        este.sequência = este.sequência + 1
+        local mensagem = {
+            protocolo = "PULSO",
+            versão = 1,
+            tipo = tipoDaMensagem,
+            nome = nome,
+            identificação = novaIdentificação(este.sequência),
+            origem = este.origem,
+            sequência = este.sequência,
+            carimboDeHora = so.tempo(),
+            validade = validade,
+            prioridade = prioridade,
+            dados = protegidos
+        }
+        se opçõesDaMensagem.correlação ~= nulo então
+            local correlação, falhaDaCorrelação = colarNãoVazio(
+                opçõesDaMensagem.correlação, "correlação"
+            )
+            se não correlação então retorne nulo, falhaDaCorrelação fim
+            mensagem.correlação = correlação
+        fim
+
+        este.fimDaFila = este.fimDaFila + 1
+        este.fila[este.fimDaFila] = mensagem
+        este.contadores.emitidas = este.contadores.emitidas + 1
+        local _, falhaDaEntrega = este:despeje()
+        retorne mensagem, falhaDaEntrega
+    fim
+
+    função canal.leitura(este, nome, dados, opçõesDaMensagem)
+        retorne este:emita("leitura", nome, dados, opçõesDaMensagem)
+    fim
+
+    função canal.sinal(este, nome, dados, opçõesDaMensagem)
+        retorne este:emita("sinal", nome, dados, opçõesDaMensagem)
+    fim
+
+    função canal.operação(este, nome, dados, opçõesDaMensagem)
+        retorne este:emita("operação", nome, dados, opçõesDaMensagem)
+    fim
+
+    função canal.confirmação(este, nome, correlação, dados, opçõesDaMensagem)
+        opçõesDaMensagem = opçõesDaMensagem ou {}
+        opçõesDaMensagem.correlação = correlação
+        retorne este:emita("confirmação", nome, dados, opçõesDaMensagem)
+    fim
+
+    função canal.recusa(este, nome, correlação, dados, opçõesDaMensagem)
+        opçõesDaMensagem = opçõesDaMensagem ou {}
+        opçõesDaMensagem.correlação = correlação
+        retorne este:emita("recusa", nome, dados, opçõesDaMensagem)
+    fim
+
+    função canal.pulsoDeVida(este, dados, opçõesDaMensagem)
+        retorne este:emita("pulsoDeVida", "estado", dados, opçõesDaMensagem)
+    fim
+
+    função canal.estatísticas(este)
+        retorne {
+            emitidas = este.contadores.emitidas,
+            entregues = este.contadores.entregues,
+            recusadas = este.contadores.recusadas,
+            falhasDeDestino = este.contadores.falhasDeDestino,
+            pendentes = este.fimDaFila - este.inícioDaFila + 1,
+            destinos = #este.destinos
+        }
+    fim
+
+    função canal.feche(este)
+        se este.fechado então retorne verdadeiro fim
+        este:despeje()
+        para _, destino em ipares(este.destinos) início
+            se tipo(destino.esvazie) == "função" então
+                proteja(destino.esvazie, destino)
+            fim
+            se tipo(destino.feche) == "função" então
+                proteja(destino.feche, destino)
+            fim
+        fim
+        este.fechado = verdadeiro
+        retorne verdadeiro
+    fim
+
+    retorne canal
+fim
+
+função pulso.memória(limite)
+    limite = limite ou 1024
+    local válido, falha = inteiroPositivo(limite, "limite", 1024)
+    se não válido então retorne nulo, falha fim
+    local destino = {
+        nome = "memória",
+        limite = limite,
+        mensagens = {},
+        descartadas = 0
+    }
+    função destino.envie(este, mensagem)
+        se #este.mensagens >= este.limite então
+            tabela.remova(este.mensagens, 1)
+            este.descartadas = este.descartadas + 1
+        fim
+        tabela.insira(este.mensagens, mensagem)
+        retorne verdadeiro
+    fim
+    retorne destino
+fim
+
+função pulso.terminal()
+    local destino = { nome = "terminal" }
+    função destino.envie(_, mensagem)
+        local funcionou, linha = proteja(json.cod, mensagem)
+        se não funcionou então retorne nulo, linha fim
+        mostre(linha)
+        retorne verdadeiro
+    fim
+    retorne destino
+fim
+
+função pulso.registrador(caminho, opções)
+    local caminhoVálido, falha = colarNãoVazio(caminho, "caminho")
+    se não caminhoVálido então retorne nulo, falha fim
+    opções = opções ou {}
+    se tipo(opções) ~= "tabela" então
+        retorne nulo, "opções do registrador devem ser uma tabela"
+    fim
+    local limiteArquivo, falhaDoLimite = inteiroPositivo(
+        opções.limiteArquivo, "limiteArquivo", 10 * 1024 * 1024
+    )
+    se não limiteArquivo então retorne nulo, falhaDoLimite fim
+
+    local registrador = {
+        nome = "arquivo:" .. caminho,
+        caminho = caminho,
+        limiteArquivo = limiteArquivo,
+        rotações = 0,
+        arquivo = nulo,
+        tamanho = 0,
+        fechado = falso
+    }
+
+    local função abra(este)
+        local arquivo, falhaDaAbertura = es.abra(este.caminho, "adiçãobin")
+        se não arquivo então retorne nulo, falhaDaAbertura fim
+        arquivo:definaMemint("linha")
+        local tamanho, falhaDaBusca = arquivo:busque("final")
+        se não tamanho então
+            arquivo:feche()
+            retorne nulo, falhaDaBusca
+        fim
+        este.arquivo = arquivo
+        este.tamanho = tamanho
+        retorne verdadeiro
+    fim
+
+    local função rotacione(este)
+        se este.arquivo então
+            este.arquivo:esvazie()
+            este.arquivo:feche()
+            este.arquivo = nulo
+        fim
+        este.rotações = este.rotações + 1
+        local destino = este.caminho .. "." .. so.tempo() .. "." .. este.rotações
+        local renomeou, falhaDaRenomeação = so.renomeie(este.caminho, destino)
+        se não renomeou então
+            abra(este)
+            retorne nulo, falhaDaRenomeação
+        fim
+        retorne abra(este)
+    fim
+
+    função registrador.envie(este, mensagem)
+        se este.fechado então retorne nulo, "registrador PULSO fechado" fim
+        se não este.arquivo então
+            local abriu, falhaDaAbertura = abra(este)
+            se não abriu então retorne nulo, falhaDaAbertura fim
+        fim
+        local linha, falhaDaCodificação = codifiqueJSON(mensagem, LIMITE_MENSAGEM)
+        se não linha então retorne nulo, falhaDaCodificação fim
+        linha = linha .. "\n"
+        se este.tamanho > 0 e este.tamanho + #linha > este.limiteArquivo então
+            local girou, falhaDaRotação = rotacione(este)
+            se não girou então retorne nulo, falhaDaRotação fim
+        fim
+        local escreveu, falhaDaEscrita = este.arquivo:escreva(linha)
+        se não escreveu então retorne nulo, falhaDaEscrita fim
+        este.tamanho = este.tamanho + #linha
+        retorne verdadeiro
+    fim
+
+    função registrador.esvazie(este)
+        se não este.arquivo então retorne verdadeiro fim
+        retorne este.arquivo:esvazie()
+    fim
+
+    função registrador.feche(este)
+        se este.fechado então retorne verdadeiro fim
+        se este.arquivo então
+            este.arquivo:esvazie()
+            este.arquivo:feche()
+            este.arquivo = nulo
+        fim
+        este.fechado = verdadeiro
+        retorne verdadeiro
+    fim
+
+    retorne registrador
+fim
+
+retorne pulso

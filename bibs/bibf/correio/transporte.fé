@@ -1,0 +1,125 @@
+-- Adapta a representação de endereços para transportadores que
+-- registram domínios internacionalizados pela forma DNS (A-label/Punycode).
+
+local rede = importe "rede"
+
+local transporte = { versão = "1.0.0" }
+local CRLF = "\r\n"
+
+local função separeEndereço(endereço)
+    se tipo(endereço) ~= "colar" ou
+       endereço:procure("\r", 1, verdadeiro) ou
+       endereço:procure("\n", 1, verdadeiro) então
+        retorne nulo, nulo, "endereço de transporte inválido"
+    fim
+    local parteLocal, domínio = endereço:separe("^(.+)@([^@]+)$")
+    se não parteLocal ou parteLocal == "" ou não domínio então
+        retorne nulo, nulo, "endereço de transporte não possui domínio"
+    fim
+    retorne parteLocal, domínio
+fim
+
+local função troqueLiteral(texto, alvo, substituto)
+    se alvo == "" ou alvo == substituto então retorne texto fim
+    local partes, posição = {}, 1
+    enquanto verdadeiro início
+        local encontrada = texto:procure(alvo, posição, verdadeiro)
+        se não encontrada então
+            partes[#partes + 1] = texto:corte(posição)
+            pare
+        fim
+        partes[#partes + 1] = texto:corte(posição, encontrada - 1)
+        partes[#partes + 1] = substituto
+        posição = encontrada + #alvo
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função possuiNãoASCII(texto)
+    para índice = 1, #texto início
+        se texto:byte(índice) > 127 então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+função transporte.endereçoASCII(endereço)
+    local parteLocal, domínio, falha = separeEndereço(endereço)
+    se não parteLocal então retorne nulo, falha fim
+    local domínioASCII, falhaDoDomínio = rede.domínioASCII(domínio)
+    se não domínioASCII então
+        retorne nulo, falhaDoDomínio ou
+            "domínio internacional inválido no transporte"
+    fim
+    retorne parteLocal .. "@" .. domínioASCII:minúscula()
+fim
+
+local função normalizeDomínioNoCabeçalho(bloco, endereço)
+    local _, domínio, falha = separeEndereço(endereço)
+    se não domínio então retorne nulo, falha fim
+    local domínioASCII, falhaDoDomínio = rede.domínioASCII(domínio)
+    se não domínioASCII então
+        retorne nulo, falhaDoDomínio ou
+            "domínio internacional inválido no cabeçalho"
+    fim
+    domínioASCII = domínioASCII:minúscula()
+    local domínioUnicode = rede.domínioUnicode(domínioASCII)
+    bloco = troqueLiteral(bloco, "@" .. domínio,
+        "@" .. domínioASCII)
+    se domínioUnicode e domínioUnicode ~= domínio então
+        bloco = troqueLiteral(bloco, "@" .. domínioUnicode,
+            "@" .. domínioASCII)
+    fim
+    retorne bloco
+fim
+
+função transporte.prepareRetransmissor(conteúdo, remetente,
+                                               destinatários)
+    se tipo(conteúdo) ~= "colar" então
+        retorne nulo, "conteúdo do transporte deve ser um colar"
+    fim
+    se tipo(destinatários) ~= "tabela" ou #destinatários == 0 então
+        retorne nulo, "transporte precisa de ao menos um destinatário"
+    fim
+
+    local separador = CRLF .. CRLF
+    local posição = conteúdo:procure(separador, 1, verdadeiro)
+    se não posição então
+        separador = "\n\n"
+        posição = conteúdo:procure(separador, 1, verdadeiro)
+    fim
+    se não posição então
+        retorne nulo, "mensagem não separa cabeçalhos e corpo"
+    fim
+
+    local remetenteASCII, falha = transporte.endereçoASCII(remetente)
+    se não remetenteASCII então retorne nulo, falha fim
+    local destinatáriosASCII = {}
+    para índice, endereço em ipares(destinatários) início
+        destinatáriosASCII[índice], falha =
+            transporte.endereçoASCII(endereço)
+        se não destinatáriosASCII[índice] então retorne nulo, falha fim
+    fim
+
+    local bloco = conteúdo:corte(1, posição - 1)
+    para _, endereço em ipares({ remetente,
+            tabela.desempacote(destinatários) }) início
+        bloco, falha = normalizeDomínioNoCabeçalho(bloco, endereço)
+        se não bloco então retorne nulo, falha fim
+    fim
+    local corpo = conteúdo:corte(posição + #separador)
+
+    local smtpUTF8 = possuiNãoASCII(bloco) ou
+        possuiNãoASCII(remetenteASCII)
+    para _, endereço em ipares(destinatáriosASCII) início
+        se possuiNãoASCII(endereço) então smtpUTF8 = verdadeiro fim
+    fim
+
+    retorne {
+        conteúdo = bloco .. separador .. corpo,
+        remetente = remetenteASCII,
+        destinatários = destinatáriosASCII,
+        smtpUTF8 = smtpUTF8
+    }
+fim
+
+retorne transporte

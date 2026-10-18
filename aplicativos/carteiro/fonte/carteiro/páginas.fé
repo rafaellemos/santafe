@@ -1,0 +1,1570 @@
+local util = importe "carteiro.web"
+local páginas = {}
+local identidade = {
+    marca = "Santafé", destino = "/", estilo = nulo, ícone = nulo,
+    corDoTema = "#00695c"
+}
+
+função páginas.configure(configuração)
+    configuração = configuração ou {}
+    identidade.marca = configuração.marcaCarteiro ou "Santafé"
+    identidade.destino = configuração.inícioCarteiro ou "/"
+    identidade.estilo = configuração.estiloCarteiro
+    identidade.ícone = configuração.íconeCarteiro
+    identidade.corDoTema = configuração.corDoTemaCarteiro ou "#00695c"
+fim
+
+local nomesDasPastas = {
+    entrada = "Entrada",
+    todas = "Todas",
+    enviadas = "Enviadas",
+    rascunhos = "Rascunhos",
+    arquivadas = "Arquivadas",
+    indesejadas = "Indesejadas",
+    lixeira = "Lixeira"
+}
+
+local íconesDasPastas = {
+    entrada = "inbox",
+    todas = "mail_outline",
+    enviadas = "send",
+    rascunhos = "drafts",
+    arquivadas = "archive",
+    indesejadas = "report",
+    lixeira = "delete"
+}
+
+local função dataLegível(carimbo)
+    se não carimbo ou carimbo == 0 então retorne "" fim
+    retorne so.data("%d/%m/%Y %H:%M", carimbo)
+fim
+
+local meses = { "Janeiro", "Fevereiro", "Março", "Abril", "Maio",
+    "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro",
+    "Dezembro" }
+local mesesCurtos = { "jan.", "fev.", "mar.", "abr.", "mai.", "jun.",
+    "jul.", "ago.", "set.", "out.", "nov.", "dez." }
+local diasCurtos = { "dom.", "seg.", "ter.", "qua.", "qui.", "sex.",
+    "sáb." }
+
+local função tempoRelativo(carimbo)
+    local agora = so.tempo()
+    local diferença = mat.máximo(0, agora - carimbo)
+    local dias = mat.piso(diferença / 86400)
+    se diferença < 60 então retorne "agora"
+    senão se diferença < 3600 então
+        local minutos = mat.máximo(1, mat.piso(diferença / 60))
+        retorne "há " .. minutos .. (minutos == 1 e " minuto" ou " minutos")
+    senão se diferença < 86400 então
+        local horas = mat.máximo(1, mat.piso(diferença / 3600))
+        retorne "há " .. horas .. (horas == 1 e " hora" ou " horas")
+    fim fim fim
+    retorne "há " .. dias .. (dias == 1 e " dia" ou " dias")
+fim
+
+local função dataRelativa(carimbo)
+    se não carimbo ou carimbo == 0 então retorne "" fim
+    local agora = so.tempo()
+    local diferença = mat.máximo(0, agora - carimbo)
+    local principal
+    se diferença < 86400 então
+        principal = so.data("%H:%M", carimbo)
+    senão
+        local mês = paraNúmero(so.data("%m", carimbo)) ou 1
+        principal = paraNúmero(so.data("%d", carimbo)) .. "/" .. meses[mês]
+        se so.data("%Y", carimbo) ~= so.data("%Y", agora) então
+            principal = principal .. "/" .. so.data("%Y", carimbo)
+        fim
+    fim
+    retorne '<time datetime="' .. so.data("%Y-%m-%dT%H:%M:%S", carimbo) ..
+        '" title="' .. dataLegível(carimbo) .. '">' .. principal ..
+        ' <small>(' .. tempoRelativo(carimbo) .. ')</small></time>'
+fim
+
+local função dataDetalhada(carimbo)
+    se não carimbo ou carimbo == 0 então retorne "" fim
+    local mês = paraNúmero(so.data("%m", carimbo)) ou 1
+    local texto = paraNúmero(so.data("%d", carimbo)) .. " de " ..
+        mesesCurtos[mês] .. " de " .. so.data("%Y, %H:%M", carimbo)
+    retorne '<time datetime="' .. so.data("%Y-%m-%dT%H:%M:%S", carimbo) ..
+        '" title="' .. dataLegível(carimbo) .. '">' .. texto ..
+        ' <small>(' .. tempoRelativo(carimbo) .. ')</small></time>'
+fim
+
+local função dataResumida(carimbo)
+    se não carimbo ou carimbo == 0 então retorne "" fim
+    local agora = so.tempo()
+    local mês = paraNúmero(so.data("%m", carimbo)) ou 1
+    local diaDaSemana = (paraNúmero(so.data("%w", carimbo)) ou 0) + 1
+    local texto = diasCurtos[diaDaSemana] .. ", " ..
+        paraNúmero(so.data("%d", carimbo)) .. " de " ..
+        mesesCurtos[mês]
+    se so.data("%Y", carimbo) ~= so.data("%Y", agora) então
+        texto = texto .. " de " .. so.data("%Y", carimbo)
+    fim
+    texto = texto .. ", " .. so.data("%H:%M", carimbo)
+    retorne '<time datetime="' .. so.data("%Y-%m-%dT%H:%M:%S", carimbo) ..
+        '" title="' .. dataLegível(carimbo) .. '">' .. texto ..
+        ' <small>(' .. tempoRelativo(carimbo) .. ')</small></time>'
+fim
+
+local função tamanhoLegível(tamanho)
+    tamanho = paraNúmero(tamanho) ou 0
+    se tamanho >= 1048576 então
+        retorne colar.formate("%.1f MB", tamanho / 1048576)
+    fim
+    se tamanho >= 1024 então
+        retorne colar.formate("%.1f KB", tamanho / 1024)
+    fim
+    retorne tamanho .. " B"
+fim
+
+local função assuntoLegívelDaConversa(assunto)
+    assunto = util.apare(assunto)
+    local prefixos = { "resposta:", "encaminhada:", "re:", "fwd:",
+        "fw:", "enc:" }
+    enquanto assunto ~= "" início
+        local minúsculo = assunto:minúscula()
+        local retirou = falso
+        para _, prefixo em ipares(prefixos) início
+            se minúsculo:corte(1, #prefixo) == prefixo então
+                assunto = assunto:corte(#prefixo + 1):apare()
+                retirou = verdadeiro
+                pare
+            fim
+        fim
+        se não retirou então pare fim
+    fim
+    retorne assunto ~= "" e assunto ou "(sem assunto)"
+fim
+
+local função númeroLegível(valor)
+    local texto = paraColar(mat.paraInteiro(valor) ou 0)
+    local partes = {}
+    enquanto #texto > 3 início
+        tabela.insira(partes, 1, texto:corte(#texto - 2))
+        texto = texto:corte(1, #texto - 3)
+    fim
+    tabela.insira(partes, 1, texto)
+    retorne tabela.concatene(partes, ".")
+fim
+
+local função junteEndereços(valor)
+    se tipo(valor) ~= "tabela" então retorne util.endereçoLegível(valor) fim
+    local partes = {}
+    para _, chave em ipares({ "para", "cópia", "cópiaOculta" }) início
+        local lista = valor[chave]
+        se tipo(lista) == "tabela" então
+            para _, endereço em ipares(lista) início
+                partes[#partes + 1] = util.endereçoLegível(endereço)
+            fim
+        fim
+    fim
+    retorne tabela.concatene(partes, ", ")
+fim
+
+local função participantesDaConversa(mensagem, interlocutor)
+    local participantes = mensagem.remetentesNaConversa
+    se tipo(participantes) ~= "tabela" ou #participantes == 0 então
+        retorne interlocutor
+    fim
+    local legíveis = {}
+    para _, participante em ipares(participantes) início
+        legíveis[#legíveis + 1] = util.endereçoLegível(participante)
+    fim
+    retorne tabela.concatene(legíveis, ", ")
+fim
+
+local função tipoBreveDoAnexo(tipo, nome)
+    tipo = paraColar(tipo ou ""):minúscula()
+    se tipo == "application/pdf" então retorne "PDF" fim
+    se tipo == "image/svg+xml" então retorne "SVG" fim
+    se tipo == "image/png" então retorne "PNG" fim
+    se tipo == "image/jpeg" então retorne "JPG" fim
+    se tipo == "image/gif" então retorne "GIF" fim
+    se tipo == "image/webp" então retorne "WEBP" fim
+    local extensão = paraColar(nome ou ""):separe("%.([^%.]+)$")
+    se extensão e #extensão <= 8 então retorne extensão:maiúscula() fim
+    retorne "ARQUIVO"
+fim
+
+local ÍCONE_PDF = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone PDF"><path fill="#E5252A" d="M128 0H302L448 150V448c0 35.346-28.654 64-64 64H128c-35.346 0-64-28.654-64-64V64C64 28.654 92.654 0 128 0Z"/><path fill="#ED676A" d="M302 0 448 150H302V0Z"/><g fill="#FFFFFF"><path d="M139 289h39c19.7 0 32 12.2 32 31.7 0 19.8-12.3 31.3-32 31.3h-16v30h-23v-93Zm23 20v23h14c7.4 0 12-4.4 12-11.5S183.4 309 176 309h-14Z"/><path fill-rule="evenodd" d="M221 289h37c27.3 0 44 18.3 44 46.5S285.3 382 258 382h-37v-93Zm23 20v53h12c14.2 0 23-10.2 23-26.5S270.2 309 256 309h-12Z"/><path d="M315 289h66v20h-43v17h35v20h-35v36h-23v-93Z"/></g></svg>]]
+
+local ÍCONE_SVG = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone de arquivo SVG alaranjado"><path d="M128 0H302L448 150V448C448 483.3 419.3 512 384 512H128C92.7 512 64 483.3 64 448V64C64 28.7 92.7 0 128 0Z" fill="#F57C00"/><path d="M302 0L448 150H302Z" fill="#FFB15C"/><text x="256" y="382" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" fill="#FFFFFF">SVG</text></svg>]]
+
+local ÍCONE_PNG = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Ícone PNG com fundo transparente"><defs><filter id="carteiro-anexo-png-sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.18"/></filter></defs><g filter="url(#carteiro-anexo-png-sombra)"><path d="M185 95H453L636 278V688Q636 724 600 724H199Q163 724 163 688V117Q163 95 185 95Z" fill="#10C987"/><rect x="163" y="541" width="473" height="183" fill="#08B873"/><rect x="163" y="540" width="473" height="3" fill="#8FE6C7" opacity="0.8"/><path d="M453 95L636 278H513Q477 278 453 254Q453 278 453 216Z" fill="#0CB06F"/><path d="M453 95L636 278H513Q453 278 453 218Z" fill="#0DB878"/><path d="M509 278L636 405V278Z" fill="#000000" opacity="0.12"/><g fill="none" stroke="#F3F3F3" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"><rect x="246" y="286" width="309" height="177" rx="28" ry="28"/><circle cx="312" cy="359" r="22"/><path d="M302 441L362 373L411 441"/><path d="M395 441L437 376L500 441"/></g><text x="400" y="665" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" fill="#F7F7F7">PNG</text></g></svg>]]
+
+local ÍCONE_JPG = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone JPG em SVG"><defs><clipPath id="carteiro-anexo-jpg-recorte"><path d="M72 4h302l78 78v418c0 4.4-3.6 8-8 8H72c-4.4 0-8-3.6-8-8V12c0-4.4 3.6-8 8-8z"/></clipPath></defs><path d="M72 4h302l78 78v418c0 4.4-3.6 8-8 8H72c-4.4 0-8-3.6-8-8V12c0-4.4 3.6-8 8-8z" fill="#cdcbc2"/><path d="M342 4l110 110H342z" fill="#c4c2b7"/><g clip-path="url(#carteiro-anexo-jpg-recorte)"><circle cx="173" cy="129" r="42" fill="#e8ca53"/><path d="M64 358L214 224l51 50 96-136 151 151v69z" fill="#33bba0"/><rect x="64" y="358" width="388" height="150" fill="#1ea892"/><rect x="64" y="357" width="388" height="2" fill="#48cdb7" opacity="0.9"/></g><text x="258" y="484" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="129" font-weight="400" fill="#f4f4f2">JPG</text></svg>]]
+
+local função íconeDoAnexo(tipo, nome)
+    local breve = tipoBreveDoAnexo(tipo, nome)
+    se breve == "PDF" então retorne ÍCONE_PDF fim
+    se breve == "SVG" então retorne ÍCONE_SVG fim
+    se breve == "PNG" então retorne ÍCONE_PNG fim
+    se breve == "JPG" ou breve == "JPEG" então retorne ÍCONE_JPG fim
+    retorne '<b class="carteiro-anexo-tipo">' ..
+        util.escapeHTML(breve) .. '.</b>'
+fim
+
+local função caminhoDoAnexo(mensagemId, anexoId, visualizar)
+    retorne "/carteiro/mensagens/" .. mensagemId .. "/anexos/" ..
+        anexoId .. (visualizar e "/visualizar" ou "")
+fim
+
+local função anexoDaLista(anexo)
+    local nome = util.escapeHTML(anexo.nome ou "anexo")
+    local ícone = íconeDoAnexo(anexo.tipo, anexo.nome)
+    local classe = util.anexoExibível(anexo.tipo) e
+        "carteiro-item-anexo visualizável" ou "carteiro-item-anexo"
+    se util.anexoExibível(anexo.tipo) então
+        retorne '<button class="' .. classe .. '" type="button" ' ..
+            'data-visualizar-anexo data-anexo-nome="' .. nome ..
+            '" data-anexo-tipo="' .. util.escapeHTML(anexo.tipo) ..
+            '" data-anexo-url="' .. caminhoDoAnexo(
+                anexo.mensagemId, anexo.id, verdadeiro) ..
+            '" data-anexo-baixar="' .. caminhoDoAnexo(
+                anexo.mensagemId, anexo.id, falso) .. '" title="' .. nome ..
+            '">' .. ícone .. '<span>' .. nome .. '</span></button>'
+    fim
+    retorne '<a class="' .. classe .. '" href="' .. caminhoDoAnexo(
+        anexo.mensagemId, anexo.id, falso) .. '" title="Baixar ' .. nome ..
+        '">' .. ícone .. '<span>' .. nome .. '</span></a>'
+fim
+
+local função anexosResumidosDaConversa(mensagem)
+    local anexos = mensagem.anexosNaConversa ou {}
+    se #anexos == 0 então retorne "" fim
+    local partes = {}
+    local limite = mat.mínimo(2, #anexos)
+    para índice = 1, limite início
+        partes[#partes + 1] = anexoDaLista(anexos[índice])
+    fim
+    se #anexos > limite então
+        partes[#partes + 1] = '<span class="carteiro-item-anexo mais">Mais ' ..
+            (#anexos - limite) .. '…</span>'
+    fim
+    retorne '<span class="carteiro-item-anexos">' ..
+        tabela.concatene(partes) .. '</span>'
+fim
+
+local função anexoDaCarta(mensagemId, anexo)
+    local nome = util.escapeHTML(anexo.nome ou "anexo")
+    local tipo = util.escapeHTML(anexo.tipo ou "application/octet-stream")
+    local ícone = íconeDoAnexo(anexo.tipo, anexo.nome)
+    local baixar = caminhoDoAnexo(mensagemId, anexo.id, falso)
+    local exibível = util.anexoExibível(anexo.tipo)
+    local abertura
+    se exibível então
+        abertura = '<button class="carteiro-anexo-abertura" type="button" ' ..
+            'data-visualizar-anexo data-anexo-nome="' .. nome ..
+            '" data-anexo-tipo="' .. tipo .. '" data-anexo-url="' ..
+            caminhoDoAnexo(mensagemId, anexo.id, verdadeiro) ..
+            '" data-anexo-baixar="' .. baixar .. '" title="Visualizar ' ..
+            nome .. '">' .. ícone .. '<span><strong>' .. nome ..
+            '</strong><small>' ..
+            tamanhoLegível(anexo.tamanho) .. ' · ' .. tipo ..
+            '</small></span></button>'
+    senão
+        abertura = '<a class="carteiro-anexo-abertura" href="' .. baixar ..
+            '" title="Baixar ' .. nome .. '">' .. ícone ..
+            '<span><strong>' .. nome ..
+            '</strong><small>' .. tamanhoLegível(anexo.tamanho) ..
+            ' · ' .. tipo .. '</small></span></a>'
+    fim
+    local visualizar = exibível e
+        ('<button class="carteiro-botão-ícone" type="button" ' ..
+            'data-visualizar-anexo data-anexo-nome="' .. nome ..
+            '" data-anexo-tipo="' .. tipo .. '" data-anexo-url="' ..
+            caminhoDoAnexo(mensagemId, anexo.id, verdadeiro) ..
+            '" data-anexo-baixar="' .. baixar .. '" title="Visualizar" ' ..
+            'aria-label="Visualizar ' .. nome .. '"><i class="material-icons" ' ..
+            'aria-hidden="true">visibility</i></button><button ' ..
+            'class="carteiro-botão-ícone" type="button" data-imprimir-anexo ' ..
+            'data-anexo-url="' .. caminhoDoAnexo(
+                mensagemId, anexo.id, verdadeiro) .. '" title="Imprimir" ' ..
+            'aria-label="Imprimir ' .. nome .. '"><i class="material-icons" ' ..
+            'aria-hidden="true">print</i></button>') ou ""
+    retorne '<article class="carteiro-anexo-item">' .. abertura ..
+        '<span class="carteiro-anexo-ações">' .. visualizar ..
+        '<a class="carteiro-botão-ícone" href="' .. baixar ..
+        '" title="Baixar" aria-label="Baixar ' .. nome .. '"><i ' ..
+        'class="material-icons" aria-hidden="true">download</i></a></span></article>'
+fim
+
+local função etiquetaDaTriagem(mensagem)
+    se mensagem.decisãoDoUsuário == "indesejada" então
+        retorne '<span class="carteiro-triagem-etiqueta indesejada">' ..
+            'sua regra · indesejada</span>'
+    fim
+    se mensagem.decisãoDoUsuário == "regular" então
+        retorne '<span class="carteiro-triagem-etiqueta pessoal-regular">' ..
+            'sua regra · regular</span>'
+    fim
+    local classificação = mensagem.classificaçãoDaTriagem ou "regular"
+    se classificação == "regular" então retorne "" fim
+    retorne '<span class="carteiro-triagem-etiqueta ' ..
+        util.escapeHTML(classificação) .. '">' ..
+        util.escapeHTML(classificação) .. ' · ' ..
+        util.escapeHTML(mensagem.pontuaçãoDeSuspeita ou 0) .. '</span>'
+fim
+
+local função detalhesDaTriagem(mensagem)
+    local classificação = mensagem.classificaçãoDaTriagem ou "regular"
+    local itens = {}
+    para _, motivo em ipares(mensagem.motivosDaTriagem ou {}) início
+        itens[#itens + 1] = '<li><strong>+' ..
+            util.escapeHTML(motivo.pontos ou 0) .. '</strong> ' ..
+            util.escapeHTML(motivo.descrição ou motivo.regra ou "sinal") .. '</li>'
+    fim
+    local lista = #itens > 0 e '<ul>' .. tabela.concatene(itens) .. '</ul>' ou
+        '<p>Nenhum sinal de suspeita foi encontrado.</p>'
+    local decisãoPessoal = ""
+    se mensagem.decisãoDoUsuário e
+       mensagem.decisãoDoUsuário ~= "nenhuma" então
+        local regra = mensagem.regraDaTriagem ou "regra pessoal"
+        se regra:corte(1, 9) == "endereco:" então
+            regra = "endereço: " .. regra:corte(10)
+        senão se regra:corte(1, 8) == "dominio:" então
+            regra = "domínio: " .. regra:corte(9)
+        fim fim
+        decisãoPessoal = '<div class="carteiro-triagem-pessoal"><strong>' ..
+            'Sua decisão:</strong> ' ..
+            util.escapeHTML(mensagem.decisãoDoUsuário) .. ' por ' ..
+            util.escapeHTML(regra) .. '. A avaliação automática abaixo ' ..
+            'foi preservada.</div>'
+    fim
+    retorne '<details class="carteiro-triagem"><summary>Avaliação automática: <strong>' ..
+        util.escapeHTML(classificação) .. '</strong> · pontuação ' ..
+        util.escapeHTML(mensagem.pontuaçãoDeSuspeita ou 0) ..
+        '</summary>' .. decisãoPessoal .. lista .. '</details>'
+fim
+
+local nomesDaAutenticação = {
+    passa = "passou", falha = "falhou", falhaSuave = "falha suave",
+    neutro = "neutro", nenhum = "não informado",
+    erroTemporário = "erro temporário", erroPermanente = "erro permanente",
+    temporário = "erro temporário"
+}
+
+local nomesDasAçõesDMARC = {
+    aceitar = "aceitar", quarentena = "separar como indesejada",
+    rejeitar = "rejeitar", adiar = "adiar temporariamente"
+}
+
+local função detalhesDaAutenticação(mensagem)
+    se mensagem.direção ~= "entrada" ou não mensagem.resultadoDMARC então
+        retorne ""
+    fim
+    local função nome(valor)
+        retorne util.escapeHTML(nomesDaAutenticação[valor] ou valor ou
+            "não informado")
+    fim
+    local política = mensagem.políticaDMARC e
+        '<span>Política: <strong>' ..
+            util.escapeHTML(mensagem.políticaDMARC) .. '</strong></span>' ou ""
+    local ação = mensagem.açãoDMARC e
+        '<span>Ação: <strong>' .. util.escapeHTML(
+            nomesDasAçõesDMARC[mensagem.açãoDMARC] ou
+            mensagem.açãoDMARC) .. '</strong></span>' ou ""
+    retorne '<section class="carteiro-autenticação" aria-label="Autenticação postal">' ..
+        '<h2>Autenticação postal</h2><div>' ..
+        '<span>SPF: <strong>' .. nome(mensagem.resultadoSPF) .. '</strong></span>' ..
+        '<span>DKIM: <strong>' .. nome(mensagem.resultadoDKIM) .. '</strong></span>' ..
+        '<span>DMARC: <strong>' .. nome(mensagem.resultadoDMARC) .. '</strong></span>' ..
+        política .. ação .. '</div></section>'
+fim
+
+local função navegaçãoDaCaixa(pastaAtual)
+    local itens = {}
+    para _, pasta em ipares({ "entrada", "enviadas", "rascunhos",
+                              "indesejadas", "lixeira", "todas" }) início
+        local classe = pasta == pastaAtual e " ativo" ou ""
+        itens[#itens + 1] = '<a class="carteiro-pasta' .. classe .. '" href="/carteiro/' ..
+            pasta .. '"><i class="material-icons" aria-hidden="true">' ..
+            íconesDasPastas[pasta] .. '</i><span>' .. nomesDasPastas[pasta] .. '</span></a>'
+    fim
+    local classeDaTriagem = pastaAtual == "triagem" e " ativo" ou ""
+    itens[#itens + 1] = '<a class="carteiro-pasta' .. classeDaTriagem ..
+        '" href="/carteiro/triagem"><i class="material-icons" ' ..
+        'aria-hidden="true">filter_list</i><span>Triagem</span></a>'
+    local classeDoConfigurador = pastaAtual == "configurar" e " ativo" ou ""
+    itens[#itens + 1] = '<a class="carteiro-pasta' .. classeDoConfigurador ..
+        '" href="/carteiro/configurar"><i class="material-icons" ' ..
+        'aria-hidden="true">phonelink_setup</i><span>Configurar</span></a>'
+    retorne tabela.concatene(itens)
+fim
+
+local função opçõesDePastas(mensagem)
+    local opções = {}
+    local destinos = { "arquivadas", "indesejadas", "lixeira" }
+    se mensagem.pasta == "arquivadas" ou mensagem.pasta == "indesejadas" ou
+       mensagem.pasta == "lixeira" então
+        se mensagem.direção == "entrada" então
+            tabela.insira(destinos, 1, "entrada")
+        senão se mensagem.direção == "saída" ou mensagem.direção == "saida" então
+            tabela.insira(destinos, 1, "enviadas")
+        fim fim
+    fim
+    para _, pasta em ipares(destinos) início
+        se pasta ~= mensagem.pasta então
+            opções[#opções + 1] = '<option value="' .. pasta .. '">' ..
+                nomesDasPastas[pasta] .. '</option>'
+        fim
+    fim
+    retorne tabela.concatene(opções)
+fim
+
+função páginas.base(usuário, caixa, título, conteúdo, pastaAtual)
+    local nome = util.escapeHTML(usuário.nome)
+    local endereço = util.escapeHTML(util.endereçoLegível(caixa.endereço))
+    local estilo = identidade.estilo e
+        '<link href="' .. util.escapeHTML(identidade.estilo) ..
+        '" rel="stylesheet">' ou ""
+    local marca = util.escapeHTML(identidade.marca)
+    local ícone = identidade.ícone e
+        '<img class="carteiro-marca-imagem" src="' ..
+        util.escapeHTML(identidade.ícone) .. '" alt="">' ou
+        '<i class="material-icons" aria-hidden="true">local_post_office</i>'
+    local favicon = identidade.ícone ou "/estático/fotos/santafe.ico"
+    retorne [[<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+  <meta name="theme-color" content="]] .. util.escapeHTML(identidade.corDoTema) .. [[">
+  <title>Carteiro | ]] .. util.escapeHTML(título) .. [[</title>
+  <link rel="icon" href="]] .. util.escapeHTML(favicon) .. [[">
+  <link href="/estático/css/materialize.css" rel="stylesheet">
+  <link href="/estático/css/material-icons.css" rel="stylesheet">
+  <link href="/carteiro/estático/css/carteiro.css?v=32" rel="stylesheet">
+  ]] .. estilo .. [[
+</head>
+<body>
+  <header class="carteiro-topo">
+    <a class="carteiro-marca" href="/carteiro/" aria-label="Carteiro, caixa de entrada">
+      ]] .. ícone .. [[
+      <strong>Correio</strong><small>]] .. marca .. [[</small>
+    </a>
+    <div class="carteiro-conta">
+      <span><strong>]] .. nome .. [[</strong><small>]] .. endereço .. [[</small></span>
+      <a href="]] .. util.escapeHTML(identidade.destino) .. [[" class="white-text">]] .. marca .. [[</a>
+      <form action="/sair" method="POST">
+        <input type="hidden" name="csrf" value="]] .. util.escapeHTML(usuário.csrf) .. [[">
+        <button class="btn-flat white-text" type="submit">Sair</button>
+      </form>
+    </div>
+  </header>
+  <div class="carteiro-corpo">
+    <aside class="carteiro-lateral" aria-label="Pastas do correio">
+      <a class="btn amber darken-3 carteiro-nova" href="/carteiro/nova">
+        <i class="material-icons left" aria-hidden="true">edit</i>Nova mensagem
+      </a>
+      <nav>]] .. navegaçãoDaCaixa(pastaAtual) .. [[</nav>
+    </aside>
+    <main class="carteiro-conteúdo">]] .. conteúdo .. [[</main>
+  </div>
+  <dialog class="carteiro-visualizador documento" data-visualizador-anexo>
+    <header><strong data-visualizador-título>Visualização do anexo</strong>
+      <button class="carteiro-botão-ícone" type="button" data-fechar-visualizador
+        title="Fechar" aria-label="Fechar visualização"><i class="material-icons"
+        aria-hidden="true">close</i></button></header>
+    <div class="carteiro-visualizador-conteúdo">
+      <iframe data-visualizador-quadro title="Visualização do anexo"></iframe>
+      <img data-visualizador-imagem alt="" hidden>
+    </div>
+    <footer><a class="btn-flat teal-text" data-visualizador-baixar href="#">
+      <i class="material-icons left" aria-hidden="true">download</i>Baixar</a>
+      <button class="btn-flat teal-text" type="button" data-imprimir-visualizador>
+        <i class="material-icons left" aria-hidden="true">print</i>Imprimir</button></footer>
+  </dialog>
+  <script src="/carteiro/estático/js/carteiro.js?v=19" defer></script>
+</body>
+</html>]]
+fim
+
+local função caminhoDaPágina(pasta, busca, página)
+    local argumentos = {}
+    busca = util.apare(busca):corte(1, 100)
+    se busca ~= "" então
+        argumentos[#argumentos + 1] = "busca=" ..
+            util.codifiquePercentual(busca)
+    fim
+    se página > 1 então
+        argumentos[#argumentos + 1] = "pagina=" .. página
+    fim
+    local caminho = "/carteiro/" .. pasta
+    se #argumentos > 0 então
+        caminho = caminho .. "?" .. tabela.concatene(argumentos, "&amp;")
+    fim
+    retorne caminho
+fim
+
+função páginas.lista(usuário, caixa, pasta, mensagens, busca,
+                              página, total, limite)
+    página = paraNúmero(página) ou 1
+    limite = paraNúmero(limite) ou 50
+    total = paraNúmero(total) ou #mensagens
+    se página < 1 então página = 1 fim
+    local começo = total > 0 e ((página - 1) * limite + 1) ou 0
+    local término = mat.mínimo(total, começo + #mensagens - 1)
+    se total == 0 então término = 0 fim
+    local temAnterior = página > 1
+    local temPróxima = término < total
+    local itens = {}
+    para índice, mensagem em ipares(mensagens) início
+        local nãoLida = não mensagem.lida e " não-lida" ou ""
+        local interlocutor = (mensagem.direção == "saída" ou
+            mensagem.direção == "saida") e
+            junteEndereços(mensagem.destinatários) ou
+            util.endereçoLegível(mensagem.remetente)
+        local identificaçãoDaSeleção = "carteiro-carta-" .. mensagem.id
+        local seleção =
+            '<input id="' .. identificaçãoDaSeleção .. '" type="checkbox" ' ..
+            'name="carta_' .. mensagem.id .. '" value="' .. mensagem.id ..
+            '" data-carta data-lida="' ..
+            (mensagem.lida e "verdadeiro" ou "falso") .. '"><label ' ..
+            'class="carteiro-seletor-item" for="' .. identificaçãoDaSeleção ..
+            '" aria-label="Selecionar carta"></label>'
+        local participantes = participantesDaConversa(mensagem, interlocutor)
+        local caminho = '/carteiro/mensagens/' .. mensagem.id .. '?pasta=' .. pasta ..
+            '&amp;posicao=' .. (começo + índice - 1) ..
+            '&amp;total=' .. total
+        itens[#itens + 1] = '<div class="carteiro-linha' .. nãoLida .. '">' ..
+            seleção .. '<div class="carteiro-item' .. nãoLida .. '"><a ' ..
+            'class="carteiro-item-cabeçalho" href="' .. caminho .. '">' ..
+            '<span class="carteiro-item-remetente">' ..
+            util.escapeHTML(participantes) .. '</span>' ..
+            '<span class="carteiro-item-assunto"><strong>' ..
+            util.escapeHTML(assuntoLegívelDaConversa(mensagem.assunto)) ..
+            ((mensagem.quantidadeNaConversa ou 1) > 1 e
+                (' <b class="carteiro-contagem-conversa">' ..
+                    mensagem.quantidadeNaConversa .. '</b>') ou '') ..
+            '</strong>' .. etiquetaDaTriagem(mensagem) .. '<small> — ' ..
+            util.escapeHTML(mensagem.resumo) .. '</small></span>' ..
+            '<span class="carteiro-item-data">' .. dataRelativa(mensagem.criadaEm) .. '</span>' ..
+            '</a>' .. anexosResumidosDaConversa(mensagem) .. '</div></div>'
+    fim
+    se #itens == 0 então
+        itens[1] = '<div class="carteiro-vazio"><i class="material-icons">mark_email_read</i>' ..
+            '<h5>Nenhuma mensagem aqui</h5><p>Esta pasta ainda está vazia.</p></div>'
+    fim
+
+    local esvaziar = ""
+    se pasta == "lixeira" e #mensagens > 0 então
+        esvaziar = '<form class="carteiro-esvaziar" ' ..
+            'action="/carteiro/lixeira/esvaziar" method="POST" ' ..
+            'data-confirma="Esvaziar a lixeira definitivamente? Esta ação não pode ser desfeita.">' ..
+            '<input type="hidden" name="csrf" value="' ..
+            util.escapeHTML(usuário.csrf) .. '"><button class="btn-flat red-text" ' ..
+            'type="submit"><i class="material-icons left" aria-hidden="true">' ..
+            'delete_forever</i>Esvaziar lixeira</button></form>'
+    fim
+
+    local anterior = temAnterior e
+        ('<a class="carteiro-botão-ícone" rel="prev" href="' ..
+        caminhoDaPágina(pasta, busca, página - 1) ..
+        '" title="Página anterior" aria-label="Página anterior"><i ' ..
+        'class="material-icons" aria-hidden="true">chevron_left</i></a>') ou
+        '<span class="carteiro-botão-ícone desativado" aria-disabled="true" ' ..
+        'aria-label="Não há página anterior"><i class="material-icons" ' ..
+        'aria-hidden="true">chevron_left</i></span>'
+    local próxima = temPróxima e
+        ('<a class="carteiro-botão-ícone" rel="next" href="' ..
+        caminhoDaPágina(pasta, busca, página + 1) ..
+        '" title="Próxima página" aria-label="Próxima página"><i ' ..
+        'class="material-icons" aria-hidden="true">chevron_right</i></a>') ou
+        '<span class="carteiro-botão-ícone desativado" aria-disabled="true" ' ..
+        'aria-label="Não há próxima página"><i class="material-icons" ' ..
+        'aria-hidden="true">chevron_right</i></span>'
+    local controleDaPágina = '<div class="carteiro-controle-página" ' ..
+        'aria-label="Navegação entre páginas"><span>' .. númeroLegível(começo) ..
+        '–' .. númeroLegível(término) .. ' de ' .. númeroLegível(total) ..
+        '</span>' .. anterior .. próxima .. '</div>'
+    local atualizar = '<a class="carteiro-botão-ícone" href="' ..
+        caminhoDaPágina(pasta, busca, página) .. '" title="Atualizar esta caixa" ' ..
+        'aria-label="Atualizar esta caixa"><i class="material-icons" ' ..
+        'aria-hidden="true">refresh</i></a>'
+    local lista = '<section class="carteiro-lista">' ..
+        tabela.concatene(itens) .. '</section>'
+
+    se #mensagens > 0 então
+        local ações
+        se pasta == "lixeira" então
+            ações = '<div class="carteiro-ações-selecionadas" ' ..
+                'data-ações-selecionadas hidden><button ' ..
+                'class="carteiro-botão-ícone" type="button" ' ..
+                'data-executar-acao value="restaurar" ' ..
+                'title="Restaurar em Todas" aria-label="Restaurar em Todas">' ..
+                '<i class="material-icons" aria-hidden="true">' ..
+                'restore_from_trash</i></button></div>'
+        senão
+            ações = '<div class="carteiro-ações-selecionadas" ' ..
+                'data-ações-selecionadas hidden>' ..
+                '<button class="carteiro-botão-ícone" type="button" ' ..
+                'data-executar-acao value="arquivar" title="Arquivar" ' ..
+                'aria-label="Arquivar"><i class="material-icons" ' ..
+                'aria-hidden="true">archive</i></button>' ..
+                '<button class="carteiro-botão-ícone" type="button" ' ..
+                'data-executar-acao value="indesejada" title="Indesejada" ' ..
+                'aria-label="Marcar como indesejada"><i class="material-icons" ' ..
+                'aria-hidden="true">report</i></button>' ..
+                '<button class="carteiro-botão-ícone" type="button" ' ..
+                'data-executar-acao value="excluir" title="Descartar" ' ..
+                'aria-label="Descartar na Lixeira"><i class="material-icons" ' ..
+                'aria-hidden="true">delete</i></button>' ..
+                '<details class="carteiro-menu carteiro-menu-ações"><summary ' ..
+                'class="carteiro-botão-ícone" title="Ações das cartas" ' ..
+                'aria-label="Ações das cartas selecionadas"><i class="material-icons" ' ..
+                'aria-hidden="true">more_vert</i></summary><div ' ..
+                'class="carteiro-menu-conteúdo"><button type="button" ' ..
+                'data-executar-acao value="lida"><i class="material-icons" ' ..
+                'aria-hidden="true">drafts</i>Marcar como lida</button>' ..
+                '<button type="button" data-executar-acao value="não-lida"><i ' ..
+                'class="material-icons" aria-hidden="true">markunread</i>' ..
+                'Marcar como não lida</button><button type="button" ' ..
+                'data-executar-acao value="arquivar"><i class="material-icons" ' ..
+                'aria-hidden="true">archive</i>Arquivar</button><button type="button" ' ..
+                'data-executar-acao value="excluir"><i class="material-icons" ' ..
+                'aria-hidden="true">delete</i>Descartar</button><button type="button" ' ..
+                'data-executar-acao value="indesejada"><i class="material-icons" ' ..
+                'aria-hidden="true">report</i>Indesejada</button></div></details></div>'
+        fim
+        local seletor = '<div class="carteiro-seletor-menu"><input ' ..
+            'id="carteiro-selecionar-todas" type="checkbox" ' ..
+            'data-selecionar-todas><label for="carteiro-selecionar-todas" ' ..
+            'aria-label="Selecionar todas as cartas desta página"></label>' ..
+            '<details class="carteiro-menu"><summary title="Opções de seleção" ' ..
+            'aria-label="Opções de seleção"><i class="material-icons" ' ..
+            'aria-hidden="true">arrow_drop_down</i></summary>' ..
+            '<div class="carteiro-menu-conteúdo"><button type="button" ' ..
+            'data-selecionar="todas">Todas</button><button type="button" ' ..
+            'data-selecionar="nenhuma">Nenhuma</button><button type="button" ' ..
+            'data-selecionar="lidas">Lidas</button><button type="button" ' ..
+            'data-selecionar="não-lidas">Não lidas</button></div></details></div>'
+        local avisoGlobal = '<div class="carteiro-seleção-global" ' ..
+            'data-seleção-global data-total="' .. total .. '" data-pasta="' ..
+            util.escapeHTML(nomesDasPastas[pasta]) .. '" hidden><span ' ..
+            'data-aviso-página>Todas as ' .. númeroLegível(#mensagens) ..
+            ' conversas nesta página estão selecionadas.</span> ' ..
+            '<button type="button" data-selecionar-escopo>Selecionar todas as ' ..
+            númeroLegível(total) .. ' conversas em ' ..
+            util.escapeHTML(nomesDasPastas[pasta]) .. '</button><span ' ..
+            'data-aviso-total hidden>Todas as ' .. númeroLegível(total) ..
+            ' conversas em ' .. util.escapeHTML(nomesDasPastas[pasta]) ..
+            ' estão selecionadas.</span> <button type="button" ' ..
+            'data-limpar-escopo hidden>Limpar seleção</button></div>'
+        lista = '<form class="carteiro-seleção-em-lote" ' ..
+            'action="/carteiro/mensagens/acao-em-lote" method="POST" ' ..
+            'data-seleção-em-lote><input type="hidden" name="csrf" value="' ..
+            util.escapeHTML(usuário.csrf) .. '"><input type="hidden" ' ..
+            'name="pastaDeOrigem" value="' .. pasta .. '"><input type="hidden" ' ..
+            'name="busca" value="' .. util.escapeHTML(busca) .. '">' ..
+            '<input type="hidden" name="pagina" value="' .. página .. '">' ..
+            '<input type="hidden" name="acao" value="" data-acao-lote>' ..
+            '<input type="hidden" name="escopo" value="pagina" ' ..
+            'data-escopo-seleção><div class="carteiro-barra-postal"><div ' ..
+            'class="carteiro-ferramentas">' .. seletor .. atualizar .. ações ..
+            '</div>' .. controleDaPágina .. '</div>' .. avisoGlobal .. lista ..
+            '</form>'
+    senão
+        lista = '<div class="carteiro-barra-postal"><div ' ..
+            'class="carteiro-ferramentas">' .. atualizar .. '</div>' ..
+            controleDaPágina .. '</div>' .. lista
+    fim
+
+    local conteúdo = '<section class="carteiro-cabeçalho-lista"><div><h1>' ..
+        nomesDasPastas[pasta] .. '</h1><p>' .. númeroLegível(total) ..
+        (total == 1 e ' conversa' ou ' conversas') .. '</p></div>' ..
+        '<div class="carteiro-cabeçalho-ações">' .. esvaziar ..
+        '<form action="/carteiro/' .. pasta .. '" method="GET" role="search">' ..
+        '<i class="material-icons">search</i><input name="busca" type="search" maxlength="100" ' ..
+        'value="' .. util.escapeHTML(busca) .. '" placeholder="Pesquisar nesta pasta">' ..
+        '<button class="btn-flat teal-text" type="submit">Buscar</button></form></div></section>' ..
+        lista
+    retorne páginas.base(usuário, caixa, nomesDasPastas[pasta], conteúdo, pasta)
+fim
+
+função páginas.triagem(usuário, caixa, regras)
+    local linhas = {}
+    para _, regra em ipares(regras ou {}) início
+        local decisão = regra.decisão == "permitir" e
+            "Entregar na entrada" ou "Separar em indesejadas"
+        linhas[#linhas + 1] = '<tr><td>' .. util.escapeHTML(regra.escopo) ..
+            '</td><td><code>' .. util.escapeHTML(regra.valor) ..
+            '</code></td><td>' .. decisão .. '</td><td>' ..
+            '<form action="/carteiro/triagem/regras/remover" method="POST">' ..
+            '<input type="hidden" name="csrf" value="' ..
+            util.escapeHTML(usuário.csrf) .. '"><input type="hidden" ' ..
+            'name="escopo" value="' .. util.escapeHTML(regra.escopo) ..
+            '"><input type="hidden" name="valor" value="' ..
+            util.escapeHTML(regra.valor) .. '"><button class="btn-flat red-text" ' ..
+            'type="submit">Remover</button></form></td></tr>'
+    fim
+    se #linhas == 0 então
+        linhas[1] = '<tr><td colspan="4" class="carteiro-triagem-vazia">' ..
+            'Você ainda não criou regras pessoais.</td></tr>'
+    fim
+    local conteúdo = [[
+<section class="carteiro-painel carteiro-regras-triagem">
+  <div class="carteiro-painel-título"><div><h1>Triagem</h1>
+    <p>Decida como cartas futuras de um endereço ou domínio devem ser entregues.</p>
+  </div></div>
+  <div class="carteiro-informação"><i class="material-icons" aria-hidden="true">info</i>
+    <span>Uma regra pessoal muda somente a pasta de entrega. Ela não apaga a
+    pontuação automática, não confia no HTML e não dispensa antivírus,
+    SPF, DKIM ou DMARC. A regra de endereço prevalece sobre a de domínio.</span></div>
+  <form class="carteiro-nova-regra" action="/carteiro/triagem/regras" method="POST">
+    <input type="hidden" name="csrf" value="]] ..
+        util.escapeHTML(usuário.csrf) .. [[">
+    <label>Aplicar a
+      <select name="escopo" required>
+        <option value="endereço">Endereço exato</option>
+        <option value="domínio">Domínio inteiro</option>
+      </select>
+    </label>
+    <label>Endereço ou domínio
+      <input name="valor" type="text" maxlength="512" required
+        placeholder="ana@exemplo.org ou exemplo.org">
+    </label>
+    <label>Fazer
+      <select name="decisão" required>
+        <option value="permitir">Entregar na entrada</option>
+        <option value="separar">Separar em indesejadas</option>
+      </select>
+    </label>
+    <button class="btn teal" type="submit"><i class="material-icons left">add</i>Salvar regra</button>
+  </form>
+  <div class="carteiro-tabela-regras"><table>
+    <thead><tr><th>Alcance</th><th>Valor</th><th>Decisão</th><th></th></tr></thead>
+    <tbody>]] .. tabela.concatene(linhas) .. [[</tbody>
+  </table></div>
+</section>]]
+    retorne páginas.base(usuário, caixa, "Triagem", conteúdo, "triagem")
+fim
+
+função páginas.configurador(usuário, caixa, configuração)
+    local servidor = util.escapeHTML(configuração.domínioASCII)
+    local endereço = util.escapeHTML(util.endereçoLegível(caixa.endereço))
+    local conteúdo = [[
+<section class="carteiro-painel carteiro-configurador">
+  <div class="carteiro-painel-título"><div><h1>Configurar este aparelho</h1>
+    <p>Leve sua caixa postal ao celular, computador ou programa de correio.</p>
+  </div></div>
+  <div class="carteiro-configurador-grade">
+    <article class="carteiro-configurador-cartão carteiro-configurador-apple">
+      <i class="material-icons" aria-hidden="true">phone_iphone</i>
+      <div><h2>iPhone e iPad</h2>
+        <p>Baixe o perfil próprio para iOS, com escopo do aparelho, endereço,
+        servidores, portas e TLS.</p>
+        <a class="btn teal" href="/carteiro/configurar/correio-santafe.mobileconfig">
+          <i class="material-icons left" aria-hidden="true">download</i>Baixar para iPhone/iPad</a>
+      </div>
+    </article>
+    <article class="carteiro-configurador-cartão carteiro-configurador-apple">
+      <i class="material-icons" aria-hidden="true">laptop_mac</i>
+      <div><h2>Mac</h2>
+        <p>O Mac usa um perfil de usuário separado, adequado ao chaveiro e ao
+        Mail do macOS.</p>
+        <a class="btn teal" href="/carteiro/configurar/correio-santafe-mac.mobileconfig">
+          <i class="material-icons left" aria-hidden="true">download</i>Baixar para Mac</a>
+      </div>
+    </article>
+    <article class="carteiro-configurador-cartão">
+      <i class="material-icons" aria-hidden="true">verified_user</i>
+      <div><h2>Sua senha continua sua</h2>
+        <p>O perfil não contém sua senha. O aparelho a pedirá durante a
+        instalação e a guardará no chaveiro local.</p>
+      </div>
+    </article>
+  </div>
+  <section class="carteiro-configurador-passos">
+    <h2>Instalação no iPhone ou iPad</h2>
+    <ol><li>Toque em <strong>Baixar para iPhone/iPad</strong> e permita o download.</li>
+      <li>Abra <strong>Ajustes</strong> e toque em <strong>Perfil Baixado</strong>.</li>
+      <li>Confira a conta <code>]] .. endereço .. [[</code> e toque em
+      <strong>Instalar</strong>.</li>
+      <li>Informe a senha da sua caixa quando o sistema pedir.</li></ol>
+  </section>
+  <section class="carteiro-configurador-manual">
+    <h2>Configuração manual e outros programas</h2>
+    <p>Use o endereço postal completo como nome de usuário na entrada e na saída.</p>
+    <div class="carteiro-configurador-tabela"><table>
+      <thead><tr><th>Serviço</th><th>Servidor</th><th>Porta</th><th>Proteção</th></tr></thead>
+      <tbody><tr><td>Receber por IMAP</td><td><code>]] .. servidor .. [[</code></td>
+        <td>993</td><td>TLS desde o início</td></tr>
+      <tr><td>Enviar por SMTP</td><td><code>]] .. servidor .. [[</code></td>
+        <td>465</td><td>TLS desde o início</td></tr>
+      <tr><td>Envio alternativo</td><td><code>]] .. servidor .. [[</code></td>
+        <td>587</td><td>STARTTLS obrigatório</td></tr></tbody>
+    </table></div>
+    <dl class="carteiro-configurador-identidade"><div><dt>Endereço</dt><dd><code>]] ..
+        endereço .. [[</code></dd></div><div><dt>Nome de usuário</dt><dd><code>]] ..
+        endereço .. [[</code></dd></div><div><dt>Autenticação</dt><dd>Senha normal</dd></div></dl>
+  </section>
+  <div class="carteiro-informação"><i class="material-icons" aria-hidden="true">travel_explore</i>
+    <span>Os registros SRV do domínio também anunciam IMAP 993, SMTP 465 e
+    SMTP 587. Programas compatíveis podem descobrir essas definições automaticamente.</span></div>
+</section>]]
+    retorne páginas.base(usuário, caixa, "Configurar", conteúdo, "configurar")
+fim
+
+função páginas.compositor(usuário, caixa, valores, aviso)
+    valores = valores ou {}
+    local respondendo = valores.respondendo ou
+        (valores.respostaA ~= nulo e valores.respostaA ~= "")
+    local encaminhando = valores.encaminhando ou
+        (valores.encaminharDe ~= nulo e valores.encaminharDe ~= "")
+    local título = encaminhando e "Encaminhar" ou
+        (respondendo e "Responder" ou "Nova mensagem")
+    local ação = encaminhando e "Encaminhar carta" ou
+        (respondendo e "Enviar resposta" ou "Enviar")
+    local anúncio = aviso e '<div class="carteiro-aviso">' .. util.escapeHTML(aviso) .. '</div>' ou ""
+    local avisoDosAnexos = ""
+    local htmlInicial = util.htmlSeguroDoCompositor(valores.html)
+    se encaminhando então
+        local quantidade = #(valores.anexosOriginais ou {})
+        avisoDosAnexos = '<div class="carteiro-informação"><i class="material-icons" ' ..
+            'aria-hidden="true">forward_to_inbox</i><span>' ..
+            (quantidade > 0 e
+                (quantidade .. ' anexo(s) da carta original serão incluídos automaticamente.') ou
+                'A carta original não possui anexos.') .. '</span></div>'
+    fim
+    local conteúdo = [[
+<section class="carteiro-painel carteiro-compositor">
+  <div class="carteiro-painel-título"><h1>]] .. título .. [[</h1><a href="/carteiro/entrada">Fechar</a></div>
+  ]] .. anúncio .. [[
+  <form action="/carteiro/enviar" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="]] .. util.escapeHTML(usuário.csrf) .. [[">
+    <input type="hidden" name="respostaA" value="]] ..
+        util.escapeHTML(valores.respostaA) .. [[">
+    <input type="hidden" name="encaminharDe" value="]] ..
+        util.escapeHTML(valores.encaminharDe) .. [[">
+    <label>De<input type="text" value="]] ..
+        util.escapeHTML(util.endereçoLegível(caixa.endereço)) .. [[" readonly></label>
+    <label>Para<input name="para" type="text" maxlength="4000" required
+      value="]] .. util.escapeHTML(util.endereçoLegível(valores["para"])) .. [[" placeholder="ana@exemplo.org, maria@exemplo.org"></label>
+    <details><summary>Cópia e cópia oculta</summary>
+      <label>Cópia<input name="cópia" type="text" maxlength="4000" value="]] .. util.escapeHTML(util.endereçoLegível(valores.cópia)) .. [["></label>
+      <label>Cópia oculta<input name="cópiaOculta" type="text" maxlength="4000" value="]] .. util.escapeHTML(util.endereçoLegível(valores.cópiaOculta)) .. [["></label>
+    </details>
+    <label>Assunto<input name="assunto" type="text" maxlength="500" value="]] .. util.escapeHTML(valores.assunto) .. [["></label>
+    <fieldset class="carteiro-modo-compositor">
+      <legend>Formato da mensagem</legend>
+      <button class="ativo" type="button" data-modo-compositor="texto"
+        aria-pressed="true">Texto</button>
+      <button type="button" data-modo-compositor="html"
+        aria-pressed="false">Formatação</button>
+    </fieldset>
+    <label data-compositor-texto>Mensagem<textarea name="texto"
+      maxlength="2000000" required data-campo-texto>]] ..
+        util.escapeHTML(valores.texto) .. [[</textarea></label>
+    <section class="carteiro-editor" data-compositor-html hidden>
+      <div class="carteiro-editor-barra" role="toolbar"
+        aria-label="Formatação da mensagem">
+        <button type="button" data-comando-editor="bold" title="Negrito"
+          aria-label="Negrito"><i class="material-icons">format_bold</i></button>
+        <button type="button" data-comando-editor="italic" title="Itálico"
+          aria-label="Itálico"><i class="material-icons">format_italic</i></button>
+        <button type="button" data-comando-editor="underline" title="Sublinhado"
+          aria-label="Sublinhado"><i class="material-icons">format_underlined</i></button>
+        <button type="button" data-comando-editor="insertUnorderedList"
+          title="Lista" aria-label="Lista"><i class="material-icons">format_list_bulleted</i></button>
+        <button type="button" data-comando-editor="insertOrderedList"
+          title="Lista numerada" aria-label="Lista numerada"><i
+          class="material-icons">format_list_numbered</i></button>
+        <button type="button" data-comando-editor="formatBlock" data-valor-editor="blockquote"
+          title="Citação" aria-label="Citação"><i
+          class="material-icons">format_quote</i></button>
+        <button type="button" data-comando-editor="removeFormat"
+          title="Remover formatação" aria-label="Remover formatação"><i
+          class="material-icons">format_clear</i></button>
+      </div>
+      <div class="carteiro-editor-conteúdo" contenteditable="true"
+        role="textbox" aria-multiline="true" data-editor-html>]] ..
+        htmlInicial .. [[</div>
+      <textarea name="html" maxlength="2000000" data-editor-html-campo hidden>]] ..
+        util.escapeHTML(htmlInicial) .. [[</textarea>
+      <p class="carteiro-editor-aviso">A formatação aceita texto, títulos,
+        listas, citações, negrito, itálico e sublinhado. Programas,
+        formulários, estilos e imagens remotas não são inseridos.</p>
+    </section>
+    ]] .. avisoDosAnexos .. [[
+    <label class="carteiro-anexo"><i class="material-icons">attach_file</i>Anexar arquivo
+      <input name="anexo" type="file"></label>
+    <div class="carteiro-ações"><button class="btn teal" type="submit"><i class="material-icons left">send</i>]] .. ação .. [[</button></div>
+  </form>
+</section>]]
+    retorne páginas.base(usuário, caixa, título, conteúdo)
+fim
+
+local função controlesDoHTML(usuário, mensagem)
+    se mensagem.direção ~= "entrada" então retorne "" fim
+    local id = paraColar(mensagem.id)
+    local csrf = util.escapeHTML(usuário.csrf)
+    se mensagem.falhaDaConfiança então
+        retorne '<div class="carteiro-aviso">Não foi possível consultar suas ' ..
+            'preferências de confiança. A mensagem formatada permanece bloqueada.</div>'
+    fim
+    se não mensagem.remetenteConfiável então
+        retorne '<div class="carteiro-confiança"><div><strong>Mensagem HTML ' ..
+            'protegida</strong><span>Somente a versão em texto inerte é exibida. ' ..
+            'Confiar não abre ligações, imagens nem a mensagem formatada.</span></div>' ..
+            '<form action="/carteiro/mensagens/' .. id ..
+            '/remetente/confiar" method="POST"><input type="hidden" name="csrf" value="' ..
+            csrf .. '"><button class="btn-flat teal-text" type="submit">' ..
+            'Confiar no remetente</button></form></div>'
+    fim
+    local exibição
+    se mensagem.mostrarConteúdoExterno então
+        exibição = '<span class="carteiro-conteúdo-exibido">Conteúdo externo ' ..
+            'visível somente nesta abertura.</span>'
+    senão se mensagem.mostrarHTML então
+        exibição = '<a class="btn amber darken-3" href="/carteiro/mensagens/' ..
+            id .. '?mostrarHTML=1&amp;mostrarExterno=1"><i class="material-icons left" ' ..
+            'aria-hidden="true">image</i>Mostrar imagens externas</a>'
+    senão
+        exibição = '<a class="btn amber darken-3" href="/carteiro/mensagens/' ..
+            id .. '?mostrarHTML=1"><i class="material-icons left" ' ..
+            'aria-hidden="true">visibility</i>Mostrar mensagem formatada</a>'
+    fim fim
+    retorne '<div class="carteiro-confiança confiável"><div><strong>Remetente ' ..
+        'confiável</strong><span>A mensagem continua fechada até sua confirmação. ' ..
+        'Imagens externas exigem uma segunda autorização e podem informar ao ' ..
+        'remetente que a carta foi aberta.</span></div>' ..
+        '<div class="carteiro-confiança-ações">' .. exibição ..
+        '<form action="/carteiro/mensagens/' .. id ..
+        '/remetente/deixar-de-confiar" method="POST"><input type="hidden" ' ..
+        'name="csrf" value="' .. csrf .. '"><button class="btn-flat red-text" ' ..
+        'type="submit">Deixar de confiar</button></form></div></div>'
+fim
+
+função páginas.mensagem(usuário, caixa, mensagem)
+    local anexos = {}
+    local imagens = {}
+    para _, anexo em ipares(mensagem.anexos ou {}) início
+        anexos[#anexos + 1] = '<a class="carteiro-anexo-item" href="/carteiro/mensagens/' ..
+            mensagem.id .. '/anexos/' .. anexo.id .. '"><i class="material-icons">attachment</i>' ..
+            '<span>' .. util.escapeHTML(anexo.nome) .. '<small>' .. anexo.tamanho ..
+            ' tacos · ' .. util.escapeHTML(anexo.tipo) .. '</small></span></a>'
+        se util.imagemExibível(anexo.tipo) então
+            imagens[#imagens + 1] = '<figure class="carteiro-imagem-no-corpo">' ..
+                '<img loading="lazy" src="/carteiro/mensagens/' .. mensagem.id ..
+                '/anexos/' .. anexo.id .. '/visualizar" alt="' ..
+                util.escapeHTML(anexo.nome) .. '"><figcaption>' ..
+                util.escapeHTML(anexo.nome) .. '</figcaption></figure>'
+        fim
+    fim
+    local corpo
+    se mensagem.html e mensagem.html ~= "" então
+        local alternativa
+        se mensagem.texto e mensagem.texto ~= "" então
+            alternativa = '<div class="carteiro-texto carteiro-texto-inerte">' ..
+                util.escapeHTML(mensagem.texto) .. '</div>'
+        senão
+            alternativa = '<div class="carteiro-vazio"><p>A carta não possui uma ' ..
+                'versão em texto. Confie no remetente e confirme a abertura para ' ..
+                'ver a mensagem formatada.</p></div>'
+        fim
+        corpo = '<section class="carteiro-html-recebido">' ..
+            controlesDoHTML(usuário, mensagem)
+        se mensagem.mostrarHTML então
+            local parâmetros = mensagem.mostrarConteúdoExterno e
+                "?mostrar=1&amp;externo=1" ou "?mostrar=1"
+            local avisoDoIsolamento = mensagem.mostrarConteúdoExterno e
+                'HTML isolado: imagens externas liberadas nesta abertura; programas ' ..
+                    'e formulários continuam bloqueados.' ou
+                'HTML isolado: ligações podem ser abertas por escolha do usuário; ' ..
+                    'imagens externas, programas e formulários permanecem bloqueados.'
+            corpo = corpo .. '<div class="carteiro-informação"><i ' ..
+                'class="material-icons" aria-hidden="true">verified_user</i><span>' ..
+                avisoDoIsolamento .. '</span></div>' ..
+                '<iframe class="carteiro-quadro-html" title="Corpo HTML da carta" ' ..
+                'sandbox="allow-popups allow-popups-to-escape-sandbox" ' ..
+                'referrerpolicy="no-referrer" loading="lazy" ' ..
+                'src="/carteiro/mensagens/' .. mensagem.id ..
+                '/corpo-html' .. parâmetros .. '"></iframe>' ..
+                '<details class="carteiro-texto-alternativo"><summary>Versão em ' ..
+                'texto</summary>' .. alternativa .. '</details>'
+        senão
+            corpo = corpo .. '<div class="carteiro-informação"><i ' ..
+                'class="material-icons" aria-hidden="true">link_off</i><span>' ..
+                'Ligações e botões da versão HTML permanecem ocultos.</span></div>' ..
+                alternativa
+        fim
+        corpo = corpo .. '</section>'
+    senão se mensagem.texto e mensagem.texto ~= "" então
+        corpo = '<div class="carteiro-texto">' .. util.escapeHTML(mensagem.texto) .. '</div>'
+    senão
+        corpo = '<div class="carteiro-vazio"><p>Mensagem sem corpo textual.</p></div>'
+    fim fim
+    local açõesDaMensagem = '<form action="/carteiro/mensagens/' .. mensagem.id ..
+        '/mover" method="POST"><input type="hidden" name="csrf" value="' ..
+        util.escapeHTML(usuário.csrf) .. '"><select name="pasta" aria-label="Mover para">' ..
+        opçõesDePastas(mensagem) .. '</select>' ..
+        '<button class="btn-flat teal-text" type="submit">Mover</button></form>'
+    se mensagem.direção == "entrada" então
+        local decisão = (mensagem.pasta == "indesejadas" ou
+            mensagem.decisãoDoUsuário == "indesejada") e
+            "regular" ou "indesejada"
+        local rótulo = decisão == "regular" e
+            "Não é indesejada" ou "Marcar como indesejada"
+        local classe = decisão == "regular" e "teal-text" ou "red-text"
+        local açãoDaTriagem = '<form class="carteiro-ação-triagem" ' ..
+            'action="/carteiro/mensagens/' .. mensagem.id ..
+            '/triagem" method="POST"><input type="hidden" name="csrf" value="' ..
+            util.escapeHTML(usuário.csrf) .. '"><input type="hidden" ' ..
+            'name="decisão" value="' .. decisão .. '"><button class="btn-flat ' ..
+            classe .. '" type="submit"><i class="material-icons left">' ..
+            (decisão == "regular" e "mark_email_read" ou "report") ..
+            '</i>' .. rótulo .. '</button></form>'
+        açõesDaMensagem = '<a class="btn teal" href="/carteiro/mensagens/' ..
+            mensagem.id .. '/responder"><i class="material-icons left">reply</i>Responder</a>' ..
+            açãoDaTriagem .. açõesDaMensagem
+    fim
+    açõesDaMensagem = '<a class="btn-flat teal-text" href="/carteiro/mensagens/' ..
+        mensagem.id .. '/encaminhar"><i class="material-icons left">forward</i>Encaminhar</a>' ..
+        açõesDaMensagem
+    local conteúdo = '<article class="carteiro-painel carteiro-mensagem">' ..
+        '<div class="carteiro-painel-título"><a href="/carteiro/' .. mensagem.pasta ..
+        '"><i class="material-icons">arrow_back</i>Voltar</a>' ..
+        '<div class="carteiro-painel-opções">' .. açõesDaMensagem .. '</div></div>' ..
+        '<header><h1>' .. util.escapeHTML(mensagem.assunto ~= "" e mensagem.assunto ou "(sem assunto)") ..
+        '</h1><p><strong>De:</strong> ' ..
+        util.escapeHTML(util.endereçoLegível(mensagem.remetente)) .. '</p>' ..
+        '<p><strong>Para:</strong> ' .. util.escapeHTML(junteEndereços(mensagem.destinatários)) .. '</p>' ..
+        '<p><strong>Data:</strong> ' .. dataLegível(mensagem.criadaEm) .. '</p>' ..
+        '<p><strong>Entrega:</strong> ' .. util.escapeHTML(mensagem.estadoDaEntrega) ..
+        '</p>' .. detalhesDaAutenticação(mensagem) ..
+        detalhesDaTriagem(mensagem) .. '</header>' ..
+        corpo .. (#imagens > 0 e '<section class="carteiro-imagens-no-corpo">' ..
+        tabela.concatene(imagens) .. '</section>' ou '') ..
+        (#anexos > 0 e '<section class="carteiro-anexos"><h2>Anexos</h2>' ..
+        tabela.concatene(anexos) .. '</section>' ou '') .. '</article>'
+    retorne páginas.base(usuário, caixa, mensagem.assunto, conteúdo, mensagem.pasta)
+fim
+
+-- Leitor 1.4: a interface abaixo substitui a apresentação técnica de uma
+-- carta isolada por uma conversa. Os dados de autenticação e Triagem seguem
+-- preservados no banco e no PULSO, mas não ocupam o corpo destinado ao leitor.
+local função nomeBreveDoRemetente(remetente)
+    local valor = util.endereçoLegível(remetente)
+    local nome = valor:separe('^%s*"?([^"<]+)"?%s*<')
+    se nome e nome:apare() ~= "" então retorne nome:apare() fim
+    local arroba = valor:procure("@", 1, verdadeiro)
+    se arroba e arroba > 1 então retorne valor:corte(1, arroba - 1) fim
+    retorne valor
+fim
+
+local função caminhoDaConversa(mensagem, parâmetro, valor)
+    local pasta = mensagem.pastaDaConversa ou mensagem.pasta
+    local id = mensagem.identificaçãoDaConversa ou mensagem.id
+    local caminho = "/carteiro/mensagens/" .. id .. "?pasta=" .. pasta
+    se mensagem.posiçãoDaLista e mensagem.totalDaLista então
+        caminho = caminho .. "&amp;posicao=" .. mensagem.posiçãoDaLista ..
+            "&amp;total=" .. mensagem.totalDaLista
+    fim
+    se parâmetro então
+        caminho = caminho .. "&amp;" .. parâmetro .. "=" ..
+            (valor ou mensagem.id)
+    fim
+    retorne caminho
+fim
+
+local função controleCompactoDoHTML(usuário, mensagem)
+    se não mensagem.html ou mensagem.html == "" então retorne "" fim
+    se mensagem.falhaDaConfiança então
+        retorne '<div class="carteiro-html-controle">A formatação não pôde ser verificada.</div>'
+    fim
+    se não mensagem.remetenteConfiável então
+        retorne '<div class="carteiro-html-controle"><span>Formatação bloqueada.</span>' ..
+            '<form action="/carteiro/mensagens/' .. mensagem.id ..
+            '/remetente/confiar" method="POST"><input type="hidden" name="csrf" value="' ..
+            util.escapeHTML(usuário.csrf) .. '"><input type="hidden" name="pasta" value="' ..
+            util.escapeHTML(mensagem.pastaDaConversa ou mensagem.pasta) ..
+            '"><button class="btn-flat teal-text" type="submit">Confiar no remetente</button></form></div>'
+    fim
+    se não mensagem.mostrarHTML então
+        retorne '<div class="carteiro-html-controle"><span>Formatação oculta.</span>' ..
+            '<a href="' .. caminhoDaConversa(mensagem, "mostrarHTML") ..
+            '">Mostrar formatação</a></div>'
+    fim
+    se não mensagem.mostrarConteúdoExterno então
+        retorne '<div class="carteiro-html-controle"><span>Imagens externas ocultas.</span>' ..
+            '<a href="' .. caminhoDaConversa(mensagem, "mostrarExterno") ..
+            '">Mostrar imagens</a></div>'
+    fim
+    retorne ""
+fim
+
+local função corpoCompactoDaCarta(usuário, mensagem)
+    local partes = { controleCompactoDoHTML(usuário, mensagem) }
+    se mensagem.html e mensagem.html ~= "" e mensagem.mostrarHTML então
+        local parâmetros = mensagem.mostrarConteúdoExterno e
+            "?mostrar=1&amp;externo=1" ou "?mostrar=1"
+        partes[#partes + 1] = '<iframe class="carteiro-quadro-html" ' ..
+            'title="Corpo HTML da carta" sandbox="allow-popups ' ..
+            'allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" ' ..
+            'loading="lazy" src="/carteiro/mensagens/' .. mensagem.id ..
+            '/corpo-html' .. parâmetros .. '"></iframe>'
+    senão se mensagem.texto e mensagem.texto ~= "" então
+        partes[#partes + 1] = '<div class="carteiro-texto">' ..
+            util.escapeHTML(mensagem.texto) .. '</div>'
+    senão
+        partes[#partes + 1] = '<div class="carteiro-vazio carteiro-corpo-vazio">' ..
+            '<p>Esta carta não possui texto simples.</p></div>'
+    fim fim
+
+    local anexos = {}
+    para _, anexo em ipares(mensagem.anexos ou {}) início
+        anexos[#anexos + 1] = anexoDaCarta(mensagem.id, anexo)
+    fim
+    se #anexos > 0 então
+        partes[#partes + 1] = '<section class="carteiro-anexos carteiro-anexos-compactos">' ..
+            tabela.concatene(anexos) .. '</section>'
+    fim
+    retorne tabela.concatene(partes)
+fim
+
+local função camposDaAção(usuário, mensagem, ação)
+    retorne '<input type="hidden" name="csrf" value="' ..
+        util.escapeHTML(usuário.csrf) .. '"><input type="hidden" ' ..
+        'name="pasta" value="' .. util.escapeHTML(
+            mensagem.pastaDaConversa ou mensagem.pasta) ..
+        '"><input type="hidden" name="acao" value="' .. ação .. '">'
+fim
+
+local função endereçoPuro(valor)
+    local legível = util.endereçoLegível(valor):apare()
+    local interno = legível:separe("<([^>]+)>")
+    retorne (interno ou legível):apare()
+fim
+
+local função domínioDoEndereço(valor)
+    local endereço = endereçoPuro(valor)
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba então retorne "" fim
+    retorne endereço:corte(arroba + 1)
+fim
+
+local função dadosDoRemetente(mensagem)
+    local endereço = endereçoPuro(mensagem.remetente)
+    local nome = util.endereçoLegível(mensagem.remetente)
+        :separe('^%s*"?([^"<]+)"?%s*<') ou ""
+    nome = nome:apare()
+    local nomeDistinto = nome ~= "" e nome:minúscula() ~= endereço:minúscula()
+    retorne nome, endereço, nomeDistinto
+fim
+
+local função seloDoRemetente(mensagem)
+    retorne (mensagem.resultadoDKIM == "passa" ou
+        mensagem.resultadoDMARC == "passa") e
+        '<i class="material-icons carteiro-remetente-verificado" ' ..
+        'title="Identidade postal verificada" aria-label="Identidade ' ..
+        'postal verificada">new_releases</i>' ou ""
+fim
+
+local função remetenteApresentado(mensagem)
+    local nome, endereço, nomeDistinto = dadosDoRemetente(mensagem)
+    retorne (nomeDistinto e ('<strong>' .. util.escapeHTML(nome) ..
+        '</strong> ') ou '') .. seloDoRemetente(mensagem) .. '<span>&lt;' ..
+        util.escapeHTML(endereço) .. '&gt;</span>'
+fim
+
+local função remetenteRecolhido(mensagem)
+    local nome, endereço, nomeDistinto = dadosDoRemetente(mensagem)
+    local principal = nomeDistinto e nome ou endereço
+    retorne '<strong>' .. util.escapeHTML(principal) .. '</strong>' ..
+        seloDoRemetente(mensagem)
+fim
+
+local função resumoDosDestinatários(caixa, mensagem)
+    local endereçoDaCaixa = endereçoPuro(caixa.endereço):minúscula()
+    local recebeu = falso
+    local outros = {}
+    para _, chave em ipares({ "para", "cópia", "cópiaOculta" }) início
+        para _, valor em ipares((mensagem.destinatários ou {})[chave] ou {}) início
+            local endereço = endereçoPuro(valor)
+            se endereço:minúscula() == endereçoDaCaixa então
+                recebeu = verdadeiro
+            senão
+                outros[#outros + 1] = nomeBreveDoRemetente(valor)
+            fim
+        fim
+    fim
+    se recebeu então
+        retorne "para mim" .. (#outros > 0 e
+            (", " .. tabela.concatene(outros, ", ")) ou "")
+    fim
+    local todos = junteEndereços(mensagem.destinatários)
+    retorne todos ~= "" e ("para " .. todos) ou "destinatários não informados"
+fim
+
+local função linhaDosDetalhes(rótulo, valor)
+    valor = paraColar(valor ou ""):apare()
+    se valor == "" então retorne "" fim
+    retorne '<div><dt>' .. util.escapeHTML(rótulo) .. '</dt><dd>' ..
+        util.escapeHTML(valor) .. '</dd></div>'
+fim
+
+local função nomeDaAutenticação(valor)
+    retorne nomesDaAutenticação[valor] ou valor ou "não informado"
+fim
+
+local função detalhesDaCarta(caixa, mensagem)
+    local enviadoPor = domínioDoEndereço(mensagem.remetenteEnvelope)
+    local assinadoPor = mensagem.resultadoDKIM == "passa" e
+        (mensagem.domínioDoAutor ou domínioDoEndereço(mensagem.remetente)) ou ""
+    local autenticação = "SPF: " .. nomeDaAutenticação(
+        mensagem.resultadoSPF) .. "; DKIM: " .. nomeDaAutenticação(
+        mensagem.resultadoDKIM) .. "; DMARC: " .. nomeDaAutenticação(
+        mensagem.resultadoDMARC)
+    se mensagem.açãoDMARC então
+        autenticação = autenticação .. "; ação: " ..
+            (nomesDasAçõesDMARC[mensagem.açãoDMARC] ou
+                mensagem.açãoDMARC)
+    fim
+    local triagem = (mensagem.classificaçãoDaTriagem ou "regular") ..
+        "; pontuação " .. paraColar(mensagem.pontuaçãoDeSuspeita ou 0)
+    se mensagem.decisãoDoUsuário e
+       mensagem.decisãoDoUsuário ~= "nenhuma" então
+        triagem = triagem .. "; decisão pessoal: " ..
+            mensagem.decisãoDoUsuário
+    fim
+    retorne '<details class="carteiro-carta-detalhes" data-não-alternar>' ..
+        '<summary>' .. util.escapeHTML(resumoDosDestinatários(caixa, mensagem)) ..
+        '<i class="material-icons" aria-hidden="true">arrow_drop_down</i>' ..
+        '</summary><dl>' ..
+        linhaDosDetalhes("de:", util.endereçoLegível(mensagem.remetente)) ..
+        linhaDosDetalhes("a:", junteEndereços(mensagem.destinatários)) ..
+        linhaDosDetalhes("data:", dataLegível(mensagem.criadaEm)) ..
+        linhaDosDetalhes("assunto:", mensagem.assunto) ..
+        linhaDosDetalhes("Message-ID:", mensagem.identificação) ..
+        linhaDosDetalhes("envelope SMTP:",
+            util.endereçoLegível(mensagem.remetenteEnvelope)) ..
+        linhaDosDetalhes("enviado por:", enviadoPor) ..
+        linhaDosDetalhes("assinado por:", assinadoPor) ..
+        linhaDosDetalhes("autenticação:", autenticação) ..
+        linhaDosDetalhes("política DMARC:", mensagem.políticaDMARC) ..
+        linhaDosDetalhes("Triagem:", triagem) ..
+        '</dl></details>'
+fim
+
+local função ferramentasDaCarta(usuário, mensagem)
+    local id = mensagem.id
+    local itens = {
+        '<a href="/carteiro/mensagens/' .. id .. '/responder">Responder</a>',
+        '<a href="/carteiro/mensagens/' .. id .. '/encaminhar">Encaminhar</a>',
+        '<form action="/carteiro/mensagens/' .. id ..
+            '/acao" method="POST">' .. camposDaAção(
+                usuário, mensagem, "excluir") ..
+            '<button type="submit">Excluir</button></form>',
+        '<form action="/carteiro/mensagens/' .. id ..
+            '/acao" method="POST">' .. camposDaAção(
+                usuário, mensagem, "não-lida-daqui") ..
+            '<button type="submit">Marcar como não lidas a partir daqui</button></form>'
+    }
+    se mensagem.direção == "entrada" então
+        local nome = util.escapeHTML(nomeBreveDoRemetente(mensagem.remetente))
+        itens[#itens + 1] = '<form action="/carteiro/mensagens/' .. id ..
+            '/acao" method="POST">' .. camposDaAção(
+                usuário, mensagem, "bloquear") ..
+            '<button type="submit">Bloquear &ldquo;' .. nome .. '&rdquo;</button></form>'
+        itens[#itens + 1] = '<form action="/carteiro/mensagens/' .. id ..
+            '/acao" method="POST">' .. camposDaAção(
+                usuário, mensagem, "indesejada") ..
+            '<button type="submit">Denunciar Indesejada</button></form>'
+        itens[#itens + 1] = '<form action="/carteiro/mensagens/' .. id ..
+            '/acao" method="POST">' .. camposDaAção(
+                usuário, mensagem, "fisgada") ..
+            '<button type="submit">Denunciar Fisgada</button></form>'
+        itens[#itens + 1] = '<a href="/carteiro/todas?busca=' ..
+            util.codifiquePercentual(mensagem.remetente) ..
+            '">Filtrar as mensagens assim</a>'
+    fim
+    itens[#itens + 1] = '<a href="/carteiro/mensagens/' .. id ..
+        '/imprimir" target="_blank" rel="noopener" data-imprimir-carta>' ..
+        'Imprimir</a>'
+    itens[#itens + 1] = '<a href="/carteiro/mensagens/' .. id ..
+        '/baixar">Baixar mensagem</a>'
+    itens[#itens + 1] = '<a href="/carteiro/mensagens/' .. id ..
+        '/original" target="_blank" rel="noopener noreferrer">Mostrar original</a>'
+    retorne '<div class="carteiro-carta-ferramentas" data-não-alternar>' ..
+        '<a class="carteiro-botão-ícone" href="/carteiro/mensagens/' .. id ..
+        '/responder" title="Responder" aria-label="Responder"><i ' ..
+        'class="material-icons">reply</i></a><a class="carteiro-botão-ícone" ' ..
+        'href="/carteiro/mensagens/' .. id .. '/encaminhar" title="Encaminhar" ' ..
+        'aria-label="Encaminhar"><i class="material-icons">forward</i></a>' ..
+        '<details class="carteiro-menu carteiro-menu-carta"><summary ' ..
+        'class="carteiro-botão-ícone" title="Mais" aria-label="Mais ações">' ..
+        '<i class="material-icons">more_vert</i></summary><div ' ..
+        'class="carteiro-menu-conteúdo">' .. tabela.concatene(itens) ..
+        '</div></details></div>'
+fim
+
+local função cartãoDaConversa(usuário, caixa, mensagem)
+    local fixa = mensagem.últimaDaConversa == verdadeiro
+    local aberta = fixa ou mensagem.aberta == verdadeiro
+    local classeDaIdentidade = fixa e "carteiro-carta-identidade" ou
+        "carteiro-carta-alternador"
+    local atributosDaIdentidade = fixa e "" ou
+        (' role="button" tabindex="0" data-alternar-carta aria-expanded="' ..
+            (aberta e "true" ou "false") .. '"')
+    retorne '<article class="carteiro-carta-conversa' ..
+        (aberta e ' aberta' ou '') .. '" data-carta-conversa="' ..
+        mensagem.id .. '"' .. (fixa e ' data-carta-fixa' ou '') ..
+        '><header><div class="' .. classeDaIdentidade .. '"' ..
+        atributosDaIdentidade .. '><span class="carteiro-avatar" ' ..
+        'aria-hidden="true">' .. util.escapeHTML(
+            nomeBreveDoRemetente(mensagem.remetente):corte(1, 1):maiúscula()) ..
+        '</span><span class="carteiro-carta-resumo"><span ' ..
+        'class="carteiro-remetente carteiro-remetente-aberto">' ..
+        remetenteApresentado(mensagem) .. '</span><span ' ..
+        'class="carteiro-remetente carteiro-remetente-recolhido">' ..
+        remetenteRecolhido(mensagem) .. '</span><span ' ..
+        'class="carteiro-carta-data carteiro-carta-data-aberta">' ..
+        dataDetalhada(mensagem.criadaEm) .. '</span><span ' ..
+        'class="carteiro-carta-data carteiro-carta-data-recolhida">' ..
+        dataResumida(mensagem.criadaEm) .. '</span>' ..
+        detalhesDaCarta(caixa, mensagem) .. '<small ' ..
+        'class="carteiro-carta-prévia">' ..
+        util.escapeHTML(mensagem.resumo ou "") .. '</small></span></div>' ..
+        ferramentasDaCarta(usuário, mensagem) ..
+        '</header><div class="carteiro-carta-corpo" data-corpo-carta' ..
+        (aberta e '' ou ' hidden') .. '>' ..
+        corpoCompactoDaCarta(usuário, mensagem) ..
+        '</div></article>'
+fim
+
+local função botãoDaConversa(usuário, id, pasta, ação, ícone, rótulo)
+    retorne '<form action="/carteiro/conversas/' .. id ..
+        '/acao" method="POST"><input type="hidden" name="csrf" value="' ..
+        util.escapeHTML(usuário.csrf) .. '"><input type="hidden" name="pasta" value="' ..
+        pasta .. '"><input type="hidden" name="acao" value="' .. ação ..
+        '"><button class="carteiro-botão-ícone" type="submit" title="' ..
+        rótulo .. '" aria-label="' .. rótulo .. '"><i class="material-icons">' ..
+        ícone .. '</i></button></form>'
+fim
+
+local função itemDaConversa(usuário, id, pasta, ação, rótulo)
+    retorne '<form action="/carteiro/conversas/' .. id ..
+        '/acao" method="POST"><input type="hidden" name="csrf" value="' ..
+        util.escapeHTML(usuário.csrf) .. '"><input type="hidden" name="pasta" value="' ..
+        pasta .. '"><input type="hidden" name="acao" value="' .. ação ..
+        '"><button type="submit">' .. rótulo .. '</button></form>'
+fim
+
+local função menuMoverDaConversa(usuário, id, pasta)
+    local itens = {}
+    se pasta ~= "arquivadas" então
+        itens[#itens + 1] = itemDaConversa(usuário, id, pasta,
+            "mover:arquivadas", "Todas (arquivar)")
+    fim
+    se pasta ~= "indesejadas" então
+        itens[#itens + 1] = itemDaConversa(usuário, id, pasta,
+            "mover:indesejadas", "Indesejadas")
+    fim
+    se pasta ~= "lixeira" então
+        itens[#itens + 1] = itemDaConversa(usuário, id, pasta,
+            "mover:lixeira", "Lixeira")
+    fim
+    se pasta == "lixeira" então
+        itens[#itens + 1] = itemDaConversa(usuário, id, pasta,
+            "restaurar", "Restaurar na caixa principal")
+    fim
+    retorne '<details class="carteiro-menu carteiro-menu-conversa" ' ..
+        'data-não-alternar><summary class="carteiro-botão-ícone" ' ..
+        'title="Mover para" aria-label="Mover a conversa para"><i ' ..
+        'class="material-icons">move_to_inbox</i></summary><div ' ..
+        'class="carteiro-menu-conteúdo">' .. tabela.concatene(itens) ..
+        '</div></details>'
+fim
+
+função páginas.conversa(usuário, caixa, mensagens, pasta, identificação,
+                           posição, total)
+    mensagens = mensagens ou {}
+    local última = mensagens[#mensagens] ou {}
+    local assunto = assuntoLegívelDaConversa(última.assunto)
+    local cartões = {}
+    local algumaAnteriorAberta, algumaAnteriorFechada = falso, falso
+    para índice, mensagem em ipares(mensagens) início
+        mensagem.últimaDaConversa = índice == #mensagens
+        se não mensagem.últimaDaConversa então
+            se mensagem.aberta então
+                algumaAnteriorAberta = verdadeiro
+            senão
+                algumaAnteriorFechada = verdadeiro
+            fim
+        fim
+        cartões[#cartões + 1] = cartãoDaConversa(usuário, caixa, mensagem)
+    fim
+
+    local ações
+    se pasta == "lixeira" então
+        ações = botãoDaConversa(usuário, identificação, pasta,
+            "restaurar", "restore_from_trash", "Restaurar em Todas")
+    senão
+        ações = botãoDaConversa(usuário, identificação, pasta,
+            "arquivar", "archive", "Arquivar") ..
+            botãoDaConversa(usuário, identificação, pasta,
+                "indesejada", "report", "Indesejada") ..
+            botãoDaConversa(usuário, identificação, pasta,
+                "excluir", "delete", "Descartar") ..
+            botãoDaConversa(usuário, identificação, pasta,
+                "não-lida", "markunread", "Marcar como não lida")
+    fim
+
+    local mover = menuMoverDaConversa(usuário, identificação, pasta)
+    local itensDoMenu =
+        itemDaConversa(usuário, identificação, pasta,
+            "arquivar", "Arquivar") ..
+        itemDaConversa(usuário, identificação, pasta,
+            "indesejada", "Indesejada") ..
+        itemDaConversa(usuário, identificação, pasta,
+            "excluir", "Descartar") ..
+        itemDaConversa(usuário, identificação, pasta,
+            "não-lida", "Marcar como não lida") ..
+        '<a href="/carteiro/todas?busca=' ..
+            util.codifiquePercentual(assunto) .. '">Filtrar mensagens assim</a>' ..
+        '<a href="/carteiro/conversas/' .. identificação ..
+            '/encaminhar?pasta=' .. pasta .. '">Encaminhar tudo</a>'
+    local menu = '<details class="carteiro-menu carteiro-menu-conversa" ' ..
+        'data-não-alternar><summary class="carteiro-botão-ícone" title="Mais" ' ..
+        'aria-label="Mais ações da conversa"><i class="material-icons">' ..
+        'more_vert</i></summary><div class="carteiro-menu-conteúdo">' ..
+        itensDoMenu .. '</div></details>'
+
+    local controlesDeExpansão = ""
+    se #mensagens > 1 então
+        controlesDeExpansão = '<button class="carteiro-botão-ícone" ' ..
+            'type="button" data-expandir-conversa' ..
+            (algumaAnteriorFechada e '' ou ' hidden') ..
+            ' title="Expandir anteriores" ' ..
+            'aria-label="Expandir todas as cartas anteriores"><i ' ..
+            'class="material-icons">unfold_more</i></button><button ' ..
+            'class="carteiro-botão-ícone" type="button" ' ..
+            'data-recolher-conversa' ..
+            (algumaAnteriorAberta e '' ou ' hidden') ..
+            ' title="Recolher anteriores" ' ..
+            'aria-label="Recolher todas as cartas anteriores"><i ' ..
+            'class="material-icons">unfold_less</i></button>'
+    fim
+
+    local paginação = ""
+    posição, total = paraNúmero(posição), paraNúmero(total)
+    se posição e total e posição > 0 e total > 0 e posição <= total então
+        paginação = '<span class="carteiro-conversa-paginação">' ..
+            númeroLegível(posição) .. ' de ' .. númeroLegível(total) .. '</span>'
+    fim
+
+    local rodapé = ""
+    se última.id então
+        rodapé = '<footer class="carteiro-conversa-rodapé" ' ..
+            'aria-label="Ações ao final da conversa"><a class="btn-flat ' ..
+            'carteiro-conversa-rodapé-botão" href="/carteiro/mensagens/' ..
+            última.id .. '/responder"><i class="material-icons">reply</i>' ..
+            'Responder</a><a class="btn-flat ' ..
+            'carteiro-conversa-rodapé-botão" href="/carteiro/mensagens/' ..
+            última.id .. '/encaminhar"><i class="material-icons">forward</i>' ..
+            'Encaminhar</a></footer>'
+    fim
+
+    local conteúdo = '<section class="carteiro-painel carteiro-conversa">' ..
+        '<div class="carteiro-painel-título carteiro-conversa-ferramentas">' ..
+        '<div class="carteiro-conversa-ações"><a class="carteiro-botão-ícone" ' ..
+        'href="/carteiro/' .. pasta .. '" title="Voltar" aria-label="Voltar">' ..
+        '<i class="material-icons">arrow_back</i></a>' .. ações .. mover ..
+        menu .. '</div>' .. paginação .. '</div><header ' ..
+        'class="carteiro-conversa-título"><div><h1>' ..
+        util.escapeHTML(assunto) .. '</h1><span>' .. #mensagens ..
+        (#mensagens == 1 e ' carta' ou ' cartas') .. '</span></div><div ' ..
+        'class="carteiro-conversa-controles" ' ..
+        'aria-label="Controles da conversa">' .. controlesDeExpansão ..
+        '<a class="carteiro-botão-ícone" href="/carteiro/conversas/' ..
+        identificação .. '/imprimir?pasta=' .. pasta .. '" target="_blank" ' ..
+        'rel="noopener" data-imprimir-carta title="Imprimir tudo" ' ..
+        'aria-label="Imprimir toda a conversa"><i class="material-icons">' ..
+        'print</i></a></div></header>' ..
+        '<div class="carteiro-conversa-cartas">' .. tabela.concatene(cartões) ..
+        '</div>' .. rodapé .. '</section>'
+    retorne páginas.base(usuário, caixa, assunto, conteúdo, pasta)
+fim
+
+local função textoParaImpressão(mensagem)
+    local texto = paraColar(mensagem.texto ou "")
+    se texto ~= "" então retorne texto fim
+    texto = paraColar(mensagem.html ou "")
+        :troque("<[Bb][Rr]%s*/?>", "\n")
+        :troque("</[Pp]%s*>", "\n\n")
+        :troque("</[Dd][Ii][Vv]%s*>", "\n")
+        :troque("<[^>]+>", "")
+        :troque("&nbsp;", " ")
+        :troque("&lt;", "<")
+        :troque("&gt;", ">")
+        :troque("&quot;", '"')
+        :troque("&#39;", "'")
+        :troque("&amp;", "&")
+    retorne texto:apare()
+fim
+
+função páginas.impressão(mensagens, título)
+    se tipo(mensagens) ~= "tabela" ou mensagens.id então
+        mensagens = { mensagens }
+    fim
+    mensagens = mensagens ou {}
+    título = assuntoLegívelDaConversa(título ou
+        ((mensagens[#mensagens] ou {}).assunto))
+    local cartas = {}
+    para _, mensagem em ipares(mensagens) início
+        local anexos = {}
+        para _, anexo em ipares(mensagem.anexos ou {}) início
+            anexos[#anexos + 1] = '<li>' .. util.escapeHTML(anexo.nome) ..
+                ' <small>(' .. tamanhoLegível(anexo.tamanho) .. '; ' ..
+                util.escapeHTML(anexo.tipo) .. ')</small></li>'
+        fim
+        local listaDeAnexos = #anexos > 0 e
+            ('<section><h3>Anexos</h3><ul>' .. tabela.concatene(anexos) ..
+                '</ul></section>') ou ""
+        cartas[#cartas + 1] = '<article><header><strong>' ..
+            util.escapeHTML(util.endereçoLegível(mensagem.remetente)) ..
+            '</strong><time>' .. util.escapeHTML(dataLegível(
+                mensagem.criadaEm)) .. '</time><p><b>Para:</b> ' ..
+            util.escapeHTML(junteEndereços(mensagem.destinatários)) ..
+            '</p></header><pre>' .. util.escapeHTML(
+                textoParaImpressão(mensagem)) .. '</pre>' ..
+            listaDeAnexos .. '</article>'
+    fim
+    retorne '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' ..
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' ..
+        '<title>' .. util.escapeHTML(título) .. '</title><style>' ..
+        '@page{margin:18mm}*{box-sizing:border-box}body{margin:0;color:#202124;' ..
+        'font:14px/1.55 Arial,sans-serif}main{max-width:900px;margin:auto}' ..
+        'h1{font-size:24px;margin:0 0 24px}article{border-top:1px solid #dadce0;' ..
+        'padding:18px 0}article header{position:relative;padding-right:180px}' ..
+        'article header strong{font-size:15px}article header time{position:absolute;' ..
+        'right:0;top:0;color:#5f6368}article header p{margin:3px 0;color:#5f6368}' ..
+        'pre{margin:20px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;' ..
+        'font:14px/1.6 Arial,sans-serif}h3{font-size:14px;margin-bottom:4px}' ..
+        'ul{margin-top:4px;padding-left:20px}small{color:#5f6368}' ..
+        '@media(max-width:560px){article header{padding-right:0}article header time{' ..
+        'position:static;display:block;margin-top:3px}}@media print{main{max-width:none}}' ..
+        '</style></head><body><main><h1>' .. util.escapeHTML(título) ..
+        '</h1>' .. tabela.concatene(cartas) .. '</main></body></html>'
+fim
+
+-- Mantém o contrato de quem ainda chama o leitor com uma carta única.
+função páginas.mensagem(usuário, caixa, mensagem)
+    mensagem.aberta = verdadeiro
+    mensagem.pastaDaConversa = mensagem.pasta
+    mensagem.identificaçãoDaConversa = mensagem.id
+    retorne páginas.conversa(usuário, caixa, { mensagem },
+        mensagem.pasta, mensagem.id)
+fim
+
+função páginas.erro(usuário, caixa, título, mensagem, código)
+    local conteúdo = '<section class="carteiro-painel carteiro-erro"><i class="material-icons">error_outline</i>' ..
+        '<h1>' .. util.escapeHTML(título) .. '</h1><p>' .. util.escapeHTML(mensagem) ..
+        '</p><a href="/carteiro/entrada">Voltar à caixa de entrada</a></section>'
+    retorne páginas.base(usuário, caixa, título, conteúdo), código
+fim
+
+retorne páginas

@@ -1,0 +1,129 @@
+-- Leitura MIME usada pelo Carteiro: UTF-8, texto, HTML e anexos.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+
+local correio = importe "correio"
+
+local mensagem, falha = correio.novaMensagem {
+    remetente = "rafael@santafé.dev.br",
+    destinatários = { "ana@exemplo.org" },
+    assunto = "Olá, Carteiro!",
+    texto = "Corpo em português: ação.",
+    html = "<p>Corpo em <strong>português</strong>.</p>",
+    anexos = {
+        {
+            nome = "ação.txt",
+            tipo = "text/plain; charset=utf-8",
+            dados = "conteúdo do anexo"
+        }
+    }
+}
+garanta(mensagem, falha)
+
+local mime
+mime, falha = mensagem:forme()
+garanta(mime, falha)
+
+local lida
+lida, falha = correio.leiaMensagem(mime)
+garanta(lida, falha)
+garanta(lida.assunto == "Olá, Carteiro!", "assunto UTF-8 não foi decodificado")
+garanta(lida.texto == "Corpo em português: ação.", "corpo textual divergiu")
+garanta(lida.html == "<p>Corpo em <strong>português</strong>.</p>",
+    "corpo HTML divergiu")
+garanta(#lida.anexos == 1, "quantidade de anexos incorreta")
+garanta(lida.anexos[1].nome == "ação.txt", "nome UTF-8 do anexo divergiu")
+garanta(lida.anexos[1].dados == "conteúdo do anexo", "dados do anexo divergiram")
+
+local nomeContinuado = tabela.concatene({
+    "From: Ana <ana@exemplo.org>",
+    "To: Rafael <rafael@santafé.dev.br>",
+    "Subject: Anexo RFC 2231",
+    "Content-Type: multipart/mixed; boundary=anexo-continuado",
+    "",
+    "--anexo-continuado",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "Segue o documento.",
+    "--anexo-continuado",
+    "Content-Type: application/pdf;",
+    " name*0*=UTF-8''relat%C3%B3rio%20de%20setembro%20;",
+    " name*1*=de%202026.pdf",
+    "Content-Disposition: attachment;",
+    " filename*0*=UTF-8'pt-BR'relat%C3%B3rio%20de%20setembro%20;",
+    " filename*1*=de%202026.pdf",
+    "Content-Transfer-Encoding: base64",
+    "",
+    "JVBERi0xLjQK",
+    "--anexo-continuado--"
+}, "\r\n")
+
+lida, falha = correio.leiaMensagem(nomeContinuado)
+garanta(lida, falha)
+garanta(#lida.anexos == 1, "anexo RFC 2231 não foi reconhecido")
+garanta(lida.anexos[1].nome == "relatório de setembro de 2026.pdf",
+    "continuação filename* do RFC 2231 não foi recomposta")
+
+local imprimível = tabela.concatene({
+    "From: Ana <ana@exemplo.org>",
+    "To: Rafael <rafael@santafé.dev.br>",
+    "Subject: =?UTF-8?Q?Ol=C3=A1=2C_Santaf=C3=A9!?=",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    "A=C3=A7=C3=A3o conclu=C3=ADda."
+}, "\r\n")
+
+lida, falha = correio.leiaMensagem(imprimível)
+garanta(lida, falha)
+garanta(lida.assunto == "Olá, Santafé!", "palavra codificada do assunto divergiu")
+garanta(lida.texto == "Ação concluída.", "quoted-printable divergiu")
+
+local inválida, falhaInválida = correio.leiaMensagem("sem separador")
+garanta(não inválida e falhaInválida:procure("não separa", 1, verdadeiro),
+    "mensagem MIME inválida foi aceita")
+
+local anexosDemais = {}
+para índice = 1, 26 início
+    anexosDemais[índice] = {
+        nome = "anexo-" .. índice .. ".txt",
+        tipo = "text/plain",
+        dados = "x"
+    }
+fim
+local mensagemExcessiva, falhaDosAnexos = correio.novaMensagem {
+    remetente = "rafael@santafé.dev.br",
+    destinatários = { "ana@exemplo.org" },
+    texto = "limite",
+    anexos = anexosDemais
+}
+garanta(não mensagemExcessiva e
+    falhaDosAnexos:procure("25 anexos", 1, verdadeiro),
+    "limite de anexos da mensagem de saída não foi aplicado")
+
+local partesExcessivas = {
+    "From: rafael@santafé.dev.br",
+    "To: ana@exemplo.org",
+    "Content-Type: multipart/mixed; boundary=limite-santafe",
+    ""
+}
+para índice = 1, 26 início
+    partesExcessivas[#partesExcessivas + 1] = "--limite-santafe"
+    partesExcessivas[#partesExcessivas + 1] =
+        "Content-Type: application/octet-stream"
+    partesExcessivas[#partesExcessivas + 1] =
+        'Content-Disposition: attachment; filename="a' .. índice .. '.bin"'
+    partesExcessivas[#partesExcessivas + 1] =
+        "Content-Transfer-Encoding: base64"
+    partesExcessivas[#partesExcessivas + 1] = ""
+    partesExcessivas[#partesExcessivas + 1] = "eA=="
+fim
+partesExcessivas[#partesExcessivas + 1] = "--limite-santafe--"
+local mimeExcessivo = tabela.concatene(partesExcessivas, "\r\n")
+local leituraExcessiva, falhaDaLeituraExcessiva =
+    correio.leiaMensagem(mimeExcessivo)
+garanta(não leituraExcessiva e
+    falhaDaLeituraExcessiva:procure("anexos demais", 1, verdadeiro),
+    "limite de anexos da mensagem recebida não foi aplicado")
+
+mostre("correio MIME: ok")

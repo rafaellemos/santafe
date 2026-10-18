@@ -1,0 +1,26 @@
+[Unit]
+Description=Correio Recebedor Santafé
+After=network-online.target mariadb.service
+Wants=network-online.target mariadb.service
+
+[Service]
+Type=simple
+User=correio
+Group=correio
+WorkingDirectory=/opt/correio
+EnvironmentFile=/etc/santafe/correio.env
+EnvironmentFile=-/etc/santafe/correio-clientes.env
+ExecStart=/usr/local/bin/santafé /opt/correio/recebedor.fé
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc/letsencrypt
+ReadWritePaths=/var/log/santafé /var/lib/santafé/correio /var/lib/correio-clientes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

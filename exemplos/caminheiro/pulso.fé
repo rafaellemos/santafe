@@ -1,0 +1,15 @@
+local pulso = importe "pulso"
+local caminheiro = importe "caminheiro"
+
+local canal = garanta(pulso.novo {
+    serviço = "meu-site",
+    instância = "web-01"
+})
+canal:adicioneDestino(pulso.terminal())
+
+local ap = garanta(caminheiro.novo { pulso = canal })
+ap.rota("GET", "/", função(_, res)
+    res:texto("Caminheiro emitindo PULSO")
+fim)
+
+ap.escute(7000)

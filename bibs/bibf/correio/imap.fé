@@ -1,0 +1,2038 @@
+-- Correio IMAP4rev1: acesso assíncrono às caixas postais sobre TLS.
+--
+-- A biblioteca implementa o protocolo e delega autenticação, persistência,
+-- UIDs e conteúdo ao repositório postal. Nenhuma senha ou carta entra no PULSO.
+
+local rede = importe "rede"
+local Vigia = importe "vigia"
+local correio = importe "correio"
+
+local imap = {
+    nome = "Correio IMAP Santafé",
+    versão = "1.2.0"
+}
+
+local CRLF = "\r\n"
+local capacidadesComAutenticação =
+    "IMAP4rev1 AUTH=PLAIN SASL-IR ID LIST-EXTENDED SPECIAL-USE " ..
+    "NAMESPACE IDLE MOVE UIDPLUS UNSELECT ENABLE UTF8=ACCEPT"
+local capacidadesAutenticadas =
+    "IMAP4rev1 ID LIST-EXTENDED SPECIAL-USE NAMESPACE IDLE MOVE " ..
+    "UIDPLUS UNSELECT ENABLE UTF8=ACCEPT"
+
+local pastas = {
+    -- INBOX já é especial pelo próprio nome no IMAP. \Inbox não existe
+    -- no RFC 6154 e faz clientes estritos descartarem a lista de caixas.
+    { nome = "INBOX", interna = "entrada" },
+    { nome = "Enviadas", interna = "enviadas", especial = "\\Sent" },
+    { nome = "Rascunhos", interna = "rascunhos", especial = "\\Drafts" },
+    { nome = "Arquivadas", interna = "arquivadas", especial = "\\Archive" },
+    { nome = "Indesejadas", interna = "indesejadas", especial = "\\Junk" },
+    { nome = "Lixeira", interna = "lixeira", especial = "\\Trash" }
+}
+
+local função emita(canal, tipo, nome, dados, prioridade)
+    se não canal então retorne fim
+    proteja(função()
+        canal:sinal(nome, dados ou {}, { prioridade = prioridade ou "normal" })
+    fim)
+fim
+
+local função apare(valor)
+    retorne paraColar(valor ou ""):apare()
+fim
+
+local função possuiNãoASCII(texto)
+    para índice = 1, #texto início
+        se texto:byte(índice) > 127 então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+-- As linhas de controle do IMAP4rev1 são US-ASCII. O conteúdo das cartas
+-- continua intacto nos literais; somente o texto humano de OK/NO/BAD é
+-- transliterado para não derrubar clientes estritos, como o Mail do iOS.
+local função textoDeProtocolo(valor)
+    local texto = paraColar(valor ou "")
+    local trocas = {
+        { "á", "a" }, { "à", "a" }, { "â", "a" }, { "ã", "a" },
+        { "é", "e" }, { "ê", "e" }, { "í", "i" },
+        { "ó", "o" }, { "ô", "o" }, { "õ", "o" },
+        { "ú", "u" }, { "ü", "u" }, { "ç", "c" },
+        { "Á", "A" }, { "À", "A" }, { "Â", "A" }, { "Ã", "A" },
+        { "É", "E" }, { "Ê", "E" }, { "Í", "I" },
+        { "Ó", "O" }, { "Ô", "O" }, { "Õ", "O" },
+        { "Ú", "U" }, { "Ü", "U" }, { "Ç", "C" }
+    }
+    para _, troca em ipares(trocas) início
+        texto = texto:troque(troca[1], troca[2])
+    fim
+    retorne texto
+fim
+
+local função aspe(valor)
+    valor = paraColar(valor ou "")
+    valor = valor:troque("\\", "\\\\"):troque("\"", "\\\"")
+    valor = valor:troque("\r", " "):troque("\n", " ")
+    retorne "\"" .. valor .. "\""
+fim
+
+local função aspeOuNulo(valor)
+    se valor == nulo ou valor == "" então retorne "NIL" fim
+    retorne aspe(valor)
+fim
+
+local função nomeDaPasta(interna)
+    para _, pasta em ipares(pastas) início
+        se pasta.interna == interna então retorne pasta.nome fim
+    fim
+    retorne nulo
+fim
+
+local função pastaInterna(nome)
+    nome = apare(nome)
+    se nome:corte(1, 1) == "\"" e nome:corte(-1) == "\"" então
+        nome = nome:corte(2, -2)
+    fim
+    para _, pasta em ipares(pastas) início
+        se nome:minúscula() == pasta.nome:minúscula() ou
+           nome:minúscula() == pasta.interna:minúscula() então
+            retorne pasta.interna
+        fim
+    fim
+    retorne nulo
+fim
+
+local função correspondeAoPadrãoDaLista(nome, padrão, índiceDoNome,
+                                                     índiceDoPadrão)
+    índiceDoNome = índiceDoNome ou 1
+    índiceDoPadrão = índiceDoPadrão ou 1
+    se índiceDoPadrão > #padrão então retorne índiceDoNome > #nome fim
+    local caractere = padrão:corte(índiceDoPadrão, índiceDoPadrão)
+    se caractere == "*" ou caractere == "%" então
+        -- Todas as caixas desta versão estão no primeiro nível; por isso
+        -- * e % produzem o mesmo conjunto, sem atravessar um delimitador.
+        se correspondeAoPadrãoDaLista(nome, padrão, índiceDoNome,
+                índiceDoPadrão + 1) então
+            retorne verdadeiro
+        fim
+        se índiceDoNome <= #nome então
+            retorne correspondeAoPadrãoDaLista(nome, padrão,
+                índiceDoNome + 1, índiceDoPadrão)
+        fim
+        retorne falso
+    fim
+    se índiceDoNome > #nome ou
+       nome:corte(índiceDoNome, índiceDoNome):minúscula() ~=
+            caractere:minúscula() então
+        retorne falso
+    fim
+    retorne correspondeAoPadrãoDaLista(nome, padrão,
+        índiceDoNome + 1, índiceDoPadrão + 1)
+fim
+
+local função palavras(texto)
+    local itens, atual = {}, ""
+    local emAspas, escape = falso, falso
+    para índice = 1, #texto início
+        local caractere = texto:corte(índice, índice)
+        se emAspas então
+            se escape então
+                atual = atual .. caractere
+                escape = falso
+            senão se caractere == "\\" então
+                escape = verdadeiro
+            senão se caractere == "\"" então
+                emAspas = falso
+            senão
+                atual = atual .. caractere
+            fim fim fim
+        senão se caractere == "\"" então
+            emAspas = verdadeiro
+        senão se caractere == " " ou caractere == "\t" então
+            se atual ~= "" então itens[#itens + 1] = atual; atual = "" fim
+        senão
+            atual = atual .. caractere
+        fim fim fim
+    fim
+    se emAspas ou escape então retorne nulo, "colar entre aspas incompleto" fim
+    se atual ~= "" então itens[#itens + 1] = atual fim
+    retorne itens
+fim
+
+local função extraiaArgumento(texto)
+    texto = apare(texto)
+    se texto == "" então retorne nulo, texto, falso fim
+    se texto:corte(1, 1) ~= "\"" então
+        local fimDoArgumento = texto:procure("[ \t]")
+        se não fimDoArgumento então retorne texto, "", falso fim
+        retorne texto:corte(1, fimDoArgumento - 1),
+            apare(texto:corte(fimDoArgumento + 1)), falso
+    fim
+    local resultado, escape = "", falso
+    para índice = 2, #texto início
+        local caractere = texto:corte(índice, índice)
+        se escape então
+            resultado = resultado .. caractere
+            escape = falso
+        senão se caractere == "\\" então
+            escape = verdadeiro
+        senão se caractere == "\"" então
+            retorne resultado, apare(texto:corte(índice + 1)), verdadeiro
+        senão
+            resultado = resultado .. caractere
+        fim fim fim
+    fim
+    retorne nulo, texto, verdadeiro, "colar entre aspas incompleto"
+fim
+
+local função analiseLISTA(texto)
+    local restante = apare(texto)
+    local somenteEspeciais = falso
+    se restante:corte(1, 1) == "(" então
+        local fechamento = restante:procure(")", 2, verdadeiro)
+        se não fechamento então
+            retorne nulo, "opções LIST incompletas"
+        fim
+        local opções = restante:corte(2, fechamento - 1):maiúscula()
+        somenteEspeciais = opções:procure(
+            "SPECIAL-USE", 1, verdadeiro) ~= nulo
+        restante = apare(restante:corte(fechamento + 1))
+    fim
+    local referência, sobra, _, falha = extraiaArgumento(restante)
+    se referência == nulo então
+        retorne nulo, falha ou "referência LIST ausente"
+    fim
+    local padrão
+    padrão, sobra, _, falha = extraiaArgumento(sobra)
+    se padrão == nulo então retorne nulo, falha ou "padrão LIST ausente" fim
+    -- RETURN (SPECIAL-USE) solicita os atributos, mas não filtra INBOX.
+    se sobra ~= "" e
+       não sobra:maiúscula():procure("^RETURN[ \t]+%(") então
+        retorne nulo, "argumentos LIST não reconhecidos"
+    fim
+    retorne {
+        referência = referência, padrão = padrão,
+        somenteEspeciais = somenteEspeciais
+    }
+fim
+
+local função respostaLISTA(comando, pedido)
+    se pedido.padrão == "" então
+        retorne "* " .. comando .. " (\\Noselect) \"/\" \"\"" .. CRLF
+    fim
+    local padrão = pedido.padrão
+    se pedido.referência ~= "" e pedido.referência ~= "/" então
+        padrão = pedido.referência .. padrão
+    fim
+    local resposta = ""
+    para _, pasta em ipares(pastas) início
+        se (não pedido.somenteEspeciais ou pasta.especial) e
+           correspondeAoPadrãoDaLista(pasta.nome, padrão) então
+            local atributos = "\\HasNoChildren"
+            se pasta.especial então
+                atributos = atributos .. " " .. pasta.especial
+            fim
+            resposta = resposta .. "* " .. comando .. " (" .. atributos ..
+                ") \"/\" " .. aspe(pasta.nome) .. CRLF
+        fim
+    fim
+    retorne resposta
+fim
+
+local função carimboIMAP(valor)
+    se valor == nulo ou valor == "" então retorne so.tempo() fim
+    local dia, mêsTexto, ano, hora, minuto, segundo, sinal, horaDoFuso,
+        minutoDoFuso = valor:separe(
+        "^([0-9][0-9]?)-([A-Za-z][A-Za-z][A-Za-z])-" ..
+        "([0-9][0-9][0-9][0-9]) ([0-9][0-9]):([0-9][0-9]):" ..
+        "([0-9][0-9]) ([+-])([0-9][0-9])([0-9][0-9])$")
+    local meses = {
+        jan = 1, feb = 2, mar = 3, apr = 4, may = 5, jun = 6,
+        jul = 7, aug = 8, sep = 9, oct = 10, nov = 11, dec = 12
+    }
+    dia, ano = paraNúmero(dia), paraNúmero(ano)
+    local mês = mêsTexto e meses[mêsTexto:minúscula()] ou nulo
+    hora, minuto, segundo = paraNúmero(hora), paraNúmero(minuto),
+        paraNúmero(segundo)
+    horaDoFuso, minutoDoFuso = paraNúmero(horaDoFuso),
+        paraNúmero(minutoDoFuso)
+    se não (dia e mês e ano e hora e minuto e segundo e
+            horaDoFuso e minutoDoFuso) então
+        retorne nulo, "data interna inválida"
+    fim
+    local bissexto = ano % 4 == 0 e (ano % 100 ~= 0 ou ano % 400 == 0)
+    local dias = { 31, bissexto e 29 ou 28, 31, 30, 31, 30,
+                   31, 31, 30, 31, 30, 31 }
+    se ano < 1970 ou ano > 9999 ou dia < 1 ou dia > dias[mês] ou
+       hora > 23 ou minuto > 59 ou segundo > 60 ou
+       horaDoFuso > 23 ou minutoDoFuso > 59 então
+        retorne nulo, "data interna fora do intervalo"
+    fim
+    local anoCivil = ano - (mês <= 2 e 1 ou 0)
+    local era = mat.piso(anoCivil / 400)
+    local anoDaEra = anoCivil - era * 400
+    local mêsAjustado = mês + (mês > 2 e -3 ou 9)
+    local diaDoAno = mat.piso((153 * mêsAjustado + 2) / 5) + dia - 1
+    local diaDaEra = anoDaEra * 365 + mat.piso(anoDaEra / 4) -
+        mat.piso(anoDaEra / 100) + diaDoAno
+    local carimbo = (era * 146097 + diaDaEra - 719468) * 86400 +
+        hora * 3600 + minuto * 60 + mat.mínimo(segundo, 59)
+    local deslocamento = horaDoFuso * 3600 + minutoDoFuso * 60
+    se sinal == "+" então carimbo = carimbo - deslocamento
+    senão carimbo = carimbo + deslocamento fim
+    retorne carimbo
+fim
+
+local função analiseAPPEND(restante, limite)
+    local prefixo, tamanhoTexto = restante:separe(
+        "^(.-)[ \t]+UTF8[ \t]*%([ \t]*~{([0-9]+)}$")
+    local internacional = prefixo ~= nulo
+    se não prefixo então
+        prefixo, tamanhoTexto = restante:separe(
+            "^(.-)[ \t]+{([0-9]+)}$")
+    fim
+    local tamanho = mat.paraInteiro(paraNúmero(tamanhoTexto))
+    se não prefixo ou não tamanho então
+        retorne nulo,
+            "APPEND exige {tamanho} ou UTF8 (~{tamanho})"
+    fim
+    se tamanho < 1 então retorne nulo, "literal APPEND vazio" fim
+    se tamanho > limite então
+        retorne nulo, "literal APPEND excede o limite de " ..
+            limite .. " tacos"
+    fim
+    local pastaExterna, restanteDosArgumentos, _, falha =
+        extraiaArgumento(prefixo)
+    se não pastaExterna então
+        retorne nulo, falha ou "pasta APPEND ausente"
+    fim
+    local sinalizadores = { lida = falso, importante = falso }
+    se restanteDosArgumentos:corte(1, 1) == "(" então
+        local fechamento = restanteDosArgumentos:procure(")", 2, verdadeiro)
+        se não fechamento então retorne nulo, "sinalizadores APPEND incompletos" fim
+        local lista = restanteDosArgumentos:corte(2, fechamento - 1)
+        restanteDosArgumentos = apare(
+            restanteDosArgumentos:corte(fechamento + 1))
+        para item em lista:capture("[^ \t]+") início
+            local alto = item:maiúscula()
+            se alto == "\\SEEN" então sinalizadores.lida = verdadeiro
+            senão se alto == "\\FLAGGED" então
+                sinalizadores.importante = verdadeiro
+            senão se alto ~= "\\DRAFT" então
+                retorne nulo, "sinalizador APPEND não aceito: " .. item
+            fim fim fim
+        fim
+    fim
+    local criadaEm
+    se restanteDosArgumentos ~= "" então
+        local data, sobra, estavaEntreAspas, falhaDaData =
+            extraiaArgumento(restanteDosArgumentos)
+        se não data ou não estavaEntreAspas ou sobra ~= "" então
+            retorne nulo, falhaDaData ou "data APPEND inválida"
+        fim
+        criadaEm, falhaDaData = carimboIMAP(data)
+        se não criadaEm então retorne nulo, falhaDaData fim
+    fim
+    retorne {
+        pastaExterna = pastaExterna, pasta = pastaInterna(pastaExterna),
+        tamanho = tamanho, lida = sinalizadores.lida,
+        importante = sinalizadores.importante,
+        criadaEm = criadaEm ou so.tempo(), internacional = internacional,
+        terminador = internacional e (")" .. CRLF) ou CRLF
+    }
+fim
+
+local função atributosFETCH(texto)
+    texto = apare(texto)
+    se texto:corte(1, 1) == "(" e texto:corte(-1) == ")" então
+        texto = texto:corte(2, -2)
+    fim
+    local itens, atual = {}, ""
+    local colchetes, parênteses = 0, 0
+    para índice = 1, #texto início
+        local caractere = texto:corte(índice, índice)
+        se caractere == "[" então colchetes = colchetes + 1 fim
+        se caractere == "]" então colchetes = mat.máximo(0, colchetes - 1) fim
+        se caractere == "(" então parênteses = parênteses + 1 fim
+        se caractere == ")" então parênteses = mat.máximo(0, parênteses - 1) fim
+        se (caractere == " " ou caractere == "\t") e
+           colchetes == 0 e parênteses == 0 então
+            se atual ~= "" então itens[#itens + 1] = atual; atual = "" fim
+        senão
+            atual = atual .. caractere
+        fim
+    fim
+    se atual ~= "" então itens[#itens + 1] = atual fim
+    local resultado = {}
+    para _, item em ipares(itens) início
+        local alto = item:maiúscula()
+        se alto == "FAST" então
+            para _, nome em ipares({ "FLAGS", "INTERNALDATE", "RFC822.SIZE" }) início
+                resultado[#resultado + 1] = nome
+            fim
+        senão se alto == "ALL" então
+            para _, nome em ipares({
+                "FLAGS", "INTERNALDATE", "RFC822.SIZE", "ENVELOPE"
+            }) início resultado[#resultado + 1] = nome fim
+        senão se alto == "FULL" então
+            para _, nome em ipares({
+                "FLAGS", "INTERNALDATE", "RFC822.SIZE", "ENVELOPE", "BODY"
+            }) início resultado[#resultado + 1] = nome fim
+        senão
+            resultado[#resultado + 1] = item
+        fim fim fim
+    fim
+    retorne resultado
+fim
+
+local função decodifiquePLAIN(valor)
+    local funcionou, bruto = proteja(colar.decBase64, apare(valor))
+    se não funcionou ou tipo(bruto) ~= "colar" então retorne nulo fim
+    local primeiro = bruto:procure("\0", 1, verdadeiro)
+    se não primeiro então retorne nulo fim
+    local segundo = bruto:procure("\0", primeiro + 1, verdadeiro)
+    se não segundo então retorne nulo fim
+    local usuário = bruto:corte(primeiro + 1, segundo - 1)
+    local senha = bruto:corte(segundo + 1)
+    se usuário == "" então retorne nulo fim
+    retorne usuário, senha
+fim
+
+local função pertenceAoConjunto(valor, conjunto, máximo)
+    para trecho em conjunto:capture("[^,]+") início
+        trecho = trecho:apare()
+        local doisPontos = trecho:procure(":", 1, verdadeiro)
+        local função número(parte)
+            se parte == "*" então retorne máximo fim
+            retorne mat.paraInteiro(paraNúmero(parte))
+        fim
+        se doisPontos então
+            local começo = número(trecho:corte(1, doisPontos - 1))
+            local fimDoTrecho = número(trecho:corte(doisPontos + 1))
+            se começo e fimDoTrecho então
+                local menor = mat.mínimo(começo, fimDoTrecho)
+                local maior = mat.máximo(começo, fimDoTrecho)
+                se valor >= menor e valor <= maior então retorne verdadeiro fim
+            fim
+        senão
+            local único = número(trecho)
+            se único e valor == único então retorne verdadeiro fim
+        fim
+    fim
+    retorne falso
+fim
+
+local função linhas(texto)
+    local quantidade = 0
+    para _ em paraColar(texto ou ""):capture("\n") início
+        quantidade = quantidade + 1
+    fim
+    retorne quantidade
+fim
+
+local função dataInterna(carimbo)
+    -- IMAP exige os nomes ingleses dos meses independentemente da localidade
+    -- do processo. UTC também evita que uma mudança de fuso altere a carta.
+    local meses = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+    local data = so.data("!*t", carimbo ou so.tempo())
+    retorne aspe(colar.formate("%02d-%s-%04d %02d:%02d:%02d +0000",
+        data.day, meses[data.month], data.year,
+        data.hour, data.min, data.sec))
+fim
+
+local função endereçoIMAP(valor)
+    valor = apare(valor)
+    local entre = valor:separe("<([^<>]+)>")
+    se entre então valor = entre fim
+    local arroba = valor:procure("@", 1, verdadeiro)
+    se não arroba então retorne "NIL" fim
+    local parte = valor:corte(1, arroba - 1):apare()
+    local domínio = valor:corte(arroba + 1):apare()
+    se parte == "" ou domínio == "" então retorne "NIL" fim
+    retorne "((NIL NIL " .. aspe(parte) .. " " .. aspe(domínio) .. "))"
+fim
+
+local função listaDeEndereços(valor)
+    se tipo(valor) ~= "tabela" ou #valor == 0 então retorne "NIL" fim
+    local itens = {}
+    para _, endereço em ipares(valor) início
+        local formado = endereçoIMAP(endereço)
+        se formado ~= "NIL" então
+            itens[#itens + 1] = formado:corte(2, -2)
+        fim
+    fim
+    se #itens == 0 então retorne "NIL" fim
+    retorne "(" .. tabela.concatene(itens, " ") .. ")"
+fim
+
+local função envelope(mensagem)
+    local destinatários = mensagem.destinatários ou {}
+    local de = endereçoIMAP(mensagem.remetente)
+    local resposta = endereçoIMAP(mensagem.responderPara ou mensagem.remetente)
+    retorne "(" .. dataInterna(mensagem.criadaEm) .. " " ..
+        aspeOuNulo(mensagem.assunto) .. " " .. de .. " " .. de .. " " ..
+        resposta .. " " .. listaDeEndereços(destinatários["para"] ou {}) .. " " ..
+        listaDeEndereços(destinatários["cópia"] ou {}) .. " " ..
+        listaDeEndereços(destinatários.cópiaOculta ou {}) .. " NIL " ..
+        aspeOuNulo(mensagem.identificação) .. ")"
+fim
+
+local função tipoDoAnexo(valor)
+    valor = apare(valor):maiúscula()
+    local barra = valor:procure("/", 1, verdadeiro)
+    se não barra então retorne "APPLICATION", "OCTET-STREAM" fim
+    retorne valor:corte(1, barra - 1), valor:corte(barra + 1)
+fim
+
+local função partesVirtuais(mensagem)
+    local partes = {}
+    se mensagem.texto ~= nulo então
+        partes[#partes + 1] = {
+            tipo = "TEXT", subtipo = "PLAIN", dados = mensagem.texto,
+            linhas = linhas(mensagem.texto)
+        }
+    fim
+    se mensagem.html ~= nulo então
+        partes[#partes + 1] = {
+            tipo = "TEXT", subtipo = "HTML", dados = mensagem.html,
+            linhas = linhas(mensagem.html)
+        }
+    fim
+    para _, anexo em ipares(mensagem.anexos ou {}) início
+        local tipo, subtipo = tipoDoAnexo(anexo.tipo)
+        partes[#partes + 1] = {
+            tipo = tipo, subtipo = subtipo, anexo = anexo,
+            tamanho = anexo.tamanho ou 0
+        }
+    fim
+    se #partes == 0 então
+        partes[1] = { tipo = "TEXT", subtipo = "PLAIN", dados = "", linhas = 0 }
+    fim
+    retorne partes
+fim
+
+local função estruturaDaParte(parte)
+    local tamanho = parte.dados e #parte.dados ou (parte.tamanho ou 0)
+    se parte.tipo == "TEXT" então
+        retorne "(\"TEXT\" " .. aspe(parte.subtipo) ..
+            " (\"CHARSET\" \"UTF-8\") NIL NIL \"8BIT\" " ..
+            tamanho .. " " .. (parte.linhas ou 0) .. " NIL NIL NIL NIL)"
+    fim
+    local parâmetros = parte.anexo e
+        "(\"NAME\" " .. aspe(parte.anexo.nome ou "anexo") .. ")" ou "NIL"
+    local disposição = parte.anexo e
+        "(\"ATTACHMENT\" (\"FILENAME\" " ..
+            aspe(parte.anexo.nome ou "anexo") .. "))" ou "NIL"
+    retorne "(" .. aspe(parte.tipo) .. " " .. aspe(parte.subtipo) .. " " ..
+        parâmetros .. " NIL NIL \"BINARY\" " .. tamanho ..
+        " NIL " .. disposição .. " NIL NIL)"
+fim
+
+local função estruturaDoCorpo(mensagem)
+    local partes = partesVirtuais(mensagem)
+    se #partes == 1 então retorne estruturaDaParte(partes[1]) fim
+    local formadas = {}
+    para _, parte em ipares(partes) início
+        formadas[#formadas + 1] = estruturaDaParte(parte)
+    fim
+    retorne "(" .. tabela.concatene(formadas, " ") ..
+        " \"MIXED\" NIL NIL NIL)"
+fim
+
+local função separeMIME(mime)
+    local posição = mime:procure(CRLF .. CRLF, 1, verdadeiro)
+    se não posição então retorne mime .. CRLF, "" fim
+    retorne mime:corte(1, posição + 3), mime:corte(posição + 4)
+fim
+
+local função filtreCabeçalhos(cabeçalho, nomes, negue)
+    local aceitos = {}
+    para nome em nomes:maiúscula():capture("[^ ()]+") início
+        aceitos[nome] = verdadeiro
+    fim
+    local resultado, atual, conservar = {}, "", falso
+    para linha em (cabeçalho .. CRLF):capture("(.-)\r\n") início
+        se linha == "" então pare fim
+        se linha:corte(1, 1) == " " ou linha:corte(1, 1) == "\t" então
+            se conservar então resultado[#resultado + 1] = linha fim
+        senão
+            local doisPontos = linha:procure(":", 1, verdadeiro)
+            local nome = doisPontos e linha:corte(1, doisPontos - 1):maiúscula() ou ""
+            conservar = aceitos[nome] == verdadeiro
+            se negue então conservar = não conservar fim
+            se conservar então resultado[#resultado + 1] = linha fim
+        fim
+    fim
+    retorne tabela.concatene(resultado, CRLF) .. CRLF .. CRLF
+fim
+
+local função sinalizadores(sessão, mensagem)
+    local itens = {}
+    se mensagem.lida então itens[#itens + 1] = "\\Seen" fim
+    se mensagem.importante então itens[#itens + 1] = "\\Flagged" fim
+    se mensagem.apagadaNoIMAP então itens[#itens + 1] = "\\Deleted" fim
+    retorne "(" .. tabela.concatene(itens, " ") .. ")"
+fim
+
+função imap.servidor(opções)
+    opções = opções ou {}
+    local repositório = garanta(opções.repositório,
+        "repositório postal é obrigatório")
+    local resumoIsca = garanta(opções.resumoIsca,
+        "resumo-isca de autenticação é obrigatório")
+    local endereço = opções.endereço ou "127.0.0.1"
+    local porta = mat.paraInteiro(opções.porta ou 993)
+    se não porta ou porta < 1 ou porta > 65535 então
+        retorne nulo, "porta IMAP fora do intervalo 1..65535"
+    fim
+    local certificado, falha = rede.carregueCertificadoTLS(
+        opções.certificado, opções.chavePrivada)
+    se não certificado então retorne nulo, falha fim
+
+    local configuração = {
+        endereço = endereço,
+        porta = porta,
+        nome = opções.nome ou "localhost",
+        tempoLimite = opções.tempoLimite ou 1800000,
+        limiteLinha = opções.limiteLinha ou 16384,
+        limiteMensagem = opções.limiteMensagem ou 50 * 1024 * 1024,
+        limiteComandos = opções.limiteComandos ou 10000,
+        limiteTentativas = opções.limiteTentativasDeAutenticação ou 5,
+        intervaloOcioso = opções.intervaloOcioso ou 15000,
+        pulso = opções.pulso
+    }
+    se tipo(configuração.intervaloOcioso) ~= "número" ou
+       configuração.intervaloOcioso < 1000 então
+        retorne nulo, "intervaloOcioso precisa ter ao menos 1000 ms"
+    fim
+    se mat.paraInteiro(configuração.limiteMensagem) == nulo ou
+       configuração.limiteMensagem < 1 ou
+       configuração.limiteMensagem > 100 * 1024 * 1024 então
+        retorne nulo, "limiteMensagem precisa estar entre 1 taco e 100 MiB"
+    fim
+    local vigia
+    vigia, falha = Vigia.novo({
+        nome = "correio.imap.conexões", pulso = configuração.pulso,
+        janela = 60,
+        limiteNaJanela = opções.limiteNovasConexõesPorMinuto ou 60,
+        limiteSimultâneo = opções.limiteConexõesPorEndereço ou 10,
+        limiteGlobal = opções.limiteConexões ou 500,
+        duraçãoDoBloqueio = 0, máximoDeChaves = 10000, ociosidade = 1800
+    })
+    se não vigia então retorne nulo, falha fim
+
+    local servidor = {
+        receptor = rede.servidorTCP(), certificado = certificado,
+        configuração = configuração, vigia = vigia,
+        conexões = {}, iniciado = falso, fechado = falso, total = 0
+    }
+    local processeEntrada
+
+    local função encerre(sessão)
+        se sessão.fechada então retorne fim
+        sessão.fechada = verdadeiro
+        se sessão.agendamentoOcioso então
+            sessão.agendamentoOcioso:cancele()
+            sessão.agendamentoOcioso = nulo
+        fim
+        sessão.saídas = {}
+        sessão.conexão:feche()
+        servidor.conexões[sessão] = nulo
+        servidor.total = mat.máximo(0, servidor.total - 1)
+        servidor.vigia:conclua(sessão.endereço)
+        emita(configuração.pulso, "leitura", "correio.imapConexãoFechada", {
+            endereço = sessão.endereço, comandos = sessão.comandos,
+            -- Somente nomes de comandos: nunca argumentos, credenciais,
+            -- endereços postais ou conteúdo das cartas.
+            rastro = sessão.rastro
+        })
+    fim
+
+    local bombeieSaída
+    bombeieSaída = função(sessão)
+        se sessão.fechada ou sessão.enviando então retorne fim
+        local item = tabela.remova(sessão.saídas, 1)
+        se não item então retorne fim
+        sessão.enviando = verdadeiro
+        sessão.conexão:envieAssíncrono(item.texto,
+            função(_, _, falhaDoEnvio)
+                sessão.enviando = falso
+                se falhaDoEnvio então encerre(sessão); retorne fim
+                se item.depois então item.depois() fim
+                bombeieSaída(sessão)
+            fim)
+    fim
+
+    local função envie(sessão, texto, depois)
+        se sessão.fechada então retorne fim
+        sessão.saídas[#sessão.saídas + 1] = {
+            texto = texto, depois = depois
+        }
+        bombeieSaída(sessão)
+    fim
+
+    local função prossiga(sessão)
+        se sessão.fechada então retorne fim
+        sessão.aguardando = falso
+        processeEntrada(sessão)
+    fim
+
+    local função conclua(sessão, etiqueta, estado, texto, antes)
+        envie(sessão, (antes ou "") .. etiqueta .. " " .. estado .. " " ..
+            textoDeProtocolo(texto) .. CRLF, função() prossiga(sessão) fim)
+    fim
+
+    local função leiaMais(sessão)
+        se sessão.fechada ou sessão.aguardando então retorne fim
+        sessão.conexão:recebaDadosAssíncrono(8192,
+            função(_, dados, falhaDaLeitura)
+                se falhaDaLeitura então encerre(sessão); retorne fim
+                sessão.acumulado = sessão.acumulado .. dados
+                processeEntrada(sessão)
+            fim)
+    fim
+
+    local função autentique(sessão, etiqueta, usuário, senha)
+        sessão.aguardando = verdadeiro
+        repositório:autentiqueCaixa(usuário, senha, resumoIsca,
+            função(identidade, falhaDaAutenticação)
+                se sessão.fechada então retorne fim
+                se identidade e identidade.caixa então
+                    sessão.identidade = identidade
+                    sessão.caixa = identidade.caixa
+                    sessão.estado = "autenticada"
+                    emita(configuração.pulso, "sinal",
+                        "correio.imapAutenticado", {
+                            endereço = sessão.endereço,
+                            usuário = identidade.usuário ou identidade.endereço
+                        })
+                    conclua(sessão, etiqueta, "OK",
+                        "[CAPABILITY " .. capacidadesAutenticadas ..
+                        "] autenticado")
+                    retorne
+                fim
+                sessão.tentativas = sessão.tentativas + 1
+                local temporária = falhaDaAutenticação ~= nulo
+                emita(configuração.pulso, "sinal",
+                    temporária e "correio.imapAutenticaçãoIndisponível" ou
+                        "correio.imapAutenticaçãoRecusada",
+                    { endereço = sessão.endereço }, "alta")
+                se sessão.tentativas >= configuração.limiteTentativas então
+                    envie(sessão, etiqueta ..
+                        " NO [AUTHENTICATIONFAILED] credenciais recusadas" .. CRLF ..
+                        "* BYE tentativas de autenticacao excedidas" .. CRLF,
+                        função() encerre(sessão) fim)
+                    retorne
+                fim
+                conclua(sessão, etiqueta, "NO",
+                    temporária e "[UNAVAILABLE] autenticação indisponível" ou
+                        "[AUTHENTICATIONFAILED] credenciais recusadas")
+            fim)
+    fim
+
+    local função recarregue(sessão, tratador)
+        repositório:listeMensagensIMAP(
+            sessão.caixa.id, sessão.pasta, função(estado, falhaDoEstado)
+                se estado então sessão.pastaEstado = estado fim
+                tratador(estado, falhaDoEstado)
+            fim)
+    fim
+
+    local função canceleOcioso(sessão)
+        se sessão.agendamentoOcioso então
+            sessão.agendamentoOcioso:cancele()
+            sessão.agendamentoOcioso = nulo
+        fim
+    fim
+
+    local função copieEstadoOcioso(estado)
+        local cópia = { mensagens = {}, quantidade = estado.quantidade ou 0 }
+        para _, mensagem em ipares(estado.mensagens ou {}) início
+            cópia.mensagens[#cópia.mensagens + 1] = {
+                id = mensagem.id, uid = mensagem.uid,
+                lida = mensagem.lida, importante = mensagem.importante,
+                apagadaNoIMAP = mensagem.apagadaNoIMAP
+            }
+        fim
+        retorne cópia
+    fim
+
+    local função atualizaçõesOciosas(sessão, novoEstado)
+        local anterior = sessão.estadoOcioso ou
+            copieEstadoOcioso(sessão.pastaEstado ou { mensagens = {} })
+        local anteriores, novos = {}, {}
+        para sequência, mensagem em ipares(anterior.mensagens ou {}) início
+            anteriores[mensagem.uid] = {
+                sequência = sequência, mensagem = mensagem
+            }
+        fim
+        para sequência, mensagem em ipares(novoEstado.mensagens ou {}) início
+            novos[mensagem.uid] = { sequência = sequência, mensagem = mensagem }
+        fim
+
+        local removidas, adicionadas, sinalizadoresAlterados = {}, 0, {}
+        para uid, item em pares(anteriores) início
+            se não novos[uid] então
+                removidas[#removidas + 1] = item.sequência
+            fim
+        fim
+        tabela.ordene(removidas, função(a, b) retorne a > b fim)
+
+        para uid, item em pares(novos) início
+            local antiga = anteriores[uid]
+            se não antiga então
+                adicionadas = adicionadas + 1
+            senão se antiga.mensagem.lida ~= item.mensagem.lida ou
+                     antiga.mensagem.importante ~= item.mensagem.importante ou
+                     antiga.mensagem.apagadaNoIMAP ~= item.mensagem.apagadaNoIMAP
+                     então
+                sinalizadoresAlterados[#sinalizadoresAlterados + 1] = item
+            fim fim
+        fim
+        tabela.ordene(sinalizadoresAlterados,
+            função(a, b) retorne a.sequência < b.sequência fim)
+
+        local resposta = ""
+        para _, sequência em ipares(removidas) início
+            resposta = resposta .. "* " .. sequência .. " EXPUNGE" .. CRLF
+        fim
+        se adicionadas > 0 então
+            resposta = resposta .. "* " .. novoEstado.quantidade ..
+                " EXISTS" .. CRLF
+        fim
+        para _, item em ipares(sinalizadoresAlterados) início
+            resposta = resposta .. "* " .. item.sequência ..
+                " FETCH (UID " .. item.mensagem.uid .. " FLAGS " ..
+                sinalizadores(sessão, item.mensagem) .. ")" .. CRLF
+        fim
+        sessão.pastaEstado = novoEstado
+        sessão.estadoOcioso = copieEstadoOcioso(novoEstado)
+        retorne resposta, #removidas, adicionadas, #sinalizadoresAlterados
+    fim
+
+    local armeOcioso
+    armeOcioso = função(sessão)
+        se sessão.fechada ou não sessão.ociosa ou
+           sessão.estado ~= "selecionada" então retorne fim
+        canceleOcioso(sessão)
+        local agendamento, falha = rede.agende(configuração.intervaloOcioso,
+            função()
+                sessão.agendamentoOcioso = nulo
+                se sessão.fechada ou não sessão.ociosa então retorne fim
+                repositório:listeMensagensIMAP(sessão.caixa.id, sessão.pasta,
+                    função(estado, falhaDoEstado)
+                        se sessão.fechada ou não sessão.ociosa então retorne fim
+                        se não estado então
+                            emita(configuração.pulso, "sinal",
+                                "correio.imapOciosoIndisponível", {
+                                    endereço = sessão.endereço,
+                                    falha = paraColar(falhaDoEstado)
+                                }, "alta")
+                            armeOcioso(sessão)
+                            retorne
+                        fim
+                        local resposta, removidas, adicionadas, alteradas =
+                            atualizaçõesOciosas(sessão, estado)
+                        se resposta == "" então
+                            armeOcioso(sessão)
+                            retorne
+                        fim
+                        emita(configuração.pulso, "leitura",
+                            "correio.imapAtualizaçãoOciosa", {
+                                endereço = sessão.endereço,
+                                removidas = removidas, adicionadas = adicionadas,
+                                sinalizadores = alteradas
+                            })
+                        envie(sessão, resposta, função()
+                            armeOcioso(sessão)
+                        fim)
+                    fim)
+            fim)
+        se não agendamento então
+            emita(configuração.pulso, "sinal",
+                "correio.imapOciosoIndisponível", {
+                    endereço = sessão.endereço, falha = falha
+                }, "alta")
+            retorne
+        fim
+        sessão.agendamentoOcioso = agendamento
+    fim
+
+    local função selecionadas(estado, conjunto, porUID)
+        local resultado = {}
+        local mensagens = estado.mensagens ou {}
+        local máximo = porUID e mat.máximo(0, estado.próximoUID - 1) ou
+            #mensagens
+        para sequência, mensagem em ipares(mensagens) início
+            local valor = porUID e mensagem.uid ou sequência
+            se pertenceAoConjunto(valor, conjunto, máximo) então
+                resultado[#resultado + 1] = {
+                    sequência = sequência, mensagem = mensagem
+                }
+            fim
+        fim
+        retorne resultado
+    fim
+
+    local função obtenhaParte(sessão, mensagem, seção, tratador)
+        local cabeçalho, corpo = separeMIME(mensagem.mime ou "")
+        local alta = apare(seção):maiúscula()
+        se alta == "" então tratador(mensagem.mime ou "", nulo); retorne fim
+        se alta == "HEADER" então tratador(cabeçalho, nulo); retorne fim
+        se alta == "TEXT" então tratador(corpo, nulo); retorne fim
+        se alta:corte(1, 13) == "HEADER.FIELDS" então
+            local abre = seção:procure("(", 1, verdadeiro)
+            local fecha = seção:procure(")", 1, verdadeiro)
+            local nomes = abre e fecha e seção:corte(abre + 1, fecha - 1) ou ""
+            local negue = alta:corte(1, 17) == "HEADER.FIELDS.NOT"
+            tratador(filtreCabeçalhos(cabeçalho, nomes, negue), nulo)
+            retorne
+        fim
+        local índice = mat.paraInteiro(paraNúmero(alta:separe("^([0-9]+)")))
+        local partes = partesVirtuais(mensagem)
+        local parte = índice e partes[índice] ou nulo
+        se não parte então tratador("", nulo); retorne fim
+        se alta:corte(-5) == ".MIME" então
+            local tipo = parte.tipo .. "/" .. parte.subtipo
+            local formado = "Content-Type: " .. tipo
+            se parte.tipo == "TEXT" então formado = formado .. "; charset=UTF-8" fim
+            se parte.anexo então
+                formado = formado .. "; name=" .. aspe(parte.anexo.nome ou "anexo")
+            fim
+            formado = formado .. CRLF .. "Content-Transfer-Encoding: " ..
+                (parte.tipo == "TEXT" e "8bit" ou "binary")
+            se parte.anexo então
+                formado = formado .. CRLF ..
+                    "Content-Disposition: attachment; filename=" ..
+                    aspe(parte.anexo.nome ou "anexo")
+            fim
+            tratador(formado .. CRLF .. CRLF, nulo)
+            retorne
+        fim
+        se parte.dados ~= nulo então tratador(parte.dados, nulo); retorne fim
+        repositório:obtenhaAnexo(sessão.caixa.id, mensagem.id,
+            parte.anexo.id, função(anexo, falhaDoAnexo)
+                tratador(anexo e anexo.dados ou nulo, falhaDoAnexo)
+            fim)
+    fim
+
+    local função apliqueParcial(atributo, dados)
+        -- RFC 3501: o cliente pede <origem.quantidade>, mas a resposta
+        -- identifica somente a origem efetivamente devolvida.
+        local origem, quantidade = atributo:separe(
+            "<([0-9]+)%.([0-9]+)>$")
+        origem = mat.paraInteiro(paraNúmero(origem))
+        quantidade = mat.paraInteiro(paraNúmero(quantidade))
+        se origem == nulo ou quantidade == nulo então
+            retorne dados, ""
+        fim
+        se origem < 0 ou quantidade < 0 então retorne dados, "" fim
+        se origem >= #dados ou quantidade == 0 então
+            retorne "", "<" .. origem .. ">"
+        fim
+        retorne dados:corte(origem + 1, origem + quantidade),
+            "<" .. origem .. ">"
+    fim
+
+    local função formeFETCH(sessão, item, atributos, tratador)
+        repositório:obtenhaMensagemIMAP(sessão.caixa.id,
+            item.mensagem.id, função(mensagem, falhaDaMensagem)
+                se não mensagem então
+                    tratador(nulo, falhaDaMensagem ou "carta indisponível")
+                    retorne
+                fim
+                local formados = {}
+                local marcarLida = falso
+                local função próximo(índice)
+                    se índice > #atributos então
+                        local função termine()
+                            tratador("* " .. item.sequência .. " FETCH (" ..
+                                tabela.concatene(formados, " ") .. ")" .. CRLF,
+                                nulo)
+                        fim
+                        se marcarLida e não mensagem.lida então
+                            mensagem.lida = verdadeiro
+                            repositório:atualizeSinalizadoresIMAP(
+                                sessão.caixa.id, mensagem.id, {
+                                    lida = verdadeiro,
+                                    importante = mensagem.importante,
+                                    apagada = mensagem.apagadaNoIMAP
+                                }, função(_, falhaDaMarca)
+                                    se falhaDaMarca então
+                                        tratador(nulo, falhaDaMarca)
+                                    senão termine() fim
+                                fim)
+                        senão termine() fim
+                        retorne
+                    fim
+                    local atributo = atributos[índice]
+                    local alto = atributo:maiúscula()
+                    se alto == "FLAGS" então
+                        formados[#formados + 1] = "FLAGS " ..
+                            sinalizadores(sessão, mensagem)
+                        próximo(índice + 1); retorne
+                    fim
+                    se alto == "UID" então
+                        formados[#formados + 1] = "UID " .. mensagem.uid
+                        próximo(índice + 1); retorne
+                    fim
+                    se alto == "RFC822.SIZE" então
+                        formados[#formados + 1] = "RFC822.SIZE " .. #mensagem.mime
+                        próximo(índice + 1); retorne
+                    fim
+                    se alto == "INTERNALDATE" então
+                        formados[#formados + 1] = "INTERNALDATE " ..
+                            dataInterna(mensagem.criadaEm)
+                        próximo(índice + 1); retorne
+                    fim
+                    se alto == "ENVELOPE" então
+                        formados[#formados + 1] = "ENVELOPE " .. envelope(mensagem)
+                        próximo(índice + 1); retorne
+                    fim
+                    se alto == "BODY" ou alto == "BODYSTRUCTURE" então
+                        formados[#formados + 1] = alto .. " " ..
+                            estruturaDoCorpo(mensagem)
+                        próximo(índice + 1); retorne
+                    fim
+                    local éLiteral = alto == "RFC822" ou
+                        alto == "RFC822.HEADER" ou alto == "RFC822.TEXT" ou
+                        alto:corte(1, 5) == "BODY[" ou
+                        alto:corte(1, 10) == "BODY.PEEK["
+                    se éLiteral então
+                        local seção = ""
+                        local rótulo = atributo
+                        se alto == "RFC822.HEADER" então
+                            seção = "HEADER"
+                        fim
+                        se alto == "RFC822.TEXT" então seção = "TEXT" fim
+                        se alto:corte(1, 5) == "BODY[" ou
+                           alto:corte(1, 10) == "BODY.PEEK[" então
+                            local abre = atributo:procure("[", 1, verdadeiro)
+                            local fecha = atributo:procure("]", abre + 1, verdadeiro)
+                            seção = fecha e atributo:corte(abre + 1, fecha - 1) ou ""
+                            rótulo = "BODY[" .. seção .. "]"
+                            se alto:corte(1, 10) ~= "BODY.PEEK[" e
+                               seção:maiúscula():corte(1, 6) ~= "HEADER" então
+                                marcarLida = verdadeiro
+                            fim
+                        fim
+                        se alto == "RFC822" ou alto == "RFC822.TEXT" então
+                            marcarLida = verdadeiro
+                        fim
+                        obtenhaParte(sessão, mensagem, seção,
+                            função(dados, falhaDaParte)
+                                se falhaDaParte então
+                                    tratador(nulo, falhaDaParte); retorne
+                                fim
+                                local parcial
+                                dados, parcial = apliqueParcial(atributo, dados)
+                                rótulo = rótulo .. parcial
+                                formados[#formados + 1] = rótulo .. " {" ..
+                                    #dados .. "}" .. CRLF .. dados
+                                próximo(índice + 1)
+                            fim)
+                        retorne
+                    fim
+                    emita(configuração.pulso, "leitura",
+                        "correio.imapAtributoFetchIgnorado", {
+                            endereço = sessão.endereço,
+                            atributo = atributo:corte(1, 200)
+                        })
+                    próximo(índice + 1)
+                fim
+                próximo(1)
+            fim)
+    fim
+
+    local função executeFETCH(sessão, etiqueta, conjunto, textoDosAtributos,
+                                      porUID)
+        local atributos = atributosFETCH(textoDosAtributos)
+        se #atributos == 0 então
+            conclua(sessão, etiqueta, "BAD", "atributos FETCH ausentes")
+            retorne
+        fim
+        -- RFC 3501, seção 6.4.8: toda resposta a UID FETCH precisa
+        -- incluir o UID da mensagem, mesmo quando o cliente não o solicita
+        -- entre os atributos. Sem ele, clientes como o Apple Mail recebem o
+        -- literal, mas não conseguem associá-lo à carta e descartam o corpo.
+        se porUID então
+            local possuiUID = falso
+            para _, atributo em ipares(atributos) início
+                se atributo:maiúscula() == "UID" então
+                    possuiUID = verdadeiro
+                    pare
+                fim
+            fim
+            se não possuiUID então tabela.insira(atributos, 1, "UID") fim
+        fim
+        sessão.aguardando = verdadeiro
+        recarregue(sessão, função(estado, falhaDoEstado)
+            se não estado então
+                conclua(sessão, etiqueta, "NO",
+                    "[UNAVAILABLE] " .. paraColar(falhaDoEstado)); retorne
+            fim
+            local itens = selecionadas(estado, conjunto, porUID)
+            local respostas = {}
+            local função próximo(índice)
+                se índice > #itens então
+                    conclua(sessão, etiqueta, "OK", "FETCH concluído",
+                        tabela.concatene(respostas, ""))
+                    retorne
+                fim
+                formeFETCH(sessão, itens[índice], atributos,
+                    função(resposta, falhaDaFormação)
+                        se não resposta então
+                            conclua(sessão, etiqueta, "NO",
+                                "[UNAVAILABLE] " .. paraColar(falhaDaFormação))
+                            retorne
+                        fim
+                        respostas[#respostas + 1] = resposta
+                        próximo(índice + 1)
+                    fim)
+            fim
+            próximo(1)
+        fim)
+    fim
+
+    local função executeSEARCH(sessão, etiqueta, critérios, porUID)
+        sessão.aguardando = verdadeiro
+        recarregue(sessão, função(estado, falhaDoEstado)
+            se não estado então
+                conclua(sessão, etiqueta, "NO",
+                    "[UNAVAILABLE] " .. paraColar(falhaDoEstado)); retorne
+            fim
+            local termos = palavras(critérios)
+            se não termos então
+                conclua(sessão, etiqueta, "BAD", "critério SEARCH inválido")
+                retorne
+            fim
+            se termos[1] e termos[1]:maiúscula() == "CHARSET" então
+                se sessão.utf8Aceito então
+                    conclua(sessão, etiqueta, "BAD",
+                        "SEARCH não aceita CHARSET após ENABLE UTF8=ACCEPT")
+                    retorne
+                fim
+                tabela.remova(termos, 1); tabela.remova(termos, 1)
+            fim
+            local encontrados = {}
+            para sequência, mensagem em ipares(estado.mensagens ou {}) início
+                local aceita = verdadeiro
+                local índice = 1
+                enquanto índice <= #termos e aceita início
+                    local termo = termos[índice]:maiúscula()
+                    se termo == "ALL" então
+                    senão se termo == "SEEN" então aceita = mensagem.lida
+                    senão se termo == "UNSEEN" então aceita = não mensagem.lida
+                    senão se termo == "FLAGGED" então aceita = mensagem.importante
+                    senão se termo == "UNFLAGGED" então aceita = não mensagem.importante
+                    senão se termo == "FROM" ou termo == "SUBJECT" ou
+                               termo == "TEXT" então
+                        índice = índice + 1
+                        local busca = (termos[índice] ou ""):minúscula()
+                        local alvo = termo == "FROM" e mensagem.remetente ou
+                            (termo == "SUBJECT" e mensagem.assunto ou
+                                (paraColar(mensagem.assunto ou "") .. " " ..
+                                 paraColar(mensagem.resumo ou "") .. " " ..
+                                 paraColar(mensagem.texto ou "")))
+                        aceita = paraColar(alvo ou ""):minúscula():procure(
+                            busca, 1, verdadeiro) ~= nulo
+                    senão se termo == "UID" então
+                        índice = índice + 1
+                        aceita = pertenceAoConjunto(mensagem.uid,
+                            termos[índice] ou "", estado.próximoUID - 1)
+                    senão
+                        aceita = falso
+                    fim fim fim fim fim fim fim
+                    índice = índice + 1
+                fim
+                se aceita então
+                    encontrados[#encontrados + 1] = porUID e mensagem.uid ou sequência
+                fim
+            fim
+            local textos = {}
+            para _, valor em ipares(encontrados) início textos[#textos + 1] = paraColar(valor) fim
+            conclua(sessão, etiqueta, "OK", "SEARCH concluído",
+                "* SEARCH" .. (#textos > 0 e " " .. tabela.concatene(textos, " ") ou "") .. CRLF)
+        fim)
+    fim
+
+    local função executeSTORE(sessão, etiqueta, conjunto, restante, porUID)
+        local modo, lista = restante:separe("^([^ \t]+)[ \t]+%((.-)%)$")
+        se não modo então
+            modo, lista = restante:separe("^([^ \t]+)[ \t]+([^ \t]+)$")
+        fim
+        se não modo então
+            conclua(sessão, etiqueta, "BAD", "STORE inválido"); retorne
+        fim
+        local silencioso = modo:maiúscula():corte(-7) == ".SILENT"
+        se silencioso então modo = modo:corte(1, -8) fim
+        modo = modo:maiúscula()
+        se modo ~= "FLAGS" e modo ~= "+FLAGS" e modo ~= "-FLAGS" então
+            conclua(sessão, etiqueta, "BAD", "modo STORE inválido"); retorne
+        fim
+        local pedidos = {}
+        para nome em lista:maiúscula():capture("[^ ]+") início pedidos[nome] = verdadeiro fim
+        sessão.aguardando = verdadeiro
+        recarregue(sessão, função(estado, falhaDoEstado)
+            se não estado então
+                conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                    paraColar(falhaDoEstado)); retorne
+            fim
+            local itens = selecionadas(estado, conjunto, porUID)
+            local respostas = {}
+            local função próximo(índice)
+                se índice > #itens então
+                    conclua(sessão, etiqueta, "OK", "STORE concluído",
+                        tabela.concatene(respostas, "")); retorne
+                fim
+                local item = itens[índice]
+                local mensagem = item.mensagem
+                local lida = mensagem.lida
+                local importante = mensagem.importante
+                local apagada = mensagem.apagadaNoIMAP == verdadeiro
+                local função aplique(nome, atual)
+                    se modo == "FLAGS" então retorne pedidos[nome] == verdadeiro fim
+                    se modo == "+FLAGS" e pedidos[nome] então retorne verdadeiro fim
+                    se modo == "-FLAGS" e pedidos[nome] então retorne falso fim
+                    retorne atual
+                fim
+                lida = aplique("\\SEEN", lida)
+                importante = aplique("\\FLAGGED", importante)
+                apagada = aplique("\\DELETED", apagada)
+                repositório:atualizeSinalizadoresIMAP(
+                    sessão.caixa.id, mensagem.id,
+                    { lida = lida, importante = importante,
+                      apagada = apagada },
+                    função(ok, falhaDaAtualização)
+                        se não ok então
+                            conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                                paraColar(falhaDaAtualização)); retorne
+                        fim
+                        mensagem.lida, mensagem.importante = lida, importante
+                        mensagem.apagadaNoIMAP = apagada
+                        se não silencioso então
+                            respostas[#respostas + 1] = "* " .. item.sequência ..
+                                " FETCH (FLAGS " .. sinalizadores(sessão, mensagem) ..
+                                " UID " .. mensagem.uid .. ")" .. CRLF
+                        fim
+                        próximo(índice + 1)
+                    fim)
+            fim
+            próximo(1)
+        fim)
+    fim
+
+    local função copieItens(sessão, etiqueta, conjunto, destino, porUID)
+        local pastaDestino = pastaInterna(destino)
+        se não pastaDestino então
+            conclua(sessão, etiqueta, "NO", "[TRYCREATE] pasta inexistente")
+            retorne
+        fim
+        sessão.aguardando = verdadeiro
+        recarregue(sessão, função(estado, falhaDoEstado)
+            se não estado então
+                conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                    paraColar(falhaDoEstado)); retorne
+            fim
+            local itens = selecionadas(estado, conjunto, porUID)
+            local função destinoPermitido(mensagem)
+                se pastaDestino == sessão.pasta então retorne verdadeiro fim
+                se pastaDestino == "arquivadas" ou
+                   pastaDestino == "indesejadas" ou pastaDestino == "lixeira" então
+                    retorne verdadeiro
+                fim
+                local restaurável = sessão.pasta == "arquivadas" ou
+                    sessão.pasta == "indesejadas" ou
+                    sessão.pasta == "lixeira"
+                se não restaurável então retorne falso fim
+                se pastaDestino == "entrada" então
+                    retorne mensagem.direção == "entrada"
+                fim
+                se pastaDestino == "enviadas" então
+                    retorne mensagem.direção == "saida"
+                fim
+                retorne falso
+            fim
+            local ids, uidsDeOrigem = {}, {}
+            para _, item em ipares(itens) início
+                se não destinoPermitido(item.mensagem) então
+                    conclua(sessão, etiqueta, "NO",
+                        "[CANNOT] destino protegido pela direção da carta")
+                    retorne
+                fim
+                ids[#ids + 1] = item.mensagem.id
+                uidsDeOrigem[#uidsDeOrigem + 1] = paraColar(item.mensagem.uid)
+            fim
+            se #ids == 0 então
+                conclua(sessão, etiqueta, "OK", "COPY concluído")
+                retorne
+            fim
+            local quantidadeAnterior = estado.quantidade ou 0
+            repositório:copieMensagensIMAP(sessão.caixa.id, ids,
+                pastaDestino, função(resultado, falhaDaCópia)
+                    se não resultado então
+                        conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                            paraColar(falhaDaCópia)); retorne
+                    fim
+                    se #resultado.cópias ~= #ids ou não resultado.validadeUID então
+                        conclua(sessão, etiqueta, "NO",
+                            "[SERVERBUG] resultado COPY incompleto")
+                        retorne
+                    fim
+                    local uidsDeDestino = {}
+                    para _, cópia em ipares(resultado.cópias) início
+                        uidsDeDestino[#uidsDeDestino + 1] = paraColar(cópia.uid)
+                    fim
+                    local código = "[COPYUID " .. resultado.validadeUID .. " " ..
+                        tabela.concatene(uidsDeOrigem, ",") .. " " ..
+                        tabela.concatene(uidsDeDestino, ",") .. "] "
+                    emita(configuração.pulso, "leitura",
+                        "correio.imapCartasCopiadas", {
+                            endereço = sessão.endereço,
+                            origem = sessão.pasta, destino = pastaDestino,
+                            quantidade = #ids
+                        })
+                    recarregue(sessão, função(estadoNovo, falhaDaRecarga)
+                        se não estadoNovo então
+                            conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                                paraColar(falhaDaRecarga)); retorne
+                        fim
+                        local antes = ""
+                        se pastaDestino == sessão.pasta e
+                           estadoNovo.quantidade > quantidadeAnterior então
+                            antes = "* " .. estadoNovo.quantidade .. " EXISTS" .. CRLF
+                        fim
+                        conclua(sessão, etiqueta, "OK",
+                            código .. "COPY concluído", antes)
+                    fim)
+                fim)
+        fim)
+    fim
+
+    local função movaItens(sessão, etiqueta, conjunto, destino, porUID,
+                                  éExpurgo, silencioso, aoConcluir)
+        local pastaDestino = pastaInterna(destino)
+        se não pastaDestino então
+            conclua(sessão, etiqueta, "NO", "[TRYCREATE] pasta inexistente")
+            retorne
+        fim
+        sessão.aguardando = verdadeiro
+        recarregue(sessão, função(estado, falhaDoEstado)
+            se não estado então
+                conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                    paraColar(falhaDoEstado)); retorne
+            fim
+            local itens = selecionadas(estado, conjunto, porUID)
+            local função destinoPermitido(mensagem)
+                se pastaDestino == sessão.pasta então retorne verdadeiro fim
+                se pastaDestino == "arquivadas" ou
+                   pastaDestino == "indesejadas" ou pastaDestino == "lixeira" então
+                    retorne verdadeiro
+                fim
+                local restaurável = sessão.pasta == "arquivadas" ou
+                    sessão.pasta == "indesejadas" ou
+                    sessão.pasta == "lixeira"
+                se não restaurável então retorne falso fim
+                se pastaDestino == "entrada" então
+                    retorne mensagem.direção == "entrada"
+                fim
+                se pastaDestino == "enviadas" então
+                    retorne mensagem.direção == "saida"
+                fim
+                retorne falso
+            fim
+            para _, item em ipares(itens) início
+                se não destinoPermitido(item.mensagem) então
+                    conclua(sessão, etiqueta, "NO",
+                        "[CANNOT] destino protegido pela direção da carta")
+                    retorne
+                fim
+            fim
+            local respostas, deslocamento = {}, 0
+            local função próximo(índice)
+                se índice > #itens então
+                    recarregue(sessão, função(estadoNovo, falhaDaRecarga)
+                        se não estadoNovo então
+                            conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                                paraColar(falhaDaRecarga)); retorne
+                        fim
+                        local antes = tabela.concatene(respostas, "")
+                        se aoConcluir então aoConcluir(antes); retorne fim
+                        conclua(sessão, etiqueta, "OK",
+                            éExpurgo e "EXPUNGE concluído" ou "MOVE concluído",
+                            antes)
+                    fim)
+                    retorne
+                fim
+                local item = itens[índice]
+                repositório:movaMensagemIMAP(sessão.caixa.id,
+                    item.mensagem.id, pastaDestino,
+                    função(resultado, falhaDoMovimento)
+                        se não resultado então
+                            conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                                paraColar(falhaDoMovimento)); retorne
+                        fim
+                        se não silencioso então
+                            respostas[#respostas + 1] = "* " ..
+                                (item.sequência - deslocamento) ..
+                                " EXPUNGE" .. CRLF
+                        fim
+                        deslocamento = deslocamento + 1
+                        item.mensagem.apagadaNoIMAP = falso
+                        próximo(índice + 1)
+                    fim)
+            fim
+            próximo(1)
+        fim)
+    fim
+
+    local função removaItensDaLixeira(sessão, etiqueta, conjunto, porUID,
+                                                silencioso, aoConcluir)
+        sessão.aguardando = verdadeiro
+        recarregue(sessão, função(estado, falhaDoEstado)
+            se não estado então
+                conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                    paraColar(falhaDoEstado)); retorne
+            fim
+            local candidatos = selecionadas(estado, conjunto, porUID)
+            local itens = {}
+            para _, item em ipares(candidatos) início
+                se item.mensagem.apagadaNoIMAP então
+                    itens[#itens + 1] = item
+                fim
+            fim
+            local respostas, deslocamento = {}, 0
+            local função próximo(índice)
+                se índice > #itens então
+                    recarregue(sessão, função(estadoNovo, falhaDaRecarga)
+                        se não estadoNovo então
+                            conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                                paraColar(falhaDaRecarga)); retorne
+                        fim
+                        local antes = tabela.concatene(respostas, "")
+                        se aoConcluir então aoConcluir(antes); retorne fim
+                        conclua(sessão, etiqueta, "OK", "EXPUNGE concluído",
+                            antes)
+                    fim)
+                    retorne
+                fim
+                local item = itens[índice]
+                repositório:removaMensagemIMAP(sessão.caixa.id,
+                    item.mensagem.id,
+                    função(resultado, falhaDaExclusão)
+                        se não resultado então
+                            conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                                paraColar(falhaDaExclusão)); retorne
+                        fim
+                        se não silencioso então
+                            respostas[#respostas + 1] = "* " ..
+                                (item.sequência - deslocamento) ..
+                                " EXPUNGE" .. CRLF
+                        fim
+                        deslocamento = deslocamento + 1
+                        item.mensagem.apagadaNoIMAP = falso
+                        próximo(índice + 1)
+                    fim)
+            fim
+            próximo(1)
+        fim)
+    fim
+
+    local função executeAPPEND(sessão, pedido, mime)
+        sessão.aguardando = verdadeiro
+        local inspeção, falhaDaInspeção =
+            correio.inspecioneCabeçalhos(mime)
+        se não inspeção então
+            conclua(sessão, pedido.etiqueta, "NO", "[CANNOT] " ..
+                paraColar(falhaDaInspeção))
+            retorne
+        fim
+        se inspeção.internacionais e não pedido.internacional então
+            emita(configuração.pulso, "leitura",
+                "correio.imapUnicodeCompatibilidade", {
+                    endereço = sessão.endereço,
+                    comando = "APPEND"
+                })
+        fim
+        repositório:adicioneMensagemIMAP(sessão.caixa, pedido.pasta, mime, {
+            lida = pedido.lida, importante = pedido.importante,
+            criadaEm = pedido.criadaEm
+        }, função(resultado, falhaDaInclusão)
+            se sessão.fechada então retorne fim
+            se não resultado então
+                conclua(sessão, pedido.etiqueta, "NO", "[CANNOT] " ..
+                    paraColar(falhaDaInclusão ou "carta não foi anexada"))
+                retorne
+            fim
+            emita(configuração.pulso, "leitura", "correio.imapCartaAnexada", {
+                endereço = sessão.endereço, pasta = pedido.pasta,
+                tamanho = #mime, duplicada = resultado.duplicada == verdadeiro
+            })
+            local texto = "[APPENDUID " .. resultado.validadeUID .. " " ..
+                resultado.uid .. "] APPEND concluído"
+            se sessão.estado ~= "selecionada" ou
+               sessão.pasta ~= pedido.pasta ou resultado.duplicada então
+                conclua(sessão, pedido.etiqueta, "OK", texto)
+                retorne
+            fim
+            local quantidadeAnterior = sessão.pastaEstado.quantidade ou 0
+            recarregue(sessão, função(estado)
+                local antes = ""
+                se estado e estado.quantidade > quantidadeAnterior então
+                    antes = "* " .. estado.quantidade .. " EXISTS" .. CRLF
+                fim
+                conclua(sessão, pedido.etiqueta, "OK", texto, antes)
+            fim)
+        fim)
+    fim
+
+    local função expurgueUID(sessão, etiqueta, conjunto)
+        se sessão.pasta == "lixeira" então
+            removaItensDaLixeira(sessão, etiqueta, conjunto, verdadeiro,
+                falso)
+            retorne
+        fim
+        local maiorUID = 0
+        para _, mensagem em ipares(sessão.pastaEstado.mensagens ou {}) início
+            maiorUID = mat.máximo(maiorUID, mensagem.uid ou 0)
+        fim
+        local uids = {}
+        para _, mensagem em ipares(sessão.pastaEstado.mensagens ou {}) início
+            se mensagem.apagadaNoIMAP e
+               pertenceAoConjunto(mensagem.uid, conjunto, maiorUID) então
+                uids[#uids + 1] = paraColar(mensagem.uid)
+            fim
+        fim
+        se #uids == 0 então
+            conclua(sessão, etiqueta, "OK", "UID EXPUNGE concluído")
+            retorne
+        fim
+        movaItens(sessão, etiqueta, tabela.concatene(uids, ","),
+            "Lixeira", verdadeiro, verdadeiro)
+    fim
+
+    local função trateComando(sessão, linha)
+        sessão.comandos = sessão.comandos + 1
+        se sessão.comandos > configuração.limiteComandos então
+            envie(sessão, "* BYE limite de comandos atingido" .. CRLF,
+                função() encerre(sessão) fim)
+            retorne
+        fim
+        local etiqueta, comando, restante = linha:separe(
+            "^([^ \t]+)[ \t]+([^ \t]+)[ \t]*(.*)$")
+        se não etiqueta então
+            envie(sessão, "* BAD comando IMAP inválido" .. CRLF,
+                função() prossiga(sessão) fim)
+            retorne
+        fim
+        comando = comando:maiúscula()
+        se #sessão.rastro < 64 então
+            sessão.rastro[#sessão.rastro + 1] = comando
+        fim
+
+        se comando == "CAPABILITY" então
+            local capacidades = sessão.estado == "nãoAutenticada" e
+                capacidadesComAutenticação ou capacidadesAutenticadas
+            conclua(sessão, etiqueta, "OK", "CAPABILITY concluído",
+                "* CAPABILITY " .. capacidades .. CRLF); retorne
+        fim
+        se comando == "NOOP" ou comando == "CHECK" então
+            conclua(sessão, etiqueta, "OK", comando .. " concluído"); retorne
+        fim
+        se comando == "LOGOUT" então
+            envie(sessão, "* BYE ate logo" .. CRLF .. etiqueta ..
+                " OK LOGOUT concluído" .. CRLF,
+                função() encerre(sessão) fim); retorne
+        fim
+        se comando == "ID" então
+            conclua(sessão, etiqueta, "OK", "ID concluído",
+                "* ID (\"name\" \"Correio Santafe\" \"version\" " ..
+                aspe(imap.versão) .. ")" .. CRLF); retorne
+        fim
+
+        se sessão.estado == "nãoAutenticada" então
+            se comando == "LOGIN" então
+                local itens, falhaDasPalavras = palavras(restante)
+                se não itens ou #itens ~= 2 então
+                    conclua(sessão, etiqueta, "BAD",
+                        falhaDasPalavras ou "LOGIN exige usuário e senha")
+                    retorne
+                fim
+                se possuiNãoASCII(itens[1]) ou possuiNãoASCII(itens[2]) então
+                    conclua(sessão, etiqueta, "NO",
+                        "[CANNOT] credenciais Unicode exigem AUTHENTICATE")
+                    retorne
+                fim
+                autentique(sessão, etiqueta, itens[1], itens[2]); retorne
+            fim
+            se comando == "AUTHENTICATE" então
+                local itens = palavras(restante) ou {}
+                se não itens[1] ou itens[1]:maiúscula() ~= "PLAIN" então
+                    conclua(sessão, etiqueta, "NO",
+                        "[AUTHENTICATIONFAILED] mecanismo não aceito")
+                    retorne
+                fim
+                se itens[2] então
+                    local usuário, senha = decodifiquePLAIN(itens[2])
+                    se não usuário então
+                        conclua(sessão, etiqueta, "NO",
+                            "[AUTHENTICATIONFAILED] credencial inválida")
+                    senão autentique(sessão, etiqueta, usuário, senha) fim
+                senão
+                    sessão.autenticaçãoPendente = etiqueta
+                    envie(sessão, "+ " .. CRLF,
+                        função() prossiga(sessão) fim)
+                fim
+                retorne
+            fim
+            conclua(sessão, etiqueta, "NO", "autenticação obrigatória")
+            retorne
+        fim
+
+        se comando == "ENABLE" então
+            se sessão.estado ~= "autenticada" então
+                conclua(sessão, etiqueta, "NO",
+                    "[CANNOT] ENABLE exige estado autenticado")
+                retorne
+            fim
+            local itens, falhaDosItens = palavras(restante)
+            se não itens então
+                conclua(sessão, etiqueta, "BAD", falhaDosItens); retorne
+            fim
+            local habilitadas = {}
+            para _, item em ipares(itens) início
+                se item:maiúscula() == "UTF8=ACCEPT" e
+                   não sessão.utf8Aceito então
+                    sessão.utf8Aceito = verdadeiro
+                    habilitadas[#habilitadas + 1] = "UTF8=ACCEPT"
+                fim
+            fim
+            local antes = ""
+            se #habilitadas > 0 então
+                antes = "* ENABLED " ..
+                    tabela.concatene(habilitadas, " ") .. CRLF
+                emita(configuração.pulso, "leitura",
+                    "correio.imapUnicodeAtivado", {
+                        endereço = sessão.endereço,
+                        capacidades = habilitadas
+                    })
+            fim
+            conclua(sessão, etiqueta, "OK", "ENABLE concluido", antes)
+            retorne
+        fim
+
+        se comando == "NAMESPACE" então
+            conclua(sessão, etiqueta, "OK", "NAMESPACE concluído",
+                "* NAMESPACE ((\"\" \"/\")) NIL NIL" .. CRLF); retorne
+        fim
+        se comando == "LIST" ou comando == "LSUB" então
+            local pedido, falhaDaLista = analiseLISTA(restante)
+            se não pedido então
+                conclua(sessão, etiqueta, "BAD", falhaDaLista); retorne
+            fim
+            conclua(sessão, etiqueta, "OK", comando .. " concluído",
+                respostaLISTA(comando, pedido))
+            retorne
+        fim
+        se comando == "SUBSCRIBE" ou comando == "UNSUBSCRIBE" então
+            conclua(sessão, etiqueta, "OK", comando .. " concluído"); retorne
+        fim
+        se comando == "APPEND" então
+            local pedido, falhaDoPedido = analiseAPPEND(
+                restante, configuração.limiteMensagem)
+            se não pedido então
+                conclua(sessão, etiqueta, "BAD", falhaDoPedido); retorne
+            fim
+            se não pedido.pasta então
+                conclua(sessão, etiqueta, "NO",
+                    "[TRYCREATE] pasta inexistente"); retorne
+            fim
+            se pedido.pasta ~= "rascunhos" e pedido.pasta ~= "enviadas" então
+                conclua(sessão, etiqueta, "NO",
+                    "[CANNOT] APPEND aceita somente Rascunhos ou Enviadas")
+                retorne
+            fim
+            se pedido.internacional e não sessão.utf8Aceito então
+                conclua(sessão, etiqueta, "NO",
+                    "[NOTENABLED] execute ENABLE UTF8=ACCEPT")
+                retorne
+            fim
+            pedido.etiqueta = etiqueta
+            sessão.literalPendente = pedido
+            envie(sessão, "+ pronto para " .. pedido.tamanho .. " tacos" ..
+                CRLF, função() prossiga(sessão) fim)
+            retorne
+        fim
+        se comando == "STATUS" então
+            local caixa, itens = restante:separe(
+                "^([^ \t]+)[ \t]+%((.-)%)$")
+            local pasta = caixa e pastaInterna(caixa) ou nulo
+            se não pasta então
+                conclua(sessão, etiqueta, "NO", "pasta inexistente"); retorne
+            fim
+            sessão.aguardando = verdadeiro
+            repositório:listeMensagensIMAP(sessão.caixa.id, pasta,
+                função(estado, falhaDoEstado)
+                    se não estado então
+                        conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                            paraColar(falhaDoEstado)); retorne
+                    fim
+                    local valores = {}
+                    para item em (itens ou ""):maiúscula():capture("[^ ]+") início
+                        se item == "MESSAGES" então
+                            valores[#valores + 1] = "MESSAGES " .. estado.quantidade
+                        senão se item == "UNSEEN" então
+                            valores[#valores + 1] = "UNSEEN " .. estado.nãoLidas
+                        senão se item == "UIDNEXT" então
+                            valores[#valores + 1] = "UIDNEXT " .. estado.próximoUID
+                        senão se item == "UIDVALIDITY" então
+                            valores[#valores + 1] = "UIDVALIDITY " .. estado.validadeUID
+                        fim fim fim fim
+                    fim
+                    conclua(sessão, etiqueta, "OK", "STATUS concluído",
+                        "* STATUS " .. aspe(nomeDaPasta(pasta)) .. " (" ..
+                        tabela.concatene(valores, " ") .. ")" .. CRLF)
+                fim)
+            retorne
+        fim
+        se comando == "SELECT" ou comando == "EXAMINE" então
+            se não sessão.utf8Aceito então
+                emita(configuração.pulso, "leitura",
+                    "correio.imapUnicodeCompatibilidade", {
+                        endereço = sessão.endereço,
+                        comando = comando
+                    })
+            fim
+            local pasta = pastaInterna(restante)
+            se não pasta então
+                conclua(sessão, etiqueta, "NO", "pasta inexistente"); retorne
+            fim
+            sessão.aguardando = verdadeiro
+            repositório:listeMensagensIMAP(sessão.caixa.id, pasta,
+                função(estado, falhaDoEstado)
+                    se não estado então
+                        conclua(sessão, etiqueta, "NO", "[UNAVAILABLE] " ..
+                            paraColar(falhaDoEstado)); retorne
+                    fim
+                    sessão.pasta, sessão.pastaEstado = pasta, estado
+                    sessão.estado = "selecionada"
+                    sessão.somenteLeitura = comando == "EXAMINE"
+                    local primeiraNãoLida = 0
+                    para índice, mensagem em ipares(estado.mensagens) início
+                        se não mensagem.lida então primeiraNãoLida = índice; pare fim
+                    fim
+                    local resposta =
+                        "* FLAGS (\\Seen \\Flagged \\Deleted)" .. CRLF ..
+                        "* " .. estado.quantidade .. " EXISTS" .. CRLF ..
+                        "* 0 RECENT" .. CRLF ..
+                        "* OK [UIDVALIDITY " .. estado.validadeUID .. "] UIDs validos" .. CRLF ..
+                        "* OK [UIDNEXT " .. estado.próximoUID .. "] proximo UID" .. CRLF ..
+                        "* OK [UNSEEN " .. primeiraNãoLida .. "] primeira nao lida" .. CRLF ..
+                        "* OK [PERMANENTFLAGS (\\Seen \\Flagged \\Deleted)] sinalizadores" .. CRLF
+                    conclua(sessão, etiqueta, "OK",
+                        comando == "EXAMINE" e "[READ-ONLY] pasta selecionada" ou
+                            "[READ-WRITE] pasta selecionada", resposta)
+                fim)
+            retorne
+        fim
+
+        se sessão.estado ~= "selecionada" então
+            conclua(sessão, etiqueta, "NO", "selecione uma pasta primeiro")
+            retorne
+        fim
+        se comando == "UNSELECT" então
+            sessão.estado, sessão.pasta, sessão.pastaEstado =
+                "autenticada", nulo, nulo
+            conclua(sessão, etiqueta, "OK", "UNSELECT concluído"); retorne
+        fim
+        se comando == "CLOSE" então
+            local uids = {}
+            para _, mensagem em ipares(sessão.pastaEstado.mensagens ou {}) início
+                se mensagem.apagadaNoIMAP então
+                    uids[#uids + 1] = paraColar(mensagem.uid)
+                fim
+            fim
+            local função encerrePasta()
+                sessão.estado, sessão.pasta, sessão.pastaEstado =
+                    "autenticada", nulo, nulo
+                conclua(sessão, etiqueta, "OK", "CLOSE concluído")
+            fim
+            se #uids == 0 então encerrePasta(); retorne fim
+            se sessão.pasta == "lixeira" então
+                removaItensDaLixeira(sessão, etiqueta,
+                    tabela.concatene(uids, ","), verdadeiro, verdadeiro,
+                    encerrePasta)
+            senão
+                movaItens(sessão, etiqueta, tabela.concatene(uids, ","),
+                    "Lixeira", verdadeiro, verdadeiro, verdadeiro,
+                    encerrePasta)
+            fim
+            retorne
+        fim
+        se comando == "IDLE" então
+            sessão.ociosa = etiqueta
+            sessão.estadoOcioso = copieEstadoOcioso(sessão.pastaEstado)
+            envie(sessão, "+ aguardando" .. CRLF,
+                função()
+                    armeOcioso(sessão)
+                    prossiga(sessão)
+                fim); retorne
+        fim
+        se comando == "FETCH" então
+            local conjunto, atributos = restante:separe(
+                "^([^ \t]+)[ \t]+(.+)$")
+            se não conjunto então
+                conclua(sessão, etiqueta, "BAD", "FETCH inválido")
+            senão executeFETCH(sessão, etiqueta, conjunto, atributos, falso) fim
+            retorne
+        fim
+        se comando == "SEARCH" então
+            executeSEARCH(sessão, etiqueta, restante, falso); retorne
+        fim
+        se comando == "STORE" então
+            local conjunto, alteração = restante:separe(
+                "^([^ \t]+)[ \t]+(.+)$")
+            se não conjunto então conclua(sessão, etiqueta, "BAD", "STORE inválido")
+            senão executeSTORE(sessão, etiqueta, conjunto, alteração, falso) fim
+            retorne
+        fim
+        se comando == "COPY" então
+            local conjunto, destino = restante:separe(
+                "^([^ \t]+)[ \t]+(.+)$")
+            se não conjunto então conclua(sessão, etiqueta, "BAD", "COPY inválido")
+            senão copieItens(sessão, etiqueta, conjunto, destino, falso) fim
+            retorne
+        fim
+        se comando == "MOVE" então
+            local conjunto, destino = restante:separe(
+                "^([^ \t]+)[ \t]+(.+)$")
+            se não conjunto então conclua(sessão, etiqueta, "BAD", "MOVE inválido")
+            senão movaItens(sessão, etiqueta, conjunto, destino, falso, falso) fim
+            retorne
+        fim
+        se comando == "EXPUNGE" então
+            local uids = {}
+            para _, mensagem em ipares(sessão.pastaEstado.mensagens ou {}) início
+                se mensagem.apagadaNoIMAP então
+                    uids[#uids + 1] = paraColar(mensagem.uid)
+                fim
+            fim
+            se #uids == 0 então
+                conclua(sessão, etiqueta, "OK", "EXPUNGE concluído")
+            senão se sessão.pasta == "lixeira" então
+                removaItensDaLixeira(sessão, etiqueta,
+                    tabela.concatene(uids, ","), verdadeiro, falso)
+            senão
+                movaItens(sessão, etiqueta, tabela.concatene(uids, ","),
+                    "Lixeira", verdadeiro, verdadeiro)
+            fim fim
+            retorne
+        fim
+        se comando == "UID" então
+            local subcomando, argumentos = restante:separe(
+                "^([^ \t]+)[ \t]+(.+)$")
+            subcomando = subcomando e subcomando:maiúscula() ou ""
+            se #sessão.rastro > 0 então
+                sessão.rastro[#sessão.rastro] = "UID " .. subcomando
+            fim
+            se subcomando == "FETCH" então
+                local conjunto, atributos = argumentos:separe(
+                    "^([^ \t]+)[ \t]+(.+)$")
+                se conjunto então executeFETCH(sessão, etiqueta, conjunto, atributos, verdadeiro)
+                senão conclua(sessão, etiqueta, "BAD", "UID FETCH inválido") fim
+            senão se subcomando == "SEARCH" então
+                executeSEARCH(sessão, etiqueta, argumentos, verdadeiro)
+            senão se subcomando == "STORE" então
+                local conjunto, alteração = argumentos:separe(
+                    "^([^ \t]+)[ \t]+(.+)$")
+                se conjunto então executeSTORE(sessão, etiqueta, conjunto, alteração, verdadeiro)
+                senão conclua(sessão, etiqueta, "BAD", "UID STORE inválido") fim
+            senão se subcomando == "COPY" então
+                local conjunto, destino = argumentos:separe(
+                    "^([^ \t]+)[ \t]+(.+)$")
+                se conjunto então copieItens(sessão, etiqueta, conjunto, destino, verdadeiro)
+                senão conclua(sessão, etiqueta, "BAD", "UID COPY inválido") fim
+            senão se subcomando == "MOVE" então
+                local conjunto, destino = argumentos:separe(
+                    "^([^ \t]+)[ \t]+(.+)$")
+                se conjunto então movaItens(sessão, etiqueta, conjunto, destino, verdadeiro, falso)
+                senão conclua(sessão, etiqueta, "BAD", "UID MOVE inválido") fim
+            senão se subcomando == "EXPUNGE" então
+                se argumentos e apare(argumentos) ~= "" então
+                    expurgueUID(sessão, etiqueta, apare(argumentos))
+                senão
+                    conclua(sessão, etiqueta, "BAD", "UID EXPUNGE inválido")
+                fim
+            senão
+                emita(configuração.pulso, "sinal",
+                    "correio.imapComandoNãoImplementado", {
+                        endereço = sessão.endereço,
+                        comando = "UID " .. subcomando
+                    })
+                conclua(sessão, etiqueta, "BAD", "subcomando UID não implementado")
+            fim fim fim fim fim fim
+            retorne
+        fim
+        se comando == "CREATE" ou comando == "DELETE" ou comando == "RENAME" então
+            conclua(sessão, etiqueta, "NO",
+                "[CANNOT] operação não disponível nesta versão")
+            retorne
+        fim
+        emita(configuração.pulso, "sinal",
+            "correio.imapComandoNãoImplementado", {
+                endereço = sessão.endereço, comando = comando
+            })
+        conclua(sessão, etiqueta, "BAD", "comando não implementado")
+    fim
+
+    processeEntrada = função(sessão)
+        se sessão.fechada ou sessão.aguardando então retorne fim
+        se sessão.literalPendente então
+            local pedido = sessão.literalPendente
+            local terminador = pedido.terminador ou CRLF
+            se #sessão.acumulado < pedido.tamanho + #terminador então
+                leiaMais(sessão); retorne
+            fim
+            local mime = sessão.acumulado:corte(1, pedido.tamanho)
+            local término = sessão.acumulado:corte(
+                pedido.tamanho + 1, pedido.tamanho + #terminador)
+            se término ~= terminador então
+                envie(sessão, pedido.etiqueta ..
+                    " BAD literal APPEND com fechamento inválido" .. CRLF ..
+                    "* BYE fluxo IMAP nao pode ser retomado" .. CRLF,
+                    função() encerre(sessão) fim)
+                retorne
+            fim
+            sessão.acumulado = sessão.acumulado:corte(
+                pedido.tamanho + #terminador + 1)
+            sessão.literalPendente = nulo
+            sessão.aguardando = verdadeiro
+            executeAPPEND(sessão, pedido, mime)
+            retorne
+        fim
+        local fimDaLinha = sessão.acumulado:procure(CRLF, 1, verdadeiro)
+        se não fimDaLinha então
+            se #sessão.acumulado > configuração.limiteLinha então
+                envie(sessão, "* BYE linha IMAP grande demais" .. CRLF,
+                    função() encerre(sessão) fim)
+            senão leiaMais(sessão) fim
+            retorne
+        fim
+        local linha = sessão.acumulado:corte(1, fimDaLinha - 1)
+        sessão.acumulado = sessão.acumulado:corte(fimDaLinha + 2)
+        sessão.aguardando = verdadeiro
+        se sessão.ociosa então
+            local etiqueta = sessão.ociosa
+            sessão.ociosa = nulo
+            sessão.estadoOcioso = nulo
+            canceleOcioso(sessão)
+            se linha:maiúscula() == "DONE" então
+                conclua(sessão, etiqueta, "OK", "IDLE concluído")
+            senão conclua(sessão, etiqueta, "BAD", "esperado DONE") fim
+            retorne
+        fim
+        se sessão.autenticaçãoPendente então
+            local etiqueta = sessão.autenticaçãoPendente
+            sessão.autenticaçãoPendente = nulo
+            se linha == "*" então
+                conclua(sessão, etiqueta, "BAD", "autenticação cancelada")
+                retorne
+            fim
+            local usuário, senha = decodifiquePLAIN(linha)
+            se não usuário então
+                conclua(sessão, etiqueta, "NO",
+                    "[AUTHENTICATIONFAILED] credencial inválida")
+            senão autentique(sessão, etiqueta, usuário, senha) fim
+            retorne
+        fim
+        trateComando(sessão, linha)
+    fim
+
+    local função novaSessão(conexão)
+        local par = conexão:parRemoto()
+        local endereçoRemoto = par e par.endereço ou "desconhecido"
+        local admitida, decisão = servidor.vigia:admita(endereçoRemoto)
+        se não admitida então
+            conexão:feche()
+            emita(configuração.pulso, "sinal", "correio.imapConexãoLimitada",
+                { endereço = endereçoRemoto,
+                  motivo = decisão e decisão.motivo ou "limite local" }, "alta")
+            retorne
+        fim
+        local sessão = {
+            conexão = conexão, endereço = endereçoRemoto,
+            acumulado = "", estado = "nãoAutenticada", aguardando = verdadeiro,
+            fechada = falso, comandos = 0, tentativas = 0,
+            saídas = {}, enviando = falso, rastro = {}, utf8Aceito = falso
+        }
+        conexão:definaTempoLimite(configuração.tempoLimite)
+        servidor.conexões[sessão] = verdadeiro
+        servidor.total = servidor.total + 1
+        conexão:aceiteTLSAssíncrono(servidor.certificado,
+            função(_, falhaTLS)
+                se falhaTLS então encerre(sessão); retorne fim
+                emita(configuração.pulso, "leitura",
+                    "correio.imapConexãoAceita", { endereço = endereçoRemoto })
+                envie(sessão, "* OK [CAPABILITY " ..
+                    capacidadesComAutenticação .. "] " ..
+                    textoDeProtocolo(configuração.nome) ..
+                    " Correio Santafe" .. CRLF,
+                    função() prossiga(sessão) fim)
+            fim)
+    fim
+
+    local função armeAceite()
+        se servidor.fechado então retorne fim
+        servidor.receptor:aceiteAssíncrono(
+            função(_, conexão, falhaDoAceite)
+                se servidor.fechado então
+                    se conexão então conexão:feche() fim
+                    retorne
+                fim
+                armeAceite()
+                se falhaDoAceite então
+                    emita(configuração.pulso, "sinal",
+                        "correio.imapAceiteFalhou", { falha = falhaDoAceite }, "alta")
+                    retorne
+                fim
+                novaSessão(conexão)
+            fim)
+    fim
+
+    função servidor.inicie(este)
+        se este.fechado então retorne nulo, "servidor IMAP fechado" fim
+        se este.iniciado então retorne este fim
+        local amarrou, falhaDoEnlace = este.receptor:amarre(endereço, porta)
+        se não amarrou então retorne nulo, falhaDoEnlace fim
+        este.iniciado = verdadeiro
+        armeAceite()
+        emita(configuração.pulso, "sinal", "correio.imapIniciado", {
+            endereço = endereço, porta = porta, segurança = "TLS"
+        })
+        retorne este
+    fim
+
+    função servidor.escute(este)
+        local iniciou, falhaDoInício = este:inicie()
+        se não iniciou então retorne nulo, falhaDoInício fim
+        rede.laço()
+        retorne verdadeiro
+    fim
+
+    função servidor.feche(este)
+        se este.fechado então retorne verdadeiro fim
+        este.fechado = verdadeiro
+        este.receptor:feche()
+        local ativas = {}
+        para sessão em pares(este.conexões) início ativas[#ativas + 1] = sessão fim
+        para _, sessão em ipares(ativas) início encerre(sessão) fim
+        rede.pareLaço()
+        retorne verdadeiro
+    fim
+
+    retorne servidor
+fim
+
+retorne imap

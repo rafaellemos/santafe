@@ -1,0 +1,147 @@
+#!/usr/local/bin/santafé
+
+local raiz = so.obterVariável("CARTEIRO_RAIZ") ou "aplicativos/carteiro"
+local raizDoCorreio = so.obterVariável("CORREIO_RAIZ") ou "aplicativos/correio"
+módulo.caminho = raiz .. "/fonte/?.fé;" .. raiz .. "/fonte/?/ini.fé;" ..
+    raizDoCorreio .. "/fonte/?.fé;" .. raizDoCorreio .. "/fonte/?/ini.fé;" ..
+    módulo.caminho
+
+local rede = importe "rede"
+local mariadb = importe "mariadb"
+local pulso = importe "pulso"
+local Carteiro = importe "carteiro"
+local CorreioCD = importe "correio.cd"
+local Antivírus = importe "correio.antivírus"
+local configuração = (importe "carteiro.configuração").carregue()
+local CorreioMariaDB = importe "correio.mariadb"
+local Aplicação = importe "carteiro.aplicação"
+
+local verificador
+se configuração.antivírus.ativo então
+    verificador = garanta(Antivírus.novo(configuração.antivírus))
+fim
+
+garanta(configuração.banco.usuário,
+    "usuário MariaDB do Carteiro não foi definido")
+garanta(configuração.banco.banco,
+    "banco MariaDB do Carteiro não foi definido")
+
+local canalPULSO = garanta(pulso.novo({
+    serviço = "carteiro",
+    instância = so.obterVariável("CARTEIRO_INSTANCIA") ou "web-01"
+}))
+se configuração.pulsoArquivoCarteiro e configuração.pulsoArquivoCarteiro ~= "" então
+    local destino, falha = pulso.registrador(configuração.pulsoArquivoCarteiro)
+    se destino então canalPULSO:adicioneDestino(destino)
+    senão mostre("[Carteiro] registrador PULSO indisponível:", falha) fim
+fim
+
+local estado = { carteiro = nulo, falha = "banco ainda não está pronto" }
+local ponte = {}
+local métodos = {
+    "usuárioPorSessão", "caixaDoUsuário", "listeCartas", "conteCartas",
+    "listeCartasParaAção", "listeCartasDaConversa", "obtenhaCarta",
+    "obtenhaCartaOriginal", "obtenhaAnexo",
+    "marqueCartaLida", "marqueCartaNãoLida", "marqueCartasLidas",
+    "marqueCartasNãoLidas", "movaCarta", "movaCartas", "envieCarta",
+    "esvazieLixeira",
+    "remetenteConfiável", "confieNoRemetente", "deixeDeConfiarNoRemetente",
+    "listeRegrasDaTriagem", "salveRegraDaTriagem",
+    "removaRegraDaTriagem", "decidaTriagemDaCarta"
+}
+para _, nome em ipares(métodos) início
+    ponte[nome] = função(_, ...)
+        se estado.carteiro então
+            retorne estado.carteiro[nome](estado.carteiro, ...)
+        fim
+        local argumentos = { ... }
+        local tratador
+        para índice = #argumentos, 1, -1 início
+            se tipo(argumentos[índice]) == "função" então
+                tratador = argumentos[índice]
+                pare
+            fim
+        fim
+        se tratador então tratador(nulo, estado.falha) fim
+        retorne nulo, estado.falha
+    fim
+fim
+
+local vazio, falhaDaPiscina = mariadb.criePiscinaAssíncrona(
+    configuração.banco,
+    função(piscina, falha)
+        se falha então
+            estado.falha = falha
+            mostre("[Carteiro] piscina MariaDB indisponível:", falha)
+            canalPULSO:sinal("carteiro.bancoIndisponível", { falha = falha },
+                { prioridade = "alta" })
+            retorne
+        fim
+        local repositório = CorreioMariaDB.novo(piscina, configuração)
+        repositório:confiraEstrutura(função(_, falhaDaEstrutura)
+            se falhaDaEstrutura então
+                estado.falha = falhaDaEstrutura
+                mostre("[Carteiro] estrutura postal indisponível:", falhaDaEstrutura)
+                retorne
+            fim
+            local função prepareCarteiro()
+                local cd = CorreioCD.novo({
+                    diretório = repositório,
+                    repositório = repositório,
+                    fila = { tabela = configuração.tabelaDaFila },
+                    configuração = configuração,
+                    pulso = canalPULSO,
+                    antivírus = verificador
+                })
+                estado.carteiro = Carteiro.novo({ caixas = repositório, cd = cd })
+                estado.falha = nulo
+                canalPULSO:sinal("carteiro.bancoPronto", {})
+                mostre("[Carteiro] banco, estrutura postal e segurança prontos")
+            fim
+            repositório:confiraEstruturaDoCarteiro(
+                função(_, falhaDaEstruturaDoCarteiro)
+                    se falhaDaEstruturaDoCarteiro então
+                        estado.falha = falhaDaEstruturaDoCarteiro
+                        mostre("[Carteiro] preferências indisponíveis:",
+                            falhaDaEstruturaDoCarteiro)
+                        retorne
+                    fim
+                    se não verificador então prepareCarteiro(); retorne fim
+                    estado.falha = "antivírus ainda não está pronto"
+                    verificador:confiraAssíncrono(
+                        função(pronto, falhaDoAntivírus)
+                            se não pronto então
+                                estado.falha = falhaDoAntivírus
+                                mostre("[Carteiro] antivírus indisponível:",
+                                    falhaDoAntivírus)
+                                canalPULSO:sinal(
+                                    "carteiro.antivírusIndisponível",
+                                    { falha = falhaDoAntivírus },
+                                    { prioridade = "crítica" })
+                                retorne
+                            fim
+                            prepareCarteiro()
+                        fim)
+                fim)
+        fim)
+    fim
+)
+garanta(falhaDaPiscina == nulo, falhaDaPiscina)
+
+local ap = Aplicação.crie({
+    carteiro = ponte,
+    configuração = configuração,
+    pulso = canalPULSO,
+    estado = estado
+})
+
+mostre("Carteiro escutando em " .. configuração.endereço .. ":" ..
+    configuração.porta .. " sob /carteiro")
+local executou, falha = ap.escute(configuração.porta, {
+    endereço = configuração.endereço,
+    limiteCorpo = configuração.limiteCorpo,
+    limiteCabeçalhos = 64 * 1024,
+    tempoLimite = 30000
+})
+canalPULSO:feche()
+garanta(executou, falha)

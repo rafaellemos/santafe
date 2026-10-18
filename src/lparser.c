@@ -1608,7 +1608,7 @@ static void statement (LexState *ls) {
 
 /*
 ** compiles the main function, which is a regular vararg function with an
-** upvalue named LUA_ENV
+** valor externo chamado SANTAFE_AMBIENTE
 */
 static void mainfunc (LexState *ls, FuncState *fs) {
   BlockCnt bl;

@@ -1,0 +1,145 @@
+#!/usr/local/bin/santafé
+
+local raiz = so.obterVariável("CORREIO_RAIZ") ou "aplicativos/correio"
+módulo.caminho = raiz .. "/fonte/?.fé;" .. raiz .. "/fonte/?/ini.fé;" ..
+    módulo.caminho
+
+local rede = importe "rede"
+local segredo = importe "segredo"
+local correio = importe "correio"
+local pulso = importe "pulso"
+local CorreioCD = importe "correio.cd"
+local CorreioMultibanco = importe "correio.multibanco"
+local CorreioAgência = importe "correio.agência"
+local Antivírus = importe "correio.antivírus"
+local configuração = (importe "correio.configuração").carregue()
+
+garanta(configuração.agência.certificado,
+    "CORREIO_AGENCIA_CERTIFICADO não foi definido")
+garanta(configuração.agência.chavePrivada,
+    "CORREIO_AGENCIA_CHAVE não foi definida")
+
+local canal = garanta(pulso.novo({
+    serviço = "correio-agência",
+    instância = so.obterVariável("CORREIO_AGENCIA_INSTANCIA") ou "agência-01"
+}))
+se configuração.pulsoArquivo e configuração.pulsoArquivo ~= "" então
+    local destino, falha = pulso.registrador(configuração.pulsoArquivo)
+    se destino então canal:adicioneDestino(destino)
+    senão mostre("[Agência] registrador PULSO indisponível:", falha) fim
+fim
+
+local verificador
+se configuração.antivírus.ativo então
+    verificador = garanta(Antivírus.novo(configuração.antivírus))
+fim
+
+local função interrompa(mensagem)
+    mostre("[Agência] inicialização recusada:", mensagem)
+    canal:sinal("correio.agênciaIndisponível", {
+        falha = paraColar(mensagem)
+    }, { prioridade = "crítica" })
+    rede.pareLaço()
+    so.saia(1)
+fim
+
+local função inicieServidores(agência)
+    local opçõesComuns = {
+        endereço = configuração.agência.endereço,
+        nome = configuração.agência.nome,
+        certificado = configuração.agência.certificado,
+        chavePrivada = configuração.agência.chavePrivada,
+        domíniosLocais = configuração.domíniosLocais,
+        limiteMensagem = configuração.limiteCorpo,
+        limiteDestinatários = configuração.limiteDestinatários,
+        limiteConexões = configuração.agência.limiteConexões,
+        limiteConexõesPorEndereço =
+            configuração.agência.limiteConexõesPorEndereço,
+        limiteNovasConexõesPorMinuto =
+            configuração.agência.limiteNovasConexõesPorMinuto,
+        limiteTentativasDeAutenticação =
+            configuração.agência.limiteTentativasDeAutenticação,
+        exigirAutenticação = verdadeiro,
+        permitirAutenticaçãoSemTLS = falso,
+        pulso = canal,
+        autentique = função(usuário, senha, conclua)
+            agência:autentique(usuário, senha, conclua)
+        fim,
+        autorizeRemetente = função(identidade, remetente, conclua)
+            agência:autorizeRemetente(identidade, remetente, conclua)
+        fim,
+        autorize = função(_, destinatário, conclua, sessão)
+            agência:autorizeDestinatário(
+                sessão.identidade, sessão.remetente, destinatário, conclua)
+        fim,
+        receba = função(envelope, conclua)
+            agência:receba(envelope, conclua)
+        fim
+    }
+
+    local função crie(porta, segurança)
+        local opções = {}
+        para nome, valor em pares(opçõesComuns) início opções[nome] = valor fim
+        opções.porta = porta
+        opções.segurança = segurança
+        retorne correio.servidor(opções)
+    fim
+
+    local inícioTLS, falha = crie(
+        configuração.agência.portaInícioTLS, "inícioTLS")
+    se não inícioTLS então interrompa(falha); retorne fim
+    local tls
+    tls, falha = crie(configuração.agência.portaTLS, "TLS")
+    se não tls então interrompa(falha); retorne fim
+    local iniciou
+    iniciou, falha = inícioTLS:inicie()
+    se não iniciou então interrompa(falha); retorne fim
+    iniciou, falha = tls:inicie()
+    se não iniciou então inícioTLS:feche(); interrompa(falha); retorne fim
+
+    mostre("Correio Agência escutando em " .. configuração.agência.endereço ..
+        ":" .. configuração.agência.portaInícioTLS .. " (STARTTLS) e :" ..
+        configuração.agência.portaTLS .. " (TLS)")
+    canal:sinal("correio.agênciaPronta", {
+        portaInícioTLS = configuração.agência.portaInícioTLS,
+        portaTLS = configuração.agência.portaTLS
+    })
+fim
+
+local começou, falhaImediata = segredo.protejaSenhaAssíncrono(
+    segredo.novoBilhete(32), função(resumoIsca, falhaDaIsca)
+        se não resumoIsca então interrompa(falhaDaIsca); retorne fim
+        CorreioMultibanco.inicie(configuração,
+            função(repositório, falhaDosBancos)
+                se não repositório então
+                    interrompa(falhaDosBancos); retorne
+                fim
+                local função prepare()
+                    local cd = CorreioCD.novo({
+                        diretório = repositório,
+                        repositório = repositório,
+                        fila = { tabela = configuração.tabelaDaFila },
+                        configuração = configuração,
+                        pulso = canal,
+                        antivírus = verificador
+                    })
+                    inicieServidores(garanta(CorreioAgência.nova({
+                        repositório = repositório,
+                        cd = cd,
+                        resumoIsca = resumoIsca
+                    })))
+                fim
+                se não verificador então prepare(); retorne fim
+                verificador:confiraAssíncrono(
+                    função(pronto, falhaDoAntivírus)
+                        se não pronto então
+                            interrompa(falhaDoAntivírus); retorne
+                        fim
+                        prepare()
+                    fim)
+            fim)
+    fim)
+garanta(começou, falhaImediata)
+
+rede.laço()
+canal:feche()

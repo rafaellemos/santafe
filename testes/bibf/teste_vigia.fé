@@ -1,0 +1,117 @@
+-- Limites locais, bloqueios, memória limitada e integração PULSO do Vigia.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+
+local Vigia = importe "vigia"
+local pulso = importe "pulso"
+
+local instante = 1000
+local função relógio() retorne instante fim
+
+local memória = garanta(pulso.memória(32))
+local canal = garanta(pulso.novo({ serviço = "teste-vigia" }))
+garanta(canal:adicioneDestino(memória))
+
+local proteção = garanta(Vigia.novo({
+    nome = "teste.aplicação",
+    relógio = relógio,
+    pulso = canal,
+    janela = 10,
+    limiteNaJanela = 3,
+    limiteSimultâneo = 2,
+    limiteGlobal = 3,
+    duraçãoDoBloqueio = 0,
+    limiteDeFalhas = 2,
+    janelaDeFalhas = 20,
+    bloqueioPorFalhas = 5,
+    máximoDeChaves = 8,
+    ociosidade = 30
+}))
+garanta(proteção.chaves == nulo e proteção.contadores == nulo,
+    "estado interno do Vigia ficou exposto")
+
+local aceita1, estado1 = proteção:admita("192.0.2.10")
+local aceita2, estado2 = proteção:admita("192.0.2.10")
+garanta(aceita1 e aceita2)
+garanta(estado1.admitida e estado2.ativas == 2)
+
+local aceita3, decisão3 = proteção:admita("192.0.2.10")
+garanta(não aceita3 e decisão3.motivo == "limite simultâneo")
+garanta(proteção:conclua("192.0.2.10"))
+
+-- Tentativas recusadas também consomem a janela, evitando contornar a taxa.
+local aceita4, decisão4 = proteção:admita("192.0.2.10")
+garanta(não aceita4 e decisão4.motivo == "limite da janela")
+garanta(proteção:conclua("192.0.2.10"))
+
+instante = instante + 10
+garanta(proteção:admita("192.0.2.10"))
+garanta(proteção:conclua("192.0.2.10"))
+
+-- O limite global soma admissões de chaves diferentes.
+garanta(proteção:admita("192.0.2.11", 2))
+garanta(proteção:admita("192.0.2.12"))
+local global, decisãoGlobal = proteção:admita("192.0.2.13")
+garanta(não global e decisãoGlobal.motivo == "limite global")
+garanta(proteção:conclua("192.0.2.11", 2))
+garanta(proteção:conclua("192.0.2.12"))
+
+-- Falhas podem provocar bloqueio temporário sem depender do Forte.
+garanta(proteção:registreFalha("conta:ana"))
+local _, depoisDaFalha = garanta(proteção:registreFalha("conta:ana"))
+garanta(depoisDaFalha.bloqueada e depoisDaFalha.bloqueadaAté == instante + 5)
+local bloqueada, decisãoBloqueada = proteção:admita("conta:ana")
+garanta(não bloqueada e decisãoBloqueada.motivo == "bloqueio")
+
+instante = instante + 5
+local depoisDoPrazo = garanta(proteção:admita("conta:ana"))
+garanta(depoisDoPrazo)
+garanta(proteção:conclua("conta:ana"))
+
+garanta(proteção:bloqueie("manual", 30, "decisão local"))
+garanta(proteção:estado("manual").bloqueada)
+garanta(proteção:libere("manual"))
+garanta(não proteção:estado("manual").bloqueada)
+
+local estatísticas = proteção:estatísticas()
+garanta(estatísticas.admitidas == estatísticas.concluídas)
+garanta(estatísticas.recusadas == 4)
+garanta(estatísticas.bloqueios == 2)
+garanta(estatísticas.desbloqueios == 2)
+garanta(estatísticas.falhasDoPulso == 0)
+
+local encontrouLimite, encontrouBloqueio = falso, falso
+para _, mensagem em ipares(memória.mensagens) início
+    se mensagem.nome == "vigia.limiteAtingido" então
+        encontrouLimite = mensagem.dados.vigia == "teste.aplicação"
+    fim
+    se mensagem.nome == "vigia.bloqueioAplicado" então
+        encontrouBloqueio = verdadeiro
+    fim
+fim
+garanta(encontrouLimite e encontrouBloqueio,
+    "acontecimentos PULSO do Vigia ausentes")
+
+-- A tabela de chaves permanece limitada e remove itens inativos antigos.
+local agoraPequeno = 0
+local pequeno = garanta(Vigia.novo({
+    relógio = função() retorne agoraPequeno fim,
+    limiteNaJanela = 0,
+    limiteSimultâneo = 1,
+    limiteGlobal = 2,
+    máximoDeChaves = 2,
+    ociosidade = 5
+}))
+garanta(pequeno:admita("a"))
+garanta(pequeno:admita("b"))
+local terceira, capacidade = pequeno:admita("c")
+garanta(não terceira e capacidade.motivo == "capacidade")
+garanta(pequeno:conclua("a"))
+garanta(pequeno:conclua("b"))
+agoraPequeno = 6
+garanta(pequeno:limpe() == 2)
+garanta(pequeno:estatísticas().chaves == 0)
+garanta(pequeno:estatísticas().capacidadeRecusada == 1)
+
+garanta(canal:feche())
+mostre("Vigia: ok")

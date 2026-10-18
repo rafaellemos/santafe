@@ -1,0 +1,38 @@
+-- O Recebedor da porta 25 aceita somente destinatários locais. Este ensaio
+-- confirma que ele não pode ser usado como retransmissor SMTP aberto.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local porta = mat.paraInteiro(
+    so.obterVariável("TESTE_CORREIO_PORTA") ou "25")
+local carta = garanta(correio.novaMensagem({
+    remetente = "ensaio@santafé.dev.br",
+    destinatários = { "destino@exemplo.invalid" },
+    assunto = "Ensaio de retransmissão fechada",
+    texto = "Esta carta não deve ser aceita pela porta de recebimento."
+}))
+local cliente = garanta(correio.cliente({
+    endereço = "127.0.0.1",
+    porta = porta,
+    segurança = "nenhuma",
+    nome = "ensaio-retransmissao.local",
+    tempoLimite = 15000
+}))
+
+local terminou = falso
+local rejeitou = falso
+local detalhe
+garanta(cliente:envieAssíncrono(carta, função(resultado, falha)
+    terminou = verdadeiro
+    detalhe = falha
+    rejeitou = não resultado e tipo(falha) == "colar" e
+        falha:procure("550", 1, verdadeiro) ~= nulo
+    cliente:feche()
+    rede.pareLaço()
+fim))
+
+rede.laço()
+garanta(terminou e rejeitou,
+    "o Recebedor aceitou retransmissão externa: " .. paraColar(detalhe))
+mostre("Retransmissão SMTP aberta impedida: ok")

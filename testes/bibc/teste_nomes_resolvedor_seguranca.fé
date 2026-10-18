@@ -1,0 +1,110 @@
+local nomes = importe "nomes"
+local móduloResolvedor = importe "nomes.resolvedor"
+local rede = importe "rede"
+
+local portaFalsa = 18763
+local portaRecursiva = 18764
+local falsoServidor = rede.udp("IPv4")
+garanta(falsoServidor:amarre("127.0.0.1", portaFalsa))
+
+local recebeuFalha = falso
+local recusouTCP = falso
+local terminou = falso
+local clienteTCP
+local conexãoTCP
+local resolvedor
+
+local função finalize()
+    se terminou então retorne fim
+    terminou = verdadeiro
+    se conexãoTCP então conexãoTCP:feche() fim
+    se clienteTCP então clienteTCP:feche() fim
+    se resolvedor então resolvedor:feche() fim
+    falsoServidor:feche()
+    rede.pareLaço()
+fim
+
+-- O falso servidor tenta desviar uma consulta de exemplo.org para uma
+-- delegação sem relação com o nome perguntado.
+falsoServidor:inicieRecepção(4096,
+    função(pacote, falha, endereço, porta)
+        garanta(pacote, falha)
+        local consulta = garanta(nomes.decodifiqueMensagem(pacote))
+        local pergunta = consulta.perguntas[1]
+        local respostas = {}
+        local autoridades = {}
+        local adicionais = {}
+        se pergunta.nome == "resposta.exemplo.org." então
+            -- O tipo coincide, mas o dono não pertence à cadeia da pergunta.
+            respostas[1] = {
+                nome = "alheio.invalid.", tipo = "A", ttl = 300,
+                dados = "192.0.2.99"
+            }
+        senão
+            autoridades[1] = {
+                nome = "alheio.invalid.", tipo = "NS", ttl = 300,
+                dados = "ns.alheio.invalid."
+            }
+            adicionais[1] = {
+                nome = "ns.alheio.invalid.", tipo = "A", ttl = 300,
+                dados = "192.0.2.99"
+            }
+        fim
+        local resposta = garanta(nomes.codifiqueMensagem({
+            identificação = consulta.identificação,
+            bandeiras = { resposta = verdadeiro },
+            perguntas = consulta.perguntas,
+            respostas = respostas,
+            autoridades = autoridades,
+            adicionais = adicionais
+        }))
+        falsoServidor:envieParaAssíncrono(endereço, porta, resposta,
+            função() fim)
+    fim)
+
+resolvedor = garanta(móduloResolvedor.novo({
+    endereço = "127.0.0.1", porta = portaRecursiva,
+    portaExterna = portaFalsa,
+    servidoresRaiz = { "127.0.0.1" },
+    prefixosPermitidos = { "127.0.0.0/8" },
+    tempoLimite = 300, tentativas = 1, máximoTCP = 0
+}))
+garanta(resolvedor:inicie())
+
+resolvedor:resolva("www.exemplo.org", "A",
+    função(resultado, falha)
+        garanta(resultado == nulo)
+        garanta(falha e falha:procure(
+            "não pertence ao caminho consultado", 1, verdadeiro
+        ))
+        recebeuFalha = verdadeiro
+
+        resolvedor:resolva("resposta.exemplo.org", "A",
+            função(resultado2, falha2)
+                garanta(resultado2 == nulo)
+                garanta(falha2 e falha2:procure(
+                    "não pertence ao nome consultado", 1, verdadeiro
+                ))
+
+                -- Com teto zero, a conexão pode completar o aperto de mão
+                -- no SO, mas o resolvedor deve fechá-la ao aceitá-la.
+                clienteTCP = rede.clienteTCP()
+                clienteTCP:definaTempoLimite(1000)
+                clienteTCP:conecteAssíncrono("127.0.0.1", portaRecursiva,
+                    função(_, conexão)
+                        conexãoTCP = conexão
+                        rede.agende(50, função()
+                            local estatísticas = resolvedor:estatísticas()
+                            recusouTCP = estatísticas.tcpRecusadas >= 1 e
+                                estatísticas.tcpAtivas == 0
+                            finalize()
+                        fim)
+                    fim)
+            fim)
+    fim)
+
+rede.agende(2000, função() finalize() fim)
+rede.laço()
+garanta(recebeuFalha, "a referência DNS falsa não foi recusada")
+garanta(recusouTCP, "o limite de conexões TCP não foi aplicado")
+mostre("nomes resolvedor: referência e limite TCP: ok")

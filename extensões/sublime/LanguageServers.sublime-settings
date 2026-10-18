@@ -1,0 +1,9 @@
+{
+    "Santafé": {
+        "enabled": true,
+        "command": ["/usr/local/bin/santafé-sls"],
+        "selector": "source.santafe",
+        "schemes": ["file", "buffer"],
+        "diagnostics_mode": "workspace"
+    }
+}

@@ -1,0 +1,55 @@
+local Entrega = importe "correio.entrega"
+
+garanta(Entrega.versão == "1.0.0")
+garanta(Entrega.espera(0) == 1800)
+garanta(Entrega.espera(1) == 7200)
+garanta(Entrega.espera(2) == 7200)
+garanta(Entrega.espera(99) == 10800)
+
+local avisoDeAtraso = garanta(Entrega.formeAviso({
+    tipo = "atraso",
+    destinatário = "rafael@santafé.dev.br",
+    destinatários = { "ana@exemplo.org", "bia@exemplo.net" },
+    domínio = "xn--santaf-gva.dev.br",
+    nomeDoServidor = "mail.xn--santaf-gva.dev.br",
+    assuntoOriginal = "Relatório mensal",
+    identificaçãoOriginal = "<original@xn--santaf-gva.dev.br>",
+    falha = "451 4.4.1 servidor temporariamente indisponível",
+    criadaEm = 1788000000,
+    últimaTentativa = 1788010000,
+    tentarAté = 1788432000,
+    mimeOriginal = "From: rafael@santafé.dev.br\r\n" ..
+        "Subject: Relatório mensal\r\n\r\ncorpo"
+}))
+
+garanta(avisoDeAtraso.mime:procure(
+    "Content-Type: multipart/report; report-type=delivery-status",
+    1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure(
+    "Content-Type: message/global-delivery-status", 1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure("Action: delayed", 1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure("Status: 4.4.1", 1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure("Will-Retry-Until:", 1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure(
+    "Final-Recipient: utf-8; ana@exemplo.org", 1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure(
+    "Final-Recipient: utf-8; bia@exemplo.net", 1, verdadeiro))
+garanta(avisoDeAtraso.mime:procure(
+    "Content-Type: message/global-headers", 1, verdadeiro))
+
+local avisoDeFalha = garanta(Entrega.formeAviso({
+    tipo = "falha",
+    destinatário = "rafael@santafé.dev.br",
+    destinatários = { "inexistente@exemplo.org" },
+    domínio = "xn--santaf-gva.dev.br",
+    nomeDoServidor = "mail.xn--santaf-gva.dev.br",
+    assuntoOriginal = "Carta sem destino",
+    falha = "550 5.1.1 destinatário inexistente"
+}))
+
+garanta(avisoDeFalha.mime:procure("Action: failed", 1, verdadeiro))
+garanta(avisoDeFalha.mime:procure("Status: 5.1.1", 1, verdadeiro))
+garanta(não avisoDeFalha.mime:procure("Will-Retry-Until:", 1, verdadeiro))
+garanta(avisoDeFalha.remetente == "postmaster@xn--santaf-gva.dev.br")
+
+mostre("correio entrega: ok")

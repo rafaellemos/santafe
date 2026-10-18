@@ -1,0 +1,83 @@
+-- Integração: a adaptação IDNA chega intacta ao servidor SMTP.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/?/?.so;" .. módulo.caminhoC
+
+local correio = importe "correio"
+local Transporte = importe "correio.transporte"
+local rede = importe "rede"
+local pulso = importe "pulso"
+local memória = pulso.memória(100)
+local canal = garanta(pulso.novo { serviço = "teste-transporte-idna" })
+canal:adicioneDestino(memória)
+
+local original = tabela.concatene({
+    "From: Rafael <rafael@domínio.example>",
+    "To: josé@santafé.dev.br",
+    "Subject: Ensaio de transporte",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    "O Depósito conserva domínio.example no corpo."
+}, "\r\n") .. "\r\n"
+local preparada = garanta(Transporte.prepareRetransmissor(original,
+    "rafael@domínio.example", { "josé@santafé.dev.br" }))
+
+local recebida
+local servidor = garanta(correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 18766,
+    nome = "retransmissor.teste.local",
+    segurança = "nenhuma",
+    domíniosLocais = { "xn--santaf-gva.dev.br" },
+    receba = função(mensagem)
+        recebida = mensagem
+        retorne verdadeiro
+    fim,
+    pulso = canal
+})
+garanta(servidor:inicie())
+
+local mensagem = {
+    remetente = preparada.remetente,
+    smtpUTF8 = preparada.smtpUTF8,
+    identificação = "transporte-idna"
+}
+função mensagem.forme() retorne preparada.conteúdo fim
+função mensagem.destinatários()
+    retorne preparada.destinatários
+fim
+
+local cliente = garanta(correio.cliente {
+    endereço = "127.0.0.1",
+    porta = 18766,
+    nome = "correio.teste.local",
+    segurança = "nenhuma",
+    tempoLimite = 4000,
+    pulso = canal
+})
+local terminou, falhaFinal = falso, nulo
+garanta(cliente:envieAssíncrono(mensagem, função(resultado, falha)
+    terminou = resultado ~= nulo
+    falhaFinal = falha
+    cliente:feche()
+    servidor:feche()
+fim))
+
+rede.laço()
+se não terminou então
+    para _, evento em ipares(memória.mensagens) início
+        mostre(evento.nome, json.cod(evento.dados ou {}))
+    fim
+fim
+garanta(terminou, falhaFinal ou "transporte SMTP não terminou")
+garanta(recebida, "retransmissor não recebeu a carta")
+garanta(recebida.remetente == "rafael@xn--domnio-5va.example")
+garanta(recebida.destinatários[1] == "josé@xn--santaf-gva.dev.br")
+garanta(recebida.conteúdo:procure(
+    "From: Rafael <rafael@xn--domnio-5va.example>", 1, verdadeiro))
+garanta(recebida.conteúdo:procure(
+    "O Depósito conserva domínio.example no corpo.", 1, verdadeiro))
+canal:feche()
+
+mostre("correio transporte SMTP com IDNA: ok")

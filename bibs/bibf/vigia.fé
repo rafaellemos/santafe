@@ -1,0 +1,457 @@
+-- Vigia Santafé - proteção local da camada de aplicação.
+--
+-- O Vigia pertence ao serviço que protege. Ele aplica limites mesmo sem
+-- PULSO ou Forte e mantém todo o estado em memória, com quantidade limitada
+-- de chaves. "Sentinela" fica reservado à futura arquitetura do Forte.
+
+local vigia = {
+    nome = "Vigia Santafé",
+    versão = "0.1.0"
+}
+
+local função falhe(mensagem)
+    retorne nulo, mensagem
+fim
+
+local função inteiro(valor, nome, padrão, permitaZero)
+    se valor == nulo então valor = padrão fim
+    se mat.paraInteiro(valor) == nulo ou
+       (permitaZero e valor < 0 ou não permitaZero e valor <= 0) então
+        retorne nulo, nome .. (permitaZero e
+            " deve ser um inteiro não negativo" ou
+            " deve ser um inteiro positivo")
+    fim
+    retorne valor
+fim
+
+local função chaveVálida(chave)
+    se tipo(chave) ~= "colar" ou chave == "" então
+        retorne nulo, "chave do Vigia deve ser um colar não vazio"
+    fim
+    se #chave > 512 então
+        retorne nulo, "chave do Vigia excede 512 tacos"
+    fim
+    retorne chave
+fim
+
+local função copie(dados)
+    local cópia = {}
+    para nome, valor em pares(dados ou {}) início cópia[nome] = valor fim
+    retorne cópia
+fim
+
+função vigia.novo(opções)
+    opções = opções ou {}
+    se tipo(opções) ~= "tabela" então
+        retorne falhe("opções do Vigia devem ser uma tabela")
+    fim
+
+    local nome = opções.nome ou "vigia"
+    se tipo(nome) ~= "colar" ou nome == "" ou #nome > 128 então
+        retorne falhe("nome do Vigia deve ser um colar de 1 a 128 tacos")
+    fim
+
+    local janela, falha = inteiro(opções.janela, "janela", 60, falso)
+    se não janela então retorne nulo, falha fim
+    local limiteNaJanela
+    limiteNaJanela, falha = inteiro(opções.limiteNaJanela,
+        "limiteNaJanela", 60, verdadeiro)
+    se não limiteNaJanela então retorne nulo, falha fim
+    local limiteSimultâneo
+    limiteSimultâneo, falha = inteiro(opções.limiteSimultâneo,
+        "limiteSimultâneo", 20, verdadeiro)
+    se não limiteSimultâneo então retorne nulo, falha fim
+    local limiteGlobal
+    limiteGlobal, falha = inteiro(opções.limiteGlobal,
+        "limiteGlobal", 1000, verdadeiro)
+    se não limiteGlobal então retorne nulo, falha fim
+    local duraçãoDoBloqueio
+    duraçãoDoBloqueio, falha = inteiro(opções.duraçãoDoBloqueio,
+        "duraçãoDoBloqueio", 0, verdadeiro)
+    se não duraçãoDoBloqueio então retorne nulo, falha fim
+    local limiteDeFalhas
+    limiteDeFalhas, falha = inteiro(opções.limiteDeFalhas,
+        "limiteDeFalhas", 0, verdadeiro)
+    se não limiteDeFalhas então retorne nulo, falha fim
+    local janelaDeFalhas
+    janelaDeFalhas, falha = inteiro(opções.janelaDeFalhas,
+        "janelaDeFalhas", janela, falso)
+    se não janelaDeFalhas então retorne nulo, falha fim
+    local bloqueioPorFalhas
+    bloqueioPorFalhas, falha = inteiro(opções.bloqueioPorFalhas,
+        "bloqueioPorFalhas", 300, falso)
+    se não bloqueioPorFalhas então retorne nulo, falha fim
+    local máximoDeChaves
+    máximoDeChaves, falha = inteiro(opções.máximoDeChaves,
+        "máximoDeChaves", 10000, falso)
+    se não máximoDeChaves então retorne nulo, falha fim
+    local ociosidade
+    ociosidade, falha = inteiro(opções.ociosidade,
+        "ociosidade", mat.máximo(janela * 2, janelaDeFalhas * 2), falso)
+    se não ociosidade então retorne nulo, falha fim
+
+    local relógio = opções.relógio ou so.tempo
+    se tipo(relógio) ~= "função" então
+        retorne falhe("relógio do Vigia deve ser uma função")
+    fim
+    local funcionou, primeiroAgora = proteja(relógio)
+    se não funcionou ou tipo(primeiroAgora) ~= "número" ou
+       primeiroAgora < 0 então
+        retorne falhe("relógio do Vigia devolveu um valor inválido")
+    fim
+
+    -- O estado fica fechado nas funções. O chamador recebe somente
+    -- fotografias e cópias, portanto não consegue alterar contadores,
+    -- janelas ou bloqueios por acidente.
+    local este = {}
+    local canalPULSO = opções.pulso
+    local últimoAgora = primeiroAgora
+    local chaves = {}
+    local quantidadeDeChaves = 0
+    local ativas = 0
+    local operaçõesDesdeLimpeza = 0
+    local capacidadeSinalizada = falso
+    local contadores = {
+        admitidas = 0,
+        recusadas = 0,
+        concluídas = 0,
+        falhas = 0,
+        bloqueios = 0,
+        desbloqueios = 0,
+        removidas = 0,
+        capacidadeRecusada = 0,
+        falhasDoPulso = 0
+    }
+
+    local função agora()
+        local ok, valor = proteja(relógio)
+        se não ok ou tipo(valor) ~= "número" ou valor < 0 então
+            retorne últimoAgora
+        fim
+        -- Um ajuste regressivo do relógio não prolonga janelas e bloqueios.
+        se valor < últimoAgora então valor = últimoAgora fim
+        últimoAgora = valor
+        retorne valor
+    fim
+
+    local função emita(nomeDoAcontecimento, dados, prioridade)
+        se não canalPULSO então retorne fim
+        local conteúdo = copie(dados)
+        conteúdo.vigia = nome
+        local ok, mensagem = proteja(função()
+            retorne canalPULSO:sinal(nomeDoAcontecimento, conteúdo,
+                prioridade e { prioridade = prioridade } ou nulo)
+        fim)
+        se não ok ou não mensagem então
+            contadores.falhasDoPulso = contadores.falhasDoPulso + 1
+        fim
+    fim
+
+    local função retireBloqueioExpirado(item, instante)
+        se item.bloqueadaAté > 0 e instante >= item.bloqueadaAté então
+            item.bloqueadaAté = 0
+            item.motivoDoBloqueio = nulo
+            item.falhas = 0
+            item.começoDasFalhas = instante
+            item.sinalizouLimite = falso
+            contadores.desbloqueios = contadores.desbloqueios + 1
+            emita("vigia.bloqueioRetirado", { chave = item.chave,
+                motivo = "prazo encerrado" }, "normal")
+        fim
+    fim
+
+    local função renoveJanelas(item, instante)
+        se instante - item.começoDaJanela >= janela então
+            item.começoDaJanela = instante
+            item.naJanela = 0
+            item.sinalizouLimite = falso
+        fim
+        se instante - item.começoDasFalhas >= janelaDeFalhas então
+            item.começoDasFalhas = instante
+            item.falhas = 0
+        fim
+        retireBloqueioExpirado(item, instante)
+    fim
+
+    local função removaOciosas(instante)
+        local removidas = 0
+        para chave, item em pares(chaves) início
+            renoveJanelas(item, instante)
+            se item.ativas == 0 e item.bloqueadaAté == 0 e
+               instante - item.vistaEm >= ociosidade então
+                chaves[chave] = nulo
+                quantidadeDeChaves = quantidadeDeChaves - 1
+                removidas = removidas + 1
+            fim
+        fim
+        contadores.removidas = contadores.removidas + removidas
+        se removidas > 0 então capacidadeSinalizada = falso fim
+        retorne removidas
+    fim
+
+    local função removaMaisAntigaInativa(instante)
+        local chaveMaisAntiga, vistaMaisAntiga
+        para chave, item em pares(chaves) início
+            renoveJanelas(item, instante)
+            se item.ativas == 0 e item.bloqueadaAté == 0 e
+               (não vistaMaisAntiga ou item.vistaEm < vistaMaisAntiga) então
+                chaveMaisAntiga = chave
+                vistaMaisAntiga = item.vistaEm
+            fim
+        fim
+        se não chaveMaisAntiga então retorne falso fim
+        chaves[chaveMaisAntiga] = nulo
+        quantidadeDeChaves = quantidadeDeChaves - 1
+        contadores.removidas = contadores.removidas + 1
+        capacidadeSinalizada = falso
+        retorne verdadeiro
+    fim
+
+    local função prepareOperação(instante)
+        operaçõesDesdeLimpeza = operaçõesDesdeLimpeza + 1
+        se operaçõesDesdeLimpeza >= 256 então
+            operaçõesDesdeLimpeza = 0
+            removaOciosas(instante)
+        fim
+    fim
+
+    local função obtenha(chave, instante, crie)
+        local item = chaves[chave]
+        se item então
+            item.vistaEm = instante
+            renoveJanelas(item, instante)
+            retorne item
+        fim
+        se não crie então retorne nulo fim
+        se quantidadeDeChaves >= máximoDeChaves então
+            removaOciosas(instante)
+        fim
+        se quantidadeDeChaves >= máximoDeChaves então
+            removaMaisAntigaInativa(instante)
+        fim
+        se quantidadeDeChaves >= máximoDeChaves então
+            contadores.capacidadeRecusada = contadores.capacidadeRecusada + 1
+            retorne nulo, "capacidade"
+        fim
+        item = {
+            chave = chave,
+            ativas = 0,
+            começoDaJanela = instante,
+            naJanela = 0,
+            começoDasFalhas = instante,
+            falhas = 0,
+            bloqueadaAté = 0,
+            motivoDoBloqueio = nulo,
+            vistaEm = instante,
+            sinalizouLimite = falso
+        }
+        chaves[chave] = item
+        quantidadeDeChaves = quantidadeDeChaves + 1
+        retorne item
+    fim
+
+    local função fotografia(item, instante)
+        retorne {
+            chave = item e item.chave ou nulo,
+            ativas = item e item.ativas ou 0,
+            ativasGlobais = ativas,
+            naJanela = item e item.naJanela ou 0,
+            janela = janela,
+            limiteNaJanela = limiteNaJanela,
+            limiteSimultâneo = limiteSimultâneo,
+            limiteGlobal = limiteGlobal,
+            falhas = item e item.falhas ou 0,
+            bloqueada = item e item.bloqueadaAté > instante ou falso,
+            bloqueadaAté = item e item.bloqueadaAté ou 0,
+            motivoDoBloqueio = item e item.motivoDoBloqueio ou nulo
+        }
+    fim
+
+    local função decisão(item, instante, admitida, motivo)
+        local resultado = fotografia(item, instante)
+        resultado.admitida = admitida
+        resultado.motivo = motivo
+        retorne resultado
+    fim
+
+    local função apliqueBloqueio(item, instante, duração, motivo)
+        local atéQuando = instante + duração
+        local novo = atéQuando > item.bloqueadaAté
+        se novo então item.bloqueadaAté = atéQuando fim
+        item.motivoDoBloqueio = motivo ou "bloqueio local"
+        item.vistaEm = instante
+        se novo então
+            contadores.bloqueios = contadores.bloqueios + 1
+            emita("vigia.bloqueioAplicado", {
+                chave = item.chave,
+                duração = duração,
+                bloqueadaAté = item.bloqueadaAté,
+                motivo = item.motivoDoBloqueio
+            }, "alta")
+        fim
+    fim
+
+    função este.admita(_, chave, peso)
+        local válida, falhaDaChave = chaveVálida(chave)
+        se não válida então retorne nulo, falhaDaChave fim
+        local falhaDoPeso
+        peso, falhaDoPeso = inteiro(peso, "peso", 1, falso)
+        se não peso então retorne nulo, falhaDoPeso fim
+        local instante = agora()
+        prepareOperação(instante)
+        local item, falhaDaCapacidade = obtenha(válida, instante, verdadeiro)
+        se não item então
+            contadores.recusadas = contadores.recusadas + 1
+            se não capacidadeSinalizada então
+                capacidadeSinalizada = verdadeiro
+                emita("vigia.capacidadeAtingida", {
+                    chave = válida, máximoDeChaves = máximoDeChaves
+                }, "alta")
+            fim
+            retorne falso, {
+                chave = válida, admitida = falso,
+                motivo = falhaDaCapacidade, ativasGlobais = ativas
+            }
+        fim
+        se item.bloqueadaAté > instante então
+            contadores.recusadas = contadores.recusadas + 1
+            retorne falso, decisão(item, instante, falso, "bloqueio")
+        fim
+
+        item.naJanela = item.naJanela + peso
+        local motivo
+        se limiteGlobal > 0 e ativas + peso > limiteGlobal então
+            motivo = "limite global"
+        senão se limiteSimultâneo > 0 e
+           item.ativas + peso > limiteSimultâneo então
+            motivo = "limite simultâneo"
+        senão se limiteNaJanela > 0 e item.naJanela > limiteNaJanela então
+            motivo = "limite da janela"
+        fim fim fim
+
+        se motivo então
+            contadores.recusadas = contadores.recusadas + 1
+            se duraçãoDoBloqueio > 0 então
+                apliqueBloqueio(item, instante, duraçãoDoBloqueio, motivo)
+            fim
+            se não item.sinalizouLimite então
+                item.sinalizouLimite = verdadeiro
+                emita("vigia.limiteAtingido", {
+                    chave = item.chave,
+                    motivo = motivo,
+                    ativas = item.ativas,
+                    ativasGlobais = ativas,
+                    naJanela = item.naJanela,
+                    janela = janela
+                }, "alta")
+            fim
+            retorne falso, decisão(item, instante, falso, motivo)
+        fim
+
+        item.ativas = item.ativas + peso
+        ativas = ativas + peso
+        contadores.admitidas = contadores.admitidas + peso
+        retorne verdadeiro, decisão(item, instante, verdadeiro)
+    fim
+
+    função este.conclua(_, chave, peso)
+        local válida, falhaDaChave = chaveVálida(chave)
+        se não válida então retorne nulo, falhaDaChave fim
+        local falhaDoPeso
+        peso, falhaDoPeso = inteiro(peso, "peso", 1, falso)
+        se não peso então retorne nulo, falhaDoPeso fim
+        local instante = agora()
+        prepareOperação(instante)
+        local item = obtenha(válida, instante, falso)
+        se não item ou item.ativas < peso então
+            retorne falhe("nenhuma admissão correspondente no Vigia")
+        fim
+        item.ativas = item.ativas - peso
+        ativas = mat.máximo(0, ativas - peso)
+        contadores.concluídas = contadores.concluídas + peso
+        retorne verdadeiro, fotografia(item, instante)
+    fim
+
+    função este.registreFalha(_, chave, peso)
+        local válida, falhaDaChave = chaveVálida(chave)
+        se não válida então retorne nulo, falhaDaChave fim
+        local falhaDoPeso
+        peso, falhaDoPeso = inteiro(peso, "peso", 1, falso)
+        se não peso então retorne nulo, falhaDoPeso fim
+        local instante = agora()
+        prepareOperação(instante)
+        local item, falhaDaCapacidade = obtenha(válida, instante, verdadeiro)
+        se não item então retorne nulo, falhaDaCapacidade fim
+        item.falhas = item.falhas + peso
+        contadores.falhas = contadores.falhas + peso
+        se limiteDeFalhas > 0 e item.falhas >= limiteDeFalhas e
+           item.bloqueadaAté <= instante então
+            apliqueBloqueio(item, instante, bloqueioPorFalhas,
+                "limite de falhas")
+        fim
+        retorne verdadeiro, fotografia(item, instante)
+    fim
+
+    função este.bloqueie(_, chave, duração, motivo)
+        local válida, falhaDaChave = chaveVálida(chave)
+        se não válida então retorne nulo, falhaDaChave fim
+        local falhaDaDuração
+        duração, falhaDaDuração = inteiro(duração, "duração",
+            bloqueioPorFalhas, falso)
+        se não duração então retorne nulo, falhaDaDuração fim
+        se motivo ~= nulo e tipo(motivo) ~= "colar" então
+            retorne falhe("motivo do bloqueio deve ser um colar")
+        fim
+        local instante = agora()
+        prepareOperação(instante)
+        local item, falhaDaCapacidade = obtenha(válida, instante, verdadeiro)
+        se não item então retorne nulo, falhaDaCapacidade fim
+        apliqueBloqueio(item, instante, duração, motivo)
+        retorne verdadeiro, fotografia(item, instante)
+    fim
+
+    função este.libere(_, chave)
+        local válida, falhaDaChave = chaveVálida(chave)
+        se não válida então retorne nulo, falhaDaChave fim
+        local instante = agora()
+        prepareOperação(instante)
+        local item = obtenha(válida, instante, falso)
+        se não item ou item.bloqueadaAté <= instante então retorne falso fim
+        item.bloqueadaAté = 0
+        item.motivoDoBloqueio = nulo
+        item.falhas = 0
+        item.sinalizouLimite = falso
+        contadores.desbloqueios = contadores.desbloqueios + 1
+        emita("vigia.bloqueioRetirado", {
+            chave = item.chave, motivo = "liberação explícita"
+        }, "normal")
+        retorne verdadeiro, fotografia(item, instante)
+    fim
+
+    função este.estado(_, chave)
+        local válida, falhaDaChave = chaveVálida(chave)
+        se não válida então retorne nulo, falhaDaChave fim
+        local instante = agora()
+        local item = obtenha(válida, instante, falso)
+        se não item então retorne nulo fim
+        retorne fotografia(item, instante)
+    fim
+
+    função este.limpe(_)
+        local instante = agora()
+        operaçõesDesdeLimpeza = 0
+        retorne removaOciosas(instante)
+    fim
+
+    função este.estatísticas(_)
+        local resultado = copie(contadores)
+        resultado.nome = nome
+        resultado.ativas = ativas
+        resultado.chaves = quantidadeDeChaves
+        retorne resultado
+    fim
+
+    retorne este
+fim
+
+retorne vigia

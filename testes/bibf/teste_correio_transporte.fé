@@ -1,0 +1,43 @@
+-- Representação IDNA usada somente diante de retransmissores externos.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local Transporte = importe "correio.transporte"
+
+garanta(Transporte.endereçoASCII("rafael@domínio.example") ==
+    "rafael@xn--domnio-5va.example")
+garanta(Transporte.endereçoASCII("josé@santafé.dev.br") ==
+    "josé@xn--santaf-gva.dev.br")
+
+local original = tabela.concatene({
+    "From: Rafael <rafael@domínio.example>",
+    "To: josé@santafé.dev.br",
+    "Message-ID: <ensaio@domínio.example>",
+    "Subject: Olá do domínio.example",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "O corpo preserva rafael@domínio.example literalmente."
+}, "\r\n")
+
+local preparada = garanta(Transporte.prepareRetransmissor(original,
+    "rafael@domínio.example",
+    { "josé@santafé.dev.br", "ana@exemplo.org" }))
+garanta(preparada.remetente == "rafael@xn--domnio-5va.example")
+garanta(preparada.destinatários[1] == "josé@xn--santaf-gva.dev.br")
+garanta(preparada.destinatários[2] == "ana@exemplo.org")
+garanta(preparada.smtpUTF8,
+    "parte local ou cabeçalho Unicode precisa conservar SMTPUTF8")
+garanta(preparada.conteúdo:procure(
+    "From: Rafael <rafael@xn--domnio-5va.example>", 1, verdadeiro))
+garanta(preparada.conteúdo:procure(
+    "To: josé@xn--santaf-gva.dev.br", 1, verdadeiro))
+garanta(preparada.conteúdo:procure(
+    "Message-ID: <ensaio@xn--domnio-5va.example>", 1, verdadeiro))
+garanta(preparada.conteúdo:procure(
+    "Subject: Olá do domínio.example", 1, verdadeiro))
+garanta(preparada.conteúdo:procure(
+    "O corpo preserva rafael@domínio.example literalmente.",
+    1, verdadeiro))
+
+mostre("correio transporte IDNA para retransmissor: ok")

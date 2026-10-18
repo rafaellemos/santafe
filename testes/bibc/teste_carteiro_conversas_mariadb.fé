@@ -1,0 +1,90 @@
+-- Valida, sem modificar dados, as consultas de conversas no MariaDB real.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/mariadb/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local função configuração(nome)
+    retorne so.obterVariável("SANTAFE_MARIADB_" .. nome) ou
+        so.obterVariável("CORREIO_TESTE_MARIADB_" .. nome)
+fim
+
+local endereço = configuração("HOST")
+local usuário = configuração("USUARIO")
+local senha = configuração("SENHA")
+local banco = configuração("BANCO")
+local porta = paraNúmero(configuração("PORTA")) ou 3306
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina CORREIO_TESTE_MARIADB_* ou SANTAFE_MARIADB_*")
+    retorne
+fim
+
+local mariadb = importe "mariadb"
+local Adaptador = importe "correio.mariadb"
+local rede = importe "rede"
+local piscina
+local terminou = falso
+local falhaFinal
+
+local função encerre(falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    falhaFinal = falha
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+fim
+
+mariadb.criePiscinaAssíncrona({
+    endereço = endereço, usuário = usuário, senha = senha,
+    banco = banco, porta = porta, mínimo = 1, máximo = 2,
+    máximoDaFila = 8, tempoDeEspera = 3000
+}, função(novaPiscina, falhaDaPiscina)
+    se não novaPiscina então encerre(falhaDaPiscina); retorne fim
+    piscina = novaPiscina
+    piscina:executePreparadoAssíncrono([[
+SELECT caixa_id,pasta FROM correio_cartas
+WHERE apagada_imap=FALSE ORDER BY id DESC LIMIT 1]], {},
+        função(_, resultado, falhaDaReferência)
+            se falhaDaReferência então
+                se resultado então resultado:feche() fim
+                encerre(falhaDaReferência); retorne
+            fim
+            local linha = resultado:obterLinha()
+            resultado:feche()
+            se não linha então encerre("banco postal sem cartas de ensaio"); retorne fim
+            local caixaId, pasta = paraNúmero(linha[1]), linha[2]
+            local adaptador = Adaptador.novo(piscina, {}, {})
+            adaptador:listeMensagens(caixaId, pasta, "", 5, 0,
+                função(mensagens, falhaDaLista, estado)
+                    se não mensagens então encerre(falhaDaLista); retorne fim
+                    se #mensagens == 0 então
+                        encerre("a pasta escolhida não devolveu conversa"); retorne
+                    fim
+                    garanta(estado e estado.limite == 5)
+                    garanta(mensagens[1].quantidadeNaConversa >= 1)
+                    adaptador:conteMensagens(caixaId, pasta, "",
+                        função(total, falhaDaContagem)
+                            se total == nulo então
+                                encerre(falhaDaContagem); retorne
+                            fim
+                            garanta(total >= #mensagens)
+                            adaptador:listeMensagensDaConversa(caixaId, pasta,
+                                mensagens[1].id,
+                                função(conversa, falhaDaConversa)
+                                    se não conversa então
+                                        encerre(falhaDaConversa); retorne
+                                    fim
+                                    garanta(#conversa ==
+                                        mensagens[1].quantidadeNaConversa)
+                                    garanta(conversa[1].posiçãoNaConversa == 1)
+                                    mostre("Carteiro conversas MariaDB: ok")
+                                    encerre()
+                                fim)
+                        fim)
+                fim)
+        fim)
+fim)
+
+rede.laço()
+garanta(terminou e não falhaFinal, falhaFinal ou
+    "o teste de conversas MariaDB não terminou")

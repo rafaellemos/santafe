@@ -1,0 +1,132 @@
+-- Persistência e apresentação dos resultados SPF/DKIM/DMARC.
+
+módulo.caminho = "aplicativos/carteiro/fonte/?.fé;" ..
+    "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/mariadb/?.so;bibs/bibc/rede/?.so;" ..
+    módulo.caminhoC
+
+local endereço = so.obterVariável("SANTAFE_MARIADB_HOST")
+local usuário = so.obterVariável("SANTAFE_MARIADB_USUARIO")
+local senha = so.obterVariável("SANTAFE_MARIADB_SENHA")
+local banco = so.obterVariável("SANTAFE_MARIADB_BANCO")
+local porta = paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")) ou 3306
+se não (endereço e usuário e senha e banco) então
+    mostre("IGNORADO: defina as variáveis SANTAFE_MARIADB_* para testar")
+    retorne
+fim
+
+local mariadb = importe "mariadb"
+local Adaptador = importe "correio.mariadb"
+local páginas = importe "carteiro.páginas"
+local rede = importe "rede"
+local piscina
+
+local objetos = { próximo = 0, conteúdos = {} }
+função objetos.graveAssíncrono(este, conteúdo, tratador)
+    este.próximo = este.próximo + 1
+    local resumo = colar.replique(paraColar(este.próximo % 10), 64)
+    este.conteúdos[resumo] = conteúdo
+    tratador({ resumo = resumo, tamanho = #conteúdo })
+    retorne verdadeiro
+fim
+função objetos.leiaAssíncrono(este, resumo, _, tratador)
+    tratador(este.conteúdos[resumo])
+    retorne verdadeiro
+fim
+
+local função encerre(falha)
+    se falha então mostre("FALHOU:", falha) fim
+    se piscina então piscina:feche() fim
+    rede.pareLaço()
+    se falha então so.saia(1) fim
+fim
+
+rede.agende(15000, função() encerre("tempo limite do ensaio de autenticação") fim)
+
+mariadb.criePiscinaAssíncrona({
+    endereço = endereço, usuário = usuário, senha = senha,
+    banco = banco, porta = porta, mínimo = 1, máximo = 2,
+    máximoDaFila = 8, tempoDeEspera = 3000
+}, função(novaPiscina, falhaDaPiscina)
+    se não novaPiscina então encerre(falhaDaPiscina); retorne fim
+    piscina = novaPiscina
+    piscina:executePreparadoAssíncrono([[
+INSERT INTO usuarios (nome,usuario,email,papel,estado)
+VALUES (?,?,?,?,?)]], {
+        "Autenticação Postal", "autenticacao-postal",
+        "autenticacao-postal@santafé.dev.br", "usuário", "ativo"
+    }, função(_, inclusão, falhaDaInclusão)
+        se falhaDaInclusão então
+            se inclusão então inclusão:feche() fim
+            encerre(falhaDaInclusão); retorne
+        fim
+        local idDoUsuário = inclusão:idInserido()
+        inclusão:feche()
+        local adaptador = Adaptador.novo(piscina, {
+            domínio = "santafé.dev.br",
+            domínioASCII = "xn--santaf-gva.dev.br"
+        }, objetos)
+        adaptador:obtenhaOuCrieCaixa({
+            id = idDoUsuário, usuário = "autenticacao-postal",
+            nome = "Autenticação Postal"
+        }, função(caixa, falhaDaCaixa)
+            se não caixa então encerre(falhaDaCaixa); retorne fim
+            local envelope = {
+                remetente = "remetente@example.net",
+                destinatários = { caixa.parteLocal .. "@" .. caixa.domínioASCII },
+                conteúdo = "From: remetente@example.net\r\n" ..
+                    "To: " .. caixa.endereço .. "\r\n" ..
+                    "Subject: Autenticação persistida\r\n" ..
+                    "Message-ID: <autenticacao@example.net>\r\n" ..
+                    "Content-Type: text/plain; charset=utf-8\r\n\r\n" ..
+                    "Conteúdo autenticado.\r\n",
+                autenticação = {
+                    spf = { resultado = "passa", domínio = "example.net" },
+                    dkim = { resultado = "passa", domínios = { "example.net" } },
+                    dmarc = { resultado = "passa", ação = "aceitar",
+                        domínioDoAutor = "example.net", política = "reject" }
+                },
+                triagem = { classificação = "regular",
+                    pontuaçãoDeSuspeita = 0, pasta = "entrada", motivos = {} },
+                recebidaEm = so.tempo()
+            }
+            adaptador:recebaSMTP(envelope, função(quantidade, falhaDoRecebimento)
+                se quantidade ~= 1 então encerre(falhaDoRecebimento); retorne fim
+                piscina:executePreparadoAssíncrono([[
+SELECT id FROM correio_cartas WHERE caixa_id=?
+AND identificacao='<autenticacao@example.net>' LIMIT 1]], { caixa.id },
+                    função(_, consulta, falhaDaConsulta)
+                        se falhaDaConsulta então
+                            se consulta então consulta:feche() fim
+                            encerre(falhaDaConsulta); retorne
+                        fim
+                        local linha = consulta:obterLinha()
+                        consulta:feche()
+                        se não linha então encerre("carta autenticada não foi gravada"); retorne fim
+                        adaptador:obtenhaMensagem(caixa.id, paraNúmero(linha[1]),
+                            função(carta, falhaDaCarta)
+                                se não carta então encerre(falhaDaCarta); retorne fim
+                                garanta(carta.resultadoSPF == "passa")
+                                garanta(carta.resultadoDKIM == "passa")
+                                garanta(carta.resultadoDMARC == "passa")
+                                garanta(carta.domínioDoAutor == "example.net")
+                                garanta(carta.políticaDMARC == "reject")
+                                garanta(carta.açãoDMARC == "aceitar")
+                                local html = páginas.mensagem({
+                                    nome = "Autenticação Postal", csrf = "teste"
+                                }, caixa, carta)
+                                se não html:procure("SPF: passou", 1, verdadeiro) ou
+                                   não html:procure("política DMARC:", 1, verdadeiro) ou
+                                   não html:procure("reject", 1, verdadeiro) então
+                                    encerre("detalhes da autenticação ausentes"); retorne
+                                fim
+                                mostre("Autenticação postal no MariaDB/Carteiro:", "ok")
+                                encerre()
+                            fim)
+                    fim)
+            fim)
+        fim)
+    fim)
+fim)
+
+rede.laço()

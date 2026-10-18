@@ -103,7 +103,7 @@ static const char *json_token_type_name[] = {
     "fim de matriz",
     "colar",
     "n\xC3\xBAmero",
-    "booleano",
+    "l\xC3\xB3gico",
     "nulo",
     "dois-pontos",
     "v\xC3\xADrgula",
@@ -152,6 +152,11 @@ typedef struct {
     } value;
     int string_len;
 } json_token_t;
+
+/* Marcador público para uma matriz JSON vazia. Uma tabela vazia não contém
+ * informação suficiente para o serializador distinguir {} de []; quem precisa
+ * declarar a segunda forma usa json.matrizVazia. */
+static char json_empty_array_marker;
 
 static const char *char2escape[256] = {
     "\\u0000", "\\u0001", "\\u0002", "\\u0003",
@@ -691,6 +696,10 @@ static void json_append_data(lua_State *l, json_config_t *cfg,
         strbuf_append_mem(json, "null", 4);
         break;
     case LUA_TLIGHTUSERDATA:
+        if (lua_touserdata(l, -1) == (void *)&json_empty_array_marker) {
+            strbuf_append_mem(json, "[]", 2);
+            break;
+        }
         if (lua_touserdata(l, -1) == NULL) {
             strbuf_append_mem(json, "null", 4);
             break;
@@ -1374,6 +1383,9 @@ static int lua_cjson_new(lua_State *l)
     /* Valor sentinela que representa o nulo do JSON dentro de tabelas. */
     lua_pushlightuserdata(l, NULL);
     lua_setfield(l, -2, "valorNulo");
+
+    lua_pushlightuserdata(l, (void *)&json_empty_array_marker);
+    lua_setfield(l, -2, "matrizVazia");
 
     /* Set module name / version fields */
     lua_pushliteral(l, "json");

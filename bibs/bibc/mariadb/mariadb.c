@@ -167,6 +167,7 @@ typedef enum {
     POOL_ENTRY_EMPTY,
     POOL_ENTRY_CONNECTING,
     POOL_ENTRY_FREE,
+    POOL_ENTRY_CHECKING,
     POOL_ENTRY_OPERATION,
     POOL_ENTRY_SESSION,
     POOL_ENTRY_TRANSACTION,
@@ -179,6 +180,7 @@ typedef struct {
     ps_mysql_t *connection;
     int connection_ref;
     unsigned long generation;
+    gint64 last_used_us;
 } pool_entry_t;
 
 typedef enum {
@@ -199,6 +201,17 @@ typedef struct pool_job_s {
     guint timeout_source;
     gboolean queued;
 } pool_job_t;
+
+typedef struct {
+    ps_mysql_pool_t *pool;
+    pool_entry_t *entry;
+    pool_job_t *job;
+    int wait_status;
+    int result_code;
+    guint io_source;
+    guint timeout_source;
+    gboolean completed;
+} pool_ping_attempt_t;
 
 typedef struct {
     ps_mysql_pool_t *pool;
@@ -1583,6 +1596,7 @@ static void pool_close_entry(lua_State *L, pool_entry_t *entry) {
     }
     entry->connection = NULL;
     entry->state = POOL_ENTRY_EMPTY;
+    entry->last_used_us = 0;
     entry->generation++;
 }
 
@@ -1692,6 +1706,11 @@ static void pool_dispatch(ps_mysql_pool_t *pool, int pool_ref);
 static void pool_start_connection(ps_mysql_pool_t *pool, int pool_ref,
                                   gboolean initial);
 static void pool_start_job(pool_job_t *job, pool_entry_t *entry);
+static void pool_start_health_check(pool_job_t *job, pool_entry_t *entry);
+
+/* Evita um ping extra durante rajadas, mas verifica conexões que ficaram
+ * paradas tempo suficiente para o servidor ou a rede tê-las encerrado. */
+#define POOL_IDLE_HEALTH_CHECK_US (5 * G_USEC_PER_SEC)
 
 static gboolean pool_job_timeout_cb(gpointer user_data) {
     pool_job_t *job = (pool_job_t*)user_data;
@@ -1729,6 +1748,126 @@ static pool_job_t *new_pool_job(lua_State *L, ps_mysql_pool_t *pool,
     return job;
 }
 
+static void pool_schedule_health_check(pool_ping_attempt_t *attempt);
+
+static void pool_finish_health_check(pool_ping_attempt_t *attempt) {
+    ps_mysql_pool_t *pool = attempt->pool;
+    pool_entry_t *entry = attempt->entry;
+    pool_job_t *job = attempt->job;
+    gboolean healthy = attempt->result_code == 0 && entry &&
+                       entry->state == POOL_ENTRY_CHECKING &&
+                       !pool_connection_broken(entry);
+
+    if (attempt->io_source) g_source_remove(attempt->io_source);
+    if (attempt->timeout_source) g_source_remove(attempt->timeout_source);
+    attempt->io_source = 0;
+    attempt->timeout_source = 0;
+
+    if (healthy) {
+        entry->last_used_us = g_get_monotonic_time();
+        g_free(attempt);
+        if (pool->closed) {
+            entry->state = POOL_ENTRY_FREE;
+            pool_fail_job(job, "piscina MariaDB fechada");
+        } else {
+            pool_start_job(job, entry);
+        }
+        return;
+    }
+
+    if (entry) {
+        entry->state = POOL_ENTRY_DEAD;
+        if (pool_entry_clean(entry)) pool_close_entry(pool->L, entry);
+    }
+    g_free(attempt);
+    if (pool->closed)
+        pool_fail_job(job, "piscina MariaDB fechada");
+    else
+        pool_queue_job(job);
+}
+
+static void pool_continue_health_check(pool_ping_attempt_t *attempt,
+                                       int event_status) {
+    attempt->wait_status = mysql_ping_cont(&attempt->result_code,
+                                           attempt->entry->connection->con,
+                                           event_status);
+    if (attempt->wait_status)
+        pool_schedule_health_check(attempt);
+    else
+        pool_finish_health_check(attempt);
+}
+
+static gboolean pool_health_check_io_cb(GIOChannel *source,
+                                         GIOCondition condition,
+                                         gpointer user_data) {
+    pool_ping_attempt_t *attempt = (pool_ping_attempt_t*)user_data;
+    int event_status = 0;
+    (void)source;
+    attempt->io_source = 0;
+    if (attempt->timeout_source) {
+        g_source_remove(attempt->timeout_source);
+        attempt->timeout_source = 0;
+    }
+    if (condition & G_IO_IN) event_status |= MYSQL_WAIT_READ;
+    if (condition & G_IO_OUT) event_status |= MYSQL_WAIT_WRITE;
+    if (condition & (G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL))
+        event_status |= MYSQL_WAIT_EXCEPT;
+    pool_continue_health_check(attempt, event_status);
+    return G_SOURCE_REMOVE;
+}
+
+static gboolean pool_health_check_timeout_cb(gpointer user_data) {
+    pool_ping_attempt_t *attempt = (pool_ping_attempt_t*)user_data;
+    attempt->timeout_source = 0;
+    if (attempt->io_source) {
+        g_source_remove(attempt->io_source);
+        attempt->io_source = 0;
+    }
+    pool_continue_health_check(attempt, MYSQL_WAIT_TIMEOUT);
+    return G_SOURCE_REMOVE;
+}
+
+static void pool_schedule_health_check(pool_ping_attempt_t *attempt) {
+    GIOCondition condition = G_IO_ERR | G_IO_HUP | G_IO_NVAL;
+    MYSQL *connection = attempt->entry->connection->con;
+    if (attempt->wait_status & MYSQL_WAIT_READ) condition |= G_IO_IN;
+    if (attempt->wait_status & MYSQL_WAIT_WRITE) condition |= G_IO_OUT;
+    if (attempt->wait_status & MYSQL_WAIT_EXCEPT) condition |= G_IO_PRI;
+    if (attempt->wait_status &
+        (MYSQL_WAIT_READ | MYSQL_WAIT_WRITE | MYSQL_WAIT_EXCEPT)) {
+        int fd = mysql_get_socket(connection);
+        if (fd >= 0) {
+            GIOChannel *channel = g_io_channel_unix_new(fd);
+            attempt->io_source = g_io_add_watch(
+                channel, condition, pool_health_check_io_cb, attempt);
+            g_io_channel_unref(channel);
+        }
+    }
+    if (attempt->wait_status & MYSQL_WAIT_TIMEOUT) {
+        unsigned int timeout_ms = mysql_get_timeout_value_ms(connection);
+        if (timeout_ms == 0) timeout_ms = 1;
+        attempt->timeout_source = g_timeout_add(
+            timeout_ms, pool_health_check_timeout_cb, attempt);
+    }
+    if (!attempt->io_source && !attempt->timeout_source)
+        attempt->timeout_source = g_timeout_add(
+            1, pool_health_check_timeout_cb, attempt);
+}
+
+static void pool_start_health_check(pool_job_t *job, pool_entry_t *entry) {
+    pool_ping_attempt_t *attempt = g_new0(pool_ping_attempt_t, 1);
+    attempt->pool = job->pool;
+    attempt->entry = entry;
+    attempt->job = job;
+    entry->state = POOL_ENTRY_CHECKING;
+    attempt->wait_status = mysql_ping_start(
+        &attempt->result_code, entry->connection->con);
+    if (attempt->wait_status)
+        pool_schedule_health_check(attempt);
+    else
+        pool_finish_health_check(attempt);
+}
+
 static void pool_dispatch(ps_mysql_pool_t *pool, int pool_ref) {
     pool_entry_t *entry;
     while (!pool->closed && !g_queue_is_empty(pool->queue) &&
@@ -1739,7 +1878,12 @@ static void pool_dispatch(ps_mysql_pool_t *pool, int pool_ref) {
             g_source_remove(job->timeout_source);
             job->timeout_source = 0;
         }
-        pool_start_job(job, entry);
+        if (entry->last_used_us > 0 &&
+            g_get_monotonic_time() - entry->last_used_us >=
+                POOL_IDLE_HEALTH_CHECK_US)
+            pool_start_health_check(job, entry);
+        else
+            pool_start_job(job, entry);
     }
     while (!pool->closed && !g_queue_is_empty(pool->queue) &&
            pool_active_count(pool) < pool->maximum &&
@@ -1783,6 +1927,7 @@ static void pool_finish_connect_attempt(pool_connect_attempt_t *attempt,
         entry->connection_ref = luaL_ref(L, LUA_REGISTRYINDEX);
         entry->connection = connection;
         entry->state = POOL_ENTRY_FREE;
+        entry->last_used_us = g_get_monotonic_time();
     } else {
         entry->state = POOL_ENTRY_EMPTY;
         if (attempt->initial && !pool->initial_error)
@@ -2003,6 +2148,7 @@ static int l_pool_state(lua_State *L) {
     POOL_STATE_FIELD("total", pool_active_count(pool));
     POOL_STATE_FIELD("livres", pool_state_count(pool, POOL_ENTRY_FREE));
     POOL_STATE_FIELD("conectando", pool_state_count(pool, POOL_ENTRY_CONNECTING));
+    POOL_STATE_FIELD("verificando", pool_state_count(pool, POOL_ENTRY_CHECKING));
     POOL_STATE_FIELD("emOpera\xC3\xA7\xC3\xA3o", pool_state_count(pool, POOL_ENTRY_OPERATION));
     POOL_STATE_FIELD("sess\xC3\xB5" "es", pool_state_count(pool, POOL_ENTRY_SESSION));
     POOL_STATE_FIELD("transa\xC3\xA7\xC3\xB5" "es", pool_state_count(pool, POOL_ENTRY_TRANSACTION));
@@ -2016,6 +2162,7 @@ static int l_pool_close(lua_State *L) {
     ps_mysql_pool_t *pool = check_pool(L, 1);
     if (pool->closed) return 0;
     if (pool_state_count(pool, POOL_ENTRY_CONNECTING) > 0 ||
+        pool_state_count(pool, POOL_ENTRY_CHECKING) > 0 ||
         pool_state_count(pool, POOL_ENTRY_OPERATION) > 0 ||
         pool_state_count(pool, POOL_ENTRY_SESSION) > 0 ||
         pool_state_count(pool, POOL_ENTRY_TRANSACTION) > 0 ||
@@ -2038,6 +2185,7 @@ static int l_pool_gc(lua_State *L) {
     ps_mysql_pool_t *pool = check_pool(L, 1);
     if (!pool->closed && g_queue_is_empty(pool->queue) &&
         pool_state_count(pool, POOL_ENTRY_CONNECTING) == 0 &&
+        pool_state_count(pool, POOL_ENTRY_CHECKING) == 0 &&
         pool_state_count(pool, POOL_ENTRY_OPERATION) == 0 &&
         pool_state_count(pool, POOL_ENTRY_SESSION) == 0 &&
         pool_state_count(pool, POOL_ENTRY_TRANSACTION) == 0) {
@@ -2098,6 +2246,7 @@ static void pool_release_entry(ps_mysql_pool_t *pool, pool_entry_t *entry,
         if (pool_entry_clean(entry)) pool_close_entry(pool->L, entry);
     } else {
         entry->state = POOL_ENTRY_FREE;
+        entry->last_used_us = g_get_monotonic_time();
     }
     if (!pool->closed) {
         pool_dispatch(pool, pool_ref);

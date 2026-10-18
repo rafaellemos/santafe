@@ -1,0 +1,105 @@
+-- Integração real: cliente SMTP -> STARTTLS -> autenticação -> servidor.
+
+local correio = importe "correio"
+local pulso = importe "pulso"
+
+local memóriaPULSO = pulso.memória(100)
+local canal = garanta(pulso.novo { serviço = "teste-correio" })
+canal:adicioneDestino(memóriaPULSO)
+
+local recebidas = {}
+local servidor, falha = correio.servidor {
+    endereço = "127.0.0.1",
+    porta = 18751,
+    nome = "smtp.teste.local",
+    segurança = "inícioTLS",
+    certificado = "testes/recursos/tls-local-certificado.pem",
+    chavePrivada = "testes/recursos/tls-local-chave.pem",
+    domíniosLocais = { "teste.local" },
+    autentique = função(usuário, senha)
+        retorne usuário == "rafael" e senha == "segredo-do-teste"
+    fim,
+    receba = função(mensagem)
+        tabela.insira(recebidas, mensagem)
+        retorne verdadeiro
+    fim,
+    pulso = canal
+}
+garanta(servidor, falha)
+garanta(servidor:inicie())
+
+local mensagem
+mensagem, falha = correio.novaMensagem {
+    remetente = "rafael@teste.local",
+    destinatários = { "ana@teste.local" },
+    assunto = "Santafé e PULSO",
+    texto = "Olá, Ana.\n.esta linha começa com ponto.",
+    html = "<p>Olá, <strong>Ana</strong>.</p>",
+    anexos = {
+        { nome = "leitura.txt", tipo = "text/plain", dados = "medição: 42" }
+    }
+}
+garanta(mensagem, falha)
+
+local cliente
+cliente, falha = correio.cliente {
+    endereço = "localhost",
+    porta = 18751,
+    nome = "cliente.teste.local",
+    segurança = "inícioTLS",
+    validarCertificado = falso,
+    usuário = "rafael",
+    senha = "segredo-do-teste",
+    tempoLimite = 4000,
+    pulso = canal
+}
+garanta(cliente, falha)
+
+local terminou = falso
+local sucesso = falso
+local detalhe = "envio SMTP não terminou"
+garanta(cliente:envieAssíncrono(mensagem,
+    função(resultado, falhaDoEnvio)
+        terminou = verdadeiro
+        sucesso = resultado ~= nulo e falhaDoEnvio == nulo
+        detalhe = falhaDoEnvio ou "ok"
+        cliente:feche()
+        servidor:feche()
+    fim))
+
+-- servidor:feche() encerra o laço depois que o cliente recebe 250.
+importe("rede").laço()
+garanta(terminou e sucesso, detalhe)
+garanta(#recebidas == 1, "servidor não persistiu exatamente uma mensagem")
+garanta(recebidas[1].remetente == "rafael@teste.local")
+garanta(recebidas[1].destinatários[1] == "ana@teste.local")
+garanta(recebidas[1].conteúdo:procure("Santaf", 1, verdadeiro) ~= nulo)
+garanta(recebidas[1].conteúdo:procure(
+    colar.base64("Olá, Ana.\r\n.esta linha começa com ponto."),
+    1, verdadeiro
+) ~= nulo, "corpo textual MIME não foi preservado")
+local estatísticasDoServidor = servidor:estatísticas()
+garanta(estatísticasDoServidor.vigia ~= nulo,
+    "servidor SMTP não expôs as estatísticas do Vigia")
+garanta(estatísticasDoServidor.vigia.admitidas == 1 e
+        estatísticasDoServidor.vigia.concluídas == 1 e
+        estatísticasDoServidor.vigia.ativas == 0,
+    "ciclo de admissão do Vigia SMTP ficou desequilibrado")
+garanta(#memóriaPULSO.mensagens >= 4, "eventos PULSO do Correio ausentes")
+local fechamento
+para _, evento em ipares(memóriaPULSO.mensagens) início
+    se evento.nome:procure("correio.", 1, verdadeiro) == 1 então
+        garanta(evento.tipo ~= "operação",
+            "acontecimento do Correio foi classificado como ordem PULSO")
+    fim
+    se evento.nome == "correio.conexãoFechada" então
+        fechamento = evento
+    fim
+fim
+garanta(fechamento e tipo(fechamento.dados.rastro) == "tabela",
+    "fechamento SMTP não trouxe o rastro seguro")
+garanta(fechamento.dados.rastro[1] == "C:EHLO" e
+        fechamento.dados.rastro[2] == "R:250",
+    "rastro SMTP não preservou comando e resposta")
+canal:feche()
+mostre("correio STARTTLS: ok")

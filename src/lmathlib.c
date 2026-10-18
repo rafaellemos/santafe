@@ -298,10 +298,9 @@ static int math_type (lua_State *L) {
 
 /*
 ** {==================================================================
-** Deprecated functions (for compatibility only)
+** Funções matemáticas especializadas
 ** ===================================================================
 */
-#if defined(LUA_COMPAT_MATHLIB)
 
 static int math_cosh (lua_State *L) {
   lua_pushnumber(L, l_mathop(cosh)(luaL_checknumber(L, 1)));
@@ -344,7 +343,6 @@ static int math_log10 (lua_State *L) {
   return 1;
 }
 
-#endif
 /* }================================================================== */
 
 
@@ -427,8 +425,6 @@ static const luaL_Reg mathlib[] = {
   {"raiz",            math_sqrt},
   {"tangente",        math_tan},
   {"tipo",            math_type},
-#if defined(LUA_COMPAT_MATHLIB)
-  {"arcoTangente2",      math_atan},
   {"cossenoHiperb\xC3\xB3lico", math_cosh},
   {"senoHiperb\xC3\xB3lico",    math_sinh},
   {"tangenteHiperb\xC3\xB3lica",math_tanh},
@@ -436,7 +432,6 @@ static const luaL_Reg mathlib[] = {
   {"decomp\xC3\xB5" "e2",          math_frexp},
   {"recomp\xC3\xB5" "e2",          math_ldexp},
   {"log10",              math_log10},
-#endif
   /* placeholders */
   {"pi",            NULL},
   {"infinito",      NULL},

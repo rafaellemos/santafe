@@ -1,0 +1,11 @@
+[Unit]
+Description=Verifica periodicamente a fila do Correio Santafé
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=15s
+AccuracySec=2s
+Unit=correio-envios.service
+
+[Install]
+WantedBy=timers.target

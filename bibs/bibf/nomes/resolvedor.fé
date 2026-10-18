@@ -1,0 +1,969 @@
+-- Resolvedor DNS recursivo e iterativo em Santafé.
+--
+-- Não encaminha consultas a um resolvedor de terceiros: parte dos servidores
+-- raiz, segue delegações e conserva respostas em memória pelo TTL. A primeira
+-- versão não valida DNSSEC; por isso nunca marca dados como autenticados.
+
+local nomes = importe "nomes"
+local acesso = importe "nomes.acesso"
+local rede = importe "rede"
+
+local resolvedor = {}
+
+local RAÍZES_PADRÃO = {
+    "198.41.0.4", "170.247.170.2", "192.33.4.12", "199.7.91.13",
+    "192.203.230.10", "192.5.5.241", "192.112.36.4", "198.97.190.53",
+    "192.36.148.17", "192.58.128.30", "193.0.14.129", "199.7.83.42",
+    "202.12.27.33"
+}
+
+local função copie(valor, profundidade)
+    se tipo(valor) ~= "tabela" então retorne valor fim
+    profundidade = (profundidade ou 0) + 1
+    se profundidade > 16 então erro("estrutura DNS profunda demais", 3) fim
+    local resultado = {}
+    para chave, item em pares(valor) início
+        resultado[copie(chave, profundidade)] = copie(item, profundidade)
+    fim
+    retorne resultado
+fim
+
+local função acrescente(destino, origem)
+    para _, item em ipares(origem ou {}) início destino[#destino + 1] = item fim
+fim
+
+local função chaveDaPergunta(pergunta)
+    retorne pergunta.nome .. ":" .. pergunta.tipo .. ":" .. pergunta.classe
+fim
+
+local função mesmaPergunta(a, b)
+    retorne a e b e a.nome:minúscula() == b.nome:minúscula() e
+        a.tipo == b.tipo e a.classe == b.classe
+fim
+
+local função identificaçãoDoPacote(pacote)
+    se tipo(pacote) ~= "colar" ou #pacote < 2 então retorne nulo fim
+    retorne (pacote:byte(1) << 8) | pacote:byte(2)
+fim
+
+local função respostaBásica(consulta, código)
+    retorne {
+        identificação = consulta e consulta.identificação ou 0,
+        bandeiras = {
+            resposta = verdadeiro,
+            recursãoDesejada = consulta e consulta.bandeiras.recursãoDesejada ou falso,
+            recursãoDisponível = verdadeiro,
+            códigoDeResposta = código
+        },
+        perguntas = consulta e copie(consulta.perguntas) ou {},
+        respostas = {}, autoridades = {}, adicionais = {}
+    }
+fim
+
+local função limiteUDPDaConsulta(consulta, máximo)
+    local limite = mat.mínimo(máximo, 512)
+    para _, registro em ipares(consulta.adicionais ou {}) início
+        se registro.tipo == nomes.TIPOS.OPT então
+            limite = mat.mínimo(máximo, mat.máximo(512, registro.classe ou 512))
+            pare
+        fim
+    fim
+    retorne limite
+fim
+
+local função codifiqueLimitada(resposta, limite)
+    local pacote, falha = nomes.codifiqueMensagem(resposta)
+    se não pacote então retorne nulo, falha fim
+    se não limite ou #pacote <= limite então retorne pacote fim
+    resposta.bandeiras.truncada = verdadeiro
+    para _, nomeDaSeção em ipares({ "adicionais", "autoridades", "respostas" }) início
+        local seção = resposta[nomeDaSeção]
+        enquanto #seção > 0 início
+            tabela.remova(seção)
+            pacote = nomes.codifiqueMensagem(resposta)
+            se #pacote <= limite então retorne pacote fim
+        fim
+    fim
+    se #pacote > limite então retorne nulo, "limite UDP pequeno demais" fim
+    retorne pacote
+fim
+
+local função nova(opções)
+    opções = opções ou {}
+    local acl, falha = acesso.novo(opções.prefixosPermitidos)
+    se não acl então retorne nulo, falha fim
+    local limitador
+    limitador, falha = acesso.novoLimitador(opções.limiteDeTaxa ou {
+        porSegundo = 100, explosão = 200, máximoDeOrigens = 10000
+    })
+    se não limitador então retorne nulo, falha fim
+
+    local este = {
+        endereço = opções.endereço ou "127.0.0.1",
+        porta = opções.porta ou 53,
+        portaExterna = opções.portaExterna ou 53,
+        prefixosPermitidos = acl,
+        máximoUDP = opções.máximoUDP ou 1232,
+        tempoLimite = opções.tempoLimite ou 1800,
+        tentativas = opções.tentativas ou 2,
+        máximoDeSaltos = opções.máximoDeSaltos ou 32,
+        máximoDePendentes = opções.máximoDePendentes ou 2048,
+        máximoTCP = opções.máximoTCP ou 256,
+        máximoDaMemrap = opções.máximoDaMemrap ou 20000,
+        ttlMáximo = opções.ttlMáximo ou 86400,
+        servidoresRaiz = copie(opções.servidoresRaiz ou RAÍZES_PADRÃO),
+        iniciado = falso,
+        encerrando = falso,
+        estatísticasDNS = {
+            recebidas = 0, respondidas = 0, negadas = 0,
+            limitadas = 0, pendentes = 0, acertosDaMemrap = 0,
+            falhasDaMemrap = 0, consultasExternas = 0,
+            respostasDescartadas = 0, tempoEsgotado = 0,
+            tcpAtivas = 0, tcpRecusadas = 0
+        }
+    }
+
+    local memrap = {}
+    local quantidadeNaMemrap = 0
+    local pendentes = {}
+    local estadosAtivos = {}
+    local saída4
+    local saída6
+    local servidorUDP
+    local servidorTCP
+    local conexõesTCP = {}
+    local sequênciaDeEstados = 0
+
+    local função evento(nome, dados)
+        se tipo(opções.aoEvento) ~= "função" então retorne fim
+        local funcionou, falhaDoEvento = proteja(opções.aoEvento, nome, dados)
+        se não funcionou e opções.aoFalhar então opções.aoFalhar(falhaDoEvento) fim
+    fim
+
+    local função ttlDaResposta(resultado)
+        local menor = nulo
+        local listas = { resultado.respostas, resultado.autoridades }
+        para _, lista em ipares(listas) início
+            para _, registro em ipares(lista ou {}) início
+                local ttl = registro.ttl ou 0
+                se registro.tipo == nomes.TIPOS.SOA e #resultado.respostas == 0 e
+                   tipo(registro.dados) == "tabela" então
+                    ttl = mat.mínimo(ttl, registro.dados.mínimo ou ttl)
+                fim
+                se ttl > 0 e (menor == nulo ou ttl < menor) então menor = ttl fim
+            fim
+        fim
+        se não menor então retorne 0 fim
+        retorne mat.mínimo(menor, este.ttlMáximo)
+    fim
+
+    local função limpeMemrap(agora)
+        para chave, item em pares(memrap) início
+            se item.expira <= agora então
+                memrap[chave] = nulo
+                quantidadeNaMemrap = quantidadeNaMemrap - 1
+            fim
+        fim
+    fim
+
+    local função guarde(pergunta, resultado)
+        local ttl = ttlDaResposta(resultado)
+        se ttl <= 0 então retorne fim
+        local agora = so.tempo()
+        se quantidadeNaMemrap >= este.máximoDaMemrap então limpeMemrap(agora) fim
+        se quantidadeNaMemrap >= este.máximoDaMemrap então retorne fim
+        local chave = chaveDaPergunta(pergunta)
+        se não memrap[chave] então quantidadeNaMemrap = quantidadeNaMemrap + 1 fim
+        memrap[chave] = { gravado = agora, expira = agora + ttl, resultado = copie(resultado) }
+    fim
+
+    local função obtenhaDaMemrap(pergunta)
+        local chave = chaveDaPergunta(pergunta)
+        local item = memrap[chave]
+        se não item então
+            este.estatísticasDNS.falhasDaMemrap = este.estatísticasDNS.falhasDaMemrap + 1
+            retorne nulo
+        fim
+        local agora = so.tempo()
+        se item.expira <= agora então
+            memrap[chave] = nulo
+            quantidadeNaMemrap = quantidadeNaMemrap - 1
+            este.estatísticasDNS.falhasDaMemrap = este.estatísticasDNS.falhasDaMemrap + 1
+            retorne nulo
+        fim
+        local resultado = copie(item.resultado)
+        local idade = agora - item.gravado
+        para _, lista em ipares({ resultado.respostas, resultado.autoridades,
+                                  resultado.adicionais }) início
+            para _, registro em ipares(lista ou {}) início
+                registro.ttl = mat.máximo(0, (registro.ttl ou 0) - idade)
+            fim
+        fim
+        este.estatísticasDNS.acertosDaMemrap = este.estatísticasDNS.acertosDaMemrap + 1
+        retorne resultado
+    fim
+
+    local função novoID()
+        para _ = 1, 65536 início
+            local id = so.aleatório() & 0xFFFF
+            se não pendentes[id] então retorne id fim
+        fim
+        retorne nulo
+    fim
+
+    local função retireEspera(estado)
+        se estado.id e pendentes[estado.id] == estado então pendentes[estado.id] = nulo fim
+        estado.id = nulo
+        se estado.relógio então estado.relógio:cancele(); estado.relógio = nulo fim
+    fim
+
+    local função finalize(estado, resultado, falhaFinal, conserve)
+        se estado.finalizado então retorne fim
+        estado.finalizado = verdadeiro
+        estadosAtivos[estado] = nulo
+        retireEspera(estado)
+        se estado.conectorTCP então estado.conectorTCP:feche(); estado.conectorTCP = nulo fim
+        se estado.conexãoTCP então estado.conexãoTCP:feche(); estado.conexãoTCP = nulo fim
+        este.estatísticasDNS.pendentes = mat.máximo(
+            0, este.estatísticasDNS.pendentes - 1
+        )
+        se resultado e conserve então guarde(estado.pergunta, resultado) fim
+        estado.tratador(resultado, falhaFinal)
+    fim
+
+    local função enviePróximo(canal)
+        se canal.enviando ou #canal.fila == 0 então retorne fim
+        canal.enviando = verdadeiro
+        local item = canal.fila[1]
+        canal.conector:envieParaAssíncrono(
+            item.endereço, este.portaExterna, item.pacote,
+            função(_, _, falhaDoEnvio)
+                tabela.remova(canal.fila, 1)
+                canal.enviando = falso
+                se falhaDoEnvio e não item.estado.finalizado e
+                   item.estado.id == item.id então
+                    retireEspera(item.estado)
+                    item.aoFalhar(item.estado, falhaDoEnvio)
+                fim
+                enviePróximo(canal)
+            fim)
+    fim
+
+    local função enfileire(canal, endereço, pacote, estado, id, aoFalhar)
+        canal.fila[#canal.fila + 1] = { endereço = endereço, pacote = pacote,
+            estado = estado, id = id, aoFalhar = aoFalhar }
+        enviePróximo(canal)
+    fim
+
+    local tenteOutro
+    local processeMensagem
+    local resolvaInterno
+
+    local função consultaPara(pergunta, id)
+        retorne nomes.codifiqueMensagem({
+            identificação = id,
+            bandeiras = { recursãoDesejada = falso },
+            perguntas = { copie(pergunta) },
+            adicionais = { { nome = ".", tipo = "OPT", classe = 1232,
+                ttl = 0, dados = "" } }
+        })
+    fim
+
+    local função tenteServidor(estado)
+        se estado.finalizado então retorne fim
+        se estado.saltos >= este.máximoDeSaltos então
+            finalize(estado, nulo, "resolução DNS excedeu o limite de saltos")
+            retorne
+        fim
+        local endereço = estado.servidores[estado.índiceDoServidor]
+        se não endereço então tenteOutro(estado, "nenhum servidor DNS respondeu"); retorne fim
+        local canal = endereço:procure(":", 1, verdadeiro) e saída6 ou saída4
+        se não canal então tenteOutro(estado, "família IP indisponível"); retorne fim
+        local id = novoID()
+        se não id então finalize(estado, nulo, "não há identificação DNS livre"); retorne fim
+        local pacote, falhaDaCodificação = consultaPara(estado.pergunta, id)
+        se não pacote então finalize(estado, nulo, falhaDaCodificação); retorne fim
+        estado.id = id
+        estado.endereçoEsperado = endereço
+        estado.saltos = estado.saltos + 1
+        pendentes[id] = estado
+        este.estatísticasDNS.consultasExternas =
+            este.estatísticasDNS.consultasExternas + 1
+        evento("consultaExterna", { estado = estado.número,
+            nome = estado.pergunta.nome, tipo = estado.pergunta.tipo,
+            endereço = endereço, profundidade = estado.profundidade,
+            salto = estado.saltos })
+        estado.relógio = rede.agende(este.tempoLimite,
+            função(_, dado)
+                se dado.finalizado ou dado.id ~= id ou pendentes[id] ~= dado então retorne fim
+                pendentes[id] = nulo
+                dado.id = nulo
+                dado.relógio = nulo
+                este.estatísticasDNS.tempoEsgotado =
+                    este.estatísticasDNS.tempoEsgotado + 1
+                tenteOutro(dado, "tempo limite DNS excedido")
+            fim, estado)
+        enfileire(canal, endereço, pacote, estado, id, tenteOutro)
+    fim
+
+    tenteOutro = função(estado, últimaFalha)
+        se estado.finalizado então retorne fim
+        retireEspera(estado)
+        estado.índiceDoServidor = estado.índiceDoServidor + 1
+        se estado.índiceDoServidor > #estado.servidores então
+            estado.tentativa = estado.tentativa + 1
+            se estado.tentativa > este.tentativas então
+                finalize(estado, nulo, últimaFalha ou "servidores DNS indisponíveis")
+                retorne
+            fim
+            estado.índiceDoServidor = 1
+        fim
+        tenteServidor(estado)
+    fim
+
+    local função useServidores(estado, servidores, zonaAtual)
+        se estado.finalizado então retorne fim
+        retireEspera(estado)
+        estado.servidores = servidores
+        se zonaAtual então estado.zonaAtual = zonaAtual fim
+        estado.índiceDoServidor = 1
+        estado.tentativa = 1
+        tenteServidor(estado)
+    fim
+
+    local função nomeEstáSob(nome, origem)
+        se origem == "." então retorne nome:corte(-1) == "." fim
+        se nome == origem então retorne verdadeiro fim
+        local limite = #nome - #origem
+        retorne limite > 0 e nome:corte(limite + 1) == origem e
+            nome:corte(limite, limite) == "."
+    fim
+
+    local função servidoresDaDelegação(estado, mensagem)
+        local nomesDosServidores = {}
+        local vistos = {}
+        local origem
+        para _, registro em ipares(mensagem.autoridades ou {}) início
+            se registro.tipo == nomes.TIPOS.NS então
+                local dono = nomes.nomeCanônico(registro.nome)
+                local servidor = nomes.nomeCanônico(registro.dados)
+                se não dono ou não servidor então
+                    retorne {}, {}, nulo, "delegação DNS possui nome inválido"
+                fim
+                origem = origem ou dono
+                se dono ~= origem então
+                    retorne {}, {}, nulo,
+                        "delegação DNS mistura origens diferentes"
+                fim
+                se não vistos[servidor] então
+                    vistos[servidor] = verdadeiro
+                    nomesDosServidores[#nomesDosServidores + 1] = servidor
+                fim
+            fim
+        fim
+        local endereços = {}
+        se origem então
+            se não nomeEstáSob(estado.pergunta.nome, origem) ou
+               não nomeEstáSob(origem, estado.zonaAtual ou ".") então
+                retorne {}, {}, nulo,
+                    "delegação DNS não pertence ao caminho consultado"
+            fim
+            para _, registro em ipares(mensagem.adicionais ou {}) início
+                -- A cola precisa pertencer à zona do servidor que respondeu,
+                -- não necessariamente à zona filha delegada. Na raiz, "."
+                -- abrange os endereços dos servidores de todos os TLDs.
+                local dono = nomes.nomeCanônico(registro.nome)
+                se dono e
+                   (registro.tipo == nomes.TIPOS.A ou registro.tipo == nomes.TIPOS.AAAA) e
+                   vistos[dono] e
+                   nomeEstáSob(dono, estado.zonaAtual ou ".") então
+                    endereços[#endereços + 1] = registro.dados
+                fim
+            fim
+        fim
+        retorne nomesDosServidores, endereços, origem, nulo
+    fim
+
+    local função respostasDaCadeia(estado, mensagem)
+        local porNome = {}
+        para _, registro em ipares(mensagem.respostas ou {}) início
+            local dono = nomes.nomeCanônico(registro.nome)
+            se não dono então
+                retorne nulo, nulo, "resposta DNS possui nome inválido"
+            fim
+            se não porNome[dono] então porNome[dono] = {} fim
+            porNome[dono][#porNome[dono] + 1] = registro
+        fim
+
+        local selecionadas = {}
+        local atual = estado.pergunta.nome
+        local visitados = {}
+        para _ = 1, 16 início
+            se visitados[atual] então
+                retorne nulo, nulo, "ciclo CNAME na resposta DNS"
+            fim
+            visitados[atual] = verdadeiro
+            local registros = porNome[atual] ou {}
+
+            se estado.pergunta.tipo == nomes.TIPOS.QUALQUER e #registros > 0 então
+                acrescente(selecionadas, registros)
+                retorne selecionadas, nulo, nulo, verdadeiro
+            fim
+
+            local finais = {}
+            local canônicos = {}
+            local alvo
+            para _, registro em ipares(registros) início
+                se registro.tipo == estado.pergunta.tipo então
+                    finais[#finais + 1] = registro
+                fim
+                se registro.tipo == nomes.TIPOS.CNAME então
+                    local destino = nomes.nomeCanônico(registro.dados)
+                    se não destino então
+                        retorne nulo, nulo, "CNAME possui destino inválido"
+                    fim
+                    se alvo e alvo ~= destino então
+                        retorne nulo, nulo, "CNAME possui destinos conflitantes"
+                    fim
+                    alvo = destino
+                    canônicos[#canônicos + 1] = registro
+                fim
+            fim
+
+            se #finais > 0 então
+                acrescente(selecionadas, finais)
+                retorne selecionadas, nulo, nulo, verdadeiro
+            fim
+            se #canônicos == 0 então
+                retorne selecionadas,
+                    (#selecionadas > 0 e atual ou nulo), nulo, falso
+            fim
+            acrescente(selecionadas, canônicos)
+            atual = alvo
+        fim
+        retorne nulo, nulo, "cadeia CNAME excede 16 nomes"
+    fim
+
+    local função adicionaisDaResposta(respostas, adicionais)
+        local permitidos = {}
+        para _, registro em ipares(respostas ou {}) início
+            local alvo
+            se registro.tipo == nomes.TIPOS.NS ou
+               registro.tipo == nomes.TIPOS.CNAME então alvo = registro.dados
+            senão se registro.tipo == nomes.TIPOS.MX então alvo = registro.dados.troca
+            senão se registro.tipo == nomes.TIPOS.SRV então alvo = registro.dados.alvo
+            fim fim fim
+            se alvo então
+                alvo = nomes.nomeCanônico(alvo)
+                se alvo então permitidos[alvo] = verdadeiro fim
+            fim
+        fim
+        local resultado = {}
+        para _, registro em ipares(adicionais ou {}) início
+            local dono = nomes.nomeCanônico(registro.nome)
+            se dono e permitidos[dono] e
+               (registro.tipo == nomes.TIPOS.A ou registro.tipo == nomes.TIPOS.AAAA) então
+                resultado[#resultado + 1] = registro
+            fim
+        fim
+        retorne resultado
+    fim
+
+    local função resolvaServidorSemCola(estado, nomes, índice, zonaDelegada)
+        índice = índice ou 1
+        se índice > #nomes então
+            tenteOutro(estado, "delegação DNS não trouxe endereços utilizáveis")
+            retorne
+        fim
+        resolvaInterno({ nome = nomes[índice], tipo = nomes.TIPOS.A,
+            classe = nomes.CLASSES.IN },
+            função(resultado, falhaDaResolução)
+                se estado.finalizado então retorne fim
+                local endereços = {}
+                se resultado então
+                    para _, registro em ipares(resultado.respostas ou {}) início
+                        se registro.tipo == nomes.TIPOS.A então
+                            endereços[#endereços + 1] = registro.dados
+                        fim
+                    fim
+                fim
+                se #endereços > 0 então
+                    useServidores(estado, endereços, zonaDelegada)
+                senão
+                    resolvaServidorSemCola(estado, nomes, índice + 1, zonaDelegada)
+                fim
+            fim, estado.profundidade + 1, estado.visitadas)
+    fim
+
+    local função sigaCNAME(estado, mensagem, alvo)
+        resolvaInterno({ nome = alvo, tipo = estado.pergunta.tipo,
+            classe = estado.pergunta.classe },
+            função(resultado, falhaDaResolução)
+                se não resultado então
+                    finalize(estado, nulo, falhaDaResolução)
+                    retorne
+                fim
+                local combinado = {
+                    código = resultado.código,
+                    respostas = copie(mensagem.respostas),
+                    autoridades = copie(resultado.autoridades),
+                    adicionais = copie(resultado.adicionais),
+                    autoritativa = falso
+                }
+                acrescente(combinado.respostas, resultado.respostas)
+                finalize(estado, combinado, nulo, verdadeiro)
+            fim, estado.profundidade + 1, estado.visitadas)
+    fim
+
+    processeMensagem = função(estado, mensagem)
+        se estado.finalizado então retorne fim
+        local código = mensagem.bandeiras.códigoDeResposta
+        se código == nomes.CÓDIGOS.FALHA_DO_SERVIDOR ou
+           código == nomes.CÓDIGOS.RECUSADO então
+            tenteOutro(estado, "servidor DNS remoto recusou ou falhou")
+            retorne
+        fim
+        se código ~= nomes.CÓDIGOS.SEM_ERRO então
+            finalize(estado, { código = código, respostas = copie(mensagem.respostas),
+                autoridades = copie(mensagem.autoridades),
+                adicionais = copie(mensagem.adicionais), autoritativa = falso },
+                nulo, código == nomes.CÓDIGOS.NOME_INEXISTENTE)
+            retorne
+        fim
+
+        local respostas, últimoCNAME, falhaDaCadeia, achouTipo =
+            respostasDaCadeia(estado, mensagem)
+        se falhaDaCadeia então
+            tenteOutro(estado, falhaDaCadeia)
+            retorne
+        fim
+        se achouTipo então
+            finalize(estado, { código = código, respostas = copie(respostas),
+                autoridades = copie(mensagem.autoridades),
+                adicionais = copie(adicionaisDaResposta(
+                    respostas, mensagem.adicionais
+                )), autoritativa = falso },
+                nulo, verdadeiro)
+            retorne
+        fim
+        se últimoCNAME então
+            local somenteCadeia = copie(mensagem)
+            somenteCadeia.respostas = respostas
+            sigaCNAME(estado, somenteCadeia, últimoCNAME)
+            retorne
+        fim
+
+        se #mensagem.respostas > 0 então
+            tenteOutro(estado, "resposta DNS não pertence ao nome consultado")
+            retorne
+        fim
+
+        local nomesDosServidores, endereços, zonaDelegada, falhaDaDelegação =
+            servidoresDaDelegação(estado, mensagem)
+        se falhaDaDelegação então
+            tenteOutro(estado, falhaDaDelegação)
+            retorne
+        fim
+        se #endereços > 0 então
+            evento("delegaçãoComCola", { estado = estado.número,
+                nome = estado.pergunta.nome, servidores = #endereços })
+            useServidores(estado, endereços, zonaDelegada)
+            retorne
+        fim
+        se #nomesDosServidores > 0 então
+            evento("delegaçãoSemCola", { estado = estado.número,
+                nome = estado.pergunta.nome,
+                servidor = nomesDosServidores[1] })
+            resolvaServidorSemCola(
+                estado, nomesDosServidores, 1, zonaDelegada
+            )
+            retorne
+        fim
+
+        -- NODATA: nome existente, mas sem o tipo solicitado. O SOA recebido
+        -- determina o prazo da memória negativa.
+        finalize(estado, { código = código, respostas = {},
+            autoridades = copie(mensagem.autoridades),
+            adicionais = copie(mensagem.adicionais), autoritativa = falso },
+            nulo, verdadeiro)
+    fim
+
+    local função processePacoteTCP(estado, pacote)
+        local mensagem, falhaDaLeitura = nomes.decodifiqueMensagem(pacote)
+        se não mensagem ou mensagem.identificação ~= estado.idTCP ou
+           #mensagem.perguntas ~= 1 ou
+           não mesmaPergunta(mensagem.perguntas[1], estado.pergunta) então
+            tenteOutro(estado, falhaDaLeitura ou "resposta DNS TCP não corresponde à consulta")
+            retorne
+        fim
+        se estado.conectorTCP então estado.conectorTCP:feche(); estado.conectorTCP = nulo fim
+        se estado.conexãoTCP então estado.conexãoTCP:feche(); estado.conexãoTCP = nulo fim
+        processeMensagem(estado, mensagem)
+    fim
+
+    local função repitaPorTCP(estado)
+        retireEspera(estado)
+        local id = novoID()
+        se não id então tenteOutro(estado, "não há identificação DNS livre"); retorne fim
+        local pacote = consultaPara(estado.pergunta, id)
+        estado.idTCP = id
+        local cliente = rede.clienteTCP()
+        estado.conectorTCP = cliente
+        cliente:definaTempoLimite(este.tempoLimite)
+        cliente:conecteAssíncrono(
+            estado.endereçoEsperado, este.portaExterna,
+            função(_, conexão, falhaDaConexão)
+                se estado.finalizado então se conexão então conexão:feche() fim; retorne fim
+                se não conexão então tenteOutro(estado, falhaDaConexão); retorne fim
+                estado.conexãoTCP = conexão
+                conexão:definaTempoLimite(este.tempoLimite)
+                conexão:envieAssíncrono(nomes._u16(#pacote) .. pacote,
+                    função(c, _, falhaDoEnvio)
+                        se falhaDoEnvio então tenteOutro(estado, falhaDoEnvio); retorne fim
+                        local entrada = ""
+                        local função receba()
+                            c:recebaDadosAssíncrono(16384,
+                                função(_, dados, falhaDaRecepção)
+                                    se falhaDaRecepção ou não dados ou dados == "" então
+                                        tenteOutro(estado, falhaDaRecepção ou "DNS TCP foi encerrado")
+                                        retorne
+                                    fim
+                                    entrada = entrada .. dados
+                                    se #entrada < 2 então receba(); retorne fim
+                                    local tamanho = (entrada:byte(1) << 8) | entrada:byte(2)
+                                    se #entrada < tamanho + 2 então receba(); retorne fim
+                                    processePacoteTCP(estado, entrada:corte(3, tamanho + 2))
+                                fim)
+                        fim
+                        receba()
+                    fim)
+            fim)
+    fim
+
+    local função recebaExterno(pacote, falhaDaRecepção, endereço, porta)
+        se falhaDaRecepção ou não pacote então retorne fim
+        local id = identificaçãoDoPacote(pacote)
+        local estado = id e pendentes[id]
+        se não estado ou estado.endereçoEsperado ~= endereço ou
+           porta ~= este.portaExterna então
+            este.estatísticasDNS.respostasDescartadas =
+                este.estatísticasDNS.respostasDescartadas + 1
+            retorne
+        fim
+        local mensagem, falhaDaLeitura = nomes.decodifiqueMensagem(pacote)
+        se não mensagem ou não mensagem.bandeiras.resposta ou
+           #mensagem.perguntas ~= 1 ou
+           não mesmaPergunta(mensagem.perguntas[1], estado.pergunta) então
+            este.estatísticasDNS.respostasDescartadas =
+                este.estatísticasDNS.respostasDescartadas + 1
+            retorne
+        fim
+        retireEspera(estado)
+        se mensagem.bandeiras.truncada então repitaPorTCP(estado)
+        senão processeMensagem(estado, mensagem) fim
+    fim
+
+    resolvaInterno = função(pergunta, tratador, profundidade, visitadas)
+        se este.encerrando então tratador(nulo, "resolvedor DNS encerrado"); retorne fim
+        profundidade = profundidade ou 0
+        se profundidade > 16 então tratador(nulo, "encadeamento DNS profundo demais"); retorne fim
+        local nome, falhaDoNome = nomes.nomeCanônico(pergunta.nome)
+        se não nome então tratador(nulo, falhaDoNome); retorne fim
+        local tipoNumérico, falhaDoTipo = nomes.tipoParaNúmero(pergunta.tipo)
+        se não tipoNumérico então tratador(nulo, falhaDoTipo); retorne fim
+        pergunta = { nome = nome, tipo = tipoNumérico,
+            classe = pergunta.classe ou nomes.CLASSES.IN }
+        local daMemrap = obtenhaDaMemrap(pergunta)
+        se daMemrap então tratador(daMemrap); retorne fim
+        visitadas = copie(visitadas ou {})
+        local chave = chaveDaPergunta(pergunta)
+        se visitadas[chave] então tratador(nulo, "ciclo na resolução DNS"); retorne fim
+        visitadas[chave] = verdadeiro
+        se este.estatísticasDNS.pendentes >= este.máximoDePendentes então
+            tratador(nulo, "limite de consultas DNS pendentes atingido")
+            retorne
+        fim
+        este.estatísticasDNS.pendentes = este.estatísticasDNS.pendentes + 1
+        sequênciaDeEstados = sequênciaDeEstados + 1
+        local estado = { pergunta = pergunta, tratador = tratador,
+            servidores = copie(este.servidoresRaiz), índiceDoServidor = 1,
+            zonaAtual = ".",
+            tentativa = 1, saltos = 0, profundidade = profundidade,
+            visitadas = visitadas, finalizado = falso,
+            número = sequênciaDeEstados }
+        estadosAtivos[estado] = verdadeiro
+        tenteServidor(estado)
+    fim
+
+    função este.resolva(_, nome, tipoDoRegistro, tratador)
+        se tipo(tratador) ~= "função" então retorne nulo, "tratador deve ser uma função" fim
+        se não este.iniciado então
+            local iniciou, falhaDoInício = este:inicieSomenteSaída()
+            se não iniciou então retorne nulo, falhaDoInício fim
+        fim
+        resolvaInterno({ nome = nome, tipo = tipoDoRegistro ou "A",
+            classe = nomes.CLASSES.IN }, tratador, 0, {})
+        retorne verdadeiro
+    fim
+
+    local função respostaAoCliente(consulta, resultado, falhaDaResolução)
+        se não resultado então
+            retorne respostaBásica(consulta, nomes.CÓDIGOS.FALHA_DO_SERVIDOR),
+                falhaDaResolução
+        fim
+        retorne {
+            identificação = consulta.identificação,
+            bandeiras = { resposta = verdadeiro,
+                recursãoDesejada = consulta.bandeiras.recursãoDesejada,
+                recursãoDisponível = verdadeiro,
+                códigoDeResposta = resultado.código ou 0 },
+            perguntas = copie(consulta.perguntas),
+            respostas = copie(resultado.respostas),
+            autoridades = copie(resultado.autoridades),
+            adicionais = copie(resultado.adicionais)
+        }
+    fim
+
+    função este.respondaAssíncrono(_, pacote, transporte, endereço, tratador)
+        local consulta, falhaDaLeitura = nomes.decodifiqueMensagem(pacote)
+        se não consulta então
+            local resposta = respostaBásica({ identificação =
+                identificaçãoDoPacote(pacote) ou 0,
+                bandeiras = {}, perguntas = {} }, nomes.CÓDIGOS.FORMATO_INVÁLIDO)
+            tratador(codifiqueLimitada(resposta,
+                transporte == "UDP" e mat.mínimo(512, este.máximoUDP) ou nulo))
+            retorne verdadeiro
+        fim
+        se consulta.bandeiras.resposta ou
+           consulta.bandeiras.códigoDeOperação ~= 0 ou
+           #consulta.perguntas ~= 1 então
+            local código = consulta.bandeiras.códigoDeOperação ~= 0 e
+                nomes.CÓDIGOS.NÃO_IMPLEMENTADO ou nomes.CÓDIGOS.FORMATO_INVÁLIDO
+            tratador(nomes.codifiqueMensagem(respostaBásica(consulta, código)))
+            retorne verdadeiro
+        fim
+        se endereço e não acl:permita(endereço) então
+            este.estatísticasDNS.negadas = este.estatísticasDNS.negadas + 1
+            tratador(nulo, "origem fora dos prefixos permitidos", verdadeiro)
+            retorne verdadeiro
+        fim
+        se endereço e não limitador:permita(endereço) então
+            este.estatísticasDNS.limitadas = este.estatísticasDNS.limitadas + 1
+            tratador(nulo, "limite de consultas por origem excedido", verdadeiro)
+            retorne verdadeiro
+        fim
+        este.estatísticasDNS.recebidas = este.estatísticasDNS.recebidas + 1
+        resolvaInterno(consulta.perguntas[1],
+            função(resultado, falhaDaResolução)
+                local resposta = respostaAoCliente(consulta, resultado, falhaDaResolução)
+                local limite = transporte == "UDP" e
+                    limiteUDPDaConsulta(consulta, este.máximoUDP) ou nulo
+                local codificada, falhaDaCodificação = codifiqueLimitada(resposta, limite)
+                se codificada então
+                    este.estatísticasDNS.respondidas = este.estatísticasDNS.respondidas + 1
+                fim
+                tratador(codificada, falhaDaCodificação ou falhaDaResolução)
+            fim, 0, {})
+        retorne verdadeiro
+    fim
+
+    local filaDeClientesUDP = {}
+    local enviandoAoCliente = falso
+    local função envieAoPróximoCliente()
+        se enviandoAoCliente ou #filaDeClientesUDP == 0 então retorne fim
+        enviandoAoCliente = verdadeiro
+        local item = filaDeClientesUDP[1]
+        servidorUDP:envieParaAssíncrono(item.endereço, item.porta, item.pacote,
+            função()
+                tabela.remova(filaDeClientesUDP, 1)
+                enviandoAoCliente = falso
+                envieAoPróximoCliente()
+            fim)
+    fim
+
+    local função enfileireCliente(endereço, porta, pacote)
+        se #filaDeClientesUDP >= 4096 então retorne fim
+        filaDeClientesUDP[#filaDeClientesUDP + 1] = {
+            endereço = endereço, porta = porta, pacote = pacote
+        }
+        envieAoPróximoCliente()
+    fim
+
+    local função fecheConexãoTCP(estado)
+        se estado.fechada então retorne fim
+        estado.fechada = verdadeiro
+        estado.conexão:feche()
+        conexõesTCP[estado] = nulo
+        este.estatísticasDNS.tcpAtivas = mat.máximo(
+            0, este.estatísticasDNS.tcpAtivas - 1
+        )
+    fim
+
+    local função envieRespostaTCP(estado)
+        se estado.fechada ou estado.enviando ou #estado.saídas == 0 então retorne fim
+        estado.enviando = verdadeiro
+        local pacote = tabela.remova(estado.saídas, 1)
+        estado.conexão:envieAssíncrono(pacote,
+            função(_, _, falhaDoEnvio)
+                estado.enviando = falso
+                se falhaDoEnvio então fecheConexãoTCP(estado); retorne fim
+                envieRespostaTCP(estado)
+            fim)
+    fim
+
+    local função processeConsultasTCP(estado)
+        enquanto #estado.entrada >= 2 início
+            local tamanho = (estado.entrada:byte(1) << 8) | estado.entrada:byte(2)
+            se tamanho == 0 então fecheConexãoTCP(estado); retorne fim
+            se #estado.entrada < tamanho + 2 então retorne fim
+            local pacote = estado.entrada:corte(3, tamanho + 2)
+            estado.entrada = estado.entrada:corte(tamanho + 3)
+            este:respondaAssíncrono(pacote, "TCP", estado.endereço,
+                função(resposta, _, descarte)
+                    se estado.fechada ou descarte ou não resposta então retorne fim
+                    estado.saídas[#estado.saídas + 1] = nomes._u16(#resposta) .. resposta
+                    se #estado.saídas > 64 então fecheConexãoTCP(estado); retorne fim
+                    envieRespostaTCP(estado)
+                fim)
+        fim
+    fim
+
+    local função recebaClienteTCP(estado)
+        se estado.fechada então retorne fim
+        estado.conexão:recebaDadosAssíncrono(16384,
+            função(_, dados, falhaDaLeitura)
+                se falhaDaLeitura ou não dados ou dados == "" então
+                    fecheConexãoTCP(estado); retorne
+                fim
+                estado.entrada = estado.entrada .. dados
+                se #estado.entrada > 262144 então fecheConexãoTCP(estado); retorne fim
+                processeConsultasTCP(estado)
+                recebaClienteTCP(estado)
+            fim)
+    fim
+
+    local função armeAceite()
+        se não este.iniciado então retorne fim
+        servidorTCP:aceiteAssíncrono(função(_, conexão)
+            armeAceite()
+            se não conexão então retorne fim
+            local ativas = 0
+            para _ em pares(conexõesTCP) início ativas = ativas + 1 fim
+            se ativas >= este.máximoTCP então
+                este.estatísticasDNS.tcpRecusadas =
+                    este.estatísticasDNS.tcpRecusadas + 1
+                conexão:feche()
+                retorne
+            fim
+            local par = conexão:parRemoto()
+            local endereço = par e par.endereço ou ""
+            se não acl:permita(endereço) então conexão:feche(); retorne fim
+            conexão:definaTempoLimite(10000)
+            local estado = { conexão = conexão, endereço = endereço,
+                entrada = "", saídas = {}, enviando = falso, fechada = falso }
+            conexõesTCP[estado] = verdadeiro
+            este.estatísticasDNS.tcpAtivas =
+                este.estatísticasDNS.tcpAtivas + 1
+            recebaClienteTCP(estado)
+        fim)
+    fim
+
+    função este.inicieSomenteSaída()
+        este.encerrando = falso
+        se saída4 então retorne verdadeiro fim
+        local conector4, falha4 = rede.udp("IPv4")
+        se não conector4 então retorne nulo, falha4 fim
+        local amarrou, falhaDaAmarração = conector4:amarre("0.0.0.0", 0)
+        se não amarrou então conector4:feche(); retorne nulo, falhaDaAmarração fim
+        saída4 = { conector = conector4, fila = {}, enviando = falso }
+        conector4:inicieRecepção(65535, recebaExterno)
+
+        local conector6 = rede.udp("IPv6")
+        se conector6 então
+            amarrou = conector6:amarre("::", 0)
+            se amarrou então
+                saída6 = { conector = conector6, fila = {}, enviando = falso }
+                conector6:inicieRecepção(65535, recebaExterno)
+            senão conector6:feche() fim
+        fim
+        retorne verdadeiro
+    fim
+
+    função este.inicie()
+        se este.iniciado então retorne nulo, "resolvedor DNS já foi iniciado" fim
+        local iniciou, falhaDoInício = este:inicieSomenteSaída()
+        se não iniciou então retorne nulo, falhaDoInício fim
+        local família = este.endereço:procure(":", 1, verdadeiro) e "IPv6" ou "IPv4"
+        servidorUDP = rede.udp(família)
+        local amarrou, falhaDaAmarração = servidorUDP:amarre(este.endereço, este.porta)
+        se não amarrou então servidorUDP:feche(); servidorUDP = nulo; retorne nulo, falhaDaAmarração fim
+        servidorTCP = rede.servidorTCP()
+        amarrou, falhaDaAmarração = servidorTCP:amarre(este.endereço, este.porta)
+        se não amarrou então
+            servidorUDP:feche(); servidorUDP = nulo
+            servidorTCP:feche(); servidorTCP = nulo
+            retorne nulo, falhaDaAmarração
+        fim
+        este.iniciado = verdadeiro
+        este.encerrando = falso
+        servidorUDP:inicieRecepção(65535,
+            função(pacote, falhaDaRecepção, endereço, porta)
+                se falhaDaRecepção ou não pacote então retorne fim
+                este:respondaAssíncrono(pacote, "UDP", endereço,
+                    função(resposta, _, descarte)
+                        se resposta e não descarte então
+                            enfileireCliente(endereço, porta, resposta)
+                        fim
+                    fim)
+            fim)
+        armeAceite()
+        retorne verdadeiro
+    fim
+
+    função este.escute()
+        se não este.iniciado então
+            local iniciou, falhaDoInício = este:inicie()
+            se não iniciou então retorne nulo, falhaDoInício fim
+        fim
+        rede.laço()
+        retorne verdadeiro
+    fim
+
+    função este.feche()
+        este.iniciado = falso
+        este.encerrando = verdadeiro
+        para estado em pares(conexõesTCP) início fecheConexãoTCP(estado) fim
+        local paraEncerrar = {}
+        local vistos = {}
+        para estado em pares(estadosAtivos) início
+            vistos[estado] = verdadeiro
+            paraEncerrar[#paraEncerrar + 1] = estado
+        fim
+        para _, estado em ipares(paraEncerrar) início
+            finalize(estado, nulo, "resolvedor DNS encerrado")
+        fim
+        se servidorUDP então servidorUDP:feche(); servidorUDP = nulo fim
+        se servidorTCP então servidorTCP:feche(); servidorTCP = nulo fim
+        se saída4 então saída4.conector:feche(); saída4 = nulo fim
+        se saída6 então saída6.conector:feche(); saída6 = nulo fim
+        retorne verdadeiro
+    fim
+
+    função este.limpeMemrap()
+        memrap = {}
+        quantidadeNaMemrap = 0
+        retorne verdadeiro
+    fim
+
+    função este.estatísticas()
+        local resultado = copie(este.estatísticasDNS)
+        resultado.itensNaMemrap = quantidadeNaMemrap
+        retorne resultado
+    fim
+
+    retorne este
+fim
+
+resolvedor.novo = nova
+resolvedor.SERVIDORES_RAIZ = copie(RAÍZES_PADRÃO)
+retorne resolvedor

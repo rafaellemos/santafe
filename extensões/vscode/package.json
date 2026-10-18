@@ -1,0 +1,105 @@
+{
+  "name": "santafe",
+  "displayName": "Santafé",
+  "description": "Sintaxe, conclusões, navegação local e diagnósticos para Santafé.",
+  "version": "1.0.1",
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": false }
+  },
+  "publisher": "santafe",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "santafé",
+    "santafe",
+    "português",
+    "lua",
+    "lsp"
+  ],
+  "main": "./extension.js",
+  "icon": "./icon.png",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onLanguage:santafe"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "santafe",
+        "aliases": [
+          "Santafé",
+          "santafe"
+        ],
+        "extensions": [
+          ".fé",
+          ".fe"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "santafe",
+        "scopeName": "source.santafe",
+        "path": "./syntaxes/santafe.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "santafe",
+        "path": "./snippets/santafe.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "santafe.reiniciarSLS",
+        "title": "Santafé: Reiniciar SLS"
+      },
+      {
+        "command": "santafe.abrirRegistroSLS",
+        "title": "Santafé: Abrir registro do SLS"
+      }
+    ],
+    "configuration": {
+      "title": "Santafé",
+      "properties": {
+        "santafe.languageServer.enable": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Ativa o diagnóstico sintático fornecido pelo SLS."
+        },
+        "santafe.languageServer.command": {
+          "type": "string",
+          "default": "santafé-sls",
+          "scope": "machine",
+          "description": "Comando local que inicia o Servidor de Linguagem Santafé."
+        },
+        "santafe.languageServer.args": {
+          "type": "array",
+          "default": [],
+          "scope": "machine",
+          "items": {
+            "type": "string"
+          },
+          "description": "Argumentos adicionais para o comando do SLS."
+        },
+        "santafe.languageServer.trace": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "Registra os quadros LSP enviados e recebidos no canal de saída Santafé SLS."
+        }
+      }
+    }
+  }
+}

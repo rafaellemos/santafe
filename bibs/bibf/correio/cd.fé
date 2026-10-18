@@ -1,0 +1,255 @@
+local correio = importe "correio"
+
+local cd = {}
+
+local função emita(canal, tipoDaMensagem, nome, dados, opções)
+    se não canal então retorne fim
+    local funcionou, falha = proteja(função()
+        se tipoDaMensagem == "leitura" então
+            retorne canal:leitura(nome, dados, opções)
+        fim
+        retorne canal:sinal(nome, dados, opções)
+    fim)
+    se não funcionou então
+        mostre("[Correio CD] falha no PULSO:", falha)
+    fim
+fim
+
+função cd.novo(opções)
+    opções = opções ou {}
+    local diretório = garanta(opções.diretório,
+        "diretório postal do CD é obrigatório")
+    local repositório = opções.repositório ou diretório
+    local fila = opções.fila
+    local configuração = opções.configuração ou {}
+    local pulso = opções.pulso
+    local verificador = opções.antivírus
+    local selecionador = opções.triagem
+    local autenticador = opções.autenticação
+
+    local este = {
+        diretório = diretório,
+        repositório = repositório,
+        fila = fila,
+        configuração = configuração,
+        antivírus = verificador,
+        triagem = selecionador,
+        autenticação = autenticador
+    }
+
+    local função examine(conteúdo, contexto, aoAprovar, tratador)
+        se não verificador então aoAprovar(); retorne verdadeiro fim
+        local iniciou, falhaImediata = verificador:examineAssíncrono(conteúdo,
+            função(resultado, falha)
+                se falha então
+                    local recusa = {
+                        tipo = "antivírus-indisponível",
+                        mensagem = "a verificação antivírus está indisponível",
+                        detalhe = paraColar(falha)
+                    }
+                    emita(pulso, "sinal", "correio.antivírusIndisponível",
+                        { direção = contexto.direção, tamanho = #conteúdo,
+                          falha = recusa.detalhe }, { prioridade = "crítica" })
+                    tratador(nulo, recusa)
+                    retorne
+                fim
+                se não resultado.limpa então
+                    local recusa = {
+                        tipo = "ameaça",
+                        mensagem = "conteúdo malicioso recusado pelo antivírus",
+                        ameaça = resultado.ameaça
+                    }
+                    emita(pulso, "sinal", "correio.ameaçaRecusada",
+                        { direção = contexto.direção, tamanho = #conteúdo,
+                          ameaça = resultado.ameaça,
+                          endereço = contexto.endereço },
+                        { prioridade = "crítica" })
+                    tratador(nulo, recusa)
+                    retorne
+                fim
+                emita(pulso, "leitura", "correio.verificaçãoAntivírus",
+                    { direção = contexto.direção, tamanho = #conteúdo,
+                      classificação = "limpa" })
+                aoAprovar()
+            fim)
+        se não iniciou então
+            tratador(nulo, {
+                tipo = "antivírus-indisponível",
+                mensagem = "não foi possível iniciar a verificação antivírus",
+                detalhe = paraColar(falhaImediata)
+            })
+            retorne nulo, falhaImediata
+        fim
+        retorne iniciou
+    fim
+
+    local função examineTriagem(envelope, aoConcluir)
+        se não selecionador então aoConcluir(); retorne fim
+        local mensagem = envelope.mensagemLida
+        local falhaDaLeitura
+        se não mensagem então
+            mensagem, falhaDaLeitura = correio.leiaMensagem(envelope.conteúdo)
+        fim
+        se não mensagem então
+            -- O repositório aplicará a recusa MIME habitual. A Triagem não
+            -- transforma uma falha de leitura em uma classificação enganosa.
+            aoConcluir()
+            retorne
+        fim
+        local funcionou, resultado = proteja(
+            selecionador.avalie, selecionador, envelope, mensagem)
+        se não funcionou ou tipo(resultado) ~= "tabela" então
+            emita(pulso, "sinal", "correio.triagemIndisponível", {
+                falha = paraColar(resultado ou falhaDaLeitura)
+            }, { prioridade = "alta" })
+            aoConcluir()
+            retorne
+        fim
+        envelope.mensagemLida = mensagem
+        envelope.triagem = resultado
+        emita(pulso, "leitura", "correio.triagem", {
+            classificação = resultado.classificação,
+            pontuaçãoDeSuspeita = resultado.pontuaçãoDeSuspeita,
+            motivos = #(resultado.motivos ou {}),
+            remetente = envelope.remetente
+        })
+        aoConcluir()
+    fim
+
+    local função examineAutenticação(envelope, aoConcluir, tratador)
+        se não autenticador então aoConcluir(); retorne fim
+        local iniciou, falhaImediata = autenticador:avalieAssíncrono(envelope,
+            função(resultado, falha)
+                se não resultado então
+                    emita(pulso, "sinal", "correio.autenticaçãoRecusou", {
+                        endereço = envelope.endereçoRemoto,
+                        remetente = envelope.remetente,
+                        tipo = tipo(falha) == "tabela" e falha.tipo ou "falha",
+                        falha = tipo(falha) == "tabela" e falha.mensagem ou
+                            paraColar(falha)
+                    }, { prioridade = falha e falha.tipo ==
+                        "autenticação-rejeitada" e "alta" ou "crítica" })
+                    tratador(nulo, falha)
+                    retorne
+                fim
+                emita(pulso, "leitura", "correio.autenticaçãoPostal", {
+                    endereço = envelope.endereçoRemoto,
+                    remetente = envelope.remetente,
+                    spf = resultado.spf.resultado,
+                    dkim = resultado.dkim.resultado,
+                    dmarc = resultado.dmarc.resultado,
+                    ação = resultado.dmarc.ação,
+                    domínioDoAutor = resultado.dmarc.domínioDoAutor
+                })
+                aoConcluir()
+            fim)
+        se iniciou == nulo e falhaImediata então
+            tratador(nulo, { tipo = "autenticação-indisponível",
+                mensagem = paraColar(falhaImediata) })
+        fim
+    fim
+
+    função este.aceiteDestinatário(_, endereço, tratador)
+        retorne diretório:existeDestinatárioLocal(endereço, tratador)
+    fim
+
+    função este.recebaCarta(_, envelope, tratador)
+        retorne examine(envelope.conteúdo, {
+            direção = "entrada", endereço = envelope.endereçoRemoto
+        }, função()
+            examineAutenticação(envelope, função()
+                examineTriagem(envelope, função()
+                    repositório:recebaSMTP(envelope,
+                        função(quantidade, falha)
+                            se falha então
+                                emita(pulso, "sinal", "correio.cd.recebimentoRecusado",
+                                    { falha = falha }, { prioridade = "alta" })
+                                tratador(nulo, falha)
+                                retorne
+                            fim
+                            emita(pulso, "sinal", "correio.cd.cartasRecebidas",
+                                { quantidade = quantidade,
+                                  classificação = envelope.triagem e
+                                    envelope.triagem.classificação ou "não avaliada" })
+                            tratador(quantidade, nulo)
+                        fim)
+                fim)
+            fim, tratador)
+        fim, tratador)
+    fim
+
+    função este.posteCarta(_, caixa, dados, tratador)
+        se não fila então
+            tratador(nulo, "fila de envios não foi configurada")
+            retorne
+        fim
+        dados = dados ou {}
+        local mensagem = dados
+        local falha
+        se tipo(dados.forme) ~= "função" então
+            mensagem, falha = correio.novaMensagem({
+                remetente = dados.remetente ou
+                    (tipo(caixa) == "tabela" e caixa.endereço),
+                destinatários = dados.destinatários ou {},
+                cópia = dados.cópia ou {},
+                cópiaOculta = dados.cópiaOculta ou {},
+                assunto = dados.assunto ou "",
+                texto = dados.texto,
+                html = dados.html,
+                anexos = dados.anexos ou {},
+                cabeçalhos = dados.cabeçalhos ou {},
+                domínio = dados.domínio ou configuração.domínio
+            })
+        fim
+        se não mensagem então
+            tratador(nulo, falha)
+            retorne
+        fim
+        local formada, falhaDaFormação = mensagem:forme()
+        se não formada então tratador(nulo, falhaDaFormação); retorne fim
+        retorne examine(formada, {
+            direção = "saída", endereço = mensagem.remetente
+        }, função()
+            repositório:adicioneSaída(caixa, mensagem, fila,
+                função(resultado, falhaDaFila)
+                    se falhaDaFila então
+                        emita(pulso, "sinal", "correio.cd.postagemRecusada",
+                            { falha = falhaDaFila }, { prioridade = "alta" })
+                        tratador(nulo, falhaDaFila)
+                        retorne
+                    fim
+                    resultado.destinatários = #mensagem:destinatários()
+                    emita(pulso, "sinal", "correio.cd.cartaEnfileirada", resultado)
+                    tratador(resultado, nulo)
+                fim)
+        fim, tratador)
+    fim
+
+    função este.atualizeEntrega(_, identificaçãoDaFila, estado, falha, tratador)
+        retorne repositório:atualizeEntrega(
+            identificaçãoDaFila, estado, falha, tratador)
+    fim
+
+    função este.entregueAvisoDaFila(_, aviso, tratador)
+        retorne repositório:entregueAvisoDaFila(aviso,
+            função(resultado, falha)
+                se falha então
+                    emita(pulso, "sinal", "correio.avisoDeEntregaFalhou", {
+                        fila = aviso.fila, tipo = aviso.tipo,
+                        falha = paraColar(falha)
+                    }, { prioridade = "alta" })
+                    tratador(nulo, falha)
+                    retorne
+                fim
+                emita(pulso, "sinal", "correio.avisoDeEntregaCriado", {
+                    fila = aviso.fila, tipo = aviso.tipo,
+                    carta = resultado.carta
+                })
+                tratador(resultado, nulo)
+            fim)
+    fim
+
+    retorne este
+fim
+
+retorne cd

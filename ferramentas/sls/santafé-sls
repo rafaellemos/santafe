@@ -1,0 +1,11 @@
+#!/bin/sh
+# Inicializador portátil do SLS. O servidor fica ao lado das bibliotecas Fé;
+# o executável Santafé instalado no mesmo diretório é sempre o utilizado.
+
+set -eu
+
+diretorio=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+prefixo=$(CDPATH= cd -- "$diretorio/.." && pwd)
+fonte=${SANTAFE_SLS:-"$prefixo/share/santafé/1.0/ferramentas/sls.fé"}
+
+exec "$diretorio/santafé" "$fonte" "$@"

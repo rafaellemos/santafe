@@ -1,0 +1,83 @@
+-- Caixas de domínios adicionais não podem ser rebatizadas pelo domínio principal.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" ..
+    "bibs/bibc/arquivo/?.so;" ..
+    módulo.caminhoC
+
+local rede = importe "rede"
+local segredo = importe "segredo"
+local Adaptador = importe "correio.mariadb"
+
+local função resultado(linhas)
+    local este = { linhas = linhas ou {}, índice = 0 }
+    função este.obterLinha(esta)
+        esta.índice = esta.índice + 1
+        retorne esta.linhas[esta.índice]
+    fim
+    função este.feche(_) retorne verdadeiro fim
+    retorne este
+fim
+
+local resumoDaSenha
+local inseriuCaixa = falso
+local autenticou = falso
+local consultouDomínio = falso
+local piscina = {}
+
+função piscina.executePreparadoAssíncrono(_, sql, parâmetros, tratador)
+    local resposta
+    se sql:procure("FROM correio_caixas WHERE usuario_id=?", 1, verdadeiro) então
+        resposta = resultado({ { "81", "71", "josé",
+            "xn--domnio-5va.example", "josé@domínio.example",
+            "José", "ativa", "1073741824", "0" } })
+    senão se sql:procure("INSERT INTO correio_caixas", 1, verdadeiro) então
+        inseriuCaixa = verdadeiro
+        resposta = resultado()
+    senão se sql:procure("c.parte_local=? AND c.dominio_ascii=?", 1, verdadeiro) então
+        consultouDomínio = verdadeiro
+        garanta(parâmetros[1] == "josé")
+        garanta(parâmetros[2] == "xn--domnio-5va.example")
+        resposta = resultado({ { "71", "José", "josé@domínio.example",
+            "josé@domínio.example", resumoDaSenha,
+            "81", "josé", "xn--domnio-5va.example",
+            "josé@domínio.example", "ativa", "1073741824", "0" } })
+    senão
+        erro("SQL inesperado: " .. sql)
+    fim fim fim
+    tratador(piscina, resposta, nulo)
+    retorne verdadeiro
+fim
+
+local depósito = {}
+local configuração = {
+    domínio = "santafé.dev.br", domínioASCII = "xn--santaf-gva.dev.br"
+}
+
+segredo.protejaSenhaAssíncrono("Senha segura de José 2026",
+    função(resumo, falha)
+        garanta(resumo, falha)
+        resumoDaSenha = resumo
+        local adaptador = Adaptador.novo(piscina, configuração, depósito)
+        adaptador:obtenhaOuCrieCaixa({
+            id = 71, usuário = "josé@domínio.example", nome = "José"
+        }, função(caixa, falhaDaCaixa)
+            garanta(caixa, falhaDaCaixa)
+            garanta(caixa.endereço == "josé@domínio.example")
+            garanta(caixa.domínioASCII == "xn--domnio-5va.example")
+            garanta(não inseriuCaixa,
+                "a caixa adicional existente foi indevidamente recriada")
+            adaptador:autentiqueCaixa("josé@domínio.example",
+                "Senha segura de José 2026", resumoDaSenha,
+                função(identidade, falhaDaAutenticação)
+                    garanta(identidade, falhaDaAutenticação)
+                    garanta(identidade.endereço == "josé@domínio.example")
+                    autenticou = verdadeiro
+                    rede.pareLaço()
+                fim)
+        fim)
+    fim)
+
+rede.laço()
+garanta(consultouDomínio e autenticou)
+mostre("Correio com caixas em mais de um domínio: ok")

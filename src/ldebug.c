@@ -455,7 +455,7 @@ static const char *getobjname (Proto *p, int lastpc, int reg,
                          ? luaF_getlocalname(p, t + 1, pc)
                          : upvalname(p, t);
         kname(p, pc, k, name);
-        return (vn && strcmp(vn, LUA_ENV) == 0) ? "global" : "campo";
+        return (vn && strcmp(vn, SANTAFE_AMBIENTE) == 0) ? "global" : "campo";
       }
       case OP_GETUPVAL: {
         *name = upvalname(p, GETARG_B(i));

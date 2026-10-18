@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Gera o catálogo HTTPS e a exportação limpa do Sublime Package Control."""
+
+from __future__ import annotations
+
+import json
+import pathlib
+import shutil
+
+from empacotar import ARQUIVOS_DO_CONTROLE, METADADOS, RAIZ, SAÍDA_CONTROLE
+
+
+DOMINIO = "https://xn--santaf-gva.dev.br"
+ESTATICO_PUBLICO = f"{DOMINIO}/est%C3%A1tico"
+NOME = METADADOS["name"]
+VERSAO = METADADOS["version"]
+DIST = RAIZ / "dist"
+CATALOGO = DIST / "packages.json"
+ENTRADA_CONTROLE = DIST / "package-control-entrada.json"
+GITHUB = DIST / "github"
+
+
+def catálogo() -> dict:
+    return {
+        "$schema": "sublime://packagecontrol.io/schemas/repository",
+        "schema_version": "4.0.0",
+        "packages": [
+            {
+                "name": NOME,
+                "description": (
+                    "Suporte oficial à linguagem Santafé: sintaxe, trechos, "
+                    "conclusões da API e integração opcional ao SLS."
+                ),
+                "author": "Rafael Alves Lemos",
+                "homepage": f"{DOMINIO}/",
+                "labels": ["language syntax", "snippets", "linting"],
+                "releases": [
+                    {
+                        "version": VERSAO,
+                        "url": f"{ESTATICO_PUBLICO}/sublime/{SAÍDA_CONTROLE.name}",
+                        "date": "2026-10-17 21:00:00",
+                        "sublime_text": METADADOS["sublime_text"],
+                        # O arquivo .python-version no pacote evita um defeito
+                        # do Package Control 4.2.8 ao avaliar esta lista em ST 4215.
+                        "python_versions": ["3.8", "3.14"],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def escreva(destino: pathlib.Path, conteúdo: str) -> None:
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(conteúdo, encoding="utf-8")
+
+
+def exporte_github() -> None:
+    if GITHUB.exists():
+        shutil.rmtree(GITHUB)
+    GITHUB.mkdir(parents=True)
+    for relativo in ARQUIVOS_DO_CONTROLE:
+        origem = RAIZ / relativo
+        destino = GITHUB / relativo
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(origem, destino)
+    shutil.copy2(RAIZ / "CHANGELOG.md", GITHUB / "CHANGELOG.md")
+    escreva(
+        GITHUB / "README.md",
+        "# Santafé para Sublime Text\n\n"
+        "Repositório público do pacote oficial da linguagem Santafé para Sublime "
+        "Text. A versão e os arquivos distribuídos são publicados em tags Git.\n\n"
+        "Instale pela origem oficial: `Package Control: Add Repository` → "
+        "`https://xn--santaf-gva.dev.br/est%C3%A1tico/sublime/packages.json`.\n",
+    )
+    escreva(
+        ENTRADA_CONTROLE,
+        json.dumps(
+            {
+                "name": NOME,
+                "details": "https://github.com/rafaellemos/santafe-sublime",
+                "releases": [
+                    {
+                        "sublime_text": METADADOS["sublime_text"],
+                        "python_versions": ["3.8", "3.14"],
+                        "tags": True,
+                    }
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\\n",
+    )
+
+
+def principal() -> None:
+    if not SAÍDA_CONTROLE.is_file():
+        raise SystemExit(f"pacote ausente: {SAÍDA_CONTROLE}; execute empacotar.py antes")
+    escreva(CATALOGO, json.dumps(catálogo(), ensure_ascii=False, indent=2) + "\n")
+    exporte_github()
+    print(CATALOGO)
+    print(ENTRADA_CONTROLE)
+    print(GITHUB)
+
+
+if __name__ == "__main__":
+    principal()

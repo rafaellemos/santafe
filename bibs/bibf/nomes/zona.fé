@@ -1,0 +1,420 @@
+-- Zonas autoritativas DNS em Santafé.
+
+local nomes = importe "nomes"
+local zona = {}
+
+local função copieTabela(origem)
+    local destino = {}
+    para chave, valor em pares(origem ou {}) início destino[chave] = valor fim
+    retorne destino
+fim
+
+local função termineComPonto(nome)
+    se nome == "." então retorne nome fim
+    se nome:corte(-1) ~= "." então retorne nome .. "." fim
+    retorne nome
+fim
+
+local função nomeEstáSob(nome, origem)
+    se origem == "." então retorne nome:corte(-1) == "." fim
+    se nome == origem então retorne verdadeiro fim
+    local limite = #nome - #origem
+    retorne limite > 0 e nome:corte(limite + 1) == origem e
+        nome:corte(limite, limite) == "."
+fim
+
+local função nomeAbsoluto(nome, origem)
+    se nome == nulo ou nome == "@" então retorne origem fim
+    se tipo(nome) ~= "colar" então retorne nulo, "nome de registro deve ser um colar" fim
+    se nome == "." ou nome:corte(-1) == "." então
+        retorne nomes.nomeCanônico(nome)
+    fim
+    retorne nomes.nomeCanônico(nome .. "." .. origem)
+fim
+
+local função termineAlvo(registro, origem)
+    local tipoDoRegistro = registro.tipo
+    local dados = registro.dados
+    se tipoDoRegistro == nomes.TIPOS.NS ou tipoDoRegistro == nomes.TIPOS.CNAME ou
+       tipoDoRegistro == nomes.TIPOS.PTR então
+        local alvo, falha = nomeAbsoluto(dados ou registro.alvo, origem)
+        se não alvo então retorne nulo, falha fim
+        registro.dados = alvo
+    senão se tipoDoRegistro == nomes.TIPOS.MX então
+        dados = copieTabela(dados ou registro)
+        local troca, falha = nomeAbsoluto(
+            dados.troca ou dados.endereço ou dados.alvo, origem
+        )
+        se não troca então retorne nulo, falha fim
+        dados.troca = troca
+        registro.dados = dados
+    senão se tipoDoRegistro == nomes.TIPOS.SRV então
+        dados = copieTabela(dados ou registro)
+        local alvo, falha = nomeAbsoluto(dados.alvo, origem)
+        se não alvo então retorne nulo, falha fim
+        dados.alvo = alvo
+        registro.dados = dados
+    senão se tipoDoRegistro == nomes.TIPOS.SOA então
+        dados = copieTabela(dados ou registro)
+        local mestre, falha = nomeAbsoluto(dados.mestre, origem)
+        se não mestre então retorne nulo, falha fim
+        local responsável
+        responsável, falha = nomeAbsoluto(dados.responsável, origem)
+        se não responsável então retorne nulo, falha fim
+        dados.mestre = mestre
+        dados.responsável = responsável
+        registro.dados = dados
+    fim fim fim fim
+    retorne registro
+fim
+
+local função chaveDoTipo(tipoDoRegistro)
+    retorne paraColar(tipoDoRegistro)
+fim
+
+local função copieLista(lista)
+    local cópia = {}
+    para i, item em ipares(lista ou {}) início cópia[i] = item fim
+    retorne cópia
+fim
+
+local função acrescenteLista(destino, origem)
+    para _, item em ipares(origem ou {}) início destino[#destino + 1] = item fim
+fim
+
+local função nova(definição)
+    se tipo(definição) ~= "tabela" então
+        retorne nulo, "definição da zona DNS deve ser uma tabela"
+    fim
+    local origem, falha = nomes.nomeCanônico(definição.nome ou definição.origem)
+    se não origem então retorne nulo, falha fim
+    local ttlPadrão = mat.paraInteiro(definição.ttlPadrão ou 3600)
+    se não ttlPadrão ou ttlPadrão < 0 ou ttlPadrão > 0xFFFFFFFF então
+        retorne nulo, "ttlPadrão deve estar entre 0 e 4294967295"
+    fim
+
+    local este = {
+        nome = origem,
+        ttlPadrão = ttlPadrão,
+        registros = {},
+        nomes = {},
+        delegações = {},
+        soa = nulo,
+        servidores = {}
+    }
+
+    função este.adicione(_, original)
+        se tipo(original) ~= "tabela" então retorne nulo, "registro DNS deve ser uma tabela" fim
+        local registro = copieTabela(original)
+        local nomeDoRegistro
+        nomeDoRegistro, falha = nomeAbsoluto(registro.nome, origem)
+        se não nomeDoRegistro então retorne nulo, falha fim
+        se não nomeEstáSob(nomeDoRegistro, origem) então
+            retorne nulo, "registro fora da zona " .. origem
+        fim
+        registro.nome = nomeDoRegistro
+        local tipoDoRegistro
+        tipoDoRegistro, falha = nomes.tipoParaNúmero(registro.tipo)
+        se não tipoDoRegistro então retorne nulo, falha fim
+        registro.tipo = tipoDoRegistro
+        registro.classe = registro.classe ou nomes.CLASSES.IN
+        registro.ttl = registro.ttl ou ttlPadrão
+        se mat.paraInteiro(registro.ttl) == nulo ou registro.ttl < 0 ou
+           registro.ttl > 0xFFFFFFFF então
+            retorne nulo, "TTL do registro deve estar entre 0 e 4294967295"
+        fim
+        local preparado
+        preparado, falha = termineAlvo(registro, origem)
+        se não preparado então retorne nulo, falha fim
+
+        local porTipo = este.registros[nomeDoRegistro]
+        se não porTipo então
+            porTipo = {}
+            este.registros[nomeDoRegistro] = porTipo
+        fim
+        local chave = chaveDoTipo(tipoDoRegistro)
+        se não porTipo[chave] então porTipo[chave] = {} fim
+        porTipo[chave][#porTipo[chave] + 1] = registro
+        este.nomes[nomeDoRegistro] = verdadeiro
+        local ascendente = nomeDoRegistro
+        enquanto ascendente ~= origem início
+            local ponto = ascendente:procure(".", 1, verdadeiro)
+            se não ponto então pare fim
+            ascendente = ascendente:corte(ponto + 1)
+            este.nomes[ascendente] = verdadeiro
+        fim
+        se tipoDoRegistro == nomes.TIPOS.SOA e nomeDoRegistro == origem então
+            este.soa = registro
+        fim
+        se tipoDoRegistro == nomes.TIPOS.NS e nomeDoRegistro == origem então
+            este.servidores[#este.servidores + 1] = registro
+        fim
+        se tipoDoRegistro == nomes.TIPOS.NS e nomeDoRegistro ~= origem então
+            este.delegações[nomeDoRegistro] = verdadeiro
+        fim
+        retorne registro
+    fim
+
+    função este.contém(_, nome)
+        local canônico = nomes.nomeCanônico(nome)
+        se não canônico então retorne falso fim
+        se canônico == origem então retorne verdadeiro fim
+        retorne nomeEstáSob(canônico, origem)
+    fim
+
+    local função conjuntoExato(nome)
+        retorne este.registros[nome]
+    fim
+
+    local função conjuntoCoringa(nome)
+        local restante = nome
+        enquanto verdadeiro início
+            local ponto = restante:procure(".", 1, verdadeiro)
+            se não ponto então retorne nulo fim
+            restante = restante:corte(ponto + 1)
+            -- O coringa só existe sob o ancestral existente mais próximo.
+            -- Não se pode saltar um nó vazio e usar um coringa mais acima.
+            se este.nomes[restante] então
+                local nomeDoCoringa = "*." .. restante
+                retorne este.registros[nomeDoCoringa], nomeDoCoringa
+            fim
+            se restante == origem então retorne nulo fim
+        fim
+    fim
+
+    local função obtenha(nome, tipoDoRegistro, aceiteCoringa)
+        local conjunto = conjuntoExato(nome)
+        local usouCoringa = falso
+        local nomeAssinado = nome
+        local existeComoNome = este.nomes[nome] == verdadeiro
+        se não conjunto e aceiteCoringa e não existeComoNome então
+            conjunto, nomeAssinado = conjuntoCoringa(nome)
+            usouCoringa = conjunto ~= nulo
+        fim
+        se não conjunto então retorne {}, existeComoNome, falso, nome fim
+        local resultado = {}
+        se tipoDoRegistro == nomes.TIPOS.QUALQUER então
+            para _, lista em pares(conjunto) início acrescenteLista(resultado, lista) fim
+        senão
+            acrescenteLista(resultado, conjunto[chaveDoTipo(tipoDoRegistro)])
+        fim
+        se usouCoringa então
+            local substituídos = {}
+            para _, registro em ipares(resultado) início
+                local cópia = copieTabela(registro)
+                cópia.nome = nome
+                cópia.nomeAssinado = nomeAssinado
+                substituídos[#substituídos + 1] = cópia
+            fim
+            resultado = substituídos
+        fim
+        retorne resultado, verdadeiro, usouCoringa, nomeAssinado
+    fim
+
+    local função assinaturaPara(nomeDaResposta, nomeAssinado, tipoCoberto)
+        se não este.dnssec então retorne {} fim
+        local porTipo = este.registros[nomeAssinado]
+        local assinaturas = porTipo e
+            porTipo[chaveDoTipo(nomes.TIPOS.RRSIG)] ou {}
+        local resultado = {}
+        para _, assinatura em ipares(assinaturas) início
+            se assinatura.tipoCoberto == tipoCoberto então
+                local cópia = copieTabela(assinatura)
+                cópia.nome = nomeDaResposta
+                resultado[#resultado + 1] = cópia
+            fim
+        fim
+        retorne resultado
+    fim
+
+    local função acrescenteAssinaturas(destino, registros, vistos)
+        se não este.dnssec então retorne fim
+        vistos = vistos ou {}
+        local quantidade = #registros
+        para i = 1, quantidade início
+            local registro = registros[i]
+            se registro.tipo ~= nomes.TIPOS.RRSIG e
+               registro.tipo ~= nomes.TIPOS.OPT então
+                local nomeAssinado = registro.nomeAssinado ou registro.nome
+                local chave = registro.nome .. ":" .. nomeAssinado .. ":" ..
+                    registro.tipo
+                se não vistos[chave] então
+                    vistos[chave] = verdadeiro
+                    acrescenteLista(destino, assinaturaPara(
+                        registro.nome, nomeAssinado, registro.tipo
+                    ))
+                fim
+            fim
+        fim
+    fim
+
+    local função acrescenteNSEC(destino, nome, vistos)
+        se não este.dnssec então retorne fim
+        local proprietário = este.dnssec:encontreNSEC(nome)
+        se não proprietário então retorne fim
+        vistos = vistos ou {}
+        local chave = "NSEC:" .. proprietário
+        se vistos[chave] então retorne fim
+        vistos[chave] = verdadeiro
+        local registros = obtenha(proprietário, nomes.TIPOS.NSEC, falso)
+        acrescenteLista(destino, registros)
+        acrescenteAssinaturas(destino, registros, vistos)
+    fim
+
+    local função ancestralExistente(nome)
+        local atual = nome
+        enquanto atual ~= origem início
+            se este.nomes[atual] então retorne atual fim
+            local ponto = atual:procure(".", 1, verdadeiro)
+            se não ponto então pare fim
+            atual = atual:corte(ponto + 1)
+        fim
+        retorne origem
+    fim
+
+    local função acrescenteAdicionais(resultado, vistos, registros)
+        para _, registro em ipares(registros) início
+            local alvo
+            se registro.tipo == nomes.TIPOS.NS ou registro.tipo == nomes.TIPOS.CNAME ou
+               registro.tipo == nomes.TIPOS.PTR então
+                alvo = registro.dados
+            senão se registro.tipo == nomes.TIPOS.MX então
+                alvo = registro.dados.troca
+            senão se registro.tipo == nomes.TIPOS.SRV então
+                alvo = registro.dados.alvo
+            fim fim fim
+            se alvo e este:contém(alvo) então
+                para _, tipoDeEndereço em ipares({ nomes.TIPOS.A, nomes.TIPOS.AAAA }) início
+                    local lista = obtenha(alvo, tipoDeEndereço, falso)
+                    para _, endereço em ipares(lista) início
+                        local chave = endereço.nome .. ":" .. endereço.tipo .. ":" ..
+                            paraColar(endereço.dados)
+                        se não vistos[chave] então
+                            vistos[chave] = verdadeiro
+                            resultado[#resultado + 1] = endereço
+                        fim
+                    fim
+                fim
+            fim
+        fim
+    fim
+
+    local função encontreDelegação(nome)
+        local atual = nome
+        enquanto atual ~= origem início
+            se este.delegações[atual] então retorne atual fim
+            local ponto = atual:procure(".", 1, verdadeiro)
+            se não ponto então pare fim
+            atual = atual:corte(ponto + 1)
+        fim
+        retorne nulo
+    fim
+
+    função este.consulte(_, nome, tipoDoRegistro, classe, dnssecSolicitado)
+        local canônico
+        canônico, falha = nomes.nomeCanônico(nome)
+        se não canônico então retorne nulo, falha fim
+        tipoDoRegistro, falha = nomes.tipoParaNúmero(tipoDoRegistro)
+        se não tipoDoRegistro então retorne nulo, falha fim
+        se classe ~= nulo e classe ~= nomes.CLASSES.IN e
+           classe ~= nomes.CLASSES.QUALQUER então
+            retorne { código = nomes.CÓDIGOS.RECUSADO, respostas = {},
+                autoridades = {}, adicionais = {} }
+        fim
+        se não este:contém(canônico) então
+            retorne { código = nomes.CÓDIGOS.RECUSADO, respostas = {},
+                autoridades = {}, adicionais = {} }
+        fim
+
+        local corte = encontreDelegação(canônico)
+        se corte então
+            local servidoresDelegados = obtenha(corte, nomes.TIPOS.NS, falso)
+            local adicionaisDelegados = {}
+            acrescenteAdicionais(adicionaisDelegados, {}, servidoresDelegados)
+            se dnssecSolicitado e este.dnssec então
+                local vistos = {}
+                acrescenteAssinaturas(servidoresDelegados,
+                    servidoresDelegados, vistos)
+                local ds = obtenha(corte, nomes.TIPOS.DS, falso)
+                se #ds > 0 então
+                    acrescenteLista(servidoresDelegados, ds)
+                    acrescenteAssinaturas(servidoresDelegados, ds, vistos)
+                senão
+                    acrescenteNSEC(servidoresDelegados, corte, vistos)
+                fim
+            fim
+            retorne { código = nomes.CÓDIGOS.SEM_ERRO, respostas = {},
+                autoridades = servidoresDelegados,
+                adicionais = adicionaisDelegados, autoritativa = falso,
+                dnssec = dnssecSolicitado e este.dnssec ~= nulo }
+        fim
+
+        local respostas, nomeExiste = obtenha(canônico, tipoDoRegistro, verdadeiro)
+        se #respostas == 0 e tipoDoRegistro ~= nomes.TIPOS.CNAME então
+            local nomesCanônicos, existeComoNome = obtenha(
+                canônico, nomes.TIPOS.CNAME, verdadeiro
+            )
+            se #nomesCanônicos > 0 então
+                acrescenteLista(respostas, nomesCanônicos)
+                local alvo = nomesCanônicos[1].dados
+                local finais = obtenha(alvo, tipoDoRegistro, falso)
+                acrescenteLista(respostas, finais)
+                nomeExiste = verdadeiro
+            senão se existeComoNome então
+                nomeExiste = verdadeiro
+            fim fim
+        fim
+
+        local código = nomes.CÓDIGOS.SEM_ERRO
+        local autoridades = {}
+        se #respostas == 0 então
+            se não nomeExiste e não este.nomes[canônico] então
+                código = nomes.CÓDIGOS.NOME_INEXISTENTE
+            fim
+            se este.soa então autoridades[1] = este.soa fim
+        fim
+        local adicionais = {}
+        acrescenteAdicionais(adicionais, {}, respostas)
+        se dnssecSolicitado e este.dnssec então
+            local vistos = {}
+            acrescenteAssinaturas(respostas, respostas, vistos)
+            acrescenteAssinaturas(adicionais, adicionais, vistos)
+            se #respostas == 0 então
+                acrescenteAssinaturas(autoridades, autoridades, vistos)
+                acrescenteNSEC(autoridades, canônico, vistos)
+                se código == nomes.CÓDIGOS.NOME_INEXISTENTE então
+                    local ancestral = ancestralExistente(canônico)
+                    acrescenteNSEC(autoridades, "*." .. ancestral, vistos)
+                fim
+            fim
+        fim
+        retorne { código = código, respostas = respostas,
+            autoridades = autoridades, adicionais = adicionais,
+            autoritativa = verdadeiro,
+            dnssec = dnssecSolicitado e este.dnssec ~= nulo }
+    fim
+
+    para _, registro em ipares(definição.registros ou {}) início
+        local adicionado
+        adicionado, falha = este:adicione(registro)
+        se não adicionado então retorne nulo, falha fim
+    fim
+    se não este.soa então retorne nulo, "zona " .. origem .. " não possui SOA no ápice" fim
+    se #este.servidores == 0 então
+        retorne nulo, "zona " .. origem .. " não possui NS no ápice"
+    fim
+    se definição.dnssec então
+        local móduloDNSSEC = importe "nomes.dnssec"
+        local opçõesDNSSEC = tipo(definição.dnssec) == "tabela" e
+            definição.dnssec ou {}
+        local estadoDNSSEC
+        estadoDNSSEC, falha = móduloDNSSEC.assineZona(este, opçõesDNSSEC)
+        opçõesDNSSEC.chavePrivada = nulo
+        se não estadoDNSSEC então retorne nulo, falha fim
+        este.dnssec = estadoDNSSEC
+    fim
+    retorne este
+fim
+
+zona.nova = nova
+retorne zona

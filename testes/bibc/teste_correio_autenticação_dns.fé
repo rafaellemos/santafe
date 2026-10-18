@@ -1,0 +1,39 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" ..
+    módulo.caminhoC
+
+se so.obterVariável("SANTAFE_TESTE_DNS_REAL") ~= "1" então
+    mostre("Autenticação postal com DNS real: ignorada")
+    retorne
+fim
+
+local rede = importe "rede"
+local Autenticação = importe "correio.autenticação"
+local autenticador = garanta(Autenticação.nova({
+    nomeDoServidor = "mail.santafé.dev.br", tempoLimite = 10000
+}))
+local conteúdo = "Received: by emkei.cz\r\n" ..
+    "From: Juliana <juliana@embratel.com.br>\r\n" ..
+    "To: rafael@santafé.dev.br\r\n" ..
+    "Subject: Ensaio de falsificação\r\n" ..
+    "Date: Sat, 29 Aug 2026 15:35:41 +0200\r\n" ..
+    "Message-ID: <falsa@emkei.cz>\r\n" ..
+    "Content-Type: text/plain; charset=utf-8\r\n\r\nFalsa\r\n"
+
+local resultado, falha
+garanta(autenticador:avalieAssíncrono({
+    remetente = "juliana@embratel.com.br",
+    destinatários = { "rafael@santafé.dev.br" },
+    conteúdo = conteúdo, endereçoRemoto = "114.29.236.247",
+    nomeDoCliente = "emkei.cz"
+}, função(avaliação, erro)
+    resultado, falha = avaliação, erro
+    rede.pareLaço()
+fim))
+rede.laço()
+garanta(resultado == nulo e falha e
+    falha.tipo == "autenticação-rejeitada",
+    "DNS real não confirmou a falsificação da Embratel")
+garanta(falha.autenticação.spf.resultado == "falha")
+garanta(falha.autenticação.dmarc.ação == "rejeitar")
+mostre("Autenticação postal com DNS real:", "ok")

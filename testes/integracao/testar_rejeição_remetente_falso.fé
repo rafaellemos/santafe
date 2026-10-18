@@ -1,0 +1,43 @@
+-- Ensaio ponta a ponta contra o Recebedor já iniciado.
+-- A identidade Embratel declara DMARC p=reject e não autoriza o endereço
+-- local; a carta precisa terminar em SMTP 550 sem alcançar o depósito.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local porta = mat.paraInteiro(
+    so.obterVariável("TESTE_CORREIO_PORTA") ou "25")
+local destinatário = so.obterVariável("TESTE_CORREIO_DESTINATARIO") ou
+    "rafael@santafé.dev.br"
+local carta = garanta(correio.novaMensagem({
+    remetente = "juliana@embratel.com.br",
+    destinatários = { destinatário },
+    assunto = "Ensaio automatizado de remetente falso",
+    texto = "Esta carta precisa ser recusada por SPF e DMARC."
+}))
+local cliente = garanta(correio.cliente({
+    endereço = "127.0.0.1",
+    porta = porta,
+    segurança = "nenhuma",
+    nome = "ensaio-autenticacao.local",
+    tempoLimite = 15000
+}))
+
+local terminou = falso
+local rejeitou = falso
+local detalhe
+garanta(cliente:envieAssíncrono(carta, função(resultado, falha)
+    terminou = verdadeiro
+    detalhe = falha
+    rejeitou = não resultado e tipo(falha) == "colar" e
+        falha:procure("550", 1, verdadeiro) ~= nulo e
+        falha:procure("5.7.1", 1, verdadeiro) ~= nulo
+    cliente:feche()
+    rede.pareLaço()
+fim))
+
+rede.laço()
+garanta(terminou e rejeitou,
+    "o Recebedor não recusou a identidade falsa com SMTP 550 5.7.1: " ..
+        paraColar(detalhe))
+mostre("Remetente falso recusado pelo SMTP: ok")

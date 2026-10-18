@@ -1,0 +1,450 @@
+#!/usr/local/bin/santafé
+
+local raiz = so.obterVariável("CORREIO_RAIZ") ou "aplicativos/correio"
+módulo.caminho = raiz .. "/fonte/?.fé;" .. raiz .. "/fonte/?/ini.fé;" ..
+    módulo.caminho
+
+local rede = importe "rede"
+local mariadb = importe "mariadb"
+local arquivo = importe "arquivo"
+local correio = importe "correio"
+local dkim = importe "correio.dkim"
+local Entrega = importe "correio.entrega"
+local Transporte = importe "correio.transporte"
+local pulso = importe "pulso"
+local CorreioCD = importe "correio.cd"
+local configuração = (importe "correio.configuração").carregue()
+local CorreioMariaDB = importe "correio.mariadb"
+
+se configuração.envios.modo == "retransmissor" então
+    garanta(configuração.envios.endereço,
+        "CORREIO_ENVIOS_ENDERECO não foi definida")
+fim
+se configuração.dkim.exigir então
+    garanta(próximo(configuração.dkim.identidades),
+        "nenhuma identidade DKIM foi definida")
+fim
+
+local canal = garanta(pulso.novo({ serviço = "correio-envios",
+    instância = so.obterVariável("CORREIO_ENVIOS_INSTANCIA") ou "envios-01" }))
+se configuração.pulsoArquivo e configuração.pulsoArquivo ~= "" então
+    local destino = pulso.registrador(configuração.pulsoArquivo)
+    se destino então canal:adicioneDestino(destino) fim
+fim
+
+local função possuiUnicode(texto)
+    para índice = 1, #texto início
+        se texto:byte(índice) > 127 então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+local função domínioDoEndereço(endereço)
+    local domínio = paraColar(endereço ou ""):separe("@([^@]+)$")
+    se não domínio então retorne nulo fim
+    local ascii = rede.domínioASCII(domínio)
+    retorne ascii e ascii:minúscula() ou nulo
+fim
+
+local função mensagemReservada(reserva, chavesDKIM)
+    local conteúdo = reserva.conteúdo
+    local remetenteDoTransporte = reserva.remetente
+    local destinatáriosDoTransporte = reserva.destinatários
+    local exigeSMTPUTF8
+    se configuração.envios.modo == "retransmissor" então
+        local preparada, falhaDaPreparação =
+            Transporte.prepareRetransmissor(conteúdo, reserva.remetente,
+                reserva.destinatários)
+        se não preparada então retorne nulo, falhaDaPreparação fim
+        conteúdo = preparada.conteúdo
+        remetenteDoTransporte = preparada.remetente
+        destinatáriosDoTransporte = preparada.destinatários
+        exigeSMTPUTF8 = preparada.smtpUTF8
+    fim
+    local lida = correio.leiaMensagem(conteúdo) ou {}
+    local domínio = domínioDoEndereço(reserva.remetente)
+    local identidade = domínio e configuração.dkim.identidades[domínio] ou nulo
+    local chaveDKIM = identidade e chavesDKIM[domínio] ou nulo
+    se identidade e chaveDKIM então
+        local assinada, falha = dkim.assine(conteúdo, {
+            domínio = identidade.domínio,
+            seletor = identidade.seletor,
+            chavePrivada = chaveDKIM
+        })
+        se não assinada então retorne nulo, falha fim
+        conteúdo = assinada
+    senão se configuração.dkim.exigir então
+        retorne nulo, "não há identidade DKIM para o remetente " ..
+            paraColar(reserva.remetente)
+    fim fim
+    local mensagem = {
+        remetente = remetenteDoTransporte,
+        identificação = lida.identificação ou ("fila-" .. reserva.identificação),
+        smtpUTF8 = exigeSMTPUTF8 ou possuiUnicode(reserva.remetente)
+    }
+    para _, endereço em ipares(reserva.destinatários) início
+        se possuiUnicode(endereço) então mensagem.smtpUTF8 = verdadeiro fim
+    fim
+    função mensagem.forme() retorne conteúdo fim
+    função mensagem.destinatários() retorne destinatáriosDoTransporte fim
+    retorne mensagem
+fim
+
+local terminou, códigoDeSaída = falso, 0
+local função termine(falha)
+    se terminou então retorne fim
+    terminou = verdadeiro
+    se falha então
+        códigoDeSaída = 1
+        mostre("[Correio Envios]", falha)
+    fim
+    canal:feche()
+    rede.pareLaço()
+fim
+
+local função esperaDaTentativa(reserva)
+    retorne garanta(Entrega.espera(
+        reserva.tentativas, configuração.envios.intervalos))
+fim
+
+local função unaPermanentes(anteriores, novas)
+    local resultado, vistos = {}, {}
+    para _, endereço em ipares(anteriores ou {}) início
+        se não vistos[endereço] então
+            vistos[endereço] = verdadeiro
+            resultado[#resultado + 1] = endereço
+        fim
+    fim
+    para _, endereço em ipares(novas ou {}) início
+        se não vistos[endereço] então
+            vistos[endereço] = verdadeiro
+            resultado[#resultado + 1] = endereço
+        fim
+    fim
+    retorne resultado
+fim
+
+local função descrevaRelatório(relatório)
+    local partes = {}
+    para domínio, resultado em pares(relatório.domínios ou {}) início
+        se resultado.estado ~= "entregue" então
+            partes[#partes + 1] = domínio .. ": " ..
+                paraColar(resultado.falha ou resultado.estado)
+        fim
+    fim
+    se #partes == 0 então retorne nulo fim
+    retorne colar.junte("; ", tabela.desempacote(partes))
+fim
+
+local função detalhesDoAviso(reserva, falha, destinatários)
+    retorne {
+        destinatários = destinatários,
+        falha = paraColar(falha ou reserva.últimaFalha ou
+            "entrega temporariamente indisponível"),
+        últimaTentativa = so.tempo(),
+        tentarAté = reserva.criadaEm + configuração.envios.prazo
+    }
+fim
+
+local função processeFila(chavesDKIM)
+retorne mariadb.criePiscinaAssíncrona(configuração.banco,
+    função(piscina, falha)
+        se falha então termine("banco indisponível: " .. falha); retorne fim
+        local repositório = CorreioMariaDB.novo(piscina, configuração)
+        repositório:confiraEstrutura(função(_, falhaDaEstrutura)
+            se falhaDaEstrutura então
+                termine("estrutura postal indisponível: " .. falhaDaEstrutura)
+                retorne
+            fim
+            local fila = garanta(correio.filaMariaDB(piscina, {
+                tabela = configuração.tabelaDaFila,
+                limiteDeFalhasInternas =
+                    configuração.envios.falhasInternasParaQuarentena,
+                depósito = repositório.depósito
+            }))
+            local cd = CorreioCD.novo({
+                diretório = repositório,
+                repositório = repositório,
+                fila = { tabela = configuração.tabelaDaFila },
+                configuração = configuração,
+                pulso = canal
+            })
+            local função processeCarta()
+                fila:recupereReservasExpiradasAssíncrono(
+                função(_, falhaDaRecuperação)
+                    se falhaDaRecuperação então
+                        termine("falha ao recuperar reservas: " ..
+                            falhaDaRecuperação)
+                        retorne
+                    fim
+                    fila:reservePróximaAssíncrono(
+                    função(reserva, falhaDaReserva)
+                        se falhaDaReserva então
+                            termine("falha ao reservar: " .. falhaDaReserva)
+                            retorne
+                        fim
+                        se não reserva então termine(); retorne fim
+                        local mensagem, falhaDaMensagem =
+                            mensagemReservada(reserva, chavesDKIM)
+                        se não mensagem então
+                            fila:adieAssíncrono(reserva.identificação,
+                                "assinatura DKIM falhou: " ..
+                                    paraColar(falhaDaMensagem),
+                                300, função() termine(falhaDaMensagem) fim)
+                            retorne
+                        fim
+
+                        local função marqueEntregue()
+                            fila:marqueEntregueAssíncrono(
+                                reserva.identificação,
+                                função(_, falhaDaMarca)
+                                    cd:atualizeEntrega(reserva.identificação,
+                                        "entregue", falhaDaMarca,
+                                        função() termine(falhaDaMarca) fim)
+                                fim)
+                        fim
+
+                        local função marqueFalhou(falhaFinal, permanentes)
+                            permanentes = permanentes ou {}
+                            fila:marqueFalhouEAviseAssíncrono(
+                                reserva.identificação, falhaFinal,
+                                permanentes, detalhesDoAviso(reserva,
+                                    falhaFinal, permanentes),
+                                função(_, falhaDaMarca)
+                                    cd:atualizeEntrega(reserva.identificação,
+                                        "falhou", falhaDaMarca ou falhaFinal,
+                                        função() termine(falhaDaMarca) fim)
+                                fim)
+                        fim
+
+                        local função adieOuEncerre(falhaDaEntrega,
+                                                       destinatários)
+                            se so.tempo() - reserva.criadaEm >=
+                               configuração.envios.prazo então
+                                marqueFalhou(falhaDaEntrega ou
+                                    "prazo de entrega esgotado",
+                                    destinatários)
+                                retorne verdadeiro
+                            fim
+                            retorne falso
+                        fim
+
+                        local função tenteEntrega()
+                            se configuração.envios.modo == "direto" então
+                                local iniciou, falhaDireta =
+                                    correio.entregueDiretamenteAssíncrono(
+                                    mensagem, {
+                                        nome = configuração.envios.nome,
+                                        porta = configuração.envios.porta,
+                                        segurança = configuração.envios.segurança,
+                                        validarCertificado =
+                                            configuração.envios.validarCertificado,
+                                        tempoLimite =
+                                            configuração.envios.tempoLimite,
+                                        tempoLimiteDNS =
+                                            configuração.envios.tempoLimiteDNS,
+                                        máximoMX = configuração.envios.máximoMX,
+                                        pulso = canal
+                                    }, função(relatório, falhaDaEntrega)
+                                        se falhaDaEntrega então
+                                            se adieOuEncerre(falhaDaEntrega,
+                                                reserva.destinatários) então retorne fim
+                                            fila:adieAssíncrono(
+                                                reserva.identificação,
+                                                falhaDaEntrega,
+                                                esperaDaTentativa(reserva),
+                                                função() termine() fim)
+                                            retorne
+                                        fim
+                                        local permanentes = unaPermanentes(
+                                            reserva.falhasPermanentes,
+                                            relatório.permanentes)
+                                        local detalhe = descrevaRelatório(relatório)
+                                        se #relatório.temporárias > 0 então
+                                            se so.tempo() - reserva.criadaEm >=
+                                               configuração.envios.prazo então
+                                                permanentes = unaPermanentes(
+                                                    permanentes,
+                                                    relatório.temporárias)
+                                                marqueFalhou(detalhe ou
+                                                    "prazo de entrega direta esgotado",
+                                                    permanentes)
+                                                retorne
+                                            fim
+                                            fila:adieParcialAssíncrono(
+                                                reserva.identificação,
+                                                relatório.temporárias,
+                                                permanentes, detalhe ou
+                                                    "entrega direta temporariamente indisponível",
+                                                esperaDaTentativa(reserva),
+                                                função(_, falhaDoAdiantamento)
+                                                    cd:atualizeEntrega(
+                                                        reserva.identificação,
+                                                        "pendente",
+                                                        falhaDoAdiantamento ou detalhe,
+                                                        função()
+                                                            termine(falhaDoAdiantamento)
+                                                        fim)
+                                                fim)
+                                            retorne
+                                        fim
+                                        se #permanentes > 0 então
+                                            marqueFalhou(detalhe ou
+                                                "um ou mais destinatários recusaram a carta",
+                                                permanentes)
+                                        senão
+                                            marqueEntregue()
+                                        fim
+                                    fim)
+                                se não iniciou então
+                                    fila:adieAssíncrono(reserva.identificação,
+                                        falhaDireta, 300,
+                                        função() termine(falhaDireta) fim)
+                                fim
+                                retorne
+                            fim
+
+                            local cliente, falhaDoCliente = correio.cliente({
+                                endereço = configuração.envios.endereço,
+                                porta = configuração.envios.porta,
+                                segurança = configuração.envios.segurança,
+                                nome = configuração.envios.nome,
+                                usuário = configuração.envios.usuário,
+                                senha = configuração.envios.senha,
+                                validarCertificado =
+                                    configuração.envios.validarCertificado,
+                                tempoLimite = configuração.envios.tempoLimite,
+                                pulso = canal
+                            })
+                            se não cliente então
+                                se adieOuEncerre(falhaDoCliente,
+                                    reserva.destinatários) então retorne fim
+                                fila:adieAssíncrono(reserva.identificação,
+                                    falhaDoCliente, esperaDaTentativa(reserva),
+                                    função() termine() fim)
+                                retorne
+                            fim
+                            cliente:envieAssíncrono(mensagem,
+                                função(resultado, falhaDaEntrega)
+                                    local diagnóstico = cliente.últimaFalha
+                                    cliente:feche()
+                                    se resultado então
+                                        marqueEntregue()
+                                    senão se diagnóstico e
+                                            diagnóstico.permanente então
+                                        marqueFalhou(falhaDaEntrega,
+                                            reserva.destinatários)
+                                    senão
+                                        se adieOuEncerre(falhaDaEntrega,
+                                            reserva.destinatários) então retorne fim
+                                        fila:adieAssíncrono(
+                                            reserva.identificação,
+                                            falhaDaEntrega,
+                                            esperaDaTentativa(reserva),
+                                            função()
+                                                cd:atualizeEntrega(
+                                                    reserva.identificação,
+                                                    "pendente", falhaDaEntrega,
+                                                    função() termine() fim)
+                                            fim)
+                                    fim fim
+                                fim)
+                        fim
+
+                        local idade = so.tempo() - reserva.criadaEm
+                        se idade >= configuração.envios.avisoDeAtraso e
+                           idade < configuração.envios.prazo então
+                            fila:soliciteAvisoAssíncrono(
+                                reserva.identificação, "atraso",
+                                detalhesDoAviso(reserva,
+                                    reserva.últimaFalha,
+                                    reserva.destinatários),
+                                função(_, falhaDoPedido)
+                                    se falhaDoPedido então
+                                        termine("falha ao solicitar aviso: " ..
+                                            falhaDoPedido)
+                                        retorne
+                                    fim
+                                    tenteEntrega()
+                                fim)
+                        senão
+                            tenteEntrega()
+                        fim
+                    fim)
+                fim)
+            fim
+
+            local função processeAviso()
+                fila:recupereAvisosExpiradosAssíncrono(
+                função(_, falhaDaRecuperação)
+                    se falhaDaRecuperação então
+                        termine("falha ao recuperar avisos: " ..
+                            falhaDaRecuperação)
+                        retorne
+                    fim
+                    fila:canceleAvisosDesatualizadosAssíncrono(
+                    função(_, falhaDoCancelamento)
+                        se falhaDoCancelamento então
+                            termine("falha ao cancelar avisos: " ..
+                                falhaDoCancelamento)
+                            retorne
+                        fim
+                        fila:reservePróximoAvisoAssíncrono(
+                        função(aviso, falhaDaReserva)
+                            se falhaDaReserva então
+                                termine("falha ao reservar aviso: " ..
+                                    falhaDaReserva)
+                                retorne
+                            fim
+                            se não aviso então processeCarta(); retorne fim
+                            cd:entregueAvisoDaFila(aviso,
+                                função(_, falhaDoAviso)
+                                    se não falhaDoAviso então
+                                        processeCarta(); retorne
+                                    fim
+                                    fila:adieAvisoAssíncrono(aviso,
+                                        falhaDoAviso, 300,
+                                        configuração.envios.tentativasDoAviso,
+                                        função(_, falhaDoAdiamento)
+                                            se falhaDoAdiamento então
+                                                termine("falha ao adiar aviso: " ..
+                                                    falhaDoAdiamento)
+                                                retorne
+                                            fim
+                                            processeCarta()
+                                        fim)
+                                fim)
+                        fim)
+                    fim)
+                fim)
+            fim
+            processeAviso()
+        fim)
+    fim)
+fim
+
+local identidades = {}
+para _, identidade em pares(configuração.dkim.identidades) início
+    identidades[#identidades + 1] = identidade
+fim
+
+local função carregueChaves(índice, chaves)
+    chaves = chaves ou {}
+    local identidade = identidades[índice]
+    se não identidade então processeFila(chaves); retorne fim
+    arquivo.leiaAssíncrono(identidade.chave, 1024 * 1024,
+        função(chave, falha)
+            se não chave então
+                termine("não foi possível ler a chave DKIM de " ..
+                    identidade.domínio .. ": " .. paraColar(falha))
+                retorne
+            fim
+            chaves[identidade.domínio] = chave
+            carregueChaves(índice + 1, chaves)
+        fim)
+fim
+
+carregueChaves(1, {})
+
+rede.laço()
+se códigoDeSaída ~= 0 então so.saia(códigoDeSaída) fim

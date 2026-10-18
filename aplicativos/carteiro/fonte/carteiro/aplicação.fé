@@ -1,0 +1,1365 @@
+local caminheiro = importe "caminheiro"
+local segredo = importe "segredo"
+local util = importe "carteiro.web"
+local páginas = importe "carteiro.páginas"
+local configurador = importe "carteiro.configurador"
+
+local aplicação = {}
+local configuraçãoAtiva = { inícioCarteiro = "/", marcaCarteiro = "Santafé" }
+
+local pastas = {
+    entrada = verdadeiro, enviadas = verdadeiro, rascunhos = verdadeiro,
+    arquivadas = verdadeiro, indesejadas = verdadeiro, lixeira = verdadeiro,
+    todas = verdadeiro
+}
+
+local função páginaNatural(valor)
+    local página = util.idNatural(valor) ou 1
+    se página > 100000 então página = 100000 fim
+    retorne página
+fim
+
+local função caminhoDaLista(pasta, busca, página)
+    local argumentos = {}
+    busca = util.apare(busca):corte(1, 100)
+    página = páginaNatural(página)
+    se busca ~= "" então
+        argumentos[#argumentos + 1] = "busca=" ..
+            util.codifiquePercentual(busca)
+    fim
+    se página > 1 então
+        argumentos[#argumentos + 1] = "pagina=" .. página
+    fim
+    local caminho = "/carteiro/" .. pasta
+    se #argumentos > 0 então
+        caminho = caminho .. "?" .. tabela.concatene(argumentos, "&")
+    fim
+    retorne caminho
+fim
+
+local função caminhoDaConversa(id, pasta)
+    pasta = pastas[pasta] e pasta ou "entrada"
+    retorne "/carteiro/mensagens/" .. paraColar(id) .. "?pasta=" .. pasta
+fim
+
+local função valoresDaResposta(mensagem)
+    local assunto = util.apare(mensagem.assunto)
+    se assunto:minúscula():corte(1, 9) ~= "resposta:" então
+        assunto = "Resposta: " .. assunto
+    fim
+    local original = paraColar(mensagem.texto ou mensagem.resumo ou "")
+        :troque("\r\n", "\n"):troque("\r", "\n")
+    se original ~= "" então original = "> " .. original:troque("\n", "\n> ") fim
+    local introdução = "\n\nEm " .. so.data("%d/%m/%Y às %H:%M", mensagem.criadaEm) ..
+        ", " .. util.endereçoLegível(mensagem.remetente) .. " escreveu:\n"
+    local destinatário = mensagem.responderPara ou mensagem.remetente
+    se mensagem.direção == "saída" ou mensagem.direção == "saida" então
+        local partes = {}
+        para _, endereço em ipares(
+            (mensagem.destinatários ou {})["para"] ou {}) início
+            partes[#partes + 1] = util.endereçoLegível(endereço)
+        fim
+        destinatário = tabela.concatene(partes, ", ")
+    fim
+    retorne {
+        ["para"] = util.endereçoLegível(destinatário),
+        assunto = assunto,
+        texto = introdução .. original,
+        respostaA = mensagem.identificação,
+        respondendo = verdadeiro
+    }
+fim
+
+local função endereçosLegíveis(valor)
+    se tipo(valor) ~= "tabela" então retorne util.endereçoLegível(valor) fim
+    local partes = {}
+    para _, chave em ipares({ "para", "cópia", "cópiaOculta" }) início
+        para _, endereço em ipares(valor[chave] ou {}) início
+            partes[#partes + 1] = util.endereçoLegível(endereço)
+        fim
+    fim
+    retorne tabela.concatene(partes, ", ")
+fim
+
+local função valoresDoEncaminhamento(mensagem)
+    local assunto = util.apare(mensagem.assunto)
+    se assunto:minúscula():corte(1, 12) ~= "encaminhada:" então
+        assunto = "Encaminhada: " .. assunto
+    fim
+    local original = paraColar(mensagem.texto ou mensagem.resumo ou "")
+        :troque("\r\n", "\n"):troque("\r", "\n")
+    local cabeçalho = "\n\n---------- Carta encaminhada ----------\n" ..
+        "De: " .. util.endereçoLegível(mensagem.remetente) .. "\n" ..
+        "Data: " .. so.data("%d/%m/%Y às %H:%M", mensagem.criadaEm) .. "\n" ..
+        "Assunto: " .. util.apare(mensagem.assunto) .. "\n" ..
+        "Para: " .. endereçosLegíveis(mensagem.destinatários) .. "\n\n"
+    retorne {
+        assunto = assunto,
+        texto = cabeçalho .. original,
+        encaminharDe = mensagem.id,
+        encaminhando = verdadeiro,
+        anexosOriginais = mensagem.anexos ou {}
+    }
+fim
+
+local função valoresDoEncaminhamentoDaConversa(mensagens)
+    local última = mensagens[#mensagens] ou {}
+    local assunto = util.apare(última.assunto)
+    se assunto:minúscula():corte(1, 12) ~= "encaminhada:" então
+        assunto = "Encaminhada: " .. assunto
+    fim
+    local partes = { "\n\n---------- Conversa encaminhada ----------\n" }
+    para _, mensagem em ipares(mensagens) início
+        partes[#partes + 1] = "\nDe: " ..
+            util.endereçoLegível(mensagem.remetente) .. "\nData: " ..
+            so.data("%d/%m/%Y às %H:%M", mensagem.criadaEm) ..
+            "\nPara: " .. endereçosLegíveis(mensagem.destinatários) ..
+            "\n\n" .. paraColar(mensagem.texto ou mensagem.resumo ou "") ..
+            "\n\n------------------------------------------\n"
+    fim
+    retorne { assunto = assunto, texto = tabela.concatene(partes) }
+fim
+
+local função falhaSimples(res, código, mensagem)
+    util.protejaResposta(res)
+    res:código(código):html(
+        '<!doctype html><html lang="pt-BR"><meta charset="utf-8">' ..
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' ..
+        '<title>Carteiro</title><body><main style="font-family:sans-serif;max-width:680px;' ..
+        'margin:12vh auto;padding:24px"><h1>Carteiro</h1><p>' ..
+        util.escapeHTML(mensagem) .. '</p><a href="' ..
+        util.escapeHTML(configuraçãoAtiva.inícioCarteiro) .. '">Voltar a ' ..
+        util.escapeHTML(configuraçãoAtiva.marcaCarteiro) .. '</a></main></body></html>'
+    )
+fim
+
+local função descrevaFalha(falha)
+    se tipo(falha) == "tabela" então
+        retorne paraColar(falha.mensagem ou falha.detalhe ou "operação recusada"),
+            falha.tipo
+    fim
+    retorne paraColar(falha ou "operação recusada"), nulo
+fim
+
+função aplicação.crie(opções)
+    opções = opções ou {}
+    local carteiro = garanta(opções.carteiro, "arcabouço Carteiro é obrigatório")
+    local configuração = garanta(opções.configuração, "configuração é obrigatória")
+    configuração.marcaCarteiro = configuração.marcaCarteiro ou "Santafé"
+    configuração.inícioCarteiro = configuração.inícioCarteiro ou "/"
+    configuraçãoAtiva = configuração
+    local estado = opções.estado ou {}
+    local canalPULSO = opções.pulso
+    páginas.configure(configuração)
+    local ap = caminheiro.novo({ pulso = canalPULSO })
+
+    local função emita(nome, dados, prioridade)
+        se não canalPULSO então retorne fim
+        -- Falhas de observação não podem interromper uma ação do usuário.
+        proteja(função()
+            canalPULSO:sinal(nome, dados ou {}, {
+                prioridade = prioridade ou "normal"
+            })
+        fim)
+    fim
+
+    local função comCaixa(req, res, tratador)
+        local bilhete = util.obtenhaBiscoito(req, "sf_sessao")
+        se não bilhete ou bilhete == "" então
+            util.redirecione(res, "/entrar?destino=/carteiro/")
+            retorne
+        fim
+        local resumo = segredo.resumaBilhete(bilhete)
+        carteiro:usuárioPorSessão(resumo,
+            função(usuário, falha)
+                se falha então falhaSimples(res, 503, "Autenticação indisponível."); retorne fim
+                se não usuário então
+                    util.redirecione(res, "/entrar?destino=/carteiro/"); retorne
+                fim
+                carteiro:caixaDoUsuário(usuário,
+                    função(caixa, falhaDaCaixa)
+                        se falhaDaCaixa então
+                            falhaSimples(res, 503, "Caixa postal indisponível."); retorne
+                        fim
+                        se caixa.estado ~= "ativa" então
+                            falhaSimples(res, 403, "Esta caixa postal está bloqueada."); retorne
+                        fim
+                        tratador(usuário, caixa)
+                    fim)
+            fim)
+    fim
+
+    local função enviePágina(res, código, html)
+        util.protejaResposta(res)
+        retorne res:código(código ou 200):html(html)
+    fim
+
+    local função mostreErro(res, usuário, caixa, código, título, falha)
+        local html = páginas.erro(usuário, caixa, título, falha, código)
+        enviePágina(res, código, html)
+    fim
+
+    local função obtenhaAnexosOriginais(caixa, mensagem, tratador)
+        local anexos = mensagem.anexos ou {}
+        local reunidos = {}
+        local função obtenhaPróximo(índice)
+            se índice > #anexos então tratador(reunidos, nulo); retorne fim
+            local referência = anexos[índice]
+            carteiro:obtenhaAnexo(caixa, mensagem.id, referência.id,
+                função(anexo, falha)
+                    se falha ou não anexo então
+                        tratador(nulo, falha ou
+                            "um anexo da carta original não está mais disponível")
+                        retorne
+                    fim
+                    reunidos[#reunidos + 1] = {
+                        nome = util.nomeSeguroDoAnexo(anexo.nome),
+                        tipo = anexo.tipo ou "application/octet-stream",
+                        dados = anexo.dados
+                    }
+                    obtenhaPróximo(índice + 1)
+                fim)
+        fim
+        obtenhaPróximo(1)
+    fim
+
+    local função altereConfiançaNoRemetente(req, res, confiar)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local formulário = req.form ou {}
+            se não id ou não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A carta ou a proteção do formulário é inválida.")
+                retorne
+            fim
+            carteiro:obtenhaCarta(caixa, id, função(mensagem, falha)
+                se falha então mostreErro(res, usuário, caixa, 503,
+                    "Preferência indisponível", falha); retorne fim
+                se não mensagem ou mensagem.direção ~= "entrada" então
+                    mostreErro(res, usuário, caixa, 404, "Carta não encontrada",
+                        "Não é possível alterar a confiança deste remetente.")
+                    retorne
+                fim
+                local método = confiar e "confieNoRemetente" ou
+                    "deixeDeConfiarNoRemetente"
+                carteiro[método](carteiro, caixa, mensagem.remetente,
+                    função(resultado, falhaDaPreferência)
+                        se falhaDaPreferência ou não resultado então
+                            mostreErro(res, usuário, caixa, 503,
+                                "Preferência indisponível",
+                                falhaDaPreferência ou
+                                "A preferência não foi alterada.")
+                            retorne
+                        fim
+                        local pasta = pastas[formulário.pasta] e
+                            formulário.pasta ou mensagem.pasta
+                        util.redirecione(res, caminhoDaConversa(id, pasta))
+                    fim)
+            fim)
+        fim)
+    fim
+
+    ap.rota("GET", "/carteiro", função(_, res)
+        util.redirecione(res, "/carteiro/", 308)
+    fim)
+
+    ap.rota("GET", "/carteiro/", função(_, res)
+        util.redirecione(res, "/carteiro/entrada", 302)
+    fim)
+
+    para _, pasta em ipares({ "entrada", "todas", "enviadas", "rascunhos",
+                              "arquivadas", "indesejadas", "lixeira" }) início
+        local pastaDaRota = pasta
+        ap.rota("GET", "/carteiro/" .. pastaDaRota, função(req, res)
+            comCaixa(req, res, função(usuário, caixa)
+                local consulta = req.consulta ou {}
+                local busca = util.apare(consulta.busca):corte(1, 100)
+                local página = páginaNatural(consulta.pagina)
+                local limite = configuração.limiteLista ou 50
+                carteiro:conteCartas(caixa, pastaDaRota, busca,
+                    função(total, falhaDaContagem)
+                        se falhaDaContagem então
+                            mostreErro(res, usuário, caixa, 503,
+                                "Pasta indisponível", falhaDaContagem); retorne
+                        fim
+                        local páginasTotais = mat.máximo(1,
+                            mat.teto(total / limite))
+                        se página > páginasTotais então
+                            util.redirecione(res,
+                                caminhoDaLista(pastaDaRota, busca, páginasTotais),
+                                302)
+                            retorne
+                        fim
+                        local deslocamento = (página - 1) * limite
+                        carteiro:listeCartas(caixa, pastaDaRota, busca,
+                            limite, deslocamento,
+                            função(mensagens, falha)
+                                se falha então
+                                    mostreErro(res, usuário, caixa, 503,
+                                        "Pasta indisponível", falha); retorne
+                                fim
+                                enviePágina(res, 200,
+                                    páginas.lista(usuário, caixa, pastaDaRota,
+                                        mensagens, busca, página, total, limite))
+                            fim)
+                    fim)
+            fim)
+        fim)
+    fim
+
+    ap.rota("POST", "/carteiro/lixeira/esvaziar", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local formulário = req.form ou {}
+            se não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A proteção do formulário é inválida.")
+                retorne
+            fim
+            carteiro:esvazieLixeira(caixa,
+                função(resultado, falha)
+                    se não resultado então
+                        mostreErro(res, usuário, caixa, 503,
+                            "Lixeira indisponível", falha ou
+                            "A lixeira não foi esvaziada.")
+                        retorne
+                    fim
+                    emita("carteiro.lixeiraEsvaziada", {
+                        caixa = caixa.id,
+                        quantidade = resultado.quantidade ou 0,
+                        tacosLiberados = resultado.tacosLiberados ou 0
+                    })
+                    util.redirecione(res, "/carteiro/lixeira", 303)
+                fim)
+        fim)
+    fim)
+
+    local função processeAçãoEmLote(req, res, açãoForçada)
+        comCaixa(req, res, função(usuário, caixa)
+            local formulário = req.form ou {}
+            local pastaDeOrigem = formulário.pastaDeOrigem
+            se não pastas[pastaDeOrigem] ou
+               não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A pasta de origem ou a proteção do formulário é inválida.")
+                retorne
+            fim
+
+            local ação = açãoForçada ou util.apare(formulário.acao)
+            local destino
+            se pastaDeOrigem == "lixeira" então
+                se ação == "restaurar" então
+                    -- Todas é virtual; Arquivadas é o destino físico que a
+                    -- recoloca nessa visão sem presumir Entrada ou Enviadas.
+                    destino = "arquivadas"
+                senão
+                    mostreErro(res, usuário, caixa, 422, "Ação inválida",
+                        "Na Lixeira, as cartas selecionadas somente podem ser restauradas.")
+                    retorne
+                fim
+            senão se ação == "arquivar" então destino = "arquivadas"
+            senão se ação == "indesejada" então destino = "indesejadas"
+            senão se ação == "excluir" então destino = "lixeira"
+            senão se ação:corte(1, 6) == "mover:" então
+                destino = ação:corte(7)
+                ação = "mover"
+            senão se ação ~= "lida" e ação ~= "não-lida" então
+                mostreErro(res, usuário, caixa, 422, "Ação inválida",
+                    "Escolha uma ação disponível na barra postal.")
+                retorne
+            fim fim fim fim fim fim
+            se destino e (não pastas[destino] ou destino == "todas") então
+                mostreErro(res, usuário, caixa, 422, "Destino inválido",
+                    "Escolha uma caixa postal válida.")
+                retorne
+            fim
+
+            local identificações, vistas = {}, {}
+            local limite = configuração.limiteLista ou 50
+            para nome, valor em pares(formulário) início
+                se tipo(nome) == "colar" e nome:corte(1, 6) == "carta_" então
+                    local idDoNome = util.idNatural(nome:corte(7))
+                    local id = util.idNatural(valor)
+                    se id e id == idDoNome e não vistas[id] então
+                        vistas[id] = verdadeiro
+                        identificações[#identificações + 1] = id
+                    fim
+                fim
+            fim
+            local escopoCompleto = formulário.escopo == "todas"
+            se não escopoCompleto e
+               (#identificações == 0 ou #identificações > limite) então
+                mostreErro(res, usuário, caixa, 422, "Seleção inválida",
+                    #identificações == 0 e
+                        "Selecione ao menos uma carta desta página." ou
+                        "A seleção excede o limite da página.")
+                retorne
+            fim
+
+            local busca = util.apare(formulário.busca):corte(1, 100)
+            local página = páginaNatural(formulário.pagina)
+            local deslocamento = (página - 1) * limite
+
+            local função executeAção(mensagens)
+                local ids = {}
+                para _, mensagem em ipares(mensagens ou {}) início
+                    ids[#ids + 1] = mensagem.id
+                fim
+                se #ids == 0 então
+                    mostreErro(res, usuário, caixa, 422, "Seleção vazia",
+                        "Não há cartas nesse escopo para alterar.")
+                    retorne
+                fim
+                local método = ação == "lida" e "marqueCartasLidas" ou
+                    (ação == "não-lida" e "marqueCartasNãoLidas" ou
+                    "movaCartas")
+                local função conclua(resultado, falha, tipoDaFalha)
+                    se falha então
+                        mostreErro(res, usuário, caixa,
+                            tipoDaFalha == "pasta-incompatível" e 422 ou 503,
+                            "Não foi possível alterar as cartas", falha)
+                        retorne
+                    fim
+                    emita("carteiro.açãoEmLote", {
+                        caixa = caixa.id,
+                        ação = ação,
+                        destino = destino,
+                        escopo = escopoCompleto e "pasta" ou "página",
+                        quantidade = resultado.quantidade ou 0,
+                        ignoradas = resultado.ignoradas ou 0,
+                        pastaDeOrigem = pastaDeOrigem
+                    })
+                    se destino == "lixeira" então
+                        emita("carteiro.cartasMovidasParaLixeira", {
+                            caixa = caixa.id,
+                            quantidade = resultado.quantidade ou 0,
+                            ignoradas = resultado.ignoradas ou 0,
+                            pastaDeOrigem = pastaDeOrigem
+                        })
+                    fim
+                    se ação == "restaurar" então
+                        emita("carteiro.cartasRestauradas", {
+                            caixa = caixa.id,
+                            quantidade = resultado.quantidade ou 0,
+                            ignoradas = resultado.ignoradas ou 0,
+                            destino = "todas"
+                        })
+                    fim
+                    util.redirecione(res,
+                        caminhoDaLista(pastaDeOrigem, busca, página), 303)
+                fim
+                se método == "marqueCartasLidas" ou
+                   método == "marqueCartasNãoLidas" então
+                    carteiro[método](carteiro, caixa, ids, conclua)
+                senão
+                    carteiro:movaCartas(caixa, mensagens, destino, conclua)
+                fim
+            fim
+
+            se escopoCompleto então
+                carteiro:listeCartasParaAção(caixa, pastaDeOrigem, busca,
+                    função(mensagens, falhaDaLista)
+                        se falhaDaLista então
+                            mostreErro(res, usuário, caixa, 503,
+                                "Seleção indisponível", falhaDaLista)
+                            retorne
+                        fim
+                        executeAção(mensagens)
+                    fim)
+                retorne
+            fim
+
+            carteiro:listeCartas(caixa, pastaDeOrigem, busca, limite,
+                deslocamento, função(mensagens, falhaDaLista)
+                    se falhaDaLista então
+                        mostreErro(res, usuário, caixa, 503,
+                            "Seleção indisponível", falhaDaLista)
+                        retorne
+                    fim
+                    local visíveis = {}
+                    para _, mensagem em ipares(mensagens ou {}) início
+                        visíveis[mensagem.id] = verdadeiro
+                    fim
+                    para _, id em ipares(identificações) início
+                        se não visíveis[id] então
+                            mostreErro(res, usuário, caixa, 422,
+                                "Seleção inválida",
+                                "Selecione somente cartas visíveis nesta página.")
+                            retorne
+                        fim
+                    fim
+                    local representantes = {}
+                    para _, mensagem em ipares(mensagens ou {}) início
+                        se vistas[mensagem.id] então
+                            representantes[#representantes + 1] = mensagem
+                        fim
+                    fim
+                    -- A caixa de seleção representa a conversa. Expanda-a
+                    -- somente depois de conferir que o representante pertence
+                    -- à página atual, preservando a proteção contra IDs
+                    -- forjados no formulário.
+                    local selecionadas, conhecidas = {}, {}
+                    local função expanda(índice)
+                        se índice > #representantes então
+                            executeAção(selecionadas)
+                            retorne
+                        fim
+                        carteiro:listeCartasDaConversa(caixa,
+                            pastaDeOrigem, representantes[índice].id,
+                            função(cartas, falhaDaConversa)
+                                se falhaDaConversa então
+                                    mostreErro(res, usuário, caixa, 503,
+                                        "Conversa indisponível", falhaDaConversa)
+                                    retorne
+                                fim
+                                para _, carta em ipares(cartas ou {}) início
+                                    se não conhecidas[carta.id] então
+                                        conhecidas[carta.id] = verdadeiro
+                                        selecionadas[#selecionadas + 1] = carta
+                                    fim
+                                fim
+                                expanda(índice + 1)
+                            fim)
+                    fim
+                    expanda(1)
+                fim)
+        fim)
+    fim
+
+    ap.rota("POST", "/carteiro/mensagens/acao-em-lote", função(req, res)
+        processeAçãoEmLote(req, res)
+    fim)
+
+    -- Compatibilidade com a barra da versão 1.1 enquanto páginas antigas
+    -- ainda estiverem abertas no navegador.
+    ap.rota("POST", "/carteiro/mensagens/mover-para-lixeira", função(req, res)
+        processeAçãoEmLote(req, res, "excluir")
+    fim)
+
+    ap.rota("GET", "/carteiro/triagem", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            carteiro:listeRegrasDaTriagem(caixa,
+                função(regras, falha)
+                    se falha então
+                        mostreErro(res, usuário, caixa, 503,
+                            "Triagem indisponível", falha)
+                        retorne
+                    fim
+                    enviePágina(res, 200,
+                        páginas.triagem(usuário, caixa, regras))
+                fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/configurar", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            enviePágina(res, 200, páginas.configurador(
+                usuário, caixa, configuração))
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/configurar/correio-santafe.mobileconfig",
+        função(req, res)
+            comCaixa(req, res, função(usuário, caixa)
+                local perfil = configurador.perfilApple({
+                    nome = usuário.nome,
+                    endereço = caixa.endereço,
+                    usuário = caixa.endereço,
+                    servidor = configuração.domínioASCII,
+                    identidade = caixa.id,
+                    alvo = "iphone"
+                })
+                util.protejaResposta(res)
+                res:definaCabeçalho("Cache-Control", "private, no-store")
+                res:definaCabeçalho("Content-Disposition",
+                    'attachment; filename="correio-santafe.mobileconfig"')
+                res:código(200):dados(perfil,
+                    "application/x-apple-aspen-config")
+            fim)
+        fim)
+
+    ap.rota("GET", "/carteiro/configurar/correio-santafe-mac.mobileconfig",
+        função(req, res)
+            comCaixa(req, res, função(usuário, caixa)
+                local perfil = configurador.perfilApple({
+                    nome = usuário.nome,
+                    endereço = caixa.endereço,
+                    usuário = caixa.endereço,
+                    servidor = configuração.domínioASCII,
+                    identidade = caixa.id,
+                    alvo = "mac"
+                })
+                util.protejaResposta(res)
+                res:definaCabeçalho("Cache-Control", "private, no-store")
+                res:definaCabeçalho("Content-Disposition",
+                    'attachment; filename="correio-santafe-mac.mobileconfig"')
+                res:código(200):dados(perfil,
+                    "application/x-apple-aspen-config")
+            fim)
+        fim)
+
+    ap.rota("POST", "/carteiro/triagem/regras", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local formulário = req.form ou {}
+            se não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A proteção do formulário é inválida.")
+                retorne
+            fim
+            carteiro:salveRegraDaTriagem(caixa, formulário.escopo,
+                formulário.valor, formulário.decisão,
+                função(regra, falha)
+                    se falha ou não regra então
+                        mostreErro(res, usuário, caixa, 422,
+                            "Regra inválida", falha ou
+                            "A regra de triagem não foi salva.")
+                        retorne
+                    fim
+                    emita("carteiro.triagem.regraSalva", {
+                        caixa = caixa.id, escopo = regra.escopo,
+                        decisão = regra.decisão
+                    })
+                    util.redirecione(res, "/carteiro/triagem")
+                fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/triagem/regras/remover", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local formulário = req.form ou {}
+            se não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A proteção do formulário é inválida.")
+                retorne
+            fim
+            carteiro:removaRegraDaTriagem(caixa, formulário.escopo,
+                formulário.valor, função(removeu, falha)
+                    se falha ou não removeu então
+                        mostreErro(res, usuário, caixa, 422,
+                            "Regra não removida", falha ou
+                            "A regra de triagem não foi removida.")
+                        retorne
+                    fim
+                    emita("carteiro.triagem.regraRemovida", {
+                        caixa = caixa.id, escopo = formulário.escopo
+                    })
+                    util.redirecione(res, "/carteiro/triagem")
+                fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/nova", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            enviePágina(res, 200, páginas.compositor(usuário, caixa, {}))
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/responder", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            se não id então mostreErro(res, usuário, caixa, 404,
+                "Mensagem não encontrada", "Identificação inválida."); retorne fim
+            carteiro:obtenhaCarta(caixa, id, função(mensagem, falha)
+                se falha então mostreErro(res, usuário, caixa, 503,
+                    "Mensagem indisponível", falha); retorne fim
+                se não mensagem então
+                    mostreErro(res, usuário, caixa, 404,
+                        "Mensagem não encontrada", "Esta carta não pode ser respondida.")
+                    retorne
+                fim
+                enviePágina(res, 200,
+                    páginas.compositor(usuário, caixa, valoresDaResposta(mensagem)))
+            fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/encaminhar", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            se não id então mostreErro(res, usuário, caixa, 404,
+                "Mensagem não encontrada", "Identificação inválida."); retorne fim
+            carteiro:obtenhaCarta(caixa, id, função(mensagem, falha)
+                se falha então mostreErro(res, usuário, caixa, 503,
+                    "Mensagem indisponível", falha); retorne fim
+                se não mensagem então
+                    mostreErro(res, usuário, caixa, 404,
+                        "Mensagem não encontrada", "Esta carta não pode ser encaminhada.")
+                    retorne
+                fim
+                enviePágina(res, 200,
+                    páginas.compositor(usuário, caixa,
+                        valoresDoEncaminhamento(mensagem)))
+            fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/conversas/:id/encaminhar", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local consulta = req.consulta ou {}
+            local pasta = pastas[consulta.pasta] e consulta.pasta ou "entrada"
+            se não id então mostreErro(res, usuário, caixa, 404,
+                "Conversa não encontrada", "Identificação inválida."); retorne fim
+            carteiro:listeCartasDaConversa(caixa, pasta, id,
+                função(mensagens, falha)
+                    se falha então mostreErro(res, usuário, caixa, 503,
+                        "Conversa indisponível", falha); retorne fim
+                    se #mensagens == 0 então
+                        mostreErro(res, usuário, caixa, 404,
+                            "Conversa não encontrada", "Nada pode ser encaminhado.")
+                        retorne
+                    fim
+                    enviePágina(res, 200, páginas.compositor(usuário, caixa,
+                        valoresDoEncaminhamentoDaConversa(mensagens)))
+                fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/enviar", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            se req.falhaDoForm então
+                enviePágina(res, 400, páginas.compositor(
+                    usuário, caixa, {}, req.falhaDoForm)); retorne
+            fim
+            local formulário = req.form ou {}
+            se não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "O formulário expirou ou não pertence a esta sessão.")
+                retorne
+            fim
+            local destinatáriosPrincipais, falha = util.separeEndereços(
+                formulário["para"], configuração.limiteDestinatários)
+            local cópia, falhaDaCópia = util.separeEndereços(
+                formulário.cópia, configuração.limiteDestinatários)
+            local cópiaOculta, falhaDaCópiaOculta = util.separeEndereços(
+                formulário.cópiaOculta, configuração.limiteDestinatários)
+            falha = falha ou falhaDaCópia ou falhaDaCópiaOculta
+            local valores = {
+                ["para"] = formulário["para"], cópia = formulário.cópia,
+                cópiaOculta = formulário.cópiaOculta,
+                assunto = formulário.assunto, texto = formulário.texto,
+                html = formulário.html,
+                respostaA = formulário.respostaA,
+                respondendo = util.apare(formulário.respostaA) ~= "",
+                encaminharDe = formulário.encaminharDe,
+                encaminhando = util.apare(formulário.encaminharDe) ~= ""
+            }
+            se falha ou não destinatáriosPrincipais ou #destinatáriosPrincipais == 0 então
+                enviePágina(res, 400, páginas.compositor(
+                    usuário, caixa, valores, falha ou "Informe ao menos um destinatário."))
+                retorne
+            fim
+            se #destinatáriosPrincipais + #cópia + #cópiaOculta > configuração.limiteDestinatários então
+                enviePágina(res, 400, páginas.compositor(
+                    usuário, caixa, valores, "Destinatários demais.")); retorne
+            fim
+            local htmlInformado = paraColar(formulário.html ou "")
+            se #htmlInformado > 2000000 então
+                enviePágina(res, 413, páginas.compositor(
+                    usuário, caixa, valores,
+                    "A mensagem formatada excede o limite permitido.")); retorne
+            fim
+            local htmlSeguro = util.htmlSeguroDoCompositor(htmlInformado)
+            local anexos = {}
+            local arquivo = (req.arquivos ou {}).anexo
+            se arquivo então
+                se arquivo.tamanho > configuração.limiteAnexo então
+                    enviePágina(res, 413, páginas.compositor(
+                        usuário, caixa, valores, "O anexo excede o limite permitido.")); retorne
+                fim
+                anexos[1] = {
+                    nome = util.nomeSeguroDoAnexo(arquivo.nome),
+                    tipo = arquivo.tipo ou "application/octet-stream",
+                    dados = arquivo.dados
+                }
+            fim
+            local respostaA = util.apare(formulário.respostaA)
+            se #respostaA > 800 ou respostaA:procure("\r", 1, verdadeiro) ou
+               respostaA:procure("\n", 1, verdadeiro) então respostaA = "" fim
+            local cabeçalhos = {}
+            se respostaA ~= "" então
+                cabeçalhos["In-Reply-To"] = respostaA
+                cabeçalhos["References"] = respostaA
+            fim
+            local função envie(anexosDaCarta)
+                local dadosDaCarta = {
+                    remetente = caixa.endereço,
+                    nomeDoRemetente = usuário.nome,
+                    destinatários = destinatáriosPrincipais,
+                    cópia = cópia, cópiaOculta = cópiaOculta,
+                    assunto = util.apare(formulário.assunto),
+                    texto = paraColar(formulário.texto ou ""),
+                    html = htmlSeguro ~= "" e htmlSeguro ou nulo,
+                    anexos = anexosDaCarta,
+                    cabeçalhos = cabeçalhos,
+                    domínio = configuração.domínio
+                }
+                carteiro:envieCarta(caixa, dadosDaCarta,
+                função(resultado, falhaDaFila)
+                    se falhaDaFila então
+                        local mensagemDaFalha, tipoDaFalha =
+                            descrevaFalha(falhaDaFila)
+                        enviePágina(res, tipoDaFalha == "ameaça" e 422 ou 503,
+                            páginas.compositor(
+                                usuário, caixa, valores, mensagemDaFalha))
+                        retorne
+                    fim
+                    util.redirecione(res, "/carteiro/enviadas")
+                fim)
+            fim
+
+            local encaminharDe = util.idNatural(formulário.encaminharDe)
+            se util.apare(formulário.encaminharDe) ~= "" e não encaminharDe então
+                enviePágina(res, 400, páginas.compositor(
+                    usuário, caixa, valores,
+                    "A carta original do encaminhamento é inválida."))
+                retorne
+            fim
+            se não encaminharDe então envie(anexos); retorne fim
+
+            carteiro:obtenhaCarta(caixa, encaminharDe,
+                função(original, falhaDaOriginal)
+                    se falhaDaOriginal ou não original então
+                        enviePágina(res, falhaDaOriginal e 503 ou 404,
+                            páginas.compositor(usuário, caixa, valores,
+                                falhaDaOriginal ou
+                                "A carta original não está mais disponível."))
+                        retorne
+                    fim
+                    obtenhaAnexosOriginais(caixa, original,
+                        função(originais, falhaDosAnexos)
+                            se falhaDosAnexos então
+                                enviePágina(res, 503, páginas.compositor(
+                                    usuário, caixa, valores, falhaDosAnexos))
+                                retorne
+                            fim
+                            para _, anexoNovo em ipares(anexos) início
+                                originais[#originais + 1] = anexoNovo
+                            fim
+                            envie(originais)
+                        fim)
+                fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/corpo-html", função(req, res)
+        comCaixa(req, res, função(_, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            se não id então
+                util.protejaCartaHTML(res)
+                res:código(404):html("<!doctype html><meta charset=\"utf-8\">" ..
+                    "<p>Corpo HTML não encontrado.</p>")
+                retorne
+            fim
+            carteiro:obtenhaCarta(caixa, id, função(mensagem, falha)
+                se falha então
+                    util.protejaCartaHTML(res)
+                    res:código(503):html("<!doctype html><meta charset=\"utf-8\">" ..
+                        "<p>Corpo HTML temporariamente indisponível.</p>")
+                    retorne
+                fim
+                se não mensagem ou não mensagem.html ou mensagem.html == "" então
+                    util.protejaCartaHTML(res)
+                    res:código(404):html("<!doctype html><meta charset=\"utf-8\">" ..
+                        "<p>Esta carta não possui uma versão HTML.</p>")
+                    retorne
+                fim
+                local consulta = req.consulta ou {}
+                local pediuExibição = consulta.mostrar == "1"
+                local pediuConteúdoExterno =
+                    pediuExibição e consulta.externo == "1"
+                se não pediuExibição então
+                    util.protejaCartaHTML(res)
+                    res:código(403):html("<!doctype html><meta charset=\"utf-8\">" ..
+                        "<p>A mensagem formatada permanece protegida.</p>")
+                    retorne
+                fim
+                se mensagem.direção ~= "entrada" então
+                    util.protejaCartaHTML(res, pediuConteúdoExterno)
+                    res:código(200):html(util.prepareCartaHTML(mensagem.html))
+                    retorne
+                fim
+                carteiro:remetenteConfiável(caixa, mensagem.remetente,
+                    função(confiável)
+                        se confiável ~= verdadeiro então
+                            util.protejaCartaHTML(res)
+                            res:código(403):html(
+                                "<!doctype html><meta charset=\"utf-8\">" ..
+                                "<p>Confie no remetente antes de abrir a " ..
+                                "mensagem formatada.</p>")
+                            retorne
+                        fim
+                        util.protejaCartaHTML(res, pediuConteúdoExterno)
+                        res:código(200):html(util.prepareCartaHTML(mensagem.html))
+                    fim)
+            fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/mensagens/:id/remetente/confiar",
+        função(req, res)
+            altereConfiançaNoRemetente(req, res, verdadeiro)
+        fim)
+
+    ap.rota("POST", "/carteiro/mensagens/:id/remetente/deixar-de-confiar",
+        função(req, res)
+            altereConfiançaNoRemetente(req, res, falso)
+        fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            se não id então mostreErro(res, usuário, caixa, 404,
+                "Mensagem não encontrada", "Identificação inválida."); retorne fim
+            carteiro:obtenhaCarta(caixa, id, função(referência, falha)
+                se falha então mostreErro(res, usuário, caixa, 503,
+                    "Mensagem indisponível", falha); retorne fim
+                se não referência então mostreErro(res, usuário, caixa, 404,
+                    "Mensagem não encontrada", "Ela não existe nesta caixa."); retorne fim
+                local consulta = req.consulta ou {}
+                local pasta = pastas[consulta.pasta] e consulta.pasta ou
+                    referência.pasta
+                carteiro:listeCartasDaConversa(caixa, pasta, id,
+                    função(mensagens, falhaDaConversa)
+                        se falhaDaConversa então
+                            mostreErro(res, usuário, caixa, 503,
+                                "Conversa indisponível", falhaDaConversa)
+                            retorne
+                        fim
+                        se #mensagens == 0 então
+                            mostreErro(res, usuário, caixa, 404,
+                                "Conversa não encontrada",
+                                "Ela não pertence a esta pasta.")
+                            retorne
+                        fim
+                        local mostrarHTML = paraColar(consulta.mostrarHTML ou "")
+                        local mostrarExterno =
+                            paraColar(consulta.mostrarExterno ou "")
+                        local função apresente()
+                            para índice, mensagem em ipares(mensagens) início
+                                local identificador = paraColar(mensagem.id)
+                                mensagem.aberta = índice == #mensagens ou
+                                    mostrarHTML == identificador ou
+                                    mostrarExterno == identificador
+                                mensagem.pastaDaConversa = pasta
+                                mensagem.identificaçãoDaConversa = id
+                                mensagem.posiçãoDaLista = consulta.posicao
+                                mensagem.totalDaLista = consulta.total
+                            fim
+                            enviePágina(res, 200,
+                                páginas.conversa(usuário, caixa, mensagens,
+                                    pasta, id, consulta.posicao, consulta.total))
+                        fim
+                        local função prepare(índice)
+                            se índice > #mensagens então
+                                local nãoLidas = {}
+                                para _, mensagem em ipares(mensagens) início
+                                    se não mensagem.lida então
+                                        nãoLidas[#nãoLidas + 1] = mensagem.id
+                                        mensagem.lida = verdadeiro
+                                    fim
+                                fim
+                                se #nãoLidas == 0 então apresente(); retorne fim
+                                carteiro:marqueCartasLidas(caixa, nãoLidas,
+                                    função(_, falhaDaLeitura)
+                                        se falhaDaLeitura então
+                                            mostreErro(res, usuário, caixa, 503,
+                                                "Conversa indisponível",
+                                                falhaDaLeitura)
+                                            retorne
+                                        fim
+                                        apresente()
+                                    fim)
+                                retorne
+                            fim
+                            local mensagem = mensagens[índice]
+                            local identificador = paraColar(mensagem.id)
+                            local pediuHTML = mostrarHTML == identificador ou
+                                (mostrarHTML == "1" e mensagem.id == id)
+                            local pediuExterno =
+                                mostrarExterno == identificador ou
+                                (mostrarExterno == "1" e mensagem.id == id)
+                            se mensagem.direção ~= "entrada" então
+                                mensagem.remetenteConfiável = verdadeiro
+                                mensagem.mostrarHTML = pediuHTML ou pediuExterno
+                                mensagem.mostrarConteúdoExterno =
+                                    mensagem.mostrarHTML e pediuExterno
+                                prepare(índice + 1)
+                                retorne
+                            fim
+                            carteiro:remetenteConfiável(caixa,
+                                mensagem.remetente,
+                                função(confiável, falhaDaConfiança)
+                                    mensagem.remetenteConfiável =
+                                        confiável == verdadeiro
+                                    mensagem.falhaDaConfiança = falhaDaConfiança
+                                    mensagem.mostrarHTML =
+                                        mensagem.remetenteConfiável e
+                                        (pediuHTML ou pediuExterno)
+                                    mensagem.mostrarConteúdoExterno =
+                                        mensagem.mostrarHTML e pediuExterno
+                                    prepare(índice + 1)
+                                fim)
+                        fim
+                        prepare(1)
+                    fim)
+            fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/imprimir", função(req, res)
+        comCaixa(req, res, função(_, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            se não id então falhaSimples(res, 404,
+                "Mensagem não encontrada."); retorne fim
+            carteiro:obtenhaCarta(caixa, id, função(mensagem, falha)
+                se falha então falhaSimples(res, 503,
+                    "Mensagem indisponível."); retorne fim
+                se não mensagem então falhaSimples(res, 404,
+                    "Mensagem não encontrada."); retorne fim
+                util.protejaImpressão(res)
+                res:definaCabeçalho("Content-Disposition", "inline")
+                res:código(200):html(páginas.impressão(mensagem,
+                    mensagem.assunto))
+            fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/conversas/:id/imprimir", função(req, res)
+        comCaixa(req, res, função(_, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local consulta = req.consulta ou {}
+            local pasta = pastas[consulta.pasta] e consulta.pasta ou "entrada"
+            se não id então falhaSimples(res, 404,
+                "Conversa não encontrada."); retorne fim
+            carteiro:listeCartasDaConversa(caixa, pasta, id,
+                função(mensagens, falha)
+                    se falha então falhaSimples(res, 503,
+                        "Conversa indisponível."); retorne fim
+                    se #mensagens == 0 então falhaSimples(res, 404,
+                        "Conversa não encontrada."); retorne fim
+                    util.protejaImpressão(res)
+                    res:definaCabeçalho("Content-Disposition", "inline")
+                    res:código(200):html(páginas.impressão(mensagens,
+                        mensagens[#mensagens].assunto))
+                fim)
+        fim)
+    fim)
+
+    local função entregueOriginal(req, res, baixar)
+        comCaixa(req, res, função(_, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            se não id então falhaSimples(res, 404,
+                "Mensagem original não encontrada."); retorne fim
+            carteiro:obtenhaCartaOriginal(caixa, id,
+                função(mensagem, falha)
+                    se falha então falhaSimples(res, 503,
+                        "Mensagem original indisponível."); retorne fim
+                    se não mensagem ou não mensagem.mime então
+                        falhaSimples(res, 404,
+                            "Mensagem original não encontrada."); retorne
+                    fim
+                    util.protejaResposta(res)
+                    res:definaCabeçalho("Cache-Control", "private, no-store")
+                    se baixar então
+                        local nome = util.nomeSeguroDoAnexo(
+                            (mensagem.assunto ~= "" e mensagem.assunto ou
+                                "mensagem") .. ".eml")
+                        res:definaCabeçalho("Content-Disposition",
+                            "attachment; filename*=UTF-8''" ..
+                            util.codifiquePercentual(nome))
+                        res:código(200):dados(mensagem.mime, "message/rfc822")
+                    senão
+                        res:definaCabeçalho("Content-Disposition", "inline")
+                        res:código(200):dados(mensagem.mime,
+                            "text/plain; charset=utf-8")
+                    fim
+                fim)
+        fim)
+    fim
+
+    ap.rota("GET", "/carteiro/mensagens/:id/baixar", função(req, res)
+        entregueOriginal(req, res, verdadeiro)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/original", função(req, res)
+        entregueOriginal(req, res, falso)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/anexos/:anexo", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local anexoId = util.idNatural(req.parâmetros.anexo)
+            se não id ou não anexoId então
+                mostreErro(res, usuário, caixa, 404, "Anexo não encontrado",
+                    "Identificação inválida."); retorne
+            fim
+            carteiro:obtenhaAnexo(caixa, id, anexoId,
+                função(anexo, falha)
+                    se falha então falhaSimples(res, 503, "Anexo indisponível."); retorne fim
+                    se não anexo então falhaSimples(res, 404, "Anexo não encontrado."); retorne fim
+                    util.protejaResposta(res)
+                    res:definaCabeçalho("Content-Disposition", "attachment; filename*=UTF-8''" ..
+                        util.codifiquePercentual(anexo.nome))
+                    res:código(200):dados(anexo.dados, anexo.tipo)
+                fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/mensagens/:id/anexos/:anexo/visualizar", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local anexoId = util.idNatural(req.parâmetros.anexo)
+            se não id ou não anexoId então
+                falhaSimples(res, 404, "Anexo não encontrado."); retorne
+            fim
+            carteiro:obtenhaAnexo(caixa, id, anexoId, função(anexo, falha)
+                se falha então falhaSimples(res, 503, "Anexo indisponível."); retorne fim
+                se não anexo então falhaSimples(res, 404, "Anexo não encontrado."); retorne fim
+                se não util.anexoExibível(anexo.tipo) então
+                    falhaSimples(res, 415, "Este formato não oferece visualização segura.")
+                    retorne
+                fim
+                util.protejaAnexo(res)
+                res:definaCabeçalho("Content-Disposition", "inline; filename*=UTF-8''" ..
+                    util.codifiquePercentual(anexo.nome))
+                res:código(200):dados(anexo.dados, anexo.tipo)
+            fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/conversas/:id/acao", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local formulário = req.form ou {}
+            local pasta = formulário.pasta
+            local ação = formulário.acao
+            se não id ou não pastas[pasta] ou
+               não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A conversa, a pasta ou a proteção do formulário é inválida.")
+                retorne
+            fim
+            local destino
+            se ação == "arquivar" então destino = "arquivadas"
+            senão se ação == "indesejada" então destino = "indesejadas"
+            senão se ação == "excluir" então destino = "lixeira"
+            senão se ação == "restaurar" e pasta == "lixeira" então
+                destino = "arquivadas"
+            senão se ação:corte(1, 6) == "mover:" então
+                destino = ação:corte(7)
+                se destino ~= "arquivadas" e destino ~= "indesejadas" e
+                   destino ~= "lixeira" então
+                    mostreErro(res, usuário, caixa, 422, "Destino inválido",
+                        "Escolha uma pasta disponível para esta conversa.")
+                    retorne
+                fim
+            senão se ação == "não-lida" então
+                destino = nulo
+            senão
+                mostreErro(res, usuário, caixa, 422, "Ação inválida",
+                    "Escolha uma ação disponível para esta conversa.")
+                retorne
+            fim fim fim fim fim fim
+            carteiro:listeCartasDaConversa(caixa, pasta, id,
+                função(mensagens, falhaDaConversa)
+                    se falhaDaConversa então
+                        mostreErro(res, usuário, caixa, 503,
+                            "Conversa indisponível", falhaDaConversa)
+                        retorne
+                    fim
+                    se #mensagens == 0 então
+                        mostreErro(res, usuário, caixa, 404,
+                            "Conversa não encontrada", "Nada foi alterado.")
+                        retorne
+                    fim
+                    se ação == "não-lida" então
+                        local ids = {}
+                        para _, mensagem em ipares(mensagens) início
+                            ids[#ids + 1] = mensagem.id
+                        fim
+                        carteiro:marqueCartasNãoLidas(caixa, ids,
+                            função(resultado, falhaDaMarcação)
+                                se falhaDaMarcação então
+                                    mostreErro(res, usuário, caixa, 503,
+                                        "Conversa não alterada", falhaDaMarcação)
+                                    retorne
+                                fim
+                                emita("carteiro.conversaAlterada", {
+                                    caixa = caixa.id, carta = id, ação = ação,
+                                    quantidade = resultado.quantidade ou 0
+                                })
+                                util.redirecione(res, "/carteiro/" .. pasta, 303)
+                            fim)
+                        retorne
+                    fim
+                    carteiro:movaCartas(caixa, mensagens, destino,
+                        função(resultado, falhaDaAção, tipoDaFalha)
+                            se falhaDaAção então
+                                mostreErro(res, usuário, caixa,
+                                    tipoDaFalha == "pasta-incompatível" e 422 ou 503,
+                                    "Conversa não alterada", falhaDaAção)
+                                retorne
+                            fim
+                            emita("carteiro.conversaAlterada", {
+                                caixa = caixa.id, carta = id, ação = ação,
+                                quantidade = resultado.quantidade ou 0
+                            })
+                            util.redirecione(res, "/carteiro/" .. pasta, 303)
+                        fim)
+                fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/mensagens/:id/acao", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local formulário = req.form ou {}
+            local pasta = formulário.pasta
+            local ação = formulário.acao
+            se não id ou não pastas[pasta] ou
+               não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A carta, a pasta ou a proteção do formulário é inválida.")
+                retorne
+            fim
+            se ação == "excluir" então
+                carteiro:movaCarta(caixa, id, "lixeira",
+                    função(moveu, falhaDaAção)
+                        se falhaDaAção então
+                            mostreErro(res, usuário, caixa, 503,
+                                "Carta não descartada", falhaDaAção)
+                            retorne
+                        fim
+                        se não moveu então
+                            mostreErro(res, usuário, caixa, 404,
+                                "Carta não encontrada", "Nada foi alterado.")
+                            retorne
+                        fim
+                        util.redirecione(res, "/carteiro/" .. pasta, 303)
+                    fim)
+                retorne
+            fim
+            se ação == "não-lida-daqui" então
+                carteiro:listeCartasDaConversa(caixa, pasta, id,
+                    função(mensagens, falhaDaConversa)
+                        se falhaDaConversa então
+                            mostreErro(res, usuário, caixa, 503,
+                                "Conversa indisponível", falhaDaConversa)
+                            retorne
+                        fim
+                        local ids, encontrou = {}, falso
+                        para _, mensagem em ipares(mensagens ou {}) início
+                            se mensagem.id == id então encontrou = verdadeiro fim
+                            se encontrou então ids[#ids + 1] = mensagem.id fim
+                        fim
+                        se #ids == 0 então
+                            mostreErro(res, usuário, caixa, 404,
+                                "Carta não encontrada", "Nada foi alterado.")
+                            retorne
+                        fim
+                        carteiro:marqueCartasNãoLidas(caixa, ids,
+                            função(_, falhaDaMarcação)
+                                se falhaDaMarcação então
+                                    mostreErro(res, usuário, caixa, 503,
+                                        "Conversa não alterada", falhaDaMarcação)
+                                    retorne
+                                fim
+                                -- Reabrir a conversa desfaria a marcação,
+                                -- pois toda carta exibida passa a ser lida.
+                                util.redirecione(res, "/carteiro/" .. pasta, 303)
+                            fim)
+                    fim)
+                retorne
+            fim
+            se ação ~= "bloquear" e ação ~= "indesejada" e
+               ação ~= "fisgada" então
+                mostreErro(res, usuário, caixa, 422, "Ação inválida",
+                    "Escolha uma ação disponível para esta carta.")
+                retorne
+            fim
+            carteiro:decidaTriagemDaCarta(caixa, id, "indesejada",
+                função(resultado, falhaDaTriagem)
+                    se falhaDaTriagem ou não resultado então
+                        mostreErro(res, usuário, caixa, 503,
+                            "Triagem não alterada", falhaDaTriagem ou
+                            "A decisão não foi salva.")
+                        retorne
+                    fim
+                    emita("carteiro." .. ação, {
+                        caixa = caixa.id, carta = id,
+                        escopo = resultado.escopo
+                    }, ação == "fisgada" e "alta" ou "normal")
+                    util.redirecione(res, "/carteiro/indesejadas", 303)
+                fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/mensagens/:id/mover", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local formulário = req.form ou {}
+            local pasta = formulário.pasta
+            se não id ou não pastas[pasta] ou
+               não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A pasta, a mensagem ou a proteção do formulário é inválida.")
+                retorne
+            fim
+            carteiro:movaCarta(caixa, id, pasta,
+                função(moveu, falha, tipoDaFalha)
+                    se falha então mostreErro(res, usuário, caixa,
+                        tipoDaFalha == "pasta-incompatível" e 422 ou 503,
+                        "Não foi possível mover", falha); retorne fim
+                    se não moveu então mostreErro(res, usuário, caixa, 404,
+                        "Mensagem não encontrada", "Nada foi alterado."); retorne fim
+                    util.redirecione(res, "/carteiro/" .. pasta)
+                fim)
+        fim)
+    fim)
+
+    ap.rota("POST", "/carteiro/mensagens/:id/triagem", função(req, res)
+        comCaixa(req, res, função(usuário, caixa)
+            local id = util.idNatural(req.parâmetros.id)
+            local formulário = req.form ou {}
+            local decisão = formulário.decisão
+            se não id ou
+               (decisão ~= "regular" e decisão ~= "indesejada") ou
+               não util.confiraCSRF(usuário, formulário, segredo) então
+                mostreErro(res, usuário, caixa, 403, "Pedido recusado",
+                    "A carta, a decisão ou a proteção do formulário é inválida.")
+                retorne
+            fim
+            carteiro:decidaTriagemDaCarta(caixa, id, decisão,
+                função(resultado, falha)
+                    se falha ou não resultado então
+                        mostreErro(res, usuário, caixa,
+                            falha == "carta de entrada não encontrada" e 404 ou 503,
+                            "Triagem não alterada", falha ou
+                            "A decisão de triagem não foi salva.")
+                        retorne
+                    fim
+                    emita("carteiro.triagem.decisãoDoUsuário", {
+                        caixa = caixa.id, carta = id,
+                        decisão = resultado.decisão,
+                        escopo = resultado.escopo
+                    })
+                    util.redirecione(res, "/carteiro/" .. resultado.pasta)
+                fim)
+        fim)
+    fim)
+
+    ap.rota("GET", "/carteiro/estado", função(_, res)
+        util.protejaResposta(res)
+        res:definaCabeçalho("Cache-Control", "no-store")
+        local pronto = estado.falha == nulo
+        res:código(pronto e 200 ou 503):json({
+            serviço = "carteiro",
+            estado = pronto e "pronto" ou "iniciando",
+            banco = pronto e "pronto" ou "indisponível"
+        })
+    fim)
+
+    retorne ap
+fim
+
+retorne aplicação

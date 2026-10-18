@@ -1,0 +1,112 @@
+local segredo = importe "segredo"
+
+local configurador = {}
+
+local função escapeXML(valor)
+    retorne paraColar(valor ou "")
+        :troque("&", "&amp;")
+        :troque("<", "&lt;")
+        :troque(">", "&gt;")
+        :troque('"', "&quot;")
+        :troque("'", "&apos;")
+fim
+
+local função uuidDeterminístico(identidade)
+    local resumo = segredo.resumaBilhete("carteiro:perfil-apple:" .. identidade)
+    retorne resumo:corte(1, 8) .. "-" .. resumo:corte(9, 12) .. "-" ..
+        resumo:corte(13, 16) .. "-" .. resumo:corte(17, 20) .. "-" ..
+        resumo:corte(21, 32)
+fim
+
+-- Produz um perfil Apple sem credenciais. Durante a instalação interativa,
+-- o aparelho pede a senha e a guarda no chaveiro do próprio usuário.
+função configurador.perfilApple(dados)
+    dados = dados ou {}
+    local endereço = garanta(dados.endereço, "endereço postal é obrigatório")
+    local servidor = garanta(dados.servidor, "servidor postal é obrigatório")
+    local nome = dados.nome ou endereço
+    local usuário = dados.usuário ou endereço
+    local alvo = dados.alvo == "mac" e "mac" ou "iphone"
+    local escopo = alvo == "mac" e "User" ou "System"
+    local tipoDoAparelho = alvo == "mac" e 5 ou 1
+    local identidade = paraColar(dados.identidade ou endereço) .. ":" .. alvo
+    local identificador = "br.dev.santafe.carteiro.correio." ..
+        segredo.resumaBilhete(identidade):corte(1, 16)
+    local uuidDoPerfil = uuidDeterminístico(identidade .. ":perfil")
+    local uuidDaConta = uuidDeterminístico(identidade .. ":conta")
+
+    retorne [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>EmailAccountDescription</key>
+      <string>Correio Santafé</string>
+      <key>EmailAccountName</key>
+      <string>]] .. escapeXML(nome) .. [[</string>
+      <key>EmailAccountType</key>
+      <string>EmailTypeIMAP</string>
+      <key>EmailAddress</key>
+      <string>]] .. escapeXML(endereço) .. [[</string>
+      <key>IncomingMailServerAuthentication</key>
+      <string>EmailAuthPassword</string>
+      <key>IncomingMailServerHostName</key>
+      <string>]] .. escapeXML(servidor) .. [[</string>
+      <key>IncomingMailServerPortNumber</key>
+      <integer>993</integer>
+      <key>IncomingMailServerUseSSL</key>
+      <true/>
+      <key>IncomingMailServerUsername</key>
+      <string>]] .. escapeXML(usuário) .. [[</string>
+      <key>OutgoingMailServerAuthentication</key>
+      <string>EmailAuthPassword</string>
+      <key>OutgoingMailServerHostName</key>
+      <string>]] .. escapeXML(servidor) .. [[</string>
+      <key>OutgoingMailServerPortNumber</key>
+      <integer>465</integer>
+      <key>OutgoingMailServerUseSSL</key>
+      <true/>
+      <key>OutgoingMailServerUsername</key>
+      <string>]] .. escapeXML(usuário) .. [[</string>
+      <key>OutgoingPasswordSameAsIncomingPassword</key>
+      <true/>
+      <key>PayloadDescription</key>
+      <string>Configura o Correio Santafé com IMAP e SMTP protegidos por TLS.</string>
+      <key>PayloadDisplayName</key>
+      <string>Correio Santafé</string>
+      <key>PayloadIdentifier</key>
+      <string>]] .. identificador .. [[.conta</string>
+      <key>PayloadType</key>
+      <string>com.apple.mail.managed</string>
+      <key>PayloadUUID</key>
+      <string>]] .. uuidDaConta .. [[</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+    </dict>
+  </array>
+  <key>PayloadDescription</key>
+  <string>Configura a conta ]] .. escapeXML(endereço) .. [[ no Correio Santafé. A senha não faz parte deste perfil.</string>
+  <key>PayloadDisplayName</key>
+  <string>Correio Santafé</string>
+  <key>PayloadIdentifier</key>
+  <string>]] .. identificador .. [[</string>
+  <key>PayloadOrganization</key>
+  <string>Santafé</string>
+  <key>PayloadScope</key>
+  <string>]] .. escopo .. [[</string>
+  <key>TargetDeviceType</key>
+  <integer>]] .. tipoDoAparelho .. [[</integer>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>]] .. uuidDoPerfil .. [[</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>
+]]
+fim
+
+retorne configurador

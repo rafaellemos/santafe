@@ -1,0 +1,71 @@
+local nomes = importe "nomes"
+local zona = importe "nomes.zona"
+
+local z, falha = zona.nova({
+    nome = "exemplo.org",
+    ttlPadrão = 300,
+    registros = {
+        { nome = "@", tipo = "SOA", dados = {
+            mestre = "ns1", responsável = "dns", série = 2026082701,
+            atualização = 3600, novaTentativa = 600,
+            expiração = 1209600, mínimo = 300 } },
+        { nome = "@", tipo = "NS", dados = "ns1" },
+        { nome = "ns1", tipo = "A", dados = "192.0.2.53" },
+        { nome = "www", tipo = "A", dados = "192.0.2.10" },
+        { nome = "_imaps._tcp", tipo = "SRV", dados = {
+            prioridade = 0, peso = 1, porta = 993, alvo = "www" } },
+        { nome = "apelido", tipo = "CNAME", dados = "www" },
+        { nome = "*.apps", tipo = "A", dados = "192.0.2.20" },
+        { nome = "vazio", tipo = "TXT", dados = "existe" },
+        { nome = "folha.bloqueio.apps", tipo = "A", dados = "192.0.2.21" },
+        { nome = "delegado", tipo = "NS", dados = "ns.delegado" },
+        { nome = "ns.delegado", tipo = "A", dados = "192.0.2.54" }
+    }
+})
+garanta(z, falha)
+
+local resposta = z:consulte("www.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(resposta.código == nomes.CÓDIGOS.SEM_ERRO)
+garanta(#resposta.respostas == 1 e resposta.respostas[1].dados == "192.0.2.10")
+
+resposta = z:consulte("apelido.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(#resposta.respostas == 2)
+garanta(resposta.respostas[1].tipo == nomes.TIPOS.CNAME)
+
+resposta = z:consulte("_imaps._tcp.exemplo.org", "SRV", nomes.CLASSES.IN)
+garanta(#resposta.respostas == 1)
+garanta(resposta.respostas[1].dados.prioridade == 0)
+garanta(resposta.respostas[1].dados.peso == 1)
+garanta(resposta.respostas[1].dados.porta == 993)
+garanta(resposta.respostas[1].dados.alvo == "www.exemplo.org.")
+garanta(#resposta.adicionais == 1)
+garanta(resposta.adicionais[1].dados == "192.0.2.10")
+
+resposta = z:consulte("x.apps.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(#resposta.respostas == 1)
+garanta(resposta.respostas[1].nome == "x.apps.exemplo.org.")
+
+resposta = z:consulte("vazio.exemplo.org", "AAAA", nomes.CLASSES.IN)
+garanta(resposta.código == nomes.CÓDIGOS.SEM_ERRO e #resposta.autoridades == 1)
+
+-- Um nó vazio existe, mas não possui registro próprio: é NODATA.
+resposta = z:consulte("bloqueio.apps.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(resposta.código == nomes.CÓDIGOS.SEM_ERRO e #resposta.respostas == 0)
+-- O coringa de *.apps não pode saltar esse ancestral existente.
+resposta = z:consulte("x.bloqueio.apps.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(resposta.código == nomes.CÓDIGOS.NOME_INEXISTENTE)
+
+-- Abaixo de um corte, a zona-pai devolve uma referência, não dados
+-- autoritativos, incluindo somente a cola necessária ao servidor filho.
+resposta = z:consulte("www.delegado.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(resposta.código == nomes.CÓDIGOS.SEM_ERRO)
+garanta(não resposta.autoritativa e #resposta.autoridades == 1)
+garanta(resposta.autoridades[1].tipo == nomes.TIPOS.NS)
+garanta(#resposta.adicionais == 1 e
+    resposta.adicionais[1].dados == "192.0.2.54")
+
+-- O sufixo precisa começar numa fronteira de rótulo.
+garanta(não z:contém("naoexemplo.org"))
+resposta = z:consulte("ausente.exemplo.org", "A", nomes.CLASSES.IN)
+garanta(resposta.código == nomes.CÓDIGOS.NOME_INEXISTENTE)
+mostre("nomes zona: ok")

@@ -1,0 +1,296 @@
+local rede = importe "rede"
+local mariadb = importe "mariadb"
+local CorreioMariaDB = importe "correio.mariadb"
+
+-- Roteia caixas postais para bancos fisicamente independentes. A chave do
+-- banco acompanha somente o identificador interno da caixa; endereços e
+-- cabeçalhos continuam sendo apresentados sem esse marcador.
+local multibanco = {}
+
+local função domínioDoEndereço(endereço)
+    endereço = paraColar(endereço ou ""):apare()
+    local arroba = endereço:procure("@", 1, verdadeiro)
+    se não arroba ou arroba == #endereço então retorne nulo fim
+    local domínio = rede.domínioASCII(endereço:corte(arroba + 1))
+    retorne domínio e domínio:minúscula() ou nulo
+fim
+
+local função fechePiscinas(bancos)
+    para _, banco em ipares(bancos ou {}) início
+        se banco.piscina e tipo(banco.piscina.feche) == "função" então
+            banco.piscina:feche()
+        fim
+    fim
+fim
+
+função multibanco.novo(especificações)
+    garanta(tipo(especificações) == "tabela" e #especificações > 0,
+        "ao menos um banco postal é obrigatório")
+    local este = { bancos = {}, porChave = {}, porDomínio = {} }
+
+    para índice, banco em ipares(especificações) início
+        local chave = paraColar(banco.chave ou ""):apare():minúscula()
+        local domínio = paraColar(banco.domínioASCII ou ""):apare():minúscula()
+        garanta(chave ~= "" e chave:procure("^[a-z0-9_]+$") ~= nulo,
+            "chave de banco postal inválida")
+        garanta(domínio ~= "" e banco.repositório,
+            "banco postal precisa de domínio e repositório")
+        garanta(não este.porChave[chave], "chave de banco postal repetida")
+        garanta(não este.porDomínio[domínio],
+            "domínio de banco postal repetido")
+        banco.chave = chave
+        banco.domínioASCII = domínio
+        este.bancos[#este.bancos + 1] = banco
+        este.porChave[chave] = banco
+        este.porDomínio[domínio] = banco
+        se índice == 1 então este.principal = banco fim
+    fim
+
+    local função bancoDaCaixa(caixaOuId)
+        local chave, id
+        se tipo(caixaOuId) == "tabela" então
+            chave = caixaOuId.bancoPostal
+            caixaOuId = caixaOuId.id
+        fim
+        se tipo(caixaOuId) == "colar" então
+            local chaveMarcada, idMarcado = caixaOuId:separe("^([^:]+):(%d+)$")
+            se chaveMarcada então
+                chave, id = chaveMarcada, paraNúmero(idMarcado)
+            fim
+        fim
+        local banco = chave e este.porChave[chave] ou este.principal
+        id = id ou mat.paraInteiro(paraNúmero(caixaOuId))
+        se não banco ou não id então
+            retorne nulo, nulo, "identificador de caixa postal inválido"
+        fim
+        retorne banco, id
+    fim
+
+    local função marqueCaixa(banco, caixa)
+        se tipo(caixa) ~= "tabela" então retorne caixa fim
+        caixa.bancoPostal = banco.chave
+        caixa.id = banco.chave .. ":" .. paraColar(caixa.id)
+        retorne caixa
+    fim
+
+    local função desmarqueCaixa(caixa)
+        local banco, id, falha = bancoDaCaixa(caixa)
+        se não banco então retorne nulo, nulo, falha fim
+        local limpa = {}
+        para nome, valor em pares(caixa) início limpa[nome] = valor fim
+        limpa.id = id
+        limpa.bancoPostal = nulo
+        retorne banco, limpa
+    fim
+
+    função este.bancoDoEndereço(_, endereço)
+        local domínio = domínioDoEndereço(endereço)
+        retorne domínio e este.porDomínio[domínio] ou nulo
+    fim
+
+    função este.chaveDoEndereço(esta, endereço)
+        local banco = esta:bancoDoEndereço(endereço)
+        retorne banco e banco.chave ou nulo
+    fim
+
+    função este.confiraEstrutura(_, tratador)
+        local função confira(índice)
+            se índice > #este.bancos então
+                tratador(verdadeiro, nulo)
+                retorne
+            fim
+            local banco = este.bancos[índice]
+            banco.repositório:confiraEstrutura(função(pronto, falha)
+                se não pronto então
+                    tratador(nulo, banco.chave .. ": " .. paraColar(falha))
+                    retorne
+                fim
+                confira(índice + 1)
+            fim)
+        fim
+        confira(1)
+    fim
+
+    função este.autentiqueCaixa(_, identificador, senha, resumoIsca, tratador)
+        local banco
+        se paraColar(identificador ou ""):procure("@", 1, verdadeiro) então
+            banco = este:bancoDoEndereço(identificador)
+        senão
+            banco = este.principal
+        fim
+        -- Mantém o custo do resumo-isca mesmo para domínios desconhecidos.
+        banco = banco ou este.principal
+        banco.repositório:autentiqueCaixa(identificador, senha, resumoIsca,
+            função(identidade, falha)
+                se identidade e identidade.caixa então
+                    marqueCaixa(banco, identidade.caixa)
+                    identidade.bancoPostal = banco.chave
+                fim
+                tratador(identidade, falha)
+            fim)
+    fim
+
+    função este.existeDestinatárioLocal(_, endereço, tratador)
+        local banco = este:bancoDoEndereço(endereço)
+        se não banco então tratador(falso, nulo); retorne fim
+        retorne banco.repositório:existeDestinatárioLocal(endereço, tratador)
+    fim
+
+    função este.recebaSMTP(_, envelope, tratador)
+        local banco
+        para _, endereço em ipares(envelope.destinatários ou {}) início
+            local atual = este:bancoDoEndereço(endereço)
+            se não atual então
+                tratador(nulo, "destinatário não pertence a um banco postal")
+                retorne
+            fim
+            se banco e banco ~= atual então
+                tratador(nulo,
+                    "uma transação SMTP não pode misturar bancos postais")
+                retorne
+            fim
+            banco = atual
+        fim
+        se não banco então tratador(nulo, "envelope sem destinatário"); retorne fim
+        retorne banco.repositório:recebaSMTP(envelope, tratador)
+    fim
+
+    função este.adicioneSaída(_, caixa, mensagem, fila, tratador)
+        local banco, limpa, falha = desmarqueCaixa(caixa)
+        se não banco então tratador(nulo, falha); retorne fim
+        retorne banco.repositório:adicioneSaída(
+            limpa, mensagem, fila, tratador)
+    fim
+
+    local função comCaixa(caixaId, tratador, operação)
+        local banco, id, falha = bancoDaCaixa(caixaId)
+        se não banco então tratador(nulo, falha); retorne fim
+        retorne operação(banco.repositório, id)
+    fim
+
+    função este.listeMensagensIMAP(_, caixaId, pasta, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:listeMensagensIMAP(id, pasta, tratador)
+        fim)
+    fim
+
+    função este.obtenhaMensagemIMAP(_, caixaId, mensagemId, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:obtenhaMensagemIMAP(id, mensagemId, tratador)
+        fim)
+    fim
+
+    função este.obtenhaAnexo(_, caixaId, mensagemId, anexoId, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:obtenhaAnexo(
+                id, mensagemId, anexoId, tratador)
+        fim)
+    fim
+
+    função este.atualizeSinalizadoresIMAP(_, caixaId, mensagemId,
+                                                   sinalizadores, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:atualizeSinalizadoresIMAP(
+                id, mensagemId, sinalizadores, tratador)
+        fim)
+    fim
+
+    função este.movaMensagemIMAP(_, caixaId, mensagemId, pasta, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:movaMensagemIMAP(
+                id, mensagemId, pasta, tratador)
+        fim)
+    fim
+
+    função este.copieMensagensIMAP(_, caixaId, mensagens, pasta, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:copieMensagensIMAP(
+                id, mensagens, pasta, tratador)
+        fim)
+    fim
+
+    função este.removaMensagemIMAP(_, caixaId, mensagemId, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:removaMensagemIMAP(id, mensagemId, tratador)
+        fim)
+    fim
+
+    função este.esvazieLixeira(_, caixaId, tratador)
+        retorne comCaixa(caixaId, tratador, função(repositório, id)
+            retorne repositório:esvazieLixeira(id, tratador)
+        fim)
+    fim
+
+    função este.adicioneMensagemIMAP(_, caixa, pasta, mime, opções,
+                                               tratador)
+        local banco, limpa, falha = desmarqueCaixa(caixa)
+        se não banco então tratador(nulo, falha); retorne fim
+        retorne banco.repositório:adicioneMensagemIMAP(
+            limpa, pasta, mime, opções, tratador)
+    fim
+
+    função este.feche(_)
+        fechePiscinas(este.bancos)
+    fim
+
+    retorne este
+fim
+
+-- Abre e valida todas as piscinas antes de entregar o roteador. Nenhum
+-- serviço é anunciado como pronto se um dos bancos estiver indisponível.
+função multibanco.inicie(configuração, tratador)
+    local fontes = configuração.bancosPostais ou { configuração }
+    local bancos = {}
+
+    local função falhe(mensagem)
+        fechePiscinas(bancos)
+        tratador(nulo, mensagem)
+    fim
+
+    local função abra(índice)
+        se índice > #fontes então
+            tratador(multibanco.novo(bancos), nulo)
+            retorne
+        fim
+        local fonte = fontes[índice]
+        se não fonte.banco ou não fonte.banco.usuário ou
+           não fonte.banco.banco então
+            falhe("credenciais ausentes para o banco postal " ..
+                paraColar(fonte.chave ou índice))
+            retorne
+        fim
+        local iniciou, falhaImediata = mariadb.criePiscinaAssíncrona(
+            fonte.banco, função(piscina, falhaDaPiscina)
+                se não piscina então
+                    falhe(paraColar(fonte.chave) .. ": " ..
+                        paraColar(falhaDaPiscina))
+                    retorne
+                fim
+                local repositório = CorreioMariaDB.novo(piscina, fonte)
+                repositório:confiraEstrutura(função(pronto, falhaDaEstrutura)
+                    se não pronto então
+                        piscina:feche()
+                        falhe(paraColar(fonte.chave) .. ": " ..
+                            paraColar(falhaDaEstrutura))
+                        retorne
+                    fim
+                    bancos[#bancos + 1] = {
+                        chave = fonte.chave,
+                        domínioASCII = fonte.domínioASCII,
+                        configuração = fonte,
+                        piscina = piscina,
+                        repositório = repositório
+                    }
+                    abra(índice + 1)
+                fim)
+            fim)
+        se iniciou == nulo e falhaImediata então
+            falhe(paraColar(fonte.chave) .. ": " ..
+                paraColar(falhaImediata))
+        fim
+    fim
+
+    abra(1)
+fim
+
+retorne multibanco

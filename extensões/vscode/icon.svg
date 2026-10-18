@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Santafé">
+  <rect width="256" height="256" rx="52" fill="#00695c"/>
+  <path d="M62 68h132M62 128h94M62 188h132" fill="none" stroke="#b2dfdb" stroke-width="18" stroke-linecap="round"/>
+  <path d="M168 100c20 0 36 16 36 36s-16 36-36 36h-20v-72h20Zm0 18h-2v36h2c10 0 18-8 18-18s-8-18-18-18Z" fill="#fff"/>
+  <circle cx="196" cy="77" r="10" fill="#ffcc80"/>
+</svg>

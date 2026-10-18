@@ -20,4 +20,9 @@ local identidade = tomada.proteja(função(valorRecebido)
 fim)
 garanta(identidade("ok") == "ok")
 
+local conexão = tomada.pct()
+garanta(conexão:definaTempoEsgotado(1, "bloqueio"))
+garanta(conexão:definaTempoEsgotado(1, "total"))
+garanta(conexão:feche())
+
 mostre("tomada proteção: ok")

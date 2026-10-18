@@ -1,0 +1,2985 @@
+{
+  "versão": 1,
+  "itens": [
+    {
+      "rótulo": "_G",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "_VERSÃO",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "acesso:permita",
+      "origem": "bibs/bibf/nomes/acesso.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "agendamento:ativo",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "agendamento:cancele",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "agência:autentique",
+      "origem": "bibs/bibf/correio/agência.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "agência:autorizeDestinatário",
+      "origem": "bibs/bibf/correio/agência.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "agência:autorizeRemetente",
+      "origem": "bibs/bibf/correio/agência.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "agência:receba",
+      "origem": "bibs/bibf/correio/agência.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "antivírus.novo",
+      "origem": "bibs/bibf/correio/antivírus.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "antivírus:confiraAssíncrono",
+      "origem": "bibs/bibf/correio/antivírus.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "antivírus:examineAssíncrono",
+      "origem": "bibs/bibf/correio/antivírus.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "ap.aoFalhar",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "ap.depure",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "ap.encerre",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "ap.escute",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "ap.parada",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "ap.rota",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "arquivo.crieDiretóriosAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.crieDiretóriosComPermissõesAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.existeAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.graveDurávelAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.graveDurávelComPermissõesAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.leiaAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.movaAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo.removaAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:busque",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:definaMemint",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:escreva",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:esvazie",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:feche",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:leia",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "arquivo:linhas",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "autenticador:avalieAssíncrono",
+      "origem": "bibs/bibf/correio/autenticação.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "autenticação.nova",
+      "origem": "bibs/bibf/correio/autenticação.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "autoridade:escute",
+      "origem": "bibs/bibf/nomes/autoridade.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "autoridade:estatísticas",
+      "origem": "bibs/bibf/nomes/autoridade.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "autoridade:feche",
+      "origem": "bibs/bibf/nomes/autoridade.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "autoridade:inicie",
+      "origem": "bibs/bibf/nomes/autoridade.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "autoridade:responda",
+      "origem": "bibs/bibf/nomes/autoridade.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "bit32.be",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.bnão",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.bou",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.boux",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.bTeste",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.desloqueAritméticoDireita",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.desloqueDireita",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.desloqueEsquerda",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.extraia",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.gireDireita",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.gireEsquerda",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "bit32.substitua",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32"
+    },
+    {
+      "rótulo": "caminheiro.form",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "caminheiro.formulárioEmPartes",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "caminheiro.novo",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "canal:adicioneDestino",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:confirmação",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:despeje",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:emita",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:estatísticas",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:feche",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:leitura",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:operação",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:pulsoDeVida",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:recusa",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:removaDestino",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "canal:sinal",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "carregue",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "carregueArquivo",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "carteiro.novo",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:caixaDoUsuário",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:confieNoRemetente",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:conteCartas",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:decidaTriagemDaCarta",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:deixeDeConfiarNoRemetente",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:envieCarta",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:esvazieLixeira",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:listeCartas",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:listeCartasDaConversa",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:listeCartasParaAção",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:listeRegrasDaTriagem",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:marqueCartaLida",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:marqueCartaNãoLida",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:marqueCartasLidas",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:marqueCartasNãoLidas",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:movaCarta",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:movaCartas",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:obtenhaAnexo",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:obtenhaCarta",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:obtenhaCartaOriginal",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:pastas",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:remetenteConfiável",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:removaRegraDaTriagem",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:salveRegraDaTriagem",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "carteiro:usuárioPorSessão",
+      "origem": "bibs/bibf/carteiro.fé",
+      "categoria": "Carteiro"
+    },
+    {
+      "rótulo": "cd:aceiteDestinatário",
+      "origem": "bibs/bibf/correio/cd.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "cd:atualizeEntrega",
+      "origem": "bibs/bibf/correio/cd.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "cd:entregueAvisoDaFila",
+      "origem": "bibs/bibf/correio/cd.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "cd:posteCarta",
+      "origem": "bibs/bibf/correio/cd.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "cd:recebaCarta",
+      "origem": "bibs/bibf/correio/cd.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "cliente:cancele",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "cliente:conecteAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "cliente:definaTempoLimite",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "cliente:definaTLS",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "cliente:definaValidaçãoTLS",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "cliente:envieAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "cliente:feche",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "colar.apare",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.base64",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.binário",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.byte",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.capture",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.caractere",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.compacte",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.corte",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.crc32",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.decBase64",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.decHex",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.descompacte",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.desempacote",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.empacote",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.formate",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.hex",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.inverta",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.junte",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.maiúscula",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.minúscula",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.porte",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.procure",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.replique",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.separe",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.taco",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.tamanho",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "colar.troque",
+      "origem": "src/lstrlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "coleteLixo",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:aceiteTLSAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:cancele",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:definaLimitesHTTP",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:definaTempoLimite",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:envieAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:escapeColar",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:executeAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:executePreparadoAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:feche",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:inicieTLSAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:parLocal",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:parRemoto",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:prepareConsultaAssíncrona",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:recebaAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:recebaDadosAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "conexão:recebaHTTPAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "consulta:executeAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "consulta:feche",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "consulta:númeroDeParâmetros",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "correio.agência.nova",
+      "origem": "bibs/bibf/correio/agência.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "correio.cd.novo",
+      "origem": "bibs/bibf/correio/cd.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "correio.cliente",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.desprotejaPontos",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.entregueDiretamenteAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.filaMariaDB",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.filaMemória",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.imap.servidor",
+      "origem": "bibs/bibf/correio/imap.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "correio.inspecioneCabeçalhos",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.leiaMensagem",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.mariadb.novo",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.multibanco.inicie",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.multibanco.novo",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.novaMensagem",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.protejaPontos",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.servidor",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "correio.transporte.endereçoASCII",
+      "origem": "bibs/bibf/correio/transporte.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.transporte.prepareRetransmissor",
+      "origem": "bibs/bibf/correio/transporte.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.triagem.nova",
+      "origem": "bibs/bibf/correio/triagem.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "correio.util.apare",
+      "origem": "bibs/bibf/correio/util.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.util.escapeHTML",
+      "origem": "bibs/bibf/correio/util.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.util.idNatural",
+      "origem": "bibs/bibf/correio/util.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.util.nomeSeguroDoAnexo",
+      "origem": "bibs/bibf/correio/util.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.util.resumo",
+      "origem": "bibs/bibf/correio/util.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "correio.util.separeEndereços",
+      "origem": "bibs/bibf/correio/util.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "corrotina.ceda",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "corrotina.crie",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "corrotina.envolva",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "corrotina.estado",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "corrotina.executando",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "corrotina.podeCeder",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "corrotina.retome",
+      "origem": "src/lcorolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "decodificador:alimente",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "decodificador:pendente",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "decodificador:reinicie",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "defina",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "definaMetatabela",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.definaGancho",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.definaLocal",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.definaMetatabela",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.definaValorDeUsuário",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.definaValorExterno",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.depure",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.idValorExterno",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.junteValorExterno",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterGancho",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterInformação",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterLocal",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterMetatabela",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterRegistro",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterValorDeUsuário",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.obterValorExterno",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depure.rastroDePilha",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "depósito.novo",
+      "origem": "bibs/bibf/correio/depósito.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "depósito:caminhoDoObjeto",
+      "origem": "bibs/bibf/correio/depósito.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "depósito:graveAssíncrono",
+      "origem": "bibs/bibf/correio/depósito.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "depósito:leiaAssíncrono",
+      "origem": "bibs/bibf/correio/depósito.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "depósito:prepareAssíncrono",
+      "origem": "bibs/bibf/correio/depósito.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "destino:envie",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "destino:esvazie",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "destino:feche",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "dkim.assine",
+      "origem": "bibs/bibf/correio/dkim.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "dkim.verifiqueAssíncrono",
+      "origem": "bibs/bibf/correio/dkim.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "dmarc.avalieAssíncrono",
+      "origem": "bibs/bibf/correio/dmarc.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "dnssec:encontreNSEC",
+      "origem": "bibs/bibf/nomes/dnssec.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "dnssec:formateDS",
+      "origem": "bibs/bibf/nomes/dnssec.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "entrega.espera",
+      "origem": "bibs/bibf/correio/entrega.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "entrega.formeAviso",
+      "origem": "bibs/bibf/correio/entrega.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "erro",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.abra",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.arquivoTemp",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.entrada",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.escreva",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.esvazie",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.feche",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.leia",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.linhas",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.pAbra",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.saída",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "es.tipo",
+      "origem": "src/liolib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "executeArquivo",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "fila:adicioneAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:adicioneFormadaAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:adieAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:adieAvisoAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:adieParcialAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:canceleAvisosDesatualizadosAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:crieEstruturaAssíncrona",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:listeQuarentenaAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:marqueEntregueAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:marqueFalhouAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:marqueFalhouEAviseAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:quarenteneAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:receba",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:recupereAvisosExpiradosAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:recupereReservasExpiradasAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:registreFalhaInternaAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:reprocesseQuarentenaAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:reservePróximaAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:reservePróximoAvisoAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "fila:soliciteAvisoAssíncrono",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "filaMemória:receba",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "garanta",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "igual",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "imagem.codifique",
+      "origem": "bibs/bibf/imagem.fé",
+      "categoria": "Imagem"
+    },
+    {
+      "rótulo": "imagem.identifique",
+      "origem": "bibs/bibf/imagem.fé",
+      "categoria": "Imagem"
+    },
+    {
+      "rótulo": "imagem.leia",
+      "origem": "bibs/bibf/imagem.fé",
+      "categoria": "Imagem"
+    },
+    {
+      "rótulo": "imagem.paraPDF",
+      "origem": "bibs/bibf/imagem.fé",
+      "categoria": "Imagem"
+    },
+    {
+      "rótulo": "imagem.salve",
+      "origem": "bibs/bibf/imagem.fé",
+      "categoria": "Imagem"
+    },
+    {
+      "rótulo": "ipares",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "limitador:estatísticas",
+      "origem": "bibs/bibf/nomes/acesso.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "limitador:permita",
+      "origem": "bibs/bibf/nomes/acesso.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "mariadb.conecteAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mariadb.criePiscinaAssíncrona",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mariadb.versãoDoConector",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.absoluto",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.aleatório",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.arcoCosseno",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.arcoSeno",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.arcoTangente",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.arredonde",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.cosseno",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.cossenoHiperbólico",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.decompõe2",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.expoente",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.graus",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.infinito",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.log10",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.logaritmo",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.menorSemSinal",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.máximo",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.máximoInteiro",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.mínimo",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.mínimoInteiro",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.paraInteiro",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.pi",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.piso",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.potência",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.radianos",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.raiz",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.recompõe2",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.resto",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.semente",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.seno",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.senoHiperbólico",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.separa",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.tangente",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.tangenteHiperbólica",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.teto",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mat.tipo",
+      "origem": "src/lmathlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "mensagem:destinatários",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "mensagem:forme",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "mostre",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "multibanco:adicioneMensagemIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:adicioneSaída",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:atualizeSinalizadoresIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:autentiqueCaixa",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:bancoDoEndereço",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:chaveDoEndereço",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:confiraEstrutura",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:copieMensagensIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:esvazieLixeira",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:existeDestinatárioLocal",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:feche",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:listeMensagensIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:movaMensagemIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:obtenhaAnexo",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:obtenhaMensagemIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:recebaSMTP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "multibanco:removaMensagemIMAP",
+      "origem": "bibs/bibf/correio/multibanco.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "módulo.caminho",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "módulo.caminhoC",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "módulo.carregados",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "módulo.carregarBib",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "módulo.pesquisadores",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "módulo.pesquisarCaminho",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "módulo.pré",
+      "origem": "src/loadlib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "nomes.acesso.novo",
+      "origem": "bibs/bibf/nomes/acesso.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.acesso.novoLimitador",
+      "origem": "bibs/bibf/nomes/acesso.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.acesso.pertence",
+      "origem": "bibs/bibf/nomes/acesso.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.autoridade.novo",
+      "origem": "bibs/bibf/nomes/autoridade.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.CLASSES",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.codifiqueMensagem",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.codifiqueNome",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.CÓDIGOS",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.decodifiqueMensagem",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.decodifiqueNome",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.dnssec.assineZona",
+      "origem": "bibs/bibf/nomes/dnssec.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.nomeCanônico",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.nomeDoTipo",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.novaConsulta",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.resolvedor.novo",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.tipoParaNúmero",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.TIPOS",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.zona.nova",
+      "origem": "bibs/bibf/nomes/zona.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "obter",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "obterMetatabela",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "octetos",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "paraColar",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "paraNúmero",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "pares",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "pdf:Abra",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:AceitaQuebraDePágina",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:AdicioneJavaScript",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:AdicioneLigação",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:AdicionePágina",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:AutoImprima",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Cabeçalho",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CalculeLinhas",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:ConfereQuebraDePágina",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CorteIndefinido",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Célula",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CélulaAjustada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CélulaAjustadaEscapada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CélulaAjustadaEscapadaForçada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CélulaAjustadaHorizontal",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CélulaAjustadaHorizontalForçada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CélulaCortada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Círculo",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:CódigoDeBarras2de5i",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaAbscissa",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaAbscissaEOrdenada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaAlfa",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaAssunto",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaAutoQuebraDePágina",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaAutor",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaCompressão",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaConfiguraçõesDaFonte",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaCorDaLinha",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaCorDoTexto",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaCorInterna",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaCriador",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaDuplaFace",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaEspessuraDoQuadro",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaFonte",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaLigação",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaMargemDireita",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaMargemEsquerda",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaMargemSuperior",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaMargens",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaModoExibido",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaOrdenada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaPalavrasChave",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaTamanhoDaFonte",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaTraço",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:DefinaTítulo",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Elipse",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Escreva",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Feche",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Imagem",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Ligação",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:LinearGradiente",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Linha",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:MultiCélula",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:MultiCélulaEngarrafada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:NovaLinha",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:NúmeroDaPágina",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueAbscissa",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueAltura",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueConfiguraçõesDaFonte",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueCorDaLinha",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueCorDoTexto",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueCorInterna",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueLargura",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueLarguraDoColar",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueMargemDireita",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueMargemEsquerda",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueOrdenada",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PeguePseudoNúmeroDePáginas",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PegueTamanhoDaFonte",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Polígono",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:PseudoNúmeroDePáginas",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:RadialGradiente",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Retângulo",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:RetânguloAbaulado",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:RetânguloCortado",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Rodapé",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Rotacione",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Saída",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:Texto",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:TextoCortado",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:TextoRotacionado",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "pdf:TextoSombreado",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "piscina:adquiraAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "piscina:estado",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "piscina:executeAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "piscina:executePreparadoAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "piscina:feche",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "piscina:inicieTransaçãoAssíncrona",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "proteja",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "protejaMais",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "proteção:admita",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:bloqueie",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:conclua",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:estado",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:estatísticas",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:libere",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:limpe",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "proteção:registreFalha",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "próximo",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "pulso.codifique",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "pulso.memória",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "pulso.novo",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "pulso.novoDecodificador",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "pulso.registrador",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "pulso.terminal",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "pulso.valide",
+      "origem": "bibs/bibf/pulso.fé",
+      "categoria": "PULSO"
+    },
+    {
+      "rótulo": "rede.agende",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.analiseHTTP",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.carregueCertificadoTLS",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.clienteTCP",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.consulteDNSAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.domínioASCII",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.domínioUnicode",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.laço",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.novaResposta",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.pareLaço",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.resolvaEndereçosAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.respostaHTTP",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.servidorTCP",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "rede.udp",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "repositório:adicioneSaída",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:atualizeEntrega",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:confiraEstrutura",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:decidaTriagemDaCarta",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:existeDestinatárioLocal",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:listeMensagens",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:listeRegrasDaTriagem",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:marqueLida",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:movaMensagem",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:obtenhaAnexo",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:obtenhaMensagem",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:obtenhaOuCrieCaixa",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:obtenhaUsuárioPorSessão",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:recebaSMTP",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:removaRegraDaTriagem",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "repositório:salveRegraDaTriagem",
+      "origem": "bibs/bibf/correio/mariadb.fé",
+      "categoria": "Correio — persistência, multiambiente e transporte"
+    },
+    {
+      "rótulo": "req.arquivos",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.cabeçalho",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.caminho",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.caminhoOriginal",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.consulta",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.corpo",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.form",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.ip",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.método",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.parâmetros",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.portaRemota",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "req.versão",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "res:código",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "res:dados",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "res:definaCabeçalho",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "res:html",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "res:json",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "res:texto",
+      "origem": "bibs/bibf/caminheiro.fé",
+      "categoria": "Caminheiro"
+    },
+    {
+      "rótulo": "resolvedor:escute",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:estatísticas",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:feche",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:inicie",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:inicieSomenteSaída",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:limpeMemrap",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:resolva",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resolvedor:respondaAssíncrono",
+      "origem": "bibs/bibf/nomes/resolvedor.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "resultado:feche",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "resultado:idInserido",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "resultado:linhasAfetadas",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "resultado:númeroDeLinhas",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "resultado:obterLinha",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "RPDF:novo",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+    },
+    {
+      "rótulo": "segredo.assineRSA256",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.chavePúblicaRSA",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.confiraBilhete",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.confiraSenhaAssíncrono",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.novoBilhete",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.precisaAtualizarSenha",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.protejaSenhaAssíncrono",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.resuma",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.resumaBilhete",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.resumaSHA256",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "segredo.verifiqueRSA256",
+      "origem": "bibs/bibc/segredo/segredo.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "selecione",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "servidor:aceiteAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "servidor:amarre",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "servidor:cancele",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "servidor:definaTempoLimite",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "servidor:escute",
+      "origem": "bibs/bibf/correio/imap.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "servidor:estatísticas",
+      "origem": "bibs/bibf/correio.fé",
+      "categoria": "Correio — mensagem, SMTP e filas"
+    },
+    {
+      "rótulo": "servidor:feche",
+      "origem": "bibs/bibf/correio/imap.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "servidor:inicie",
+      "origem": "bibs/bibf/correio/imap.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "sessão:devolva",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "sessão:executeAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "sessão:executePreparadoAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "sessão:prepareConsultaAssíncrona",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.aleatório",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.data",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.definaLocal",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.difTempo",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.execute",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.nomeTemp",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.obterVariável",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.relógio",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.remova",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.renomeie",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.saia",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "so.tempo",
+      "origem": "src/loslib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "spf.verifiqueAssíncrono",
+      "origem": "bibs/bibf/correio/spf.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "tabela.concatene",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.desempacote",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.empacote",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.insira",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.maiorÍndice",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.mova",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.ordene",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tabela.remova",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tamanho",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "tipo",
+      "origem": "src/lbaselib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "transação:confirmeAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "transação:desfaçaAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "transação:executeAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "transação:executePreparadoAssíncrono",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "transação:prepareConsultaAssíncrona",
+      "origem": "bibs/bibc/mariadb/mariadb.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "triagem:avalie",
+      "origem": "bibs/bibf/correio/triagem.fé",
+      "categoria": "Correio — componentes"
+    },
+    {
+      "rótulo": "turing.registrar",
+      "origem": "bibs/bibf/turing.fé",
+      "categoria": "Turing"
+    },
+    {
+      "rótulo": "turing.validarBilhete",
+      "origem": "bibs/bibf/turing.fé",
+      "categoria": "Turing"
+    },
+    {
+      "rótulo": "udp:amarre",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:cancele",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:definaTempoLimite",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:enviePara",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:envieParaAssíncrono",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:feche",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:inicieRecepção",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "udp:pareRecepção",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "utf8.caractere",
+      "origem": "src/lutf8lib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "utf8.caracteres",
+      "origem": "src/lutf8lib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "utf8.código",
+      "origem": "src/lutf8lib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "utf8.padrãoCaractere",
+      "origem": "src/lutf8lib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "utf8.posição",
+      "origem": "src/lutf8lib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "utf8.tamanho",
+      "origem": "src/lutf8lib.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "Vigia.novo",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia"
+    },
+    {
+      "rótulo": "zona:adicione",
+      "origem": "bibs/bibf/nomes/zona.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "zona:consulte",
+      "origem": "bibs/bibf/nomes/zona.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "zona:contém",
+      "origem": "bibs/bibf/nomes/zona.fé",
+      "categoria": "Nomes"
+    }
+  ]
+}

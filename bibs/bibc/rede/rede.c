@@ -188,18 +188,26 @@ static gboolean parse_query_string(lua_State *L, const char *qs, size_t len,
 }
 
 typedef struct {
-    GSocketConnection *conn;
+    GIOStream *stream;          /* referência proprietária: TCP ou invólucro TLS */
+    GSocketConnection *conn;    /* conexão TCP de base, emprestada por stream */
     GInputStream *istream;
     GOutputStream *ostream;
     gboolean closed;
     gboolean read_pending;
     gboolean write_pending;
+    gboolean tls_pending;
+    gboolean tls_active;
     GCancellable *read_cancel;
     GCancellable *write_cancel;
+    GCancellable *tls_cancel;
     guint timeout_ms;
     gsize max_header_bytes;
     gsize max_body_bytes;
 } psock_conn_t;
+
+typedef struct {
+    GTlsCertificate *certificate;
+} psock_tls_cert_t;
 
 typedef struct {
     GSocketClient *client;
@@ -250,9 +258,19 @@ typedef struct {
     psock_conn_t *conn_owner;
     psock_client_t *client_owner;
     psock_server_t *server_owner;
+    GIOStream *pending_stream;
     gboolean parse_http;
     gsize max_total;
 } async_ctx_t;
+
+typedef struct {
+    lua_State *L;
+    int ref;
+    GCancellable *cancellable;
+    guint timeout_id;
+    gboolean timed_out;
+    GResolverRecordType record_type;
+} dns_ctx_t;
 
 typedef struct {
     int ref;
@@ -270,6 +288,14 @@ typedef struct {
     GSocketAddress *dest;
     guint source_id;
 } udp_send_state_t;
+
+typedef struct {
+    lua_State *L;
+    int callback_ref;
+    int self_ref;
+    guint source_id;
+    gboolean active;
+} prede_timer_t;
 
 static GMainLoop *rede_main_loop = NULL;
 
@@ -356,6 +382,13 @@ static void clear_conn_write(async_ctx_t *ctx) {
         ctx->conn_owner->write_cancel = NULL;
 }
 
+static void clear_conn_tls(async_ctx_t *ctx) {
+    if (!ctx || !ctx->conn_owner) return;
+    ctx->conn_owner->tls_pending = FALSE;
+    if (ctx->conn_owner->tls_cancel == ctx->cancellable)
+        ctx->conn_owner->tls_cancel = NULL;
+}
+
 static void clear_client_connect(async_ctx_t *ctx) {
     if (!ctx || !ctx->client_owner) return;
     ctx->client_owner->connect_pending = FALSE;
@@ -421,6 +454,25 @@ static void free_async_ctx(async_ctx_t *ctx) {
     }
     if (ctx->buffer) g_free(ctx->buffer);
     if (ctx->accum) g_byte_array_unref(ctx->accum);
+    if (ctx->pending_stream) g_object_unref(ctx->pending_stream);
+    if (ctx->cancellable) g_object_unref(ctx->cancellable);
+    g_free(ctx);
+}
+
+static gboolean dns_timeout_cb(gpointer user_data) {
+    dns_ctx_t *ctx = (dns_ctx_t*)user_data;
+    if (!ctx) return G_SOURCE_REMOVE;
+    ctx->timeout_id = 0;
+    ctx->timed_out = TRUE;
+    if (ctx->cancellable) g_cancellable_cancel(ctx->cancellable);
+    return G_SOURCE_REMOVE;
+}
+
+static void free_dns_ctx(dns_ctx_t *ctx) {
+    if (!ctx) return;
+    if (ctx->timeout_id > 0) g_source_remove(ctx->timeout_id);
+    if (ctx->L && ctx->ref != LUA_NOREF)
+        luaL_unref(ctx->L, LUA_REGISTRYINDEX, ctx->ref);
     if (ctx->cancellable) g_object_unref(ctx->cancellable);
     g_free(ctx);
 }
@@ -596,6 +648,17 @@ static psock_udp_t* check_pudp(lua_State *L, int idx) {
     /* rede{udp} */
     return (psock_udp_t*) luaL_checkudata(L, idx, "rede{udp}");
 }
+static psock_tls_cert_t* check_tls_cert(lua_State *L, int idx) {
+    return (psock_tls_cert_t*)luaL_checkudata(L, idx, "rede{certificadoTLS}");
+}
+
+static void pconn_set_stream(psock_conn_t *c, GIOStream *stream,
+                             GSocketConnection *base_conn) {
+    c->stream = stream;
+    c->conn = base_conn;
+    c->istream = g_io_stream_get_input_stream(stream);
+    c->ostream = g_io_stream_get_output_stream(stream);
+}
 
 /* connection close / gc */
 static void close_pconn(psock_conn_t *c) {
@@ -603,13 +666,15 @@ static void close_pconn(psock_conn_t *c) {
     c->closed = TRUE;
     if (c->read_cancel) g_cancellable_cancel(c->read_cancel);
     if (c->write_cancel) g_cancellable_cancel(c->write_cancel);
-    if (c->conn) {
+    if (c->tls_cancel) g_cancellable_cancel(c->tls_cancel);
+    if (c->stream) {
         GError *err = NULL;
-        g_io_stream_close(G_IO_STREAM(c->conn), NULL, &err);
+        g_io_stream_close(c->stream, NULL, &err);
         if (err) g_clear_error(&err);
-        g_object_unref(c->conn);
-        c->conn = NULL;
+        g_object_unref(c->stream);
+        c->stream = NULL;
     }
+    c->conn = NULL;
     c->istream = NULL;
     c->ostream = NULL;
 }
@@ -624,6 +689,15 @@ static int l_conn_gc(lua_State *L) {
     /* rede{conexão} */
     psock_conn_t *c = (psock_conn_t*) luaL_checkudata(L, 1, "rede{conex\xC3\xA3o}");
     close_pconn(c);
+    return 0;
+}
+
+static int l_tls_cert_gc(lua_State *L) {
+    psock_tls_cert_t *cert = check_tls_cert(L, 1);
+    if (cert && cert->certificate) {
+        g_object_unref(cert->certificate);
+        cert->certificate = NULL;
+    }
     return 0;
 }
 
@@ -791,9 +865,8 @@ static void connect_finish_cb(GObject *source_object, GAsyncResult *res, gpointe
 
         /* push new connection userdata */
         psock_conn_t *c = push_new_pconn(L);         /* func, self, conn_ud */
-        c->conn = conn;
-        c->istream = g_io_stream_get_input_stream(G_IO_STREAM(conn));
-        c->ostream = g_io_stream_get_output_stream(G_IO_STREAM(conn));
+        pconn_set_stream(c, G_IO_STREAM(conn), conn);
+        c->tls_active = G_IS_TLS_CONNECTION(conn);
         c->closed = FALSE;
 
         lua_pushnil(L);                              /* func, self, conn_ud, nil(err) */
@@ -837,7 +910,7 @@ static int l_client_connect_async(lua_State *L) {
 }
 
 /**
- * cliente:set_tls(use_tls_booleano)
+ * cliente:set_tls(use_tls_logico)
  */
 static int l_client_set_tls(lua_State *L) {
     psock_client_t *c = check_pclient(L, 1);
@@ -852,7 +925,7 @@ static int l_client_set_tls(lua_State *L) {
 }
 
 /**
- * cliente:set_validacao_tls(validate_booleano)
+ * cliente:set_validacao_tls(validate_logico)
  */
 static int l_client_set_tls_validation(lua_State *L) {
     psock_client_t *c = check_pclient(L, 1);
@@ -938,8 +1011,51 @@ static int l_conn_cancel(lua_State *L) {
         g_cancellable_cancel(c->write_cancel);
         pending = TRUE;
     }
+    if (c && c->tls_pending && c->tls_cancel) {
+        g_cancellable_cancel(c->tls_cancel);
+        pending = TRUE;
+    }
     lua_pushboolean(L, pending);
     return 1;
+}
+
+static int push_socket_peer(lua_State *L, psock_conn_t *c, gboolean remote) {
+    if (!c || c->closed || !c->conn)
+        return push_nil_err(L, "conex\xC3\xA3o inv\xC3\xA1lida");
+    GError *err = NULL;
+    GSocketAddress *socket_address = remote
+        ? g_socket_connection_get_remote_address(c->conn, &err)
+        : g_socket_connection_get_local_address(c->conn, &err);
+    if (!socket_address) {
+        int result = push_nil_err(L, gio_error_message(
+            err, "n\xC3\xA3o foi poss\xC3\xADvel obter o endere\xC3\xA7o da conex\xC3\xA3o"));
+        if (err) g_clear_error(&err);
+        return result;
+    }
+    if (!G_IS_INET_SOCKET_ADDRESS(socket_address)) {
+        g_object_unref(socket_address);
+        return push_nil_err(L, "a conex\xC3\xA3o n\xC3\xA3o usa um endere\xC3\xA7o IP");
+    }
+
+    GInetSocketAddress *inet = G_INET_SOCKET_ADDRESS(socket_address);
+    gchar *address = g_inet_address_to_string(
+        g_inet_socket_address_get_address(inet));
+    lua_newtable(L);
+    lua_pushstring(L, address);
+    lua_setfield(L, -2, "endere\xC3\xA7o");
+    lua_pushinteger(L, (lua_Integer)g_inet_socket_address_get_port(inet));
+    lua_setfield(L, -2, "porta");
+    g_free(address);
+    g_object_unref(socket_address);
+    return 1;
+}
+
+static int l_conn_remote_peer(lua_State *L) {
+    return push_socket_peer(L, check_pconn(L, 1), TRUE);
+}
+
+static int l_conn_local_peer(lua_State *L) {
+    return push_socket_peer(L, check_pconn(L, 1), FALSE);
 }
 
 /* ---------------- SERVIDOR: bind, accept_async ---------------- */
@@ -1062,9 +1178,7 @@ static void accept_finish_cb(GObject *source_object, GAsyncResult *res, gpointer
         lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->self_ref); /* func, self */
 
         psock_conn_t *c = push_new_pconn(L);         /* func, self, conn_ud */
-        c->conn = conn;
-        c->istream = g_io_stream_get_input_stream(G_IO_STREAM(conn));
-        c->ostream = g_io_stream_get_output_stream(G_IO_STREAM(conn));
+        pconn_set_stream(c, G_IO_STREAM(conn), conn);
         c->closed = FALSE;
 
         lua_pushnil(L);                              /* func, self, conn_ud, nil */
@@ -1097,6 +1211,175 @@ static int l_server_accept_async(lua_State *L) {
     arm_async_timeout(ctx, s->timeout_ms);
 
     g_socket_listener_accept_async(s->listener, ctx->cancellable, accept_finish_cb, ctx);
+    return 0;
+}
+
+/* ---------------- TLS: certificado e atualização de conexão ---------------- */
+
+static int l_rede_load_tls_certificate(lua_State *L) {
+    const char *certificate_path = luaL_checkstring(L, 1);
+    const char *key_path = luaL_checkstring(L, 2);
+    GError *err = NULL;
+    GTlsCertificate *certificate =
+        g_tls_certificate_new_from_files(certificate_path, key_path, &err);
+    if (!certificate) {
+        int result = push_nil_err(L, gio_error_message(
+            err, "n\xC3\xA3o foi poss\xC3\xADvel carregar o certificado TLS"));
+        if (err) g_clear_error(&err);
+        return result;
+    }
+
+    psock_tls_cert_t *value =
+        (psock_tls_cert_t*)lua_newuserdata(L, sizeof(psock_tls_cert_t));
+    value->certificate = certificate;
+    luaL_getmetatable(L, "rede{certificadoTLS}");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static void invoke_tls_callback(async_ctx_t *ctx, const char *message) {
+    lua_State *L = ctx->L;
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->ref);
+    lua_getfield(L, -1, "func");
+    lua_remove(L, -2);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->self_ref);
+    if (message) lua_pushstring(L, message);
+    else lua_pushnil(L);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->ref);
+    lua_getfield(L, -1, "dado");
+    lua_remove(L, -2);
+    if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+        const char *failure = lua_tostring(L, -1);
+        g_printerr("rede TLS retorno erro: %s\n", failure ? failure : "(nulo)");
+        lua_pop(L, 1);
+    }
+}
+
+static void tls_handshake_finish_cb(GObject *source_object, GAsyncResult *res,
+                                    gpointer user_data) {
+    async_ctx_t *ctx = (async_ctx_t*)user_data;
+    GError *err = NULL;
+    gboolean ok = g_tls_connection_handshake_finish(
+        G_TLS_CONNECTION(source_object), res, &err);
+    psock_conn_t *c = ctx ? ctx->conn_owner : NULL;
+    clear_conn_tls(ctx);
+
+    if (!ctx || !ctx->L || !c) {
+        if (err) g_clear_error(&err);
+        free_async_ctx(ctx);
+        return;
+    }
+
+    if (c->closed) {
+        invoke_tls_callback(ctx, "conex\xC3\xA3o fechada durante a negocia\xC3\xA7\xC3\xA3o TLS");
+    } else if (!ok) {
+        invoke_tls_callback(ctx, async_error_message(
+            ctx, err, "negocia\xC3\xA7\xC3\xA3o TLS falhou"));
+    } else {
+        GIOStream *old_stream = c->stream;
+        GIOStream *tls_stream = ctx->pending_stream;
+        ctx->pending_stream = NULL;
+        pconn_set_stream(c, tls_stream, c->conn);
+        c->tls_active = TRUE;
+        if (old_stream) g_object_unref(old_stream);
+        invoke_tls_callback(ctx, NULL);
+    }
+
+    if (err) g_clear_error(&err);
+    free_async_ctx(ctx);
+}
+
+static gboolean connection_ready_for_tls(lua_State *L, psock_conn_t *c) {
+    if (!c || c->closed || !c->stream) {
+        push_nil_err(L, "conex\xC3\xA3o inv\xC3\xA1lida");
+        return FALSE;
+    }
+    if (c->tls_active) {
+        push_nil_err(L, "a conex\xC3\xA3o j\xC3\xA1 usa TLS");
+        return FALSE;
+    }
+    if (c->read_pending || c->write_pending || c->tls_pending) {
+        push_nil_err(L, "a conex\xC3\xA3o possui uma opera\xC3\xA7\xC3\xA3o em andamento");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static int l_conn_start_tls_async(lua_State *L) {
+    psock_conn_t *c = check_pconn(L, 1);
+    const char *address = luaL_checkstring(L, 2);
+    int callback_idx = 3;
+    int data_idx = 4;
+    gboolean validate = TRUE;
+
+    if (lua_istable(L, 3)) {
+        callback_idx = 4;
+        data_idx = 5;
+        lua_getfield(L, 3, "validarCertificado");
+        if (!lua_isnil(L, -1)) validate = lua_toboolean(L, -1);
+        lua_pop(L, 1);
+    }
+    if (!lua_isfunction(L, callback_idx))
+        return push_nil_err(L, "tratador TLS precisa ser uma fun\xC3\xA7\xC3\xA3o");
+    if (!connection_ready_for_tls(L, c)) return 2;
+
+    GError *err = NULL;
+    GSocketConnectable *identity =
+        G_SOCKET_CONNECTABLE(g_network_address_new(address, 0));
+    GIOStream *tls_stream =
+        g_tls_client_connection_new(c->stream, identity, &err);
+    g_object_unref(identity);
+    if (!tls_stream) {
+        int result = push_nil_err(L, gio_error_message(
+            err, "n\xC3\xA3o foi poss\xC3\xADvel iniciar TLS"));
+        if (err) g_clear_error(&err);
+        return result;
+    }
+    if (!validate) {
+        g_signal_connect(tls_stream, "accept-certificate",
+                         G_CALLBACK(accept_invalid_certificate_cb), NULL);
+    }
+
+    async_ctx_t *ctx = create_async_ctx(L, callback_idx, data_idx);
+    ctx->conn_owner = c;
+    ctx->pending_stream = tls_stream;
+    c->tls_pending = TRUE;
+    c->tls_cancel = ctx->cancellable;
+    arm_async_timeout(ctx, c->timeout_ms);
+    g_tls_connection_handshake_async(G_TLS_CONNECTION(tls_stream),
+                                     G_PRIORITY_DEFAULT, ctx->cancellable,
+                                     tls_handshake_finish_cb, ctx);
+    return 0;
+}
+
+static int l_conn_accept_tls_async(lua_State *L) {
+    psock_conn_t *c = check_pconn(L, 1);
+    psock_tls_cert_t *certificate = check_tls_cert(L, 2);
+    if (!lua_isfunction(L, 3))
+        return push_nil_err(L, "tratador TLS precisa ser uma fun\xC3\xA7\xC3\xA3o");
+    if (!connection_ready_for_tls(L, c)) return 2;
+    if (!certificate || !certificate->certificate)
+        return push_nil_err(L, "certificado TLS inv\xC3\xA1lido");
+
+    GError *err = NULL;
+    GIOStream *tls_stream = g_tls_server_connection_new(
+        c->stream, certificate->certificate, &err);
+    if (!tls_stream) {
+        int result = push_nil_err(L, gio_error_message(
+            err, "n\xC3\xA3o foi poss\xC3\xADvel aceitar TLS"));
+        if (err) g_clear_error(&err);
+        return result;
+    }
+
+    async_ctx_t *ctx = create_async_ctx(L, 3, 4);
+    ctx->conn_owner = c;
+    ctx->pending_stream = tls_stream;
+    c->tls_pending = TRUE;
+    c->tls_cancel = ctx->cancellable;
+    arm_async_timeout(ctx, c->timeout_ms);
+    g_tls_connection_handshake_async(G_TLS_CONNECTION(tls_stream),
+                                     G_PRIORITY_DEFAULT, ctx->cancellable,
+                                     tls_handshake_finish_cb, ctx);
     return 0;
 }
 
@@ -1833,6 +2116,348 @@ static int l_rede_stop_loop(lua_State *L) {
     lua_pushboolean(L, running);
     return 1;
 }
+
+/* ---------------- agendador do laço ---------------- */
+
+static void timer_release_refs(prede_timer_t *timer) {
+    if (!timer || !timer->L) return;
+    if (timer->callback_ref != LUA_NOREF) {
+        luaL_unref(timer->L, LUA_REGISTRYINDEX, timer->callback_ref);
+        timer->callback_ref = LUA_NOREF;
+    }
+    if (timer->self_ref != LUA_NOREF) {
+        luaL_unref(timer->L, LUA_REGISTRYINDEX, timer->self_ref);
+        timer->self_ref = LUA_NOREF;
+    }
+}
+
+static gboolean timer_source_cb(gpointer user_data) {
+    prede_timer_t *timer = (prede_timer_t*)user_data;
+    if (!timer || !timer->active || !timer->L)
+        return G_SOURCE_REMOVE;
+
+    lua_State *L = timer->L;
+    timer->active = FALSE;
+    timer->source_id = 0;
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, timer->callback_ref);
+    lua_getfield(L, -1, "func");
+    lua_remove(L, -2);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, timer->self_ref);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, timer->callback_ref);
+    lua_getfield(L, -1, "dado");
+    lua_remove(L, -2);
+
+    if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+        const char *message = lua_tostring(L, -1);
+        g_printerr("rede agendador retorno erro: %s\n",
+                   message ? message : "(nulo)");
+        lua_pop(L, 1);
+    }
+    timer_release_refs(timer);
+    return G_SOURCE_REMOVE;
+}
+
+static int l_timer_cancel(lua_State *L) {
+    prede_timer_t *timer = (prede_timer_t*)luaL_checkudata(
+        L, 1, "rede{agendamento}");
+    gboolean active = timer && timer->active;
+    if (active) {
+        timer->active = FALSE;
+        if (timer->source_id > 0) {
+            guint source_id = timer->source_id;
+            timer->source_id = 0;
+            g_source_remove(source_id);
+        }
+        timer_release_refs(timer);
+    }
+    lua_pushboolean(L, active);
+    return 1;
+}
+
+static int l_timer_active(lua_State *L) {
+    prede_timer_t *timer = (prede_timer_t*)luaL_checkudata(
+        L, 1, "rede{agendamento}");
+    lua_pushboolean(L, timer && timer->active);
+    return 1;
+}
+
+static int l_timer_gc(lua_State *L) {
+    return l_timer_cancel(L);
+}
+
+static int l_rede_schedule(lua_State *L) {
+    lua_Integer delay = luaL_checkinteger(L, 1);
+    luaL_argcheck(L, delay >= 0 && (lua_Unsigned)delay <= G_MAXUINT,
+                  1, "atraso fora do intervalo");
+    luaL_argcheck(L, lua_isfunction(L, 2), 2,
+                  "tratador precisa ser uma fun\xC3\xA7\xC3\xA3o");
+
+    prede_timer_t *timer = (prede_timer_t*)lua_newuserdata(
+        L, sizeof(prede_timer_t));
+    memset(timer, 0, sizeof(*timer));
+    timer->L = L;
+    timer->callback_ref = LUA_NOREF;
+    timer->self_ref = LUA_NOREF;
+    luaL_getmetatable(L, "rede{agendamento}");
+    lua_setmetatable(L, -2);
+
+    timer->callback_ref = store_callback(L, 2, 3);
+    lua_pushvalue(L, -1);
+    timer->self_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    timer->active = TRUE;
+    timer->source_id = g_timeout_add((guint)delay, timer_source_cb, timer);
+    if (timer->source_id == 0) {
+        timer->active = FALSE;
+        timer_release_refs(timer);
+        lua_pop(L, 1);
+        return push_nil_err(L, "n\xC3\xA3o foi poss\xC3\xADvel criar o agendamento");
+    }
+    return 1;
+}
+
+/* ---------------- DNS assíncrono ---------------- */
+
+static void push_dns_records(lua_State *L, GList *records,
+                             GResolverRecordType record_type) {
+    lua_newtable(L);
+    lua_Integer index = 1;
+    for (GList *item = records; item; item = item->next) {
+        GVariant *record = (GVariant*)item->data;
+        lua_newtable(L);
+        if (record_type == G_RESOLVER_RECORD_MX) {
+            GVariant *preference_value = g_variant_get_child_value(record, 0);
+            GVariant *address_value = g_variant_get_child_value(record, 1);
+            lua_pushinteger(L, (lua_Integer)g_variant_get_uint16(preference_value));
+            lua_setfield(L, -2, "prefer\xC3\xAAncia");
+            lua_pushstring(L, g_variant_get_string(address_value, NULL));
+            lua_setfield(L, -2, "endere\xC3\xA7o");
+            g_variant_unref(preference_value);
+            g_variant_unref(address_value);
+        } else {
+            GVariant *parts = g_variant_get_child_value(record, 0);
+            GString *value = g_string_new(NULL);
+            gsize count = g_variant_n_children(parts);
+            for (gsize part_index = 0; part_index < count; part_index++) {
+                GVariant *part = g_variant_get_child_value(parts, part_index);
+                g_string_append(value, g_variant_get_string(part, NULL));
+                g_variant_unref(part);
+            }
+            lua_pushlstring(L, value->str, value->len);
+            lua_setfield(L, -2, "valor");
+            g_string_free(value, TRUE);
+            g_variant_unref(parts);
+        }
+        lua_rawseti(L, -2, index++);
+    }
+}
+
+static void dns_lookup_finish_cb(GObject *source_object, GAsyncResult *res,
+                                 gpointer user_data) {
+    dns_ctx_t *ctx = (dns_ctx_t*)user_data;
+    GError *err = NULL;
+    GList *records = g_resolver_lookup_records_finish(
+        G_RESOLVER(source_object), res, &err);
+    if (!ctx || !ctx->L) {
+        if (records) g_list_free_full(records, (GDestroyNotify)g_variant_unref);
+        if (err) g_clear_error(&err);
+        free_dns_ctx(ctx);
+        return;
+    }
+
+    lua_State *L = ctx->L;
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->ref);
+    lua_getfield(L, -1, "func");
+    lua_remove(L, -2);
+    /* RFC 5321: a ausência de MX não é, por si só, falha. O domínio
+     * torna-se o MX implícito e a camada SMTP tentará seu A/AAAA. GLib usa
+     * NOT_FOUND tanto para resposta sem MX quanto para nome inexistente; no
+     * segundo caso a conexão ao MX implícito falhará e permanecerá
+     * temporária, evitando rejeitar definitivamente um domínio por engano. */
+    if (err && g_error_matches(err, G_RESOLVER_ERROR,
+                               G_RESOLVER_ERROR_NOT_FOUND)) {
+        lua_newtable(L);
+        lua_pushnil(L);
+    } else if (err) {
+        lua_pushnil(L);
+        lua_pushstring(L, ctx->timed_out ? "tempo limite excedido" :
+                       gio_error_message(err, "consulta DNS falhou"));
+    } else {
+        push_dns_records(L, records, ctx->record_type);
+        lua_pushnil(L);
+    }
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->ref);
+    lua_getfield(L, -1, "dado");
+    lua_remove(L, -2);
+    if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+        const char *failure = lua_tostring(L, -1);
+        g_printerr("rede consulta DNS retorno erro: %s\n",
+                   failure ? failure : "(nulo)");
+        lua_pop(L, 1);
+    }
+
+    if (records) g_list_free_full(records, (GDestroyNotify)g_variant_unref);
+    if (err) g_clear_error(&err);
+    free_dns_ctx(ctx);
+}
+
+static void dns_address_finish_cb(GObject *source_object, GAsyncResult *res,
+                                  gpointer user_data) {
+    dns_ctx_t *ctx = (dns_ctx_t*)user_data;
+    GError *err = NULL;
+    GList *addresses = g_resolver_lookup_by_name_finish(
+        G_RESOLVER(source_object), res, &err);
+    if (!ctx || !ctx->L) {
+        if (addresses) g_resolver_free_addresses(addresses);
+        if (err) g_clear_error(&err);
+        free_dns_ctx(ctx);
+        return;
+    }
+
+    lua_State *L = ctx->L;
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->ref);
+    lua_getfield(L, -1, "func");
+    lua_remove(L, -2);
+    if (err && g_error_matches(err, G_RESOLVER_ERROR,
+                               G_RESOLVER_ERROR_NOT_FOUND)) {
+        lua_newtable(L);
+        lua_pushnil(L);
+    } else if (err) {
+        lua_pushnil(L);
+        lua_pushstring(L, ctx->timed_out ? "tempo limite excedido" :
+                       gio_error_message(err, "resolução de endereço falhou"));
+    } else {
+        lua_newtable(L);
+        lua_Integer index = 1;
+        for (GList *item = addresses; item; item = item->next) {
+            GInetAddress *address = G_INET_ADDRESS(item->data);
+            gchar *text = g_inet_address_to_string(address);
+            lua_pushstring(L, text);
+            lua_rawseti(L, -2, index++);
+            g_free(text);
+        }
+        lua_pushnil(L);
+    }
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->ref);
+    lua_getfield(L, -1, "dado");
+    lua_remove(L, -2);
+    if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+        const char *failure = lua_tostring(L, -1);
+        g_printerr("rede resolução de endereço retorno erro: %s\n",
+                   failure ? failure : "(nulo)");
+        lua_pop(L, 1);
+    }
+    if (addresses) g_resolver_free_addresses(addresses);
+    if (err) g_clear_error(&err);
+    free_dns_ctx(ctx);
+}
+
+static int l_rede_resolve_addresses_async(lua_State *L) {
+    const char *name = luaL_checkstring(L, 1);
+    int callback_idx = 2;
+    int data_idx = 3;
+    guint timeout_ms = 5000;
+    if (lua_istable(L, 2)) {
+        callback_idx = 3;
+        data_idx = 4;
+        lua_getfield(L, 2, "tempoLimite");
+        if (!lua_isnil(L, -1)) timeout_ms = check_timeout_ms(L, -1);
+        lua_pop(L, 1);
+    }
+    if (!lua_isfunction(L, callback_idx))
+        return push_nil_err(L,
+            "tratador de endereço precisa ser uma função");
+
+    dns_ctx_t *ctx = g_new0(dns_ctx_t, 1);
+    ctx->L = L;
+    ctx->ref = store_callback(L, callback_idx, data_idx);
+    ctx->cancellable = g_cancellable_new();
+    if (timeout_ms > 0)
+        ctx->timeout_id = g_timeout_add(timeout_ms, dns_timeout_cb, ctx);
+
+    GResolver *resolver = g_resolver_get_default();
+    g_resolver_lookup_by_name_async(resolver, name, ctx->cancellable,
+                                    dns_address_finish_cb, ctx);
+    g_object_unref(resolver);
+    return 0;
+}
+
+static int l_rede_dns_lookup_async(lua_State *L) {
+    const char *name = luaL_checkstring(L, 1);
+    const char *type = luaL_checkstring(L, 2);
+    int callback_idx = 3;
+    int data_idx = 4;
+    guint timeout_ms = 5000;
+    if (lua_istable(L, 3)) {
+        callback_idx = 4;
+        data_idx = 5;
+        lua_getfield(L, 3, "tempoLimite");
+        if (!lua_isnil(L, -1)) timeout_ms = check_timeout_ms(L, -1);
+        lua_pop(L, 1);
+    }
+    if (!lua_isfunction(L, callback_idx))
+        return push_nil_err(L, "tratador DNS precisa ser uma fun\xC3\xA7\xC3\xA3o");
+
+    GResolverRecordType record_type;
+    if (g_ascii_strcasecmp(type, "MX") == 0) {
+        record_type = G_RESOLVER_RECORD_MX;
+    } else if (g_ascii_strcasecmp(type, "TXT") == 0) {
+        record_type = G_RESOLVER_RECORD_TXT;
+    } else {
+        return push_nil_err(L, "tipo DNS aceito: MX ou TXT");
+    }
+
+    dns_ctx_t *ctx = g_new0(dns_ctx_t, 1);
+    ctx->L = L;
+    ctx->ref = store_callback(L, callback_idx, data_idx);
+    ctx->cancellable = g_cancellable_new();
+    ctx->record_type = record_type;
+    if (timeout_ms > 0)
+        ctx->timeout_id = g_timeout_add(timeout_ms, dns_timeout_cb, ctx);
+
+    GResolver *resolver = g_resolver_get_default();
+    g_resolver_lookup_records_async(resolver, name, record_type,
+                                    ctx->cancellable,
+                                    dns_lookup_finish_cb, ctx);
+    g_object_unref(resolver);
+    return 0;
+}
+
+/* ---------- Domínios internacionalizados (IDNA/Punycode) ---------- */
+
+static int l_rede_domain_ascii(lua_State *L) {
+    size_t len = 0;
+    const char *name = luaL_checklstring(L, 1, &len);
+    if (memchr(name, '\0', len) != NULL)
+        return push_nil_err(L, "dom\xC3\xADnio cont\xC3\xA9m taco zero");
+    if (!g_utf8_validate(name, (gssize)len, NULL))
+        return push_nil_err(L, "dom\xC3\xADnio n\xC3\xA3o \xC3\xA9 UTF-8 v\xC3\xA1lido");
+
+    gchar *ascii = g_hostname_to_ascii(name);
+    if (!ascii)
+        return push_nil_err(L, "dom\xC3\xADnio internacional inv\xC3\xA1lido");
+    gchar *canonical = g_ascii_strdown(ascii, -1);
+    lua_pushstring(L, canonical);
+    g_free(canonical);
+    g_free(ascii);
+    return 1;
+}
+
+static int l_rede_domain_unicode(lua_State *L) {
+    size_t len = 0;
+    const char *name = luaL_checklstring(L, 1, &len);
+    if (memchr(name, '\0', len) != NULL)
+        return push_nil_err(L, "dom\xC3\xADnio cont\xC3\xA9m taco zero");
+    gchar *unicode = g_hostname_to_unicode(name);
+    if (!unicode || !g_utf8_validate(unicode, -1, NULL)) {
+        g_free(unicode);
+        return push_nil_err(L, "dom\xC3\xADnio Punycode inv\xC3\xA1lido");
+    }
+    lua_pushstring(L, unicode);
+    g_free(unicode);
+    return 1;
+}
+
 static int l_rede_nova_res(lua_State *L) {
     psock_conn_t *conn = check_pconn(L, 1);
     /* conexão inválida */
@@ -2180,6 +2805,10 @@ static const luaL_Reg pconn_methods[] = {
     {"recebaDadosAss\xC3\xADncrono", l_conn_recv_data_async},
     {"definaTempoLimite", l_conn_set_timeout},
     {"definaLimitesHTTP", l_conn_set_http_limits},
+    {"parRemoto", l_conn_remote_peer},
+    {"parLocal", l_conn_local_peer},
+    {"inicieTLSAss\xC3\xADncrono", l_conn_start_tls_async},
+    {"aceiteTLSAss\xC3\xADncrono", l_conn_accept_tls_async},
     {"cancele", l_conn_cancel},
     {"feche", l_conn_close},
     {NULL, NULL}
@@ -2197,15 +2826,28 @@ static const luaL_Reg pudp_methods[] = {
     {NULL, NULL}
 };
 
+static const luaL_Reg ptimer_methods[] = {
+    {"cancele", l_timer_cancel},
+    {"ativo", l_timer_active},
+    {NULL, NULL}
+};
+
 static const luaL_Reg rede_funcs[] = {
     {"clienteTCP", l_rede_tcp_cliente},
     {"servidorTCP", l_rede_tcp_servidor},
     {"udp", l_rede_udp},
     {"la\xC3\xA7o", l_rede_loop},
     {"pareLa\xC3\xA7o", l_rede_stop_loop},
+    {"agende", l_rede_schedule},
     {"analiseHTTP", l_rede_analiseHTTP},
     {"respostaHTTP", l_rede_http_resposta},
     {"novaResposta", l_rede_nova_res},
+    {"carregueCertificadoTLS", l_rede_load_tls_certificate},
+    {"consulteDNSAss\xC3\xADncrono", l_rede_dns_lookup_async},
+    {"resolvaEndere\xC3\xA7osAss\xC3\xADncrono",
+        l_rede_resolve_addresses_async},
+    {"dom\xC3\xAD" "nioASCII", l_rede_domain_ascii},
+    {"dom\xC3\xAD" "nioUnicode", l_rede_domain_unicode},
     {NULL, NULL}
 };
 
@@ -2242,6 +2884,16 @@ int luaopen_rede(lua_State *L) {
         lua_pushvalue(L, -1); lua_setfield(L, -2, LUA_MM_INDICE);
     }
     lua_pop(L,1);
+
+    /* metatable rede{agendamento} */
+    if (luaL_newmetatable(L, "rede{agendamento}")) {
+        luaL_setfuncs(L, ptimer_methods, 0);
+        lua_pushcfunction(L, l_timer_gc);
+        lua_setfield(L, -2, LUA_MM_FINALIZE);
+        lua_pushvalue(L, -1);
+        lua_setfield(L, -2, LUA_MM_INDICE);
+    }
+    lua_pop(L,1);
     /* metatable rede{res} */
     if (luaL_newmetatable(L, "rede{res}")) {
         static const luaL_Reg m[] = {
@@ -2258,6 +2910,13 @@ int luaopen_rede(lua_State *L) {
         lua_setfield(L, -2, LUA_MM_FINALIZE);
         lua_pushvalue(L, -1);
         lua_setfield(L, -2, LUA_MM_INDICE);
+    }
+    lua_pop(L,1);
+
+    /* metatable rede{certificadoTLS} */
+    if (luaL_newmetatable(L, "rede{certificadoTLS}")) {
+        lua_pushcfunction(L, l_tls_cert_gc);
+        lua_setfield(L, -2, LUA_MM_FINALIZE);
     }
     lua_pop(L,1);
 

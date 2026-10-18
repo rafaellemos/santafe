@@ -1,0 +1,51 @@
+-- Copie para /etc/santafe-nomes/zonas.fé e ajuste antes de iniciar o serviço.
+-- Nomes sem ponto final são relativos à respectiva zona; @ é o ápice.
+
+retorne { zonas = {
+    {
+        nome = "xn--santaf-gva.dev.br.",
+        ttlPadrão = 3600,
+        dnssec = verdadeiro,
+        registros = {
+            { nome = "@", tipo = "SOA", dados = {
+                mestre = "ns1", responsável = "dns",
+                série = 2026082701, atualização = 3600,
+                novaTentativa = 900, expiração = 1209600, mínimo = 300
+            } },
+            { nome = "@", tipo = "NS", dados = "ns1" },
+            { nome = "@", tipo = "NS", dados = "ns2" },
+            { nome = "ns1", tipo = "A", dados = "143.208.252.1" },
+            -- ns2 deve apontar para uma segunda máquina/rede autoritativa real.
+            { nome = "ns2", tipo = "A", dados = "192.0.2.53" },
+            { nome = "@", tipo = "A", dados = "143.208.252.1" },
+            { nome = "_imaps._tcp", tipo = "SRV", dados = {
+                prioridade = 0, peso = 1, porta = 993, alvo = "@" } },
+            { nome = "_submissions._tcp", tipo = "SRV", dados = {
+                prioridade = 0, peso = 1, porta = 465, alvo = "@" } },
+            { nome = "_submission._tcp", tipo = "SRV", dados = {
+                prioridade = 0, peso = 1, porta = 587, alvo = "@" } },
+            { nome = "@", tipo = "MX", dados = {
+                preferência = 10, troca = "@" } },
+            { nome = "@", tipo = "TXT", dados = "v=spf1 mx -all" },
+            { nome = "_dmarc", tipo = "TXT",
+                dados = "v=DMARC1; p=quarantine; rua=mailto:postmaster@xn--santaf-gva.dev.br" }
+        }
+    },
+    {
+        nome = "252.208.143.in-addr.arpa.",
+        ttlPadrão = 3600,
+        -- Assine também a zona reversa quando a delegação dela usar DNSSEC.
+        dnssec = verdadeiro,
+        registros = {
+            { nome = "@", tipo = "SOA", dados = {
+                mestre = "sn1.telemulti.net.br.",
+                responsável = "dns.telemulti.net.br.",
+                série = 2026090301, atualização = 3600,
+                novaTentativa = 900, expiração = 1209600, mínimo = 300
+            } },
+            { nome = "@", tipo = "NS", dados = "sn1.telemulti.net.br." },
+            { nome = "@", tipo = "NS", dados = "sn2.telemulti.net.br." },
+            { nome = "1", tipo = "PTR", dados = "xn--santaf-gva.dev.br." }
+        }
+    }
+} }

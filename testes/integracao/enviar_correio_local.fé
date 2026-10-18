@@ -1,0 +1,59 @@
+-- Cliente usado somente pelo ensaio isolado dos serviços postais.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local endereço = so.obterVariável("TESTE_SMTP_ENDERECO") ou "127.0.0.1"
+local porta = paraNúmero(so.obterVariável("TESTE_SMTP_PORTA")) ou 2525
+local destinatário = garanta(so.obterVariável("TESTE_SMTP_DESTINATARIO"),
+    "TESTE_SMTP_DESTINATARIO não foi definida")
+local assunto = so.obterVariável("TESTE_SMTP_ASSUNTO") ou
+    "Carta do ensaio MariaDB"
+local texto = so.obterVariável("TESTE_SMTP_TEXTO")
+local html = so.obterVariável("TESTE_SMTP_HTML")
+se texto == nulo e html == nulo então
+    texto = "O fluxo completo do Correio chegou ao Carteiro."
+fim
+local remetente = so.obterVariável("TESTE_SMTP_REMETENTE") ou
+    "maria@exemplo.org"
+local responderPara = so.obterVariável("TESTE_SMTP_RESPONDER_PARA")
+local nomeDoAnexo = so.obterVariável("TESTE_SMTP_ANEXO_NOME") ou
+    "prova.txt"
+local tipoDoAnexo = so.obterVariável("TESTE_SMTP_ANEXO_TIPO") ou
+    "text/plain"
+
+local mensagem = garanta(correio.novaMensagem({
+    remetente = remetente,
+    responderPara = responderPara,
+    destinatários = { destinatário },
+    assunto = assunto,
+    texto = texto,
+    html = html,
+    anexos = {
+        {
+            nome = nomeDoAnexo,
+            tipo = tipoDoAnexo,
+            dados = "depósito íntegro"
+        }
+    }
+}))
+local cliente = garanta(correio.cliente({
+    endereço = endereço,
+    porta = porta,
+    segurança = "nenhuma",
+    tempoLimite = 5000
+}))
+local sucesso = falso
+local falhaFinal
+
+garanta(cliente:envieAssíncrono(mensagem,
+    função(resultado, falha)
+        sucesso = resultado ~= nulo
+        falhaFinal = falha
+        cliente:feche()
+        rede.pareLaço()
+    fim))
+
+rede.laço()
+garanta(sucesso, falhaFinal)
+mostre("SMTP local: ok")

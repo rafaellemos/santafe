@@ -1,0 +1,84 @@
+#!/usr/local/bin/santafé
+
+local raiz = so.obterVariável("CORREIO_RAIZ") ou "aplicativos/correio"
+módulo.caminho = raiz .. "/fonte/?.fé;" .. raiz .. "/fonte/?/ini.fé;" ..
+    módulo.caminho
+
+local rede = importe "rede"
+local segredo = importe "segredo"
+local pulso = importe "pulso"
+local CorreioMultibanco = importe "correio.multibanco"
+local CorreioIMAP = importe "correio.imap"
+local configuração = (importe "correio.configuração").carregue()
+
+garanta(configuração.imap.certificado,
+    "CORREIO_IMAP_CERTIFICADO não foi definido")
+garanta(configuração.imap.chavePrivada,
+    "CORREIO_IMAP_CHAVE não foi definida")
+
+local canal = garanta(pulso.novo({
+    serviço = "correio-imap",
+    instância = so.obterVariável("CORREIO_IMAP_INSTANCIA") ou "imap-01"
+}))
+se configuração.pulsoArquivo e configuração.pulsoArquivo ~= "" então
+    local destino, falha = pulso.registrador(configuração.pulsoArquivo)
+    se destino então canal:adicioneDestino(destino)
+    senão mostre("[IMAP] registrador PULSO indisponível:", falha) fim
+fim
+
+local função interrompa(mensagem)
+    mostre("[IMAP] inicialização recusada:", mensagem)
+    canal:sinal("correio.imapIndisponível", {
+        falha = paraColar(mensagem)
+    }, { prioridade = "crítica" })
+    rede.pareLaço()
+    so.saia(1)
+fim
+
+local começou, falhaImediata = segredo.protejaSenhaAssíncrono(
+    segredo.novoBilhete(32), função(resumoIsca, falhaDaIsca)
+        se não resumoIsca então interrompa(falhaDaIsca); retorne fim
+        CorreioMultibanco.inicie(configuração,
+            função(repositório, falhaDosBancos)
+                se não repositório então
+                    interrompa(falhaDosBancos); retorne
+                fim
+                local servidor, falha = CorreioIMAP.servidor({
+                        endereço = configuração.imap.endereço,
+                        porta = configuração.imap.porta,
+                        nome = configuração.imap.nome,
+                        certificado = configuração.imap.certificado,
+                        chavePrivada = configuração.imap.chavePrivada,
+                        tempoLimite = configuração.imap.tempoLimite,
+                        limiteLinha = configuração.imap.limiteLinha,
+                        limiteMensagem = configuração.limiteCorpo,
+                        limiteComandos = configuração.imap.limiteComandos,
+                        intervaloOcioso = configuração.imap.intervaloOcioso,
+                        limiteConexões = configuração.imap.limiteConexões,
+                        limiteConexõesPorEndereço =
+                            configuração.imap.limiteConexõesPorEndereço,
+                        limiteNovasConexõesPorMinuto =
+                            configuração.imap.limiteNovasConexõesPorMinuto,
+                        limiteTentativasDeAutenticação =
+                            configuração.imap.limiteTentativasDeAutenticação,
+                        repositório = repositório,
+                        resumoIsca = resumoIsca,
+                        pulso = canal
+                })
+                se não servidor então interrompa(falha); retorne fim
+                local iniciou
+                iniciou, falha = servidor:inicie()
+                se não iniciou então interrompa(falha); retorne fim
+                mostre("Correio IMAP escutando em " ..
+                    configuração.imap.endereço .. ":" ..
+                    configuração.imap.porta .. " (TLS)")
+                canal:sinal("correio.imapPronto", {
+                    porta = configuração.imap.porta,
+                    segurança = "TLS"
+                })
+            fim)
+    fim)
+garanta(começou, falhaImediata)
+
+rede.laço()
+canal:feche()

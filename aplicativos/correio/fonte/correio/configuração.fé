@@ -1,0 +1,303 @@
+local configuração = {}
+local rede = importe "rede"
+
+local função prefixoVálido(valor)
+    valor = paraColar(valor ou ""):apare():maiúscula()
+    garanta(valor:procure("^[A-Z][A-Z0-9_]*$") ~= nulo,
+        "prefixo do banco aceita somente A-Z, 0-9 e sublinhado")
+    retorne valor
+fim
+
+local função inteiro(nome, padrão, mínimo, máximo)
+    local texto = so.obterVariável(nome)
+    se não texto ou texto == "" então retorne padrão fim
+    local valor = paraNúmero(texto)
+    valor = valor e mat.paraInteiro(valor) ou nulo
+    garanta(valor e valor >= mínimo e valor <= máximo,
+        nome .. " deve ser um inteiro entre " .. mínimo .. " e " .. máximo)
+    retorne valor
+fim
+
+local função lógico(nome, padrão)
+    local texto = so.obterVariável(nome)
+    se não texto ou texto == "" então retorne padrão fim
+    texto = texto:minúscula():apare()
+    se texto == "1" ou texto == "sim" ou texto == "verdadeiro" então
+        retorne verdadeiro
+    fim
+    se texto == "0" ou texto == "não" ou texto == "nao" ou texto == "falso" então
+        retorne falso
+    fim
+    erro(nome .. " deve ser sim/não ou verdadeiro/falso")
+fim
+
+local função lista(nome, padrão)
+    local texto = so.obterVariável(nome)
+    se não texto ou texto:apare() == "" então retorne padrão fim
+    local itens = {}
+    para item em texto:capture("[^,]+") início
+        item = item:apare()
+        se item ~= "" então itens[#itens + 1] = item fim
+    fim
+    retorne itens
+fim
+
+local função intervalos(nome, padrão)
+    local itens = lista(nome, padrão)
+    local resultado = {}
+    para _, item em ipares(itens) início
+        local valor = mat.paraInteiro(paraNúmero(item))
+        garanta(valor e valor >= 60 e valor <= 24 * 60 * 60,
+            nome .. " aceita segundos entre 60 e 86400")
+        resultado[#resultado + 1] = valor
+    fim
+    garanta(#resultado > 0, nome .. " precisa de ao menos um intervalo")
+    retorne resultado
+fim
+
+local função identidadesDKIM(padrão)
+    local resultado = {}
+    para _, item em ipares(lista("CORREIO_DKIM_IDENTIDADES", {})) início
+        local domínio, seletor, chave = item:separe(
+            "^([^|]+)|([^|]+)|(.+)$")
+        garanta(domínio e seletor e chave,
+            "CORREIO_DKIM_IDENTIDADES usa domínio|seletor|caminho")
+        domínio = garanta(rede.domínioASCII(domínio:apare())):minúscula()
+        seletor, chave = seletor:apare(), chave:apare()
+        garanta(seletor ~= "" e chave ~= "",
+            "identidade DKIM precisa de seletor e caminho")
+        garanta(não resultado[domínio],
+            "identidade DKIM repetida para " .. domínio)
+        resultado[domínio] = {
+            domínio = domínio, seletor = seletor, chave = chave
+        }
+    fim
+    se padrão.seletor e padrão.chave então
+        local domínio = garanta(rede.domínioASCII(padrão.domínio)):minúscula()
+        se não resultado[domínio] então
+            resultado[domínio] = {
+                domínio = domínio,
+                seletor = padrão.seletor,
+                chave = padrão.chave
+            }
+        fim
+    fim
+    retorne resultado
+fim
+
+função configuração.carregueBanco(prefixo)
+    prefixo = prefixoVálido(prefixo ou "SANTAFE")
+    local função nome(sufixo)
+        retorne prefixo .. "_MARIADB_" .. sufixo
+    fim
+    retorne {
+        prefixo = prefixo,
+        endereço = so.obterVariável(nome("HOST")) ou "127.0.0.1",
+        usuário = so.obterVariável(nome("USUARIO")),
+        senha = so.obterVariável(nome("SENHA")) ou "",
+        banco = so.obterVariável(nome("BANCO")),
+        porta = inteiro(nome("PORTA"), 3306, 1, 65535),
+        mínimo = inteiro("CORREIO_PISCINA_MINIMA", 2, 1, 32),
+        máximo = inteiro("CORREIO_PISCINA_MAXIMA", 12, 1, 128),
+        máximoDaFila = inteiro("CORREIO_PISCINA_FILA", 200, 1, 10000),
+        tempoDeEspera = inteiro("CORREIO_PISCINA_ESPERA", 5000, 100, 60000)
+    }
+fim
+
+local função bancosPostais(valores, prefixoPrincipal)
+    local bancos, domínios, prefixos = {}, {}, {}
+
+    local função adicione(domínio, prefixo, raiz)
+        domínio = paraColar(domínio ou ""):apare()
+        prefixo = prefixoVálido(prefixo)
+        raiz = paraColar(raiz ou ""):apare()
+        garanta(domínio ~= "", "banco postal precisa de um domínio")
+        garanta(raiz:corte(1, 1) == "/",
+            "depósito do banco postal precisa de um caminho absoluto")
+        local domínioASCII = garanta(rede.domínioASCII(domínio)):minúscula()
+        garanta(não domínios[domínioASCII],
+            "domínio postal repetido: " .. domínioASCII)
+        garanta(não prefixos[prefixo],
+            "prefixo de banco postal repetido: " .. prefixo)
+        local específica = {}
+        para nome, valor em pares(valores) início
+            específica[nome] = valor
+        fim
+        específica.chave = prefixo:minúscula()
+        específica.prefixoDoBanco = prefixo
+        específica.domínio = domínio
+        específica.domínioASCII = domínioASCII
+        específica.domíniosLocais = { domínio, domínioASCII }
+        específica.banco = configuração.carregueBanco(prefixo)
+        específica.depósito = { raiz = raiz, limite = valores.limiteCorpo }
+        específica.bancosPostais = nulo
+        bancos[#bancos + 1] = específica
+        domínios[domínioASCII] = específica
+        prefixos[prefixo] = específica
+    fim
+
+    adicione(valores.domínio, prefixoPrincipal, valores.depósito.raiz)
+    para _, item em ipares(lista("CORREIO_BANCOS_ADICIONAIS", {})) início
+        local domínio, prefixo, raiz = item:separe(
+            "^([^|]+)|([^|]+)|(.+)$")
+        garanta(domínio e prefixo e raiz,
+            "CORREIO_BANCOS_ADICIONAIS usa domínio|prefixo|depósito")
+        adicione(domínio, prefixo, raiz)
+    fim
+    retorne bancos
+fim
+
+função configuração.carregue()
+    local domínio = so.obterVariável("CORREIO_DOMINIO") ou "santafé.dev.br"
+    local domínioASCII = garanta(rede.domínioASCII(domínio))
+    local limiteCorpo = inteiro("CORREIO_LIMITE_MENSAGEM", 50 * 1024 * 1024,
+        1024, 100 * 1024 * 1024)
+    local modoDeEnvio = so.obterVariável("CORREIO_ENVIOS_MODO") ou "direto"
+    garanta(modoDeEnvio == "direto" ou modoDeEnvio == "retransmissor",
+        "CORREIO_ENVIOS_MODO deve ser direto ou retransmissor")
+    local dkim = {
+        domínio = so.obterVariável("CORREIO_DKIM_DOMINIO") ou domínioASCII,
+        seletor = so.obterVariável("CORREIO_DKIM_SELETOR"),
+        chave = so.obterVariável("CORREIO_DKIM_CHAVE"),
+        exigir = lógico("CORREIO_DKIM_EXIGIR", modoDeEnvio == "direto")
+    }
+    dkim.identidades = identidadesDKIM(dkim)
+    local prefixoDoBanco = prefixoVálido(
+        so.obterVariável("CORREIO_BANCO_PREFIXO") ou "SANTAFE")
+    local valores = {
+        domínio = domínio,
+        domínioASCII = domínioASCII,
+        domíniosLocais = lista("CORREIO_DOMINIOS_LOCAIS", { domínio }),
+        limiteCorpo = limiteCorpo,
+        limiteDestinatários = inteiro("CORREIO_LIMITE_DESTINATARIOS", 50, 1, 100),
+        tabelaDaFila = so.obterVariável("CORREIO_TABELA_FILA") ou
+            "correio_fila",
+        depósito = {
+            raiz = so.obterVariável("CORREIO_DEPOSITO") ou
+                "/var/lib/santafé/correio",
+            limite = limiteCorpo
+        },
+        banco = configuração.carregueBanco(prefixoDoBanco),
+        envios = {
+            modo = modoDeEnvio,
+            endereço = so.obterVariável("CORREIO_ENVIOS_ENDERECO"),
+            porta = modoDeEnvio == "direto" e
+                inteiro("CORREIO_ENVIOS_PORTA_DIRETA", 25, 1, 65535) ou
+                inteiro("CORREIO_ENVIOS_PORTA", 587, 1, 65535),
+            segurança = modoDeEnvio == "direto" e
+                (so.obterVariável("CORREIO_ENVIOS_SEGURANCA_DIRETA") ou
+                    "oportunista") ou
+                (so.obterVariável("CORREIO_ENVIOS_SEGURANCA") ou "inícioTLS"),
+            nome = so.obterVariável("CORREIO_ENVIOS_NOME") ou
+                ("mail." .. domínioASCII),
+            usuário = so.obterVariável("CORREIO_ENVIOS_USUARIO"),
+            senha = so.obterVariável("CORREIO_ENVIOS_SENHA"),
+            validarCertificado = lógico("CORREIO_ENVIOS_VALIDAR_CERTIFICADO", verdadeiro),
+            tempoLimite = inteiro("CORREIO_ENVIOS_TEMPO_LIMITE", 15000,
+                1000, 120000),
+            tempoLimiteDNS = inteiro("CORREIO_ENVIOS_TEMPO_LIMITE_DNS", 5000,
+                500, 60000),
+            máximoMX = inteiro("CORREIO_ENVIOS_MAXIMO_MX", 10, 1, 50),
+            prazo = inteiro("CORREIO_ENVIOS_PRAZO", 5 * 24 * 60 * 60,
+                3600, 14 * 24 * 60 * 60),
+            intervalos = intervalos("CORREIO_ENVIOS_INTERVALOS",
+                { 1800, 7200, 7200, 10800 }),
+            avisoDeAtraso = inteiro("CORREIO_ENVIOS_AVISO_ATRASO",
+                4 * 60 * 60, 900, 7 * 24 * 60 * 60),
+            tentativasDoAviso = inteiro("CORREIO_ENVIOS_TENTATIVAS_AVISO",
+                5, 1, 20),
+            falhasInternasParaQuarentena = inteiro(
+                "CORREIO_ENVIOS_FALHAS_QUARENTENA", 3, 1, 20)
+        },
+        dkim = dkim,
+        autenticação = {
+            ativa = lógico("CORREIO_AUTENTICACAO_ATIVA", verdadeiro),
+            tempoLimite = inteiro("CORREIO_AUTENTICACAO_TEMPO_LIMITE",
+                5000, 500, 60000)
+        },
+        antivírus = {
+            ativo = lógico("CORREIO_ANTIVIRUS_ATIVO", falso),
+            endereço = so.obterVariável("CORREIO_ANTIVIRUS_ENDERECO") ou
+                "127.0.0.1",
+            porta = inteiro("CORREIO_ANTIVIRUS_PORTA", 3310, 1, 65535),
+            tempoLimite = inteiro("CORREIO_ANTIVIRUS_TEMPO_LIMITE", 120000,
+                1000, 600000),
+            limite = limiteCorpo,
+            tamanhoDoBloco = inteiro("CORREIO_ANTIVIRUS_BLOCO", 64 * 1024,
+                1024, 1024 * 1024)
+        },
+        triagem = {
+            ativa = lógico("CORREIO_TRIAGEM_ATIVA", falso),
+            limiteSuspeita = inteiro("CORREIO_TRIAGEM_LIMITE_SUSPEITA",
+                4, 1, 1000),
+            limiteIndesejada = inteiro("CORREIO_TRIAGEM_LIMITE_INDESEJADA",
+                8, 2, 1000),
+            bloqueados = lista("CORREIO_TRIAGEM_BLOQUEADOS", {})
+        },
+        recebedor = {
+            endereço = so.obterVariável("CORREIO_RECEBEDOR_ENDERECO") ou "0.0.0.0",
+            porta = inteiro("CORREIO_RECEBEDOR_PORTA", 2525, 1, 65535),
+            nome = so.obterVariável("CORREIO_RECEBEDOR_NOME") ou domínioASCII,
+            segurança = so.obterVariável("CORREIO_RECEBEDOR_SEGURANCA") ou "nenhuma",
+            certificado = so.obterVariável("CORREIO_RECEBEDOR_CERTIFICADO"),
+            chavePrivada = so.obterVariável("CORREIO_RECEBEDOR_CHAVE")
+        },
+        agência = {
+            endereço = so.obterVariável("CORREIO_AGENCIA_ENDERECO") ou "0.0.0.0",
+            portaInícioTLS = inteiro("CORREIO_AGENCIA_PORTA_STARTTLS",
+                587, 1, 65535),
+            portaTLS = inteiro("CORREIO_AGENCIA_PORTA_TLS", 465, 1, 65535),
+            nome = so.obterVariável("CORREIO_AGENCIA_NOME") ou domínioASCII,
+            certificado = so.obterVariável("CORREIO_AGENCIA_CERTIFICADO") ou
+                so.obterVariável("CORREIO_RECEBEDOR_CERTIFICADO"),
+            chavePrivada = so.obterVariável("CORREIO_AGENCIA_CHAVE") ou
+                so.obterVariável("CORREIO_RECEBEDOR_CHAVE"),
+            limiteConexões = inteiro("CORREIO_AGENCIA_LIMITE_CONEXOES",
+                500, 1, 100000),
+            limiteConexõesPorEndereço = inteiro(
+                "CORREIO_AGENCIA_LIMITE_CONEXOES_POR_ENDERECO",
+                10, 1, 1000),
+            limiteNovasConexõesPorMinuto = inteiro(
+                "CORREIO_AGENCIA_LIMITE_NOVAS_POR_MINUTO",
+                30, 1, 10000),
+            limiteTentativasDeAutenticação = inteiro(
+                "CORREIO_AGENCIA_LIMITE_AUTENTICACAO",
+                3, 1, 20)
+        },
+        imap = {
+            endereço = so.obterVariável("CORREIO_IMAP_ENDERECO") ou "0.0.0.0",
+            porta = inteiro("CORREIO_IMAP_PORTA", 993, 1, 65535),
+            nome = so.obterVariável("CORREIO_IMAP_NOME") ou domínioASCII,
+            certificado = so.obterVariável("CORREIO_IMAP_CERTIFICADO") ou
+                so.obterVariável("CORREIO_AGENCIA_CERTIFICADO") ou
+                so.obterVariável("CORREIO_RECEBEDOR_CERTIFICADO"),
+            chavePrivada = so.obterVariável("CORREIO_IMAP_CHAVE") ou
+                so.obterVariável("CORREIO_AGENCIA_CHAVE") ou
+                so.obterVariável("CORREIO_RECEBEDOR_CHAVE"),
+            tempoLimite = inteiro("CORREIO_IMAP_TEMPO_LIMITE", 1800000,
+                30000, 7200000),
+            limiteLinha = inteiro("CORREIO_IMAP_LIMITE_LINHA", 16384,
+                1024, 1048576),
+            limiteComandos = inteiro("CORREIO_IMAP_LIMITE_COMANDOS", 10000,
+                100, 1000000),
+            intervaloOcioso = inteiro("CORREIO_IMAP_INTERVALO_OCIOSO", 15000,
+                1000, 300000),
+            limiteConexões = inteiro("CORREIO_IMAP_LIMITE_CONEXOES",
+                500, 1, 100000),
+            limiteConexõesPorEndereço = inteiro(
+                "CORREIO_IMAP_LIMITE_CONEXOES_POR_ENDERECO",
+                10, 1, 1000),
+            limiteNovasConexõesPorMinuto = inteiro(
+                "CORREIO_IMAP_LIMITE_NOVAS_POR_MINUTO",
+                60, 1, 10000),
+            limiteTentativasDeAutenticação = inteiro(
+                "CORREIO_IMAP_LIMITE_AUTENTICACAO", 5, 1, 20)
+        },
+        pulsoArquivo = so.obterVariável("CORREIO_PULSO_ARQUIVO") ou
+            "/var/log/santafé/correio.pulso"
+    }
+    valores.bancosPostais = bancosPostais(valores, prefixoDoBanco)
+    retorne valores
+fim
+
+retorne configuração

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>scope</key>
+    <string>source.santafe - comment - string</string>
+    <key>settings</key>
+    <dict>
+        <key>decreaseIndentPattern</key>
+        <string>^\s*(?:fim|senão|até)\b.*$</string>
+        <key>increaseIndentPattern</key>
+        <string>^\s*(?:(?:local\s+)?função\b.*\binício\b|se\b.*\bentão\b|(?:para|enquanto)\b.*\binício\b|senão\b|repita\b)(?:\s*--.*)?$</string>
+    </dict>
+</dict>
+</plist>

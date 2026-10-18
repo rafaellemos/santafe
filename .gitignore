@@ -1,5 +1,7 @@
 # Sistemas e editores
 .DS_Store
+__pycache__/
+*.pyc
 *.swp
 *.swo
 *~
@@ -13,6 +15,7 @@
 *.exe
 *.res
 src/santafé
+src/santafé-sls
 src/santafe
 src/santafec
 testes/ferramentas/bombardeia_http
@@ -41,7 +44,11 @@ testes/**/*.svg
 .env
 .env.*
 !.env.exemplo
+*.env
+*.pulso
 *.pem
+!testes/recursos/tls-local-certificado.pem
+!testes/recursos/tls-local-chave.pem
 *.key
 *_rsa
 *_ed25519

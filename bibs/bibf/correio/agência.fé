@@ -1,0 +1,158 @@
+local correio = importe "correio"
+local rede = importe "rede"
+
+local agência = {}
+
+local função endereçoCanônico(valor)
+    valor = paraColar(valor ou ""):apare()
+    se valor:procure("�", 1, verdadeiro) ou
+       valor:procure("=?", 1, verdadeiro) ou
+       valor:procure("?=", 1, verdadeiro) então
+        retorne nulo
+    fim
+    local entreSinais = valor:separe("<([^<>]+)>")
+    se entreSinais então valor = entreSinais:apare() fim
+    local arroba = valor:procure("@", 1, verdadeiro)
+    se não arroba ou arroba == 1 ou arroba == #valor então retorne nulo fim
+    local parte = valor:corte(1, arroba - 1):minúscula()
+    local domínio = rede.domínioASCII(valor:corte(arroba + 1))
+    se não domínio então retorne nulo fim
+    retorne parte .. "@" .. domínio:minúscula()
+fim
+
+local função falhaTemporária(mensagem)
+    retorne {
+        tipo = "temporária",
+        mensagem = paraColar(mensagem ou "serviço temporariamente indisponível")
+    }
+fim
+
+local função falhaPermanente(tipoDaFalha, mensagem)
+    retorne {
+        tipo = tipoDaFalha,
+        mensagem = paraColar(mensagem ou "conteúdo recusado")
+    }
+fim
+
+função agência.nova(opções)
+    opções = opções ou {}
+    local repositório = garanta(opções.repositório,
+        "repositório postal é obrigatório")
+    local cd = garanta(opções.cd, "Correio CD é obrigatório")
+    local resumoIsca = garanta(opções.resumoIsca,
+        "resumo-isca de autenticação é obrigatório")
+
+    local este = {
+        repositório = repositório,
+        cd = cd,
+        resumoIsca = resumoIsca
+    }
+
+    função este.autentique(_, usuário, senha, tratador)
+        retorne repositório:autentiqueCaixa(
+            usuário, senha, resumoIsca,
+            função(identidade, falha)
+                se falha então
+                    tratador(nulo, falhaTemporária(falha))
+                    retorne
+                fim
+                tratador(identidade, nulo)
+            fim)
+    fim
+
+    função este.autorizeRemetente(_, identidade, remetente, tratador)
+        se tipo(identidade) ~= "tabela" ou
+           tipo(identidade.caixa) ~= "tabela" então
+            tratador(nulo, "identidade postal ausente")
+            retorne
+        fim
+        -- O caminho reverso vazio é necessário para avisos de falha (DSN).
+        se remetente == "" então tratador(verdadeiro); retorne fim
+        local informado = endereçoCanônico(remetente)
+        local permitido = endereçoCanônico(identidade.caixa.endereço)
+        local aceito = informado ~= nulo e informado == permitido
+        se aceito então
+            tratador(verdadeiro, nulo)
+        senão
+            tratador(falso,
+                "o remetente não pertence à caixa autenticada")
+        fim
+    fim
+
+    função este.autorizeDestinatário(_, identidade, _, destinatário, tratador)
+        se tipo(identidade) ~= "tabela" ou
+           tipo(identidade.caixa) ~= "tabela" então
+            tratador(nulo, "identidade postal ausente")
+            retorne
+        fim
+        local normalizado = endereçoCanônico(destinatário)
+        se normalizado então
+            tratador(verdadeiro, nulo)
+        senão
+            tratador(falso, "destinatário inválido")
+        fim
+    fim
+
+    função este.receba(_, envelope, tratador)
+        local identidade = envelope.identidade
+        se tipo(identidade) ~= "tabela" ou
+           tipo(identidade.caixa) ~= "tabela" então
+            tratador(nulo, "submissão sem identidade autenticada")
+            retorne
+        fim
+        local inspeção, falhaDaInspeção =
+            correio.inspecioneCabeçalhos(envelope.conteúdo)
+        se não inspeção então
+            tratador(nulo, falhaPermanente("conteúdo-inválido",
+                "cabeçalhos internacionais inválidos: " ..
+                    paraColar(falhaDaInspeção)))
+            retorne
+        fim
+        se inspeção.internacionais e envelope.smtpUTF8 ~= verdadeiro então
+            tratador(nulo, falhaPermanente("conteúdo-inválido",
+                "cabeçalhos UTF-8 exigem a extensão SMTPUTF8"))
+            retorne
+        fim
+        local lida, falhaDaLeitura = correio.leiaMensagem(envelope.conteúdo)
+        se não lida então
+            tratador(nulo, falhaPermanente("conteúdo-inválido",
+                "mensagem MIME inválida: " .. paraColar(falhaDaLeitura)))
+            retorne
+        fim
+
+        -- O cabeçalho visível também precisa pertencer ao autor autenticado;
+        -- validar apenas MAIL FROM ainda permitiria falsificação na leitura.
+        local autor = endereçoCanônico(lida.remetente)
+        local permitido = endereçoCanônico(identidade.caixa.endereço)
+        se autor ~= permitido então
+            tratador(nulo, falhaPermanente("autorização-rejeitada",
+                "o cabeçalho From não pertence à caixa autenticada"))
+            retorne
+        fim
+
+        local mensagem = {
+            remetente = envelope.remetente,
+            remetenteDaCópia = identidade.caixa.endereço,
+            destinatáriosPrincipais = envelope.destinatários,
+            cópia = {}, cópiaOculta = {},
+            assunto = lida.assunto ou "",
+            texto = lida.texto,
+            html = lida.html,
+            anexos = lida.anexos ou {},
+            identificação = lida.identificação,
+            smtpUTF8 = envelope.smtpUTF8 == verdadeiro
+        }
+        função mensagem.destinatários()
+            retorne envelope.destinatários
+        fim
+        função mensagem.forme()
+            retorne envelope.conteúdo
+        fim
+
+        retorne cd:posteCarta(identidade.caixa, mensagem, tratador)
+    fim
+
+    retorne este
+fim
+
+retorne agência

@@ -1,0 +1,222 @@
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;bibs/bibc/segredo/?.so;" ..
+    módulo.caminhoC
+
+local Adaptador = importe "correio.mariadb"
+
+local função linha(id)
+    local valor = {}
+    valor[1] = id
+    valor[2] = "entrada"
+    valor[3] = "entrada"
+    valor[4] = "<" .. id .. "@exemplo.org>"
+    valor[5] = "origem@exemplo.org"
+    valor[6] = "{}"
+    valor[7] = "Carta " .. id
+    valor[8] = "Resumo"
+    valor[11] = 10
+    valor[12] = 0
+    valor[13] = 0
+    valor[16] = 1700000000 + id
+    valor[17] = 1700000000 + id
+    valor[19] = "regular"
+    valor[20] = 0
+    valor[21] = "[]"
+    valor[28] = "nenhuma"
+    valor[32] = "carta " .. id
+    valor[33] = id == 103 e 3 ou 1
+    valor[34] = id == 103 e 2 ou 1
+    retorne valor
+fim
+
+local piscina = {
+    últimoSQL = nulo, últimosParâmetros = nulo,
+    confirmou = 0, desfez = 0, comandos = {}
+}
+
+função piscina.executePreparadoAssíncrono(esta, sql, parâmetros, tratador)
+    esta.últimoSQL = sql
+    esta.últimosParâmetros = parâmetros
+    esta.comandos[#esta.comandos + 1] = { sql = sql, parâmetros = parâmetros }
+    local linhas, alteradas = {}, 0
+    se sql:procure("SELECT COUNT(DISTINCT", 1, verdadeiro) então
+        linhas = { { 18733 } }
+    senão se sql:procure("SELECT id,direcao,pasta FROM", 1, verdadeiro) então
+        linhas = { { 103, "entrada", "entrada" },
+            { 102, "saida", "arquivadas" } }
+    senão se sql:procure("AS meta", 1, verdadeiro) então
+        linhas = {
+            { "carta 103", 103, "entrada", "ana@exemplo.org", "{}",
+                77, "relatório.pdf", "application/pdf", 2048 },
+            { "carta 103", 101, "entrada", "bia@exemplo.org", "{}" },
+            { "carta 102", 102, "saida", "rafael@exemplo.org",
+                '{"para":["clara@exemplo.org"]}', 78, "foto.png",
+                "image/png", 1024 }
+        }
+    senão se sql:procure("SELECT id FROM correio_cartas", 1, verdadeiro) então
+        linhas = { { 101 }, { 103 } }
+    senão se sql:procure("SELECT id,nome,tipo,tamanho FROM correio_anexos",
+            1, verdadeiro) então
+        linhas = {}
+    senão se sql:procure("FROM correio_cartas WHERE caixa_id=? AND id=? LIMIT 1",
+            1, verdadeiro) então
+        linhas = { linha(parâmetros[2]) }
+    senão se sql:procure("SELECT proximo_uid", 1, verdadeiro) então
+        linhas = { { 500 } }
+    senão se sql:procure("UPDATE correio_cartas", 1, verdadeiro) então
+        alteradas = 2
+    senão se sql:procure("INSERT INTO correio_pastas_imap", 1, verdadeiro) ou
+             sql:procure("UPDATE correio_pastas_imap", 1, verdadeiro) então
+        alteradas = 1
+    senão
+        linhas = { linha(103), linha(102), linha(101) }
+    fim fim fim fim fim fim fim fim fim
+    local posição = 0
+    local resultado = {}
+    função resultado.obterLinha()
+        posição = posição + 1
+        retorne linhas[posição]
+    fim
+    função resultado.linhasAfetadas()
+        retorne alteradas
+    fim
+    função resultado.feche() fim
+    tratador(esta, resultado, nulo)
+    retorne verdadeiro
+fim
+
+função piscina.inicieTransaçãoAssíncrona(esta, tratador)
+    tratador(esta, esta, nulo)
+    retorne verdadeiro
+fim
+
+função piscina.confirmeAssíncrono(esta, tratador)
+    esta.confirmou = esta.confirmou + 1
+    tratador(esta, verdadeiro, nulo)
+    retorne verdadeiro
+fim
+
+função piscina.desfaçaAssíncrono(esta, tratador)
+    esta.desfez = esta.desfez + 1
+    tratador(esta, verdadeiro, nulo)
+    retorne verdadeiro
+fim
+
+local repositório = Adaptador.novo(piscina, {}, {})
+local concluiu = falso
+
+repositório:listeMensagens(7, "entrada", "teste", 2, 4,
+    função(mensagens, falha, estado)
+        garanta(não falha)
+        garanta(#mensagens == 2)
+        garanta(mensagens[1].id == 103 e mensagens[2].id == 102)
+        garanta(mensagens[1].quantidadeNaConversa == 3 e
+            mensagens[1].nãoLidasNaConversa == 2 e não mensagens[1].lida)
+        garanta(#mensagens[1].remetentesNaConversa == 2 e
+            mensagens[1].remetentesNaConversa[2] == "bia@exemplo.org")
+        garanta(#mensagens[1].anexosNaConversa == 1 e
+            mensagens[1].anexosNaConversa[1].nome == "relatório.pdf")
+        garanta(mensagens[2].remetentesNaConversa[1] ==
+            "clara@exemplo.org")
+        garanta(estado.temPróxima e estado.deslocamento == 4 e
+            estado.limite == 2)
+        garanta(piscina.comandos[1].sql:procure(
+            "LIMIT 3 OFFSET 4", 1, verdadeiro))
+        garanta(piscina.comandos[1].parâmetros[1] == 7)
+        garanta(piscina.comandos[1].parâmetros[2] == "entrada")
+        garanta(piscina.comandos[1].parâmetros[3] == "teste")
+        concluiu = verdadeiro
+    fim)
+
+garanta(concluiu, "a consulta paginada não terminou")
+
+local compatível = falso
+repositório:listeMensagens(7, "entrada", "", 2,
+    função(mensagens, falha, estado)
+        garanta(não falha e #mensagens == 2)
+        garanta(estado.deslocamento == 0)
+        garanta(piscina.comandos[#piscina.comandos - 1].sql:procure(
+            "LIMIT 3 OFFSET 0", 1, verdadeiro))
+        compatível = verdadeiro
+    fim)
+
+garanta(compatível, "a assinatura anterior deixou de funcionar")
+
+local contou = falso
+repositório:conteMensagens(7, "todas", "teste",
+    função(total, falha)
+        garanta(não falha e total == 18733)
+        garanta(piscina.últimoSQL:procure(
+            "pasta NOT IN ('indesejadas','lixeira')", 1, verdadeiro))
+        garanta(piscina.últimoSQL:procure("COUNT(DISTINCT", 1, verdadeiro))
+        garanta(#piscina.últimosParâmetros == 5 e
+            piscina.últimosParâmetros[1] == 7 e
+            piscina.últimosParâmetros[2] == "teste")
+        contou = verdadeiro
+    fim)
+garanta(contou, "a contagem da visão Todas não terminou")
+
+local abriuConversa = falso
+repositório:listeMensagensDaConversa(7, "entrada", 103,
+    função(mensagens, falha)
+        garanta(não falha e #mensagens == 2)
+        garanta(mensagens[1].id == 101 e mensagens[2].id == 103)
+        garanta(mensagens[1].posiçãoNaConversa == 1 e
+            mensagens[2].quantidadeNaConversa == 2)
+        abriuConversa = verdadeiro
+    fim)
+garanta(abriuConversa, "a conversa por assunto não terminou")
+
+local listouAção = falso
+repositório:listeMensagensParaAção(7, "todas", "",
+    função(mensagens, falha)
+        garanta(não falha e #mensagens == 2)
+        garanta(mensagens[2].id == 102 e
+            mensagens[2].pasta == "arquivadas")
+        garanta(não piscina.últimoSQL:procure("LIMIT", 1, verdadeiro))
+        listouAção = verdadeiro
+    fim)
+garanta(listouAção, "a seleção integral não terminou")
+
+local moveu = falso
+repositório:movaMensagensEmLote(7, { 103, 102, 102 }, "arquivadas",
+    função(resultado, falha)
+        garanta(não falha, falha)
+        garanta(resultado.quantidade == 2)
+        garanta(piscina.últimoSQL:procure("CASE id", 1, verdadeiro))
+        garanta(piscina.últimoSQL:procure("id IN (?,?)", 1, verdadeiro))
+        garanta(piscina.últimosParâmetros[1] == "arquivadas")
+        garanta(piscina.últimosParâmetros[2] == 103)
+        garanta(piscina.últimosParâmetros[3] == 500)
+        moveu = verdadeiro
+    fim)
+garanta(moveu e piscina.confirmou == 1 e piscina.desfez == 0,
+    "o movimento transacional em lote não terminou")
+
+local marcou = falso
+repositório:marqueMensagensLidasEmLote(7, { 103, 102 },
+    função(resultado, falha)
+        garanta(não falha, falha)
+        garanta(resultado.quantidade == 2)
+        garanta(piscina.últimoSQL:procure("SET lida=?", 1, verdadeiro))
+        garanta(piscina.últimoSQL:procure("id IN (?,?)", 1, verdadeiro))
+        garanta(piscina.últimosParâmetros[1] == verdadeiro)
+        garanta(piscina.últimosParâmetros[3] == 7)
+        marcou = verdadeiro
+    fim)
+garanta(marcou e piscina.confirmou == 2 e piscina.desfez == 0,
+    "a marcação de leitura em lote não terminou")
+
+local desmarcou = falso
+repositório:marqueMensagensNãoLidasEmLote(7, { 103, 102 },
+    função(resultado, falha)
+        garanta(não falha, falha)
+        garanta(resultado.quantidade == 2)
+        garanta(piscina.últimoSQL:procure("SET lida=?", 1, verdadeiro))
+        garanta(piscina.últimosParâmetros[1] == falso)
+        garanta(piscina.últimosParâmetros[3] == 7)
+        desmarcou = verdadeiro
+    fim)
+garanta(desmarcou e piscina.confirmou == 3 e piscina.desfez == 0,
+    "a marcação como não lida em lote não terminou")
+mostre("Carteiro paginação MariaDB: ok")

@@ -1,0 +1,220 @@
+-- Política de tentativas e avisos de estado da entrega postal.
+
+local entrega = {
+    versão = "1.0.0",
+    intervalosPadrão = { 30 * 60, 2 * 60 * 60,
+        2 * 60 * 60, 3 * 60 * 60 }
+}
+
+local CRLF = "\r\n"
+local dias = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
+local meses = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+
+local função dataSMTP(carimbo)
+    local data = so.data("!*t", carimbo ou so.tempo())
+    retorne colar.formate("%s, %02d %s %04d %02d:%02d:%02d +0000",
+        dias[data.wday], data.day, meses[data.month], data.year,
+        data.hour, data.min, data.sec)
+fim
+
+local função semQuebra(valor)
+    valor = paraColar(valor ou "")
+    valor = valor:troque("\r", " "):troque("\n", " ")
+    retorne valor:apare()
+fim
+
+local função possuiNãoASCII(texto)
+    para índice = 1, #texto início
+        se texto:byte(índice) > 127 então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+
+local função codifiqueCabeçalho(texto)
+    texto = semQuebra(texto)
+    se não possuiNãoASCII(texto) então retorne texto fim
+    retorne "=?UTF-8?B?" .. colar.base64(texto) .. "?="
+fim
+
+local função base64EmLinhas(dados)
+    local bruto = colar.base64(dados)
+    local linhas = {}
+    para posição = 1, #bruto, 76 início
+        linhas[#linhas + 1] = bruto:corte(posição, posição + 75)
+    fim
+    retorne colar.junte(CRLF, tabela.desempacote(linhas))
+fim
+
+local função identificação(domínio)
+    retorne "<aviso." .. colar.formate("%08x.%08x.%08x",
+        so.tempo() & 0xFFFFFFFF,
+        so.aleatório() & 0xFFFFFFFF,
+        so.aleatório() & 0xFFFFFFFF) .. "@" .. domínio .. ">"
+fim
+
+local função limite()
+    retorne "=_Santafe_aviso_" ..
+        colar.formate("%08x%08x", so.aleatório(), so.aleatório())
+fim
+
+local função cabeçalhosOriginais(mime)
+    se tipo(mime) ~= "colar" então retorne "" fim
+    mime = mime:troque("\r\n", "\n"):troque("\r", "\n")
+    local fimDosCabeçalhos = mime:procure("\n\n", 1, verdadeiro)
+    local cabeçalhos = fimDosCabeçalhos e
+        mime:corte(1, fimDosCabeçalhos - 1) ou mime
+    se #cabeçalhos > 64 * 1024 então
+        cabeçalhos = cabeçalhos:corte(1, 64 * 1024)
+    fim
+    retorne cabeçalhos:troque("\n", CRLF)
+fim
+
+local função códigoDeEstado(tipoDoAviso, falha)
+    local encontrado = paraColar(falha ou ""):separe(
+        "([245]%.[0-9]+%.[0-9]+)")
+    se encontrado e tipoDoAviso == "atraso" e
+       encontrado:corte(1, 1) == "4" então
+        retorne encontrado
+    fim
+    se encontrado e tipoDoAviso == "falha" e
+       encontrado:corte(1, 1) == "5" então
+        retorne encontrado
+    fim
+    retorne tipoDoAviso == "atraso" e "4.0.0" ou "5.0.0"
+fim
+
+função entrega.espera(tentativas, intervalos)
+    tentativas = mat.paraInteiro(tentativas ou 0)
+    se não tentativas ou tentativas < 0 então
+        retorne nulo, "tentativas deve ser um inteiro não negativo"
+    fim
+    intervalos = intervalos ou entrega.intervalosPadrão
+    se tipo(intervalos) ~= "tabela" ou #intervalos == 0 então
+        retorne nulo, "intervalos precisa ser uma lista não vazia"
+    fim
+    local índice = mat.mínimo(tentativas + 1, #intervalos)
+    local segundos = mat.paraInteiro(intervalos[índice])
+    se não segundos ou segundos < 60 então
+        retorne nulo, "cada intervalo precisa ter ao menos 60 segundos"
+    fim
+    retorne segundos
+fim
+
+função entrega.formeAviso(opções)
+    se tipo(opções) ~= "tabela" então
+        retorne nulo, "opções do aviso precisam ser uma tabela"
+    fim
+    local tipoDoAviso = opções.tipo
+    se tipoDoAviso ~= "atraso" e tipoDoAviso ~= "falha" então
+        retorne nulo, "tipo do aviso deve ser atraso ou falha"
+    fim
+    local destinatário = semQuebra(opções.destinatário)
+    local domínio = semQuebra(opções.domínio)
+    local nomeDoServidor = semQuebra(opções.nomeDoServidor ou domínio)
+    se destinatário == "" ou domínio == "" ou nomeDoServidor == "" então
+        retorne nulo, "destinatário, domínio e nome do servidor são obrigatórios"
+    fim
+    local destinatários = opções.destinatários
+    se tipo(destinatários) ~= "tabela" ou #destinatários == 0 então
+        retorne nulo, "o aviso precisa de ao menos um destinatário original"
+    fim
+
+    local assuntoOriginal = semQuebra(opções.assuntoOriginal)
+    local falha = semQuebra(opções.falha ou
+        (tipoDoAviso == "atraso" e "entrega temporariamente indisponível" ou
+        "entrega não concluída"))
+    local ação = tipoDoAviso == "atraso" e "delayed" ou "failed"
+    local estado = códigoDeEstado(tipoDoAviso, falha)
+    local assunto = (tipoDoAviso == "atraso" e
+        "Entrega atrasada: " ou "Falha na entrega: ") .. assuntoOriginal
+    local texto
+    se tipoDoAviso == "atraso" então
+        texto = "A carta ainda não foi entregue. O Correio Santafé continuará " ..
+            "tentando até " .. dataSMTP(opções.tentarAté) .. "."
+    senão
+        texto = "O Correio Santafé encerrou as tentativas porque a carta não " ..
+            "pôde ser entregue."
+    fim
+    texto = texto .. "\n\nDestinatários afetados:\n- " ..
+        colar.junte("\n- ", tabela.desempacote(destinatários)) ..
+        "\n\nDiagnóstico: " .. falha
+
+    local campos = {
+        "Reporting-MTA: dns; " .. nomeDoServidor,
+        "Arrival-Date: " .. dataSMTP(opções.criadaEm)
+    }
+    se opções.identificaçãoOriginal e
+       opções.identificaçãoOriginal ~= "" então
+        tabela.insira(campos, 1, "Original-Envelope-Id: " ..
+            semQuebra(opções.identificaçãoOriginal))
+    fim
+    para _, endereço em ipares(destinatários) início
+        endereço = semQuebra(endereço)
+        tabela.insira(campos, "")
+        tabela.insira(campos, "Final-Recipient: utf-8; " .. endereço)
+        tabela.insira(campos, "Action: " .. ação)
+        tabela.insira(campos, "Status: " .. estado)
+        se opções.servidorRemoto e opções.servidorRemoto ~= "" então
+            tabela.insira(campos, "Remote-MTA: dns; " ..
+                semQuebra(opções.servidorRemoto))
+        fim
+        tabela.insira(campos, "Diagnostic-Code: smtp; " .. falha)
+        tabela.insira(campos, "Localized-Diagnostic: pt-BR; " .. falha)
+        tabela.insira(campos, "Last-Attempt-Date: " ..
+            dataSMTP(opções.últimaTentativa))
+        se tipoDoAviso == "atraso" e opções.tentarAté então
+            tabela.insira(campos, "Will-Retry-Until: " ..
+                dataSMTP(opções.tentarAté))
+        fim
+    fim
+
+    local separador = limite()
+    local identificaçãoDoAviso = identificação(domínio)
+    local remetente = "postmaster@" .. domínio
+    local partes = {
+        "Date: " .. dataSMTP(),
+        "Message-ID: " .. identificaçãoDoAviso,
+        "From: " .. remetente,
+        "To: " .. destinatário,
+        "Subject: " .. codifiqueCabeçalho(assunto),
+        "Auto-Submitted: auto-replied",
+        "X-Auto-Response-Suppress: All",
+        "MIME-Version: 1.0",
+        "Content-Type: multipart/report; report-type=delivery-status;" .. CRLF ..
+            " boundary=\"" .. separador .. "\"",
+        "",
+        "--" .. separador,
+        "Content-Type: text/plain; charset=UTF-8",
+        "Content-Transfer-Encoding: base64",
+        "",
+        base64EmLinhas(texto),
+        "--" .. separador,
+        "Content-Type: message/global-delivery-status",
+        "Content-Transfer-Encoding: 8bit",
+        "",
+        colar.junte(CRLF, tabela.desempacote(campos))
+    }
+    local originais = cabeçalhosOriginais(opções.mimeOriginal)
+    se originais ~= "" então
+        tabela.insira(partes, "--" .. separador)
+        tabela.insira(partes, "Content-Type: message/global-headers")
+        tabela.insira(partes, "Content-Transfer-Encoding: 8bit")
+        tabela.insira(partes, "")
+        tabela.insira(partes, originais)
+    fim
+    tabela.insira(partes, "--" .. separador .. "--")
+    tabela.insira(partes, "")
+
+    retorne {
+        tipo = tipoDoAviso,
+        identificação = identificaçãoDoAviso,
+        remetente = remetente,
+        destinatário = destinatário,
+        assunto = assunto,
+        texto = texto,
+        mime = colar.junte(CRLF, tabela.desempacote(partes))
+    }
+fim
+
+retorne entrega

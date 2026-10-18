@@ -1,0 +1,41 @@
+name: Núcleo, manual e editores
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  regressao:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Dependências Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libreadline-dev libglib2.0-dev glib-networking libmariadb-dev libsodium-dev libssl-dev python3
+      - name: Dependências macOS
+        if: runner.os == 'macOS'
+        run: brew install pkgconf readline glib glib-networking mariadb-connector-c libsodium openssl@3
+      - run: make cbin cbibc
+      - run: bash testar.sh
+        env:
+          GSETTINGS_BACKEND: memory
+      - run: python3 ferramentas/gerar_unicode.py --check
+      - run: python3 testes/integracao/testar_instalador.py
+      - name: Instalação sem privilégios
+        run: |
+          bash instalar.sh --sem-dependencias --prefixo "$RUNNER_TEMP/santafe instalado"
+          python3 testes/integracao/testar_instalacao.py "$RUNNER_TEMP/santafe instalado"
+      - run: python3 extensões/sublime/testes/testar_pacote.py
+      - run: python3 extensões/vscode/testes/testar_extensao.py
+      - run: node extensões/vscode/testes/testar_comportamento.js
+      - run: node extensões/vscode/testes/testar_sls.js
+      - run: make dist
+      - run: python3 testes/integracao/testar_distribuicao.py dist/santafe-2.0.2.tar.gz

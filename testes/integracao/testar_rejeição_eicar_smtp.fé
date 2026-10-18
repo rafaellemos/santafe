@@ -1,0 +1,43 @@
+-- Ensaio ponta a ponta e inofensivo contra o Recebedor em produção.
+-- A assinatura EICAR não é um vírus; ela existe para confirmar que o
+-- antivírus recusa a carta antes de qualquer persistência.
+
+local correio = importe "correio"
+local rede = importe "rede"
+
+local porta = mat.paraInteiro(
+    so.obterVariável("TESTE_CORREIO_PORTA") ou "25")
+local destinatário = so.obterVariável("TESTE_CORREIO_DESTINATARIO") ou
+    "rafael@santafé.dev.br"
+local eicar = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$" ..
+    "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+local carta = garanta(correio.novaMensagem({
+    remetente = "ensaio-antivirus@exemplo.invalid",
+    destinatários = { destinatário },
+    assunto = "Ensaio EICAR inofensivo",
+    texto = eicar
+}))
+local cliente = garanta(correio.cliente({
+    endereço = "127.0.0.1",
+    porta = porta,
+    segurança = "nenhuma",
+    nome = "ensaio-antivirus.local",
+    tempoLimite = 15000
+}))
+
+local terminou = falso
+local rejeitou = falso
+local detalhe
+garanta(cliente:envieAssíncrono(carta, função(resultado, falha)
+    terminou = verdadeiro
+    detalhe = falha
+    rejeitou = não resultado e tipo(falha) == "colar" e
+        falha:procure("554", 1, verdadeiro) ~= nulo
+    cliente:feche()
+    rede.pareLaço()
+fim))
+
+rede.laço()
+garanta(terminou e rejeitou,
+    "o Recebedor não recusou EICAR com SMTP 554: " .. paraColar(detalhe))
+mostre("EICAR recusado pelo SMTP 554: ok")

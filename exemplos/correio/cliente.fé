@@ -1,0 +1,26 @@
+local correio = importe "correio"
+local rede = importe "rede"
+
+local mensagem = garanta(correio.novaMensagem {
+    remetente = "remetente@exemplo.org",
+    destinatários = { "destinatario@exemplo.net" },
+    assunto = "Olá da Santafé",
+    texto = "Esta mensagem foi criada pelo Correio Santafé."
+})
+
+local cliente = garanta(correio.cliente {
+    endereço = "smtp.exemplo.org",
+    porta = 587,
+    segurança = "inícioTLS",
+    usuário = so.obterVariável("SMTP_USUARIO"),
+    senha = so.obterVariável("SMTP_SENHA")
+})
+
+garanta(cliente:envieAssíncrono(mensagem, função(resultado, falha)
+    se falha então mostre("falhou:", falha)
+    senão mostre("aceita:", resultado.identificação) fim
+    cliente:feche()
+    rede.pareLaço()
+fim))
+
+rede.laço()

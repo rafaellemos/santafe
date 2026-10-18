@@ -1,0 +1,12 @@
+// Copie este arquivo para Preferences > Package Settings > LSP >
+// Language Servers, depois de instalar o pacote LSP pelo Package Control.
+// Esta é a configuração de servidor avulso do LSP 2.10 ou posterior.
+{
+    "Santafé": {
+        "enabled": true,
+        "command": ["/usr/local/bin/santafé-sls"],
+        "selector": "source.santafe",
+        "schemes": ["file", "buffer"],
+        "diagnostics_mode": "workspace"
+    }
+}

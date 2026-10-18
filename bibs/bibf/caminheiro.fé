@@ -8,6 +8,21 @@ local rede = importe "rede"
 
 local caminheiro = {}
 
+local função emitaPulso(ap, tipoDaMensagem, nome, dados, opções)
+    se não ap ou não ap._pulso então retorne nulo fim
+    local funcionou, mensagem = proteja(função()
+        se tipoDaMensagem == "leitura" então
+            retorne ap._pulso:leitura(nome, dados, opções)
+        senão se tipoDaMensagem == "sinal" então
+            retorne ap._pulso:sinal(nome, dados, opções)
+        senão
+            retorne ap._pulso:operação(nome, dados, opções)
+        fim fim
+    fim)
+    se funcionou então retorne mensagem fim
+    retorne nulo
+fim
+
 -- Decodifica uma parte codificada de URL. O sinal "+" só representa espaço
 -- em formulários; num caminho como /C++ ele precisa continuar sendo "+".
 local função decodificarComponenteURL(txt, maisComoEspaço)
@@ -230,9 +245,11 @@ local função enviarResposta(res, corpo, formato)
         resposta, falha = res._respostaRede:html(corpo ou "")
     senão se formato == "json" então
         resposta, falha = res._respostaRede:json(corpo ou "")
+    senão se formato == "dados" então
+        resposta, falha = res._respostaRede:envie(corpo ou "")
     senão
         resposta, falha = res._respostaRede:texto(corpo ou "")
-    fim fim
+    fim fim fim
     se não resposta então
         retorne nulo, falha
     fim
@@ -249,6 +266,12 @@ local função enviarResposta(res, corpo, formato)
                 retirarConexãoDoAplicativo(res, conexão)
                 conexão:feche()
             fim
+            emitaPulso(res._ap, "sinal", "caminheiro.respostaEnviada", {
+                método = res._método,
+                código = res._código,
+                tamanho = #(corpo ou ""),
+                falha = falhaDoEnvio
+            }, res._correlaçãoPulso e { correlação = res._correlaçãoPulso } ou nulo)
         fim,
         nulo
     )
@@ -260,7 +283,7 @@ local função enviarResposta(res, corpo, formato)
     retorne verdadeiro
 fim
 
-local função criarResposta(ap, conexaoHTTP, método)
+local função criarResposta(ap, conexaoHTTP, método, correlaçãoPulso)
     local respostaRede, falha = rede.novaResposta(conexaoHTTP)
     garanta(respostaRede, falha)
 
@@ -270,7 +293,8 @@ local função criarResposta(ap, conexaoHTTP, método)
         _conexão    = conexaoHTTP,
         _método     = método ou "GET",
         _enviado      = falso,
-        _respostaRede = respostaRede
+        _respostaRede = respostaRede,
+        _correlaçãoPulso = correlaçãoPulso
     }
 
     função res.código(este, número)
@@ -333,6 +357,23 @@ local função criarResposta(ap, conexaoHTTP, método)
             corpo = resultado
         fim
         retorne enviarResposta(este, corpo, "json")
+    fim
+
+    -- Envia dados binários ou um formato que não possua atalho próprio.
+    -- O tipo é obrigatório para evitar que um anexo seja interpretado pelo
+    -- navegador como HTML por adivinhação de conteúdo.
+    função res.dados(este, corpo, tipoDoConteúdo)
+        se tipo(corpo) ~= "colar" então
+            retorne nulo, "dados da resposta devem ser um colar binário"
+        fim
+        se tipo(tipoDoConteúdo) ~= "colar" ou tipoDoConteúdo == "" então
+            retorne nulo, "tipo dos dados deve ser um colar não vazio"
+        fim
+        local ajustou, falha = este:definaCabeçalho(
+            "Content-Type", tipoDoConteúdo
+        )
+        se não ajustou então retorne nulo, falha fim
+        retorne enviarResposta(este, corpo, "dados")
     fim
 
     retorne res
@@ -553,6 +594,13 @@ local função executarCadeia(ap, índice, req, res)
 fim
 
 local função responderFalha(ap, falha, req, res)
+    emitaPulso(ap, "sinal", "caminheiro.tratamentoFalhou", {
+        método = req e req.método,
+        caminho = req e req.caminho,
+        falha = paraColar(falha)
+    }, res e res._correlaçãoPulso e
+        { correlação = res._correlaçãoPulso, prioridade = "alta" } ou
+        { prioridade = "alta" })
     mostre("[Caminheiro] falha ao tratar requisição:", falha)
     se res._enviado então
         retorne falso
@@ -590,7 +638,11 @@ fim
 
 -- ---------- FÁBRICA DO 'ap' ----------
 
-função caminheiro.novo()
+função caminheiro.novo(opções)
+    opções = opções ou {}
+    se tipo(opções) ~= "tabela" então
+        retorne nulo, "opções do Caminheiro devem ser uma tabela"
+    fim
     local ap = {}
 
     ap.rotas = {}
@@ -600,6 +652,7 @@ função caminheiro.novo()
     ap._servidor = nulo
     ap._ativo = falso
     ap._tratadorDeFalha = nulo
+    ap._pulso = opções.pulso
 
     -- registra uma parada no caminho: roda em toda
     -- requisição, na ordem cadastrada, antes do tratador final da rota
@@ -692,6 +745,9 @@ função caminheiro.novo()
         fim
         ap._conexões = {}
 
+        se estavaAtivo então
+            emitaPulso(ap, "sinal", "caminheiro.servidorEncerrado", {})
+        fim
         local parouLaço = rede.pareLaço()
         retorne estavaAtivo ou parouLaço
     fim
@@ -803,7 +859,17 @@ função caminheiro.novo()
             req.método  = (req.método ou "GET"):maiúscula()
             req.caminho = req.caminho ou "/"
 
-            local res = criarResposta(ap, conexaoHTTP, req.método)
+            local leitura = emitaPulso(ap, "leitura", "caminheiro.requisiçãoRecebida", {
+                método = req.método,
+                caminho = req.caminho,
+                endereço = req.ip,
+                portaRemota = req.portaRemota,
+                tamanho = #(req.corpo ou "")
+            })
+            local res = criarResposta(
+                ap, conexaoHTTP, req.método,
+                leitura e leitura.identificação ou nulo
+            )
             local funcionou, falha = proteja(executarCadeia, ap, 1, req, res)
             se não funcionou então
                 responderFalha(ap, falha, req, res)
@@ -819,6 +885,12 @@ função caminheiro.novo()
         fim
         ap._servidor = servidor
         ap._ativo = verdadeiro
+        emitaPulso(ap, "sinal", "caminheiro.servidorIniciado", {
+            endereço = endereço,
+            porta = porta,
+            limiteCabeçalhos = limiteCabeçalhos,
+            limiteCorpo = limiteCorpo
+        })
 
         -- retorno do aceite: assinatura ALINHADA ao C:
         -- retorno(este, conn_obj ou nil, err_msg ou nil, dado)
@@ -852,6 +924,11 @@ função caminheiro.novo()
 
             -- aqui temos uma conexão válida: inicia leitura HTTP
             ap._conexões[conexaoHTTP] = verdadeiro
+            local par = conexaoHTTP:parRemoto()
+            emitaPulso(ap, "leitura", "caminheiro.conexãoAceita", {
+                endereço = par e par.endereço,
+                porta = par e par.porta
+            })
             local definiuTempo, falhaDoTempo = conexaoHTTP:definaTempoLimite(tempoLimite)
             local definiuLimites, falhaDosLimites = conexaoHTTP:definaLimitesHTTP(
                 limiteCabeçalhos,

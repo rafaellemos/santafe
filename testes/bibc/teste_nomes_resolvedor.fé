@@ -1,0 +1,119 @@
+local nomes = importe "nomes"
+local móduloAutoridade = importe "nomes.autoridade"
+local móduloResolvedor = importe "nomes.resolvedor"
+local rede = importe "rede"
+
+local portaAutoritativa = 18761
+local portaRecursiva = 18762
+local autoridade = garanta(móduloAutoridade.novo({
+    endereço = "127.0.0.1", porta = portaAutoritativa,
+    zonas = { { nome = "exemplo.org", registros = {
+        { nome = "@", tipo = "SOA", dados = {
+            mestre = "ns1", responsável = "dns", série = 1,
+            atualização = 3600, novaTentativa = 600,
+            expiração = 86400, mínimo = 300 } },
+        { nome = "@", tipo = "NS", dados = "ns1" },
+        { nome = "ns1", tipo = "A", dados = "127.0.0.1" },
+        { nome = "www", tipo = "A", ttl = 300, dados = "192.0.2.10" },
+        { nome = "apelido", tipo = "CNAME", ttl = 300, dados = "www" }
+    } } }
+}))
+garanta(autoridade:inicie())
+
+local resolvedor = garanta(móduloResolvedor.novo({
+    endereço = "127.0.0.1", porta = portaRecursiva,
+    portaExterna = portaAutoritativa,
+    servidoresRaiz = { "127.0.0.1" },
+    prefixosPermitidos = { "127.0.0.0/8" },
+    tempoLimite = 500, tentativas = 1
+}))
+garanta(resolvedor:inicie())
+
+local negada = garanta(nomes.novaConsulta("www.exemplo.org", "A", 9, verdadeiro))
+resolvedor:respondaAssíncrono(negada, "UDP", "192.0.2.1",
+    função(resposta, _, descarte)
+        garanta(resposta == nulo e descarte)
+    fim)
+
+local cliente = rede.udp("IPv4")
+garanta(cliente:amarre("127.0.0.1", 0))
+local etapa = 1
+local terminou = falso
+local clienteTCP
+local conexãoTCP
+local entradaTCP = ""
+
+local função finalize()
+    terminou = verdadeiro
+    se conexãoTCP então conexãoTCP:feche() fim
+    se clienteTCP então clienteTCP:feche() fim
+    cliente:feche()
+    resolvedor:feche()
+    autoridade:feche()
+    rede.pareLaço()
+fim
+
+local função recebaTCP(conexão)
+    conexão:recebaDadosAssíncrono(4096, função(_, dados, falhaDaLeitura)
+        garanta(dados, falhaDaLeitura)
+        entradaTCP = entradaTCP .. dados
+        se #entradaTCP < 2 então recebaTCP(conexão); retorne fim
+        local tamanho = (entradaTCP:byte(1) << 8) | entradaTCP:byte(2)
+        se #entradaTCP < tamanho + 2 então recebaTCP(conexão); retorne fim
+        local resposta = garanta(nomes.decodifiqueMensagem(
+            entradaTCP:corte(3, tamanho + 2)
+        ))
+        garanta(resposta.identificação == 1203)
+        garanta(resposta.respostas[1].tipo == nomes.TIPOS.CNAME)
+        garanta(resposta.respostas[2].dados == "192.0.2.10")
+        finalize()
+    fim)
+fim
+
+local função testeTCP()
+    local consulta = garanta(nomes.novaConsulta(
+        "apelido.exemplo.org", "A", 1203, verdadeiro
+    ))
+    clienteTCP = rede.clienteTCP()
+    clienteTCP:definaTempoLimite(2000)
+    clienteTCP:conecteAssíncrono("127.0.0.1", portaRecursiva,
+        função(_, conexão, falhaDaConexão)
+            garanta(conexão, falhaDaConexão)
+            conexãoTCP = conexão
+            conexão:definaTempoLimite(2000)
+            conexão:envieAssíncrono(nomes._u16(#consulta) .. consulta,
+                função(c, _, falhaDoEnvio)
+                    garanta(não falhaDoEnvio, falhaDoEnvio)
+                    recebaTCP(c)
+                fim)
+        fim)
+fim
+
+local função envie(id)
+    local consulta = garanta(nomes.novaConsulta("www.exemplo.org", "A", id, verdadeiro))
+    cliente:envieParaAssíncrono("127.0.0.1", portaRecursiva, consulta,
+        função(_, _, falhaDoEnvio) garanta(não falhaDoEnvio, falhaDoEnvio) fim)
+fim
+
+cliente:inicieRecepção(4096, função(pacote, falhaDaLeitura)
+    garanta(pacote, falhaDaLeitura)
+    local resposta = garanta(nomes.decodifiqueMensagem(pacote))
+    garanta(resposta.identificação == 1200 + etapa)
+    garanta(resposta.bandeiras.recursãoDisponível)
+    garanta(não resposta.bandeiras.dadosAutênticos)
+    garanta(resposta.respostas[1].dados == "192.0.2.10")
+    se etapa == 1 então
+        etapa = 2
+        envie(1202)
+    senão
+        cliente:pareRecepção()
+        testeTCP()
+    fim
+fim)
+
+envie(1201)
+rede.laço()
+garanta(terminou)
+local estatísticas = resolvedor:estatísticas()
+garanta(estatísticas.acertosDaMemrap >= 1)
+mostre("nomes resolvedor, ACL e memrap: ok")

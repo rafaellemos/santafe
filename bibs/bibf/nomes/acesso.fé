@@ -1,0 +1,203 @@
+-- Controle de acesso e de taxa para serviços DNS.
+
+local acesso = {}
+
+local função ipv4(endereço)
+    se tipo(endereço) ~= "colar" então retorne nulo fim
+    local a, b, c, d = endereço:separe(
+        "^([0-9]+)%.([0-9]+)%.([0-9]+)%.([0-9]+)$"
+    )
+    se não a então retorne nulo fim
+    a, b, c, d = paraNúmero(a), paraNúmero(b), paraNúmero(c), paraNúmero(d)
+    se a > 255 ou b > 255 ou c > 255 ou d > 255 então retorne nulo fim
+    retorne (a << 24) | (b << 16) | (c << 8) | d
+fim
+
+local função gruposIPv6(texto)
+    local grupos = {}
+    se texto == "" então retorne grupos fim
+    para grupo em texto:capture("[^:]+") início
+        se grupo:procure(".", 1, verdadeiro) então
+            local v4 = ipv4(grupo)
+            se v4 == nulo então retorne nulo fim
+            grupos[#grupos + 1] = (v4 >> 16) & 0xFFFF
+            grupos[#grupos + 1] = v4 & 0xFFFF
+        senão
+            se #grupo > 4 ou não grupo:separe("^[0-9a-fA-F]+$") então
+                retorne nulo
+            fim
+            grupos[#grupos + 1] = paraNúmero(grupo, 16)
+        fim
+    fim
+    retorne grupos
+fim
+
+local função ipv6(endereço)
+    se tipo(endereço) ~= "colar" então retorne nulo fim
+    -- Remove a identificação de zona de endereços locais (fe80::1%eth0).
+    local porcento = endereço:procure("%", 1, verdadeiro)
+    se porcento então endereço = endereço:corte(1, porcento - 1) fim
+    local duplo = endereço:procure("::", 1, verdadeiro)
+    se duplo e endereço:procure("::", duplo + 2, verdadeiro) então retorne nulo fim
+    local grupos
+    se duplo então
+        local esquerda = gruposIPv6(endereço:corte(1, duplo - 1))
+        local direita = gruposIPv6(endereço:corte(duplo + 2))
+        se não esquerda ou não direita então retorne nulo fim
+        local faltantes = 8 - #esquerda - #direita
+        se faltantes < 1 então retorne nulo fim
+        grupos = esquerda
+        para _ = 1, faltantes início grupos[#grupos + 1] = 0 fim
+        para _, valor em ipares(direita) início grupos[#grupos + 1] = valor fim
+    senão
+        grupos = gruposIPv6(endereço)
+        se não grupos ou #grupos ~= 8 então retorne nulo fim
+    fim
+    local alto = 0
+    local baixo = 0
+    para i = 1, 4 início alto = (alto << 16) | grupos[i] fim
+    para i = 5, 8 início baixo = (baixo << 16) | grupos[i] fim
+    retorne { alto = alto, baixo = baixo }
+fim
+
+local função máscara32(ticos)
+    se ticos == 0 então retorne 0 fim
+    retorne (0xFFFFFFFF << (32 - ticos)) & 0xFFFFFFFF
+fim
+
+local função máscara64(ticos)
+    se ticos == 0 então retorne 0 fim
+    se ticos == 64 então retorne ~0 fim
+    retorne ~0 << (64 - ticos)
+fim
+
+local função compilePrefixo(texto)
+    se tipo(texto) ~= "colar" então retorne nulo, "prefixo deve ser um colar" fim
+    local barra = texto:procure("/", 1, verdadeiro)
+    local endereço = barra e texto:corte(1, barra - 1) ou texto
+    local quantidade = barra e paraNúmero(texto:corte(barra + 1)) ou nulo
+    local valor4 = ipv4(endereço)
+    se valor4 ~= nulo então
+        quantidade = quantidade ou 32
+        se mat.paraInteiro(quantidade) == nulo ou quantidade < 0 ou quantidade > 32 então
+            retorne nulo, "prefixo IPv4 fora do intervalo 0..32"
+        fim
+        local máscara = máscara32(quantidade)
+        retorne { família = 4, rede = valor4 & máscara, máscara = máscara,
+            texto = texto }
+    fim
+    local valor6 = ipv6(endereço)
+    se valor6 então
+        quantidade = quantidade ou 128
+        se mat.paraInteiro(quantidade) == nulo ou quantidade < 0 ou quantidade > 128 então
+            retorne nulo, "prefixo IPv6 fora do intervalo 0..128"
+        fim
+        local máscaraAlta = máscara64(mat.mínimo(quantidade, 64))
+        local máscaraBaixa = máscara64(mat.máximo(0, quantidade - 64))
+        retorne { família = 6,
+            alto = valor6.alto & máscaraAlta,
+            baixo = valor6.baixo & máscaraBaixa,
+            máscaraAlta = máscaraAlta, máscaraBaixa = máscaraBaixa,
+            texto = texto }
+    fim
+    retorne nulo, "endereço IP inválido no prefixo " .. texto
+fim
+
+função acesso.novo(prefixos)
+    local compilados = {}
+    para _, texto em ipares(prefixos ou { "127.0.0.0/8", "::1/128" }) início
+        local prefixo, falha = compilePrefixo(texto)
+        se não prefixo então retorne nulo, falha fim
+        compilados[#compilados + 1] = prefixo
+    fim
+    local este = { prefixos = compilados }
+    função este.permita(_, endereço)
+        local valor4 = ipv4(endereço)
+        se valor4 ~= nulo então
+            para _, prefixo em ipares(compilados) início
+                se prefixo.família == 4 e
+                   (valor4 & prefixo.máscara) == prefixo.rede então
+                    retorne verdadeiro
+                fim
+            fim
+            retorne falso
+        fim
+        local valor6 = ipv6(endereço)
+        se não valor6 então retorne falso fim
+        para _, prefixo em ipares(compilados) início
+            se prefixo.família == 6 e
+               (valor6.alto & prefixo.máscaraAlta) == prefixo.alto e
+               (valor6.baixo & prefixo.máscaraBaixa) == prefixo.baixo então
+                retorne verdadeiro
+            fim
+        fim
+        retorne falso
+    fim
+    retorne este
+fim
+
+-- Consulta pontual usada por protocolos que recebem um prefixo no próprio
+-- dado (por exemplo ip4/ip6 no SPF), sem manter uma lista de controle.
+função acesso.pertence(endereço, prefixo)
+    local compilado, falha = compilePrefixo(prefixo)
+    se não compilado então retorne nulo, falha fim
+    local verificador = garanta(acesso.novo({ prefixo }))
+    retorne verificador:permita(endereço)
+fim
+
+função acesso.novoLimitador(opções)
+    opções = opções ou {}
+    local porSegundo = mat.paraInteiro(opções.porSegundo ou 100)
+    local explosão = mat.paraInteiro(opções.explosão ou porSegundo * 2)
+    local máximoDeOrigens = mat.paraInteiro(opções.máximoDeOrigens ou 10000)
+    se não porSegundo ou porSegundo < 1 ou não explosão ou explosão < 1 ou
+       não máximoDeOrigens ou máximoDeOrigens < 1 então
+        retorne nulo, "limites DNS devem ser inteiros positivos"
+    fim
+    local origens = {}
+    local quantidade = 0
+    local últimaLimpeza = so.tempo()
+    local este = {}
+
+    local função limpe(agora)
+        se agora - últimaLimpeza < 60 então retorne fim
+        para endereço, estado em pares(origens) início
+            se agora - estado.visto > 120 então
+                origens[endereço] = nulo
+                quantidade = quantidade - 1
+            fim
+        fim
+        últimaLimpeza = agora
+    fim
+
+    função este.permita(_, endereço)
+        local agora = so.tempo()
+        limpe(agora)
+        local estado = origens[endereço]
+        se não estado então
+            se quantidade >= máximoDeOrigens então retorne falso fim
+            estado = { fichas = explosão, visto = agora }
+            origens[endereço] = estado
+            quantidade = quantidade + 1
+        senão
+            local decorrido = agora - estado.visto
+            se decorrido > 0 então
+                estado.fichas = mat.mínimo(explosão,
+                    estado.fichas + decorrido * porSegundo)
+            fim
+            estado.visto = agora
+        fim
+        se estado.fichas < 1 então retorne falso fim
+        estado.fichas = estado.fichas - 1
+        retorne verdadeiro
+    fim
+
+    função este.estatísticas()
+        retorne { origens = quantidade, porSegundo = porSegundo, explosão = explosão }
+    fim
+    retorne este
+fim
+
+acesso._ipv4 = ipv4
+acesso._ipv6 = ipv6
+retorne acesso

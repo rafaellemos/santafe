@@ -1,0 +1,123 @@
+-- Fila postal híbrida: objetos novos fora do MariaDB e leitura legada.
+
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?.fe;" .. módulo.caminho
+módulo.caminhoC = "bibs/bibc/rede/?.so;" .. módulo.caminhoC
+
+local correio = importe "correio"
+
+local função resultado(opções)
+    opções = opções ou {}
+    local este = { índice = 0, linhas = opções.linhas ou {} }
+    função este.idInserido(_) retorne opções.id ou 0 fim
+    função este.linhasAfetadas(_) retorne opções.alteradas ou 0 fim
+    função este.obterLinha(esta)
+        esta.índice = esta.índice + 1
+        retorne esta.linhas[esta.índice]
+    fim
+    função este.feche(_) retorne verdadeiro fim
+    retorne este
+fim
+
+local função piscinaFalsa()
+    local esta = { linha = nulo, estruturas = {} }
+    função esta.executeAssíncrono(piscina, sql, tratador)
+        piscina.estruturas[#piscina.estruturas + 1] = sql
+        tratador(piscina, resultado(), nulo)
+        retorne verdadeiro
+    fim
+    função esta.executePreparadoAssíncrono(piscina, sql, parâmetros, tratador)
+        local resposta
+        se sql:procure("INSERT INTO", 1, verdadeiro) então
+            local linha = {
+                [1] = "41", [2] = parâmetros[3], [3] = parâmetros[4],
+                [7] = "0", [8] = paraColar(parâmetros[#parâmetros - 1])
+            }
+            se sql:procure("conteudo_objeto", 1, verdadeiro) então
+                linha[5], linha[6] = parâmetros[5], paraColar(parâmetros[6])
+            senão
+                linha[4], linha[6] = parâmetros[5], paraColar(parâmetros[6])
+            fim
+            piscina.linha = linha
+            resposta = resultado { id = 41, alteradas = 1 }
+        senão se sql:procure("UPDATE", 1, verdadeiro) então
+            resposta = resultado { alteradas = 1 }
+        senão se sql:procure("SELECT id,remetente", 1, verdadeiro) então
+            resposta = resultado { linhas = { piscina.linha } }
+        senão
+            erro("SQL inesperado no teste: " .. sql)
+        fim fim fim
+        tratador(piscina, resposta, nulo)
+        retorne verdadeiro
+    fim
+    retorne esta
+fim
+
+local função depósitoFalso()
+    local este = { conteúdo = nulo, resumo = colar.replique("b", 64) }
+    função este.graveAssíncrono(esta, conteúdo, tratador, dado)
+        esta.conteúdo = conteúdo
+        tratador({ resumo = esta.resumo, tamanho = #conteúdo }, nulo, dado)
+        retorne verdadeiro
+    fim
+    função este.leiaAssíncrono(esta, resumo, tamanho, tratador, dado)
+        garanta(resumo == esta.resumo e tamanho == #esta.conteúdo)
+        tratador(esta.conteúdo, nulo, dado)
+        retorne verdadeiro
+    fim
+    retorne este
+fim
+
+local função mensagem(conteúdo)
+    local esta = {
+        remetente = "ana@exemplo.org",
+        lista = { "bia@exemplo.org" }
+    }
+    função esta.forme(_) retorne conteúdo fim
+    função esta.destinatários(esta) retorne esta.lista fim
+    retorne esta
+fim
+
+local conteúdo = "Subject: teste\r\n\r\ncorpo binário\0fim"
+local piscina = piscinaFalsa()
+local objetos = depósitoFalso()
+local fila = garanta(correio.filaMariaDB(piscina, {
+    tabela = "correio_fila_teste", depósito = objetos
+}))
+
+local estrutura
+fila:crieEstruturaAssíncrona(função(valor, falha)
+    garanta(não falha, falha); estrutura = valor
+fim)
+garanta(estrutura == verdadeiro)
+garanta(piscina.estruturas[1]:procure("conteudo LONGBLOB NULL", 1, verdadeiro))
+garanta(piscina.estruturas[1]:procure("conteudo_objeto CHAR(64)", 1, verdadeiro))
+garanta(piscina.estruturas[2]:procure("PRIMARY KEY (fila_id,tipo)", 1, verdadeiro))
+
+local id
+fila:adicioneAssíncrono(mensagem(conteúdo), função(valor, falha)
+    garanta(não falha, falha); id = valor
+fim)
+garanta(id == 41 e piscina.linha[4] == nulo)
+garanta(piscina.linha[5] == objetos.resumo)
+
+local reservado
+fila:reservePróximaAssíncrono(função(valor, falha)
+    garanta(não falha, falha); reservado = valor
+fim)
+garanta(reservado e reservado.conteúdo == conteúdo)
+
+-- Uma linha v1, ainda com LONGBLOB, continua legível sem depósito.
+local piscinaLegada = piscinaFalsa()
+local filaLegada = garanta(correio.filaMariaDB(piscinaLegada, {
+    tabela = "correio_fila_legada"
+}))
+filaLegada:adicioneAssíncrono(mensagem(conteúdo), função(valor, falha)
+    garanta(valor e não falha, falha)
+fim)
+local legado
+filaLegada:reservePróximaAssíncrono(função(valor, falha)
+    garanta(não falha, falha); legado = valor
+fim)
+garanta(legado e legado.conteúdo == conteúdo)
+
+mostre("Correio fila e depósito: ok")
