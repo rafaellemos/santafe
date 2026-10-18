@@ -11,7 +11,8 @@
 - instalação sem sucesso falso, sem REPL final e sem modificar `/etc/gai.conf`;
 - fonte do manual versionado em `docs/`, empacotamento NFC e testes independentes de chaves locais;
 - ensaios de integração MariaDB atualizados e configuração inicial de CI;
-- validação Linux e publicação remota desta candidata ainda pendentes.
+- suítes aprovadas em macOS e Debian, com MariaDB isolado; publicação e
+  verificação gráfica final dos editores ainda pendentes.
 
 ## 2.0.1 — 2026-10-17
 

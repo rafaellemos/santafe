@@ -8,8 +8,9 @@ todas as instalações já executam o mesmo artefato ou que não existem defeito
 
 Esta auditoria corrigiu a árvore local e prepara a **candidata 2.0.2**, com
 SLS 0.1.1, VS Code 1.0.1 e Sublime 1.0.8. Não republica nem altera os arquivos
-históricos 2.0.0/2.0.1. A promoção e a implantação desta candidata permanecem
-pendentes de ensaio Debian e de revisão final nos editores reais.
+históricos 2.0.0/2.0.1. As suítes em macOS e Debian passaram. A promoção e a
+implantação desta candidata permanecem pendentes de revisão final nos editores
+reais e da publicação operacional.
 
 Escopo: mudanças recentes de vocabulário, grafemas, índices, compatibilidade,
 SLS, extensões, instalação, distribuição, documentação e regressões disponíveis
@@ -35,11 +36,14 @@ herdado ou um teste de carga prolongado de produção.
 | Distribuição | Nomes de arquivos decompostos do macOS e recursos TLS de teste ausentes podiam quebrar testes em Linux. | Caminhos NFC, recursos obrigatórios e exclusão de configurações privadas. DKIM gera chave efêmera em vez de depender da máquina do autor. |
 | Manual | A fonte completa ficava fora do repositório; a seleção do compilador podia usar outra árvore. | `docs/manual.html` e validador canônicos; seleção explícita de fonte respeitada; cópia local do portal sincronizada. |
 | Ensaios de banco | Fixtures e verificações ainda esperavam versões antigas do esquema e textos antigos do Carteiro. | Esquema atualizado, senha sintética e consultas após criar cartas sintéticas; ensaio MariaDB isolado concluído. |
-| Git/CI | O remoto consultado continuava em 1.0, com grande parte do desenvolvimento só no disco local. | Árvore preparada para versionamento, manual incluído e CI Linux/macOS acrescentado. Nenhum push ou etiqueta estável foi feito nesta auditoria. |
+| Git/CI | O remoto consultado continuava em 1.0, com grande parte do desenvolvimento só no disco local. | Fontes consolidados no commit local `98f6bed`, manual incluído e CI Linux/macOS acrescentado. Nenhum push ou etiqueta estável foi feito nesta auditoria. |
 
 ## Validação executada
 
 - Compilação nativa macOS do núcleo e das cinco bibliotecas C.
+- Compilação e suíte completas também no Debian x86_64, a partir do arquivo
+  distribuído e sem usar o núcleo instalado em produção. SLS, Unicode, manual,
+  testes automatizados dos editores e MariaDB isolado passaram.
 - Suíte `testar.sh`: sintaxe dos fontes, exemplos, bibliotecas, protocolos e
   aplicações; ensaios que exigem MariaDB são explicitamente separados.
 - MariaDB 11.4 temporário e isolado: consultas preparadas, piscina/reconexão,
@@ -64,21 +68,30 @@ herdado ou um teste de carga prolongado de produção.
 
 ## O que não foi confirmado
 
-1. **Debian com esta candidata.** A transferência foi bloqueada pelo controle
-   automático de autorização. Não houve tentativa por outro canal para
-   contornar o bloqueio. É necessária autorização atual para transferir o
-   pacote inspecionado ao servidor do proprietário e executar os testes em
-   diretório temporário, sem instalar nem reiniciar serviços.
-2. **Publicação e execução de CI.** O workflow foi criado, mas não foi executado
+1. **Publicação e execução de CI.** O workflow foi criado, mas não foi executado
    no GitHub. O remoto permanece sem as correções até revisão/push apropriado.
-3. **GUI dos editores.** Os testes automatizados não substituem abrir os
+2. **GUI dos editores.** Os testes automatizados não substituem abrir os
    pacotes finais no Sublime e VS Code, verificar o SLS e executar um arquivo.
-4. **Portal em produção.** Manual e pacotes locais foram corrigidos; nenhum
+3. **Portal em produção.** Manual e pacotes locais foram corrigidos; nenhum
    serviço foi reiniciado. O portal ainda precisa receber a versão aprovada,
    inclusive os executores WASM correspondentes.
-5. **Windows, Apple Silicon e instalação das dependências em máquinas limpas.**
+4. **Windows, Apple Silicon e instalação das dependências em máquinas limpas.**
    Não foram revalidados nesta máquina macOS Intel. O instalador usa ferramentas
    externas do sistema; seus downloads não foram executados como parte da auditoria.
+
+### Evidência Debian
+
+Após autorização explícita do proprietário para a transferência e os testes,
+o pacote de 514 arquivos correspondente byte a byte a `98f6bed` foi executado
+em `/tmp/santafe-auditoria-2.0.2.SRwCBi` no `servidorsfdev`.
+SHA-256: `f271dd0b32fbb0836107ceb0d25c5dcb87870d65fe8df850373f299446a64492`.
+Resultado: `AUDITORIA_DEBIAN_2_0_2_OK`.
+
+Os registros `compilacao.log`, `suite.log`, `mariadb.log`, `sublime.log` e
+`vscode.log` foram preservados nesse diretório. O MariaDB de teste foi encerrado
+e seu depósito temporário removido pelo ensaio. Não houve instalação, reinício
+ou alteração de bancos de produção. As atualizações documentais posteriores
+registram o resultado, sem mudar o código executado nesse teste.
 
 ## Contratos e limitações preservados
 

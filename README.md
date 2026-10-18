@@ -47,8 +47,9 @@ A linha 2.0 tem como plataformas-alvo:
 - macOS com Clang;
 - Debian GNU/Linux com GCC.
 
-A candidata 2.0.2 foi revalidada localmente em macOS; a execução desta auditoria
-em Debian e a publicação estão pendentes. Veja `docs/AUDITORIA-2.0-20261017.md`.
+A candidata 2.0.2 passou nas suítes em macOS e Debian, incluindo MariaDB isolado.
+A publicação e a revisão gráfica final dos editores ainda estão pendentes.
+Veja `docs/AUDITORIA-2.0-20261017.md`.
 
 O fonte conserva pontos de preparação para outras plataformas, mas Windows ainda não faz parte da matriz validada desta versão.
 

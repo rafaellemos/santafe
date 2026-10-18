@@ -17,8 +17,9 @@ Operations), the local telemetry foundation planned for the future Forte.
 ## Supported platforms
 
 The 2.0 line targets macOS with Clang and Debian GNU/Linux with GCC.
-Candidate 2.0.2 has been revalidated locally on macOS; this audit's Linux run
-and remote publication remain pending. Windows is not part of the validated matrix yet.
+Candidate 2.0.2 passed the macOS and Debian suites, including isolated MariaDB
+integration. Publication and final editor GUI checks remain pending.
+Windows is not part of the validated matrix yet.
 
 Version 2.0 changes public vocabulary relative to 1.0; read the
 [change log](CHANGELOG.md) and the [migration guide](docs/MIGRACAO-VOCABULARIO-LOGICO.md)
