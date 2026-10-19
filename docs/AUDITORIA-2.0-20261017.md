@@ -42,6 +42,13 @@ herdado ou um teste de carga prolongado de produção.
 
 ### Revalidação do fechamento — 19/10/2026
 
+Correção após a tentativa de publicação: o ensaio comum havia passado, mas
+a execução com sudo revelou colisão com fixtures fixas em `/tmp` pertencentes
+a `rafael`, bloqueada por `fs.protected_regular=2`. Nenhum arquivo operacional
+foi trocado. A revisão 2 isola cada fixture em diretório `0700`, preserva os
+arquivos históricos e acrescenta ensaios concorrentes e limpeza após falha.
+O marcador Git original é preservado; `v2.0.2-r2` registra essa correção.
+
 - macOS Intel: repetidas a suíte nativa, a integração MariaDB isolada, a
   instalação em prefixo temporário, a verificação dos dados Unicode e a
   compilação/execução WebAssembly. Nenhum banco de produção foi acessado.

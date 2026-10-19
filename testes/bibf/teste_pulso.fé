@@ -59,11 +59,9 @@ circular.eu = circular
 local recusada, falhaCircular = canal:sinal("circular", circular)
 garanta(não recusada e falhaCircular:procure("circular", 1, verdadeiro))
 
-local caminho = "/tmp/santafe-pulso-teste.jsonl"
-so.remova(caminho)
-para i = 1, 8 início
-    so.remova(caminho .. "." .. so.tempo() .. "." .. i)
-fim
+local temporários = executeArquivo("testes/recursos/temporarios.fé")
+temporários(função(arquivoTemporário)
+local caminho = arquivoTemporário("pulso.jsonl")
 local registrador = garanta(pulso.registrador(caminho, { limiteArquivo = 4096 }))
 local canalDeArquivo = garanta(pulso.novo({ serviço = "arquivo" }))
 garanta(canalDeArquivo:adicioneDestino(registrador))
@@ -75,7 +73,7 @@ local linha = garanta(arquivo:leia("*linha"))
 arquivo:feche()
 local gravada = json.decod(linha)
 garanta(gravada.nome == "iniciado" e gravada.dados.porta == 25)
-so.remova(caminho)
+fim)
 
 local estatísticas = canal:estatísticas()
 garanta(estatísticas.emitidas == 5)

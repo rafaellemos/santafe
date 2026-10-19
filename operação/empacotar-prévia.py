@@ -50,6 +50,7 @@ EXIGIDOS = {
     Path("extensões/vscode/extension.js"),
     Path("extensões/sublime/Santafe.py"),
     Path("extensões/sublime/Santafe.sublime-syntax"),
+    Path("testes/recursos/temporarios.fé"),
     *RECURSOS_DISTRIBUIDOS,
 }
 DATA_FIXA = 1792195200  # 2026-10-17T00:00:00Z; permite artefatos repetíveis.

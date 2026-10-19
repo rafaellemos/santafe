@@ -77,6 +77,9 @@ for arquivo in "${testes[@]}"; do
     esac
 done
 
+echo "==> Validando o isolamento concorrente dos temporários"
+python3 ./testes/integracao/testar_temporarios.py
+
 echo "==> Auditando o vocabulário público"
 ./testes/integracao/testar_vocabulario_publico.sh
 

@@ -42,6 +42,7 @@ if [[ "$MODO" == publicar ]]; then
 fi
 cd "$RAIZ"
 export GSETTINGS_BACKEND=memory
+echo 'Publicador Santafé 2.0.2 revisão 2 — fixtures temporárias isoladas'
 echo '==> Conferindo a distribuição e compilando sem alterar a instalação'
 python3 testes/integracao/testar_distribuicao.py "$PACOTES/santafe-2.0.2.tar.gz" "$PACOTES/santafe-2.0.2.zip"
 mkdir -p "$TRABALHO/fonte-publica"

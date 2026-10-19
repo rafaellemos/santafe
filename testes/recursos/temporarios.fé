@@ -1,0 +1,23 @@
+-- Fixtures privadas por execução, inclusive ao alternar usuário comum e sudo.
+-- mktemp cria o diretório atomicamente (0700) nos alvos POSIX homologados.
+retorne função(ensaio)
+    local processo = garanta(es.pAbra("mktemp -d /tmp/santafe-fixture-XXXXXXXX", "leitura"))
+    local raiz = processo:leia("*linha")
+    garanta(processo:feche(), "mktemp não conseguiu preparar a fixture")
+    garanta(raiz e raiz:separe("^/tmp/santafe%-fixture%-[A-Za-z0-9]+$"), "caminho temporário inesperado")
+    local arquivos = {}
+    local função caminho(nome)
+        garanta(tipo(nome) == "colar" e nome:separe("^[A-Za-z0-9_.-]+$")
+            e nome ~= "." e nome ~= "..", "nome de fixture inválido")
+        local destino = raiz .. "/" .. nome
+        arquivos[destino] = verdadeiro
+        retorne destino
+    fim
+    local ok, falha = proteja(ensaio, caminho)
+    para destino em pares(arquivos) início
+        so.remova(destino)
+    fim
+    local limpa, falhaLimpeza = so.remova(raiz)
+    garanta(ok, falha)
+    garanta(limpa, falhaLimpeza)
+fim

@@ -126,7 +126,8 @@ def prepare(source, snapshot, prefix, downloads, system, site, public, out, owne
             add(file, site.parent / "versoes" / VERSION / file.relative_to(snapshot),
                 f"{owner}:{owner}", stat.S_IMODE(file.stat().st_mode), immutable=True)
     manifest = out / "release.json"
-    manifest.write_text(json.dumps(dict(version=VERSION, sls="0.1.1", vscode="1.0.6", sublime="1.0.13",
+    manifest.write_text(json.dumps(dict(version=VERSION, publication_revision=2,
+        source_tag="v2.0.2-r2", sls="0.1.1", vscode="1.0.6", sublime="1.0.13",
         downloads=hashes, source=str(site.parent / "versoes" / VERSION),
         wasm_url=BASE_WASM, restarted_services=["sfdev.service"],
         persistent_services_not_restarted=True), ensure_ascii=False, indent=2) + "\n")

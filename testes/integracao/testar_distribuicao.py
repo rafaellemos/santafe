@@ -31,6 +31,7 @@ with tarfile.open(sys.argv[1]) as archive:
             assert name.endswith('/testes/recursos/tls-local-chave.pem'), name
         assert not re.search(rb'(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36,})', data), name
     for required in ['docs/manual.html', 'docs/validar-manual.py', 'ferramentas/sls/sls.fé',
+                     'testes/recursos/temporarios.fé',
                      'extensões/vscode/vendor/vscode-oniguruma/release/onig.wasm',
                      'extensões/vscode/vendor/vscode-oniguruma/LICENSE.txt',
                      'extensões/vscode/vendor/vscode-textmate/LICENSE.md',

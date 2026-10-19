@@ -28,7 +28,7 @@ tar --no-same-owner -xzf "$PACOTES/santafe-2.0.2.tar.gz" -C "$TRABALHO"
 export SANTAFE_PACOTES_FECHAMENTO="$PACOTES"
 exec bash "$TRABALHO/santafe-2.0.2/operação/publicar-fechamento-2.0.2.sh" "${1:-publicar}"
 '''
-target = dist / "publicar-fechamento-santafe-2.0.2.sh"
+target = dist / "publicar-fechamento-santafe-2.0.2-v2.sh"
 target.write_text(launcher, encoding="utf-8")
 target.chmod(0o755)
 print(target)

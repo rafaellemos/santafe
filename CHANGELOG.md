@@ -6,6 +6,10 @@ Revisão corretiva da linha 2.0, sem novas funcionalidades nesta etapa de
 fechamento. A instalação no servidor é uma etapa separada do registro Git;
 consulte [as notas de entrega](docs/LANCAMENTO-2.0.2.md).
 
+Revisão de publicação 2 (`v2.0.2-r2`): fixtures de imagem, RPDF e Pulso
+isoladas por execução, sem colisão entre o ensaio comum e a publicação com
+sudo. Nenhuma alteração de linguagem; proteção de temporários do Linux mantida.
+
 - versão pública do executável corrigida; layout de bibliotecas e ABI preservados;
 - grafemas Unicode 17.0.0 com tabelas oficiais, GB9c e ensaio de todas as fronteiras;
 - separador binário de `colar.junte` e precisão inteira de `tabela.maiorÍndice`;

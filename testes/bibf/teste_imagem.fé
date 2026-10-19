@@ -1,18 +1,22 @@
 módulo.caminho = "bibs/bibf/?.fé;" .. módulo.caminho
 local imagem = importe "imagem"
 local caminhoJPEG = "testes/recursos/mat-santafe.jpg"
+local temporários = executeArquivo("testes/recursos/temporarios.fé")
 
-imagem.salve("/tmp/santafe-png-rgba.png", "png", 64, 48, função(x, y)
+temporários(função(caminho)
+local caminhoPNG = caminho("rgba.png")
+
+imagem.salve(caminhoPNG, "png", 64, 48, função(x, y)
     retorne x * 4, y * 5, 180, (x + y) * 255 // 112
 fim)
 
-local figura = imagem.leia("/tmp/santafe-png-rgba.png")
+local figura = imagem.leia(caminhoPNG)
 garanta(figura.formato == "png" e figura.largura == 64 e figura.altura == 48)
 garanta(figura.alfa[1] < 255 e figura.alfa[#figura.alfa] == 255)
-garanta(imagem.identifique("/tmp/santafe-png-rgba.png") == "png")
+garanta(imagem.identifique(caminhoPNG) == "png")
 garanta(imagem.identifique(caminhoJPEG) == "jpeg")
 
-local pngPDF = imagem.paraPDF("/tmp/santafe-png-rgba.png")
+local pngPDF = imagem.paraPDF(caminhoPNG)
 garanta(pngPDF.bitsPorComponente == 8)
 garanta(pngPDF.ticosPorComponente == pngPDF.bitsPorComponente)
 
@@ -27,3 +31,4 @@ local svg = [[<svg width="120" height="80" viewBox="0 0 120 80">
 local vetor = imagem.leia(svg, verdadeiro)
 garanta(vetor.formato == "svg" e vetor.largura == 120 e #vetor.elementos == 3)
 mostre("Imagem PNG/JPEG/SVG:", figura.largura, figura.altura, vetor.largura, vetor.altura)
+fim)

@@ -59,11 +59,26 @@ publicação restaura os arquivos anteriores a partir da cópia privada.
 Para publicar, após conferir os três arquivos em `/tmp`:
 
 ```sh
-sudo bash /tmp/publicar-fechamento-santafe-2.0.2.sh
+sudo bash /tmp/publicar-fechamento-santafe-2.0.2-v2.sh
 ```
 
 O mesmo lançador aceita `--preflight` sem sudo para repetir a compilação e
 as verificações em diretório temporário, sem instalar nem reiniciar serviços.
+
+### Revisão 2 do fechamento
+
+A primeira tentativa com `sudo` parou antes da instalação: fixtures com nomes
+fixos em `/tmp` pertenciam a `rafael`, e `fs.protected_regular=2` impediu sua
+reabertura por root. A revisão 2 usa diretórios privados criados atomicamente
+para os ensaios de imagem, RPDF e Pulso, com limpeza após sucesso ou falha e
+regressão concorrente. Não desativa a proteção do Linux nem remove fixtures
+históricas. Núcleo, ABI, SLS e editores mantêm suas versões e implementações.
+
+O registro original `v2.0.2` permanece intacto; `v2.0.2-r2` identifica os fontes
+com essa correção de testes/publicação. Os pacotes 2.0.2 ainda não haviam sido
+publicados no portal; o lançador novo fixa suas novas somas SHA-256. A guarda
+de imutabilidade continua recusando trocar um arquivo público já existente
+com conteúdo diferente.
 
 ## Homologação e limites
 

@@ -1,0 +1,33 @@
+local temporários = executeArquivo("testes/recursos/temporarios.fé")
+local primeiro, segundo, interrompido
+
+local função grave(caminho)
+    local arquivo = garanta(es.abra(caminho, "escrita"))
+    garanta(arquivo:escreva("fixture sintética"))
+    garanta(arquivo:feche())
+fim
+
+temporários(função(caminho)
+    primeiro = caminho("mesmo.png")
+    grave(primeiro)
+    temporários(função(outro)
+        segundo = outro("mesmo.png")
+        garanta(primeiro ~= segundo, "fixtures colidiram")
+        grave(segundo)
+    fim)
+    garanta(não es.abra(segundo, "leitura"), "fixture interna não removida")
+    garanta(não proteja(caminho, "../alheio"))
+    garanta(não proteja(caminho, "/tmp/alheio"))
+    garanta(não proteja(caminho, ".."))
+    caminho("nao-criado.txt")
+fim)
+garanta(não es.abra(primeiro, "leitura"), "fixture externa não removida")
+
+local ok, falha = proteja(temporários, função(caminho)
+    interrompido = caminho("falha.pdf")
+    grave(interrompido)
+    erro("falha prevista na fixture")
+fim)
+garanta(não ok e falha:procure("falha prevista na fixture", 1, verdadeiro))
+garanta(não es.abra(interrompido, "leitura"), "falha deixou arquivo temporário")
+mostre("Temporários privados: isolamento, limites e limpeza após falha: ok")
