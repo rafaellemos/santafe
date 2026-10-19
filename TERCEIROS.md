@@ -42,3 +42,10 @@ As propriedades e os testes de segmentação em grafemas vêm do Unicode Charact
 Database 17.0.0. Os arquivos originais, seus avisos de autoria e a licença Unicode
 estão em `ferramentas/unicode/17.0.0/`. A tabela C é reproduzida pelo gerador
 `ferramentas/gerar_unicode.py`, sem depender de acesso à rede.
+
+## Realce dos editores
+
+O pacote VS Code distribui `vscode-textmate` 9.3.2 e `vscode-oniguruma` 1.7.0,
+incluindo seu runtime WebAssembly. As licenças MIT e avisos de dependências
+acompanham os arquivos em `extensões/vscode/vendor/`. Veja o README dessa pasta.
+As gramáticas HTML/JavaScript são usadas da instalação do editor.

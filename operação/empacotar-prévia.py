@@ -38,6 +38,9 @@ CAMINHOS_IGNORADOS = {
     Path("src/santafe.worker.js"),
     Path("src/santafe.data"),
 }
+RECURSOS_DISTRIBUIDOS = {
+    Path("extensões/vscode/vendor/vscode-oniguruma/release/onig.wasm"),
+}
 EXIGIDOS = {
     Path("Makefile"),
     Path("README.md"),
@@ -47,11 +50,16 @@ EXIGIDOS = {
     Path("extensões/vscode/extension.js"),
     Path("extensões/sublime/Santafe.py"),
     Path("extensões/sublime/Santafe.sublime-syntax"),
+    *RECURSOS_DISTRIBUIDOS,
 }
 DATA_FIXA = 1792195200  # 2026-10-17T00:00:00Z; permite artefatos repetíveis.
 
 
 def ignorado(relativo: Path) -> bool:
+    if relativo in RECURSOS_DISTRIBUIDOS:
+        return False  # runtime licenciado do editor, não executável do núcleo
+    if relativo.parts[:2] == ("docs", "evidencias"):
+        return True  # capturas/relatórios locais não pertencem ao pacote público
     if relativo in {Path('testes/recursos/tls-local-certificado.pem'),
                     Path('testes/recursos/tls-local-chave.pem')}:
         return False  # certificados públicos de teste; nunca usar em produção

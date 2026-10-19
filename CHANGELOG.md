@@ -1,18 +1,27 @@
 # Histórico de alterações
 
-## 2.0.2 — candidata auditada em 2026-10-17 (não publicada)
+## 2.0.2 — fechamento em 2026-10-19
+
+Revisão corretiva da linha 2.0, sem novas funcionalidades nesta etapa de
+fechamento. A instalação no servidor é uma etapa separada do registro Git;
+consulte [as notas de entrega](docs/LANCAMENTO-2.0.2.md).
 
 - versão pública do executável corrigida; layout de bibliotecas e ABI preservados;
 - grafemas Unicode 17.0.0 com tabelas oficiais, GB9c e ensaio de todas as fronteiras;
 - separador binário de `colar.junte` e precisão inteira de `tabela.maiorÍndice`;
 - SLS 0.1.1: ciclo de vida, erros JSON-RPC, limite de cabeçalho, versões de documento;
-- VS Code 1.0.1: reinício do SLS, confiança do workspace, catálogo completo e realce;
-- Sublime 1.0.8: catálogo C/Fé, realce, fechamento de blocos e requisito Python corrigido;
+- VS Code 1.0.6 e Sublime 1.0.13: correções já homologadas de SLS, edição,
+  catálogo C/Fé com 610 entradas, gabaritos ®/Ⓡ e HTML/JS concatenados;
+- paleta suave opcional para HTML/JS e correção da herança de estilo dos gabaritos;
 - instalação sem sucesso falso, sem REPL final e sem modificar `/etc/gai.conf`;
 - fonte do manual versionado em `docs/`, empacotamento NFC e testes independentes de chaves locais;
 - ensaios de integração MariaDB atualizados e configuração inicial de CI;
-- suítes aprovadas em macOS e Debian, com MariaDB isolado; publicação e
-  verificação gráfica final dos editores ainda pendentes.
+- suítes aprovadas em macOS e Debian, com MariaDB isolado; verificação gráfica
+  dos editores concluída em macOS Intel;
+- distribuição inclui o runtime Oniguruma do VS Code, antes omitido pela
+  exclusão genérica de arquivos WebAssembly; licenças preservadas;
+- documentação e publicação reversível consolidam núcleo 2.0.2, SLS 0.1.1,
+  manual, downloads e executor WebAssembly, sem modificar bancos ou aplicações empresariais.
 
 ## 2.0.1 — 2026-10-17
 

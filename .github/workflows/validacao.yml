@@ -37,5 +37,9 @@ jobs:
       - run: python3 extensões/vscode/testes/testar_extensao.py
       - run: node extensões/vscode/testes/testar_comportamento.js
       - run: node extensões/vscode/testes/testar_sls.js
+      - run: node extensões/vscode/testes/testar_api_paletas.js
+      - run: python3 extensões/sublime/testes/testar_recorte.py
+      - run: python3 testes/integracao/testar_publicador_editores.py
+      - run: python3 testes/integracao/testar_fechamento.py
       - run: make dist
-      - run: python3 testes/integracao/testar_distribuicao.py dist/santafe-2.0.2.tar.gz
+      - run: python3 testes/integracao/testar_distribuicao.py dist/santafe-2.0.2.tar.gz dist/santafe-2.0.2.zip

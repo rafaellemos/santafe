@@ -47,9 +47,11 @@ A linha 2.0 tem como plataformas-alvo:
 - macOS com Clang;
 - Debian GNU/Linux com GCC.
 
-A candidata 2.0.2 passou nas suítes em macOS e Debian, incluindo MariaDB isolado.
-A publicação e a revisão gráfica final dos editores ainda estão pendentes.
-Veja `docs/AUDITORIA-2.0-20261017.md`.
+A revisão 2.0.2 passou nas suítes em macOS Intel e Debian, incluindo MariaDB
+isolado. VS Code 1.0.6 e Sublime 1.0.13 foram publicados e conferidos nos
+editores reais, incluindo HTML/JS concatenados e a paleta suave opcional.
+Consulte [o fechamento da versão](docs/LANCAMENTO-2.0.2.md) para distinguir
+o pacote aprovado da instalação operacional e conhecer os limites ensaiados.
 
 O fonte conserva pontos de preparação para outras plataformas, mas Windows ainda não faz parte da matriz validada desta versão.
 
@@ -98,7 +100,7 @@ santafé exemplos/01-ola.fé
 
 O servidor de linguagem é iniciado pelo editor usando `santafé-sls` em `stdio`.
 Ele acompanha a abertura, edição e salvamento dos arquivos e mostra erros de
-sintaxe sem executar o programa. As extensões VS Code 1.0.1 e Sublime Text 1.0.8 também oferecem conclusões da API pública, ajuda rápida e navegação local
+sintaxe sem executar o programa. As extensões VS Code 1.0.6 e Sublime Text 1.0.13 também oferecem conclusões da API pública, ajuda rápida e navegação local
 de funções, mesmo sem depender do SLS. Veja [SLS](docs/SLS.md),
 [`extensões/vscode`](extensões/vscode) e [`extensões/sublime`](extensões/sublime).
 
@@ -143,7 +145,7 @@ de funções, mesmo sem depender do SLS. Veja [SLS](docs/SLS.md),
 - [Auditoria do manual e da API pública](docs/AUDITORIA-MANUAL-2026-10-02.md)
 - [SLS — Servidor de Linguagem Santafé](docs/SLS.md)
 - [Auditoria 2.0](docs/AUDITORIA-2.0-20261017.md)
-- [Lançamento 2.0.1](docs/LANCAMENTO-2.0.1.md)
+- [Lançamento 2.0.2](docs/LANCAMENTO-2.0.2.md)
 - [API pública das bibliotecas Fé](docs/API-PUBLICA-DAS-BIBLIOTECAS-FE.md)
 
 ## Estrutura

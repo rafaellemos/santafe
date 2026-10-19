@@ -1098,8 +1098,10 @@ mostre(`Marca literal: \®`)
                 <div class="sf-nota">Se uma expressão aberta com <code>®{</code> não tiver o <code>}</code> final, o compilador informa <code>gabarito não finalizado</code>.</div>
 
                 <h3 id="notas-sls">Servidor de Linguagem (SLS)</h3>
+                <p>Nos pacotes de editor VS Code 1.0.6 e Sublime 1.0.13, os gabaritos realçam <code>®var</code> e <code>Ⓡvar</code> por inteiro, incluindo o curinga, em laranja e sem itálico. Em <code>®{expressão}</code> ou <code>Ⓡ{expressão}</code>, o curinga e as chaves recebem esse estilo, preservando o realce do código interno. Também há realce HTML/JavaScript em colares: HTML é reconhecido pela marcação na linha de abertura, inclusive após texto e com <code>&lt;!doctype&gt;</code> minúsculo; JavaScript pelo comentário inicial <code>/* javascript */</code> ou <code>/* js */</code>. Para indicar explicitamente o conteúdo, inclusive na linha seguinte, escreva <code>local página = --[[html]] [[</code> ou <code>local código = --[[javascript]] [[</code>. A anotação é um comentário Santafé e não altera o núcleo; <code>--[[js]]</code> não é uma anotação reconhecida nesta versão. Esse recurso é visual; não acrescenta análise semântica HTML/JS ao SLS nem interpolação a colares comuns. Ambos os editores preservam o contexto de atributos HTML e comentários JS entre fragmentos de uma mesma concatenação, mantendo as expressões intermediárias em Santafé. O VS Code usa tokens semânticos, habilitados por padrão para Santafé. O Sublime usa regiões de primeiro plano com gramáticas nativas; os cinco esquemas de cores nativos são preparados automaticamente, e esquemas personalizados precisam da regra de fundo transparente documentada no pacote. Sem essa camada, conserva-se o realce básico dos colares e seus delimitadores. Expressões dinâmicas são espaços reservados, não HTML/JS avaliado. Não há execução do código. Os limites de tamanho e tempo do realce estão documentados no pacote de cada editor.</p>
+                <p>Na paleta de comandos dos dois editores, <strong>Santafé: Paleta de HTML e JavaScript embutidos → Paleta suave</strong> aplica cores mais suaves apenas ao código embutido. O padrão acompanha o tema; arquivos HTML e JavaScript independentes não são alterados. No Monokai, <code>função</code> recebe ciano e itálico.</p>
                 <p>O <code>santafé-sls</code> é iniciado localmente pelo editor e conversa por entrada e saída padrão usando LSP (JSON-RPC 2.0). Ele não abre porta de rede, não transmite o fonte a terceiros e não executa o programa que está sendo editado.</p>
-                <div class="sf-nota">Nesta primeira versão, o SLS acompanha abertura, edição e salvamento de documentos e informa erros sintáticos em tempo real. Autocompletar, navegação para definição, referências, símbolos, formatação e depuração dependem da futura camada semântica.</div>
+                <div class="sf-nota">O SLS 0.1.1 acompanha abertura, edição e salvamento de documentos e informa erros sintáticos em tempo real. As extensões já oferecem conclusões da API pública, ajuda e navegação local de funções, independentemente do SLS. Análise de tipos e importações entre arquivos, referências globais, formatação e depuração não fazem parte deste perfil.</div>
 
                 <h3 id="notas-bibliotecas">Bibliotecas carregadas automaticamente</h3>
                 <p>Ficam disponíveis como globais assim que o interpretador inicia — não precisam de <code>importe(...)</code>:</p>
@@ -13096,10 +13098,10 @@ mostre(válido, motivo)</code></pre>
 <script>
 window.Module = window.Module || {};
 Module.locateFile = function (path) {
-  return "/estático/wasm/" + path + "?v=20261002.1";
+  return "/estático/wasm/2.0.2/" + path;
 };
 </script>
-<script src="/estático/wasm/santafe.js?v=20261002.1"></script>
+<script src="/estático/wasm/2.0.2/santafe.js"></script>
 
 <script>
 (function () {

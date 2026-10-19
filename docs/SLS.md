@@ -4,7 +4,7 @@ O SLS roda localmente, como processo filho do editor, e conversa pelo protocolo
 LSP (JSON-RPC 2.0 sobre entrada e saída padrão). Ele não abre porta de rede,
 não executa o código editado nem envia o fonte a terceiros.
 
-## Perfil estável inicial
+## Perfil 0.1.1
 
 O perfil inicial atende `initialize`, `shutdown` e o ciclo completo de documento:
 
@@ -34,7 +34,7 @@ esperada pelo VS Code e por clientes LSP compatíveis.
 ### VS Code
 
 O cliente do VS Code fica em
-[`extensões/vscode`](../extensões/vscode). A extensão 1.0.1 reconhece arquivos
+[`extensões/vscode`](../extensões/vscode). A extensão 1.0.6 reconhece arquivos
 `.fé` e `.fe`, aplica realce, trechos e regras básicas de edição, oferece
 conclusões das palavras da linguagem e da API pública, ajuda rápida, estrutura
 de funções e navegação para funções declaradas no arquivo aberto. Ela inicia
@@ -57,7 +57,7 @@ local do próprio repositório, basta `make cbin`: a extensão usa automaticamen
 
 ### Sublime Text
 
-O pacote oficial está em [`extensões/sublime`](../extensões/sublime). Ele
+O pacote oficial 1.0.13 está em [`extensões/sublime`](../extensões/sublime). Ele
 reconhece `.fé` e `.fe`, fornece realce, snippets, conclusões da API pública,
 ajuda curta e os comandos de execução e verificação sintática em
 **Tools → Build System**.
