@@ -1,0 +1,16 @@
+%YAML 1.2
+---
+scope: source.js.santafe-template
+version: 2
+hidden: true
+extends: Packages/JavaScript/JavaScript.sublime-syntax
+contexts:
+  prototype:
+    - meta_prepend: true
+    - include: interpolacoes-santafe
+  interpolacoes-santafe:
+    - include: scope:source.santafe#escape-colar
+    - include: scope:source.santafe#interpolação
+  string-content:
+    - meta_prepend: true
+    - include: interpolacoes-santafe

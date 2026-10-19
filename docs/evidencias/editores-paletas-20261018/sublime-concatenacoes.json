@@ -1,0 +1,55 @@
+{
+  "build": "4215",
+  "pacote": "1.0.13",
+  "casos": 43,
+  "tokens": 544,
+  "falhas": [],
+  "cores": {
+    "Monokai": {
+      "background": "#272822",
+      "bold": false,
+      "foreground": "#e7db74",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 56
+    },
+    "Mariana": {
+      "background": "#2f3740",
+      "bold": false,
+      "foreground": "#99c794",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Mariana.sublime-color-scheme",
+      "source_line": 59
+    },
+    "Celeste": {
+      "background": "#fefefe",
+      "bold": false,
+      "foreground": "#957350",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Celeste.sublime-color-scheme",
+      "source_line": 105
+    },
+    "Breakers": {
+      "background": "#fbfcfc",
+      "bold": false,
+      "foreground": "#80b979",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Breakers.sublime-color-scheme",
+      "source_line": 60
+    },
+    "Sixteen": {
+      "background": "#fefefe",
+      "bold": false,
+      "foreground": "#9dbf40",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Sixteen.sublime-color-scheme",
+      "source_line": 116
+    }
+  },
+  "edicao_e_limpeza": true
+}

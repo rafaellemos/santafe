@@ -38,7 +38,7 @@ def catálogo() -> dict:
                     {
                         "version": VERSAO,
                         "url": f"{ESTATICO_PUBLICO}/sublime/{SAÍDA_CONTROLE.name}",
-                        "date": "2026-10-17 21:00:00",
+                        "date": "2026-10-18 19:00:00",
                         "sublime_text": METADADOS["sublime_text"],
                         # O arquivo .python-version no pacote evita um defeito
                         # do Package Control 4.2.8 ao avaliar esta lista em ST 4215.
@@ -66,14 +66,6 @@ def exporte_github() -> None:
         shutil.copy2(origem, destino)
     shutil.copy2(RAIZ / "CHANGELOG.md", GITHUB / "CHANGELOG.md")
     escreva(
-        GITHUB / "README.md",
-        "# Santafé para Sublime Text\n\n"
-        "Repositório público do pacote oficial da linguagem Santafé para Sublime "
-        "Text. A versão e os arquivos distribuídos são publicados em tags Git.\n\n"
-        "Instale pela origem oficial: `Package Control: Add Repository` → "
-        "`https://xn--santaf-gva.dev.br/est%C3%A1tico/sublime/packages.json`.\n",
-    )
-    escreva(
         ENTRADA_CONTROLE,
         json.dumps(
             {
@@ -90,7 +82,7 @@ def exporte_github() -> None:
             ensure_ascii=False,
             indent=2,
         )
-        + "\\n",
+        + "\n",
     )
 
 

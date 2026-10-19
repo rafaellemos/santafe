@@ -1,0 +1,18 @@
+{
+  "escura": {
+    "Tag": "#9BB5C7", "Attribute": "#B5C2B8", "Comment": "#9B9B92",
+    "String": "#B6C493", "Number": "#C7AD92", "Constant": "#C7AD92",
+    "Keyword": "#B7A6C9", "Storage": "#B7A6C9", "Operator": "#B3B3AB",
+    "Function": "#9CBFBA", "Type": "#9CBFBA", "Support": "#9CBFBA",
+    "Variable": "#C3C4BD", "Parameter": "#C7AD92", "Property": "#B5C2B8",
+    "Entity": "#C7AD92", "Punctuation": "#B3B3AB", "Text": "#C3C4BD"
+  },
+  "clara": {
+    "Tag": "#425D71", "Attribute": "#4E6254", "Comment": "#68685F",
+    "String": "#4E642C", "Number": "#77522E", "Constant": "#77522E",
+    "Keyword": "#705482", "Storage": "#705482", "Operator": "#5B5B53",
+    "Function": "#35675F", "Type": "#35675F", "Support": "#35675F",
+    "Variable": "#4C4F45", "Parameter": "#77522E", "Property": "#4E6254",
+    "Entity": "#77522E", "Punctuation": "#5B5B53", "Text": "#4C4F45"
+  }
+}

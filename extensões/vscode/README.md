@@ -1,6 +1,6 @@
 # Santafé para Visual Studio Code
 
-Extensão Santafé 1.0.1 para arquivos (`.fé` e `.fe`). Ela oferece:
+Extensão Santafé 1.0.6 para arquivos (`.fé` e `.fe`). Ela oferece:
 
 - reconhecimento de arquivos, comentários, pares e indentação;
 - realce de sintaxe, trechos e ícone próprio;
@@ -14,6 +14,29 @@ Salve o arquivo com a extensão `.fé` ou `.fe` — ou escolha **Santafé** no
 seletor de linguagem do canto inferior direito — para ativar esses recursos.
 
 ## Instalação
+
+### Cores e cobertura da API — 1.0.6
+
+O realce usa o mesmo catálogo C/Fé das conclusões (610 entradas nesta versão).
+Chamadas com nomes definidos pelo usuário, inclusive aliases de bibliotecas,
+também são realçadas como chamadas. Isso é classificação sintática, não resolução
+de tipos/importações nem garantia de que uma função exista em execução.
+
+Na paleta de comandos, escolha **Santafé: Paleta de HTML e JavaScript embutidos**:
+`tema` mantém as cores do editor (padrão); `suave` aplica uma paleta menos saturada
+somente ao conteúdo HTML/JS dos colares. Também há a configuração
+`santafe.highlight.embeddedPalette`. Arquivos `.html`/`.js` não são alterados.
+As paletas têm variantes para fundo claro/escuro.
+
+Os marcadores `®var`/`Ⓡvar`, as chaves externas de `®{…}`/`Ⓡ{…}` e nomes de
+métodos após `:` são laranja, sem itálico. Dentro das chaves, continua o realce
+Santafé: colares internos são colares, números são números. No perfil Monokai,
+`função` é ciano e itálico. Não são gravadas preferências sem uma escolha na
+paleta; as decorações visuais são removidas ao desativar a extensão.
+
+Para regenerar as regras a partir do fonte, execute na raiz do repositório:
+`python3 extensões/gerar_embutidos.py`, `python3 extensões/gerar_realce_api.py` e
+`python3 extensões/gerar_paletas.py`, nesta ordem.
 
 O SLS é um processo local. Instale o núcleo Santafé na mesma máquina onde o
 VS Code está rodando, de forma que `santafé-sls` esteja no `PATH`. Em uma sessão
@@ -36,7 +59,7 @@ Gere o pacote sem depender de Node.js:
 
 ```sh
 python3 empacotar.py
-code --install-extension dist/santafe-1.0.1.vsix
+code --install-extension dist/santafe-1.0.6.vsix
 ```
 
 Também é possível escolher **Instalar do VSIX...** na visualização Extensions do
@@ -55,7 +78,68 @@ configurações do VS Code. `santafe.languageServer.args` acrescenta argumentos
 ao comando. Use `santafe.languageServer.trace` para inspecionar os quadros LSP
 em **Saída → Santafé SLS**.
 
-## Limites da versão 1.0.1
+## Gabaritos, HTML e JavaScript
+
+O realce distingue `®nome`, `Ⓡnome` e `®{expressão}` nos gabaritos entre
+acentos graves. Chaves aninhadas são balanceadas; `\®` permanece literal.
+O curinga integra o realce de `®nome`; `®{` e `}` recebem o estilo de operador,
+enquanto o conteúdo da expressão mantém seu próprio realce.
+Colares com aspas ou colchetes não passam a interpolar por serem realçados.
+Para nomes Unicode na forma curta, use a expressão `®{índice}`: o núcleo atual
+reconhece nomes ASCII na forma `®var`.
+
+HTML é reconhecido por uma tag, comentário HTML ou `<!DOCTYPE`/`<!doctype>`
+na linha de abertura, inclusive depois de texto como `[[ | Site</title>]]`.
+A procura não ultrapassa o delimitador do colar. JavaScript é reconhecido pelo comentário
+inicial `/* javascript */` (ou `/* js */`). Para começar na linha seguinte,
+coloque a anotação `--[[html]]` ou `--[[javascript]]` antes do delimitador,
+na mesma linha:
+
+```santafé
+local página = --[[html]] [[
+<h1>Olá!</h1>
+<script>const total = 3;</script>
+]]
+local programa = --[[javascript]] [[
+const saudação = "Olá!";
+console.log(saudação);
+]]
+local modelo = `<h1 class="®nome">®{tamanho(nome)}</h1>`
+```
+
+São comentários válidos do Santafé, não uma nova sintaxe do núcleo. Use colares
+longos para não precisar escapar aspas. O recurso fornece **realce**, não
+diagnósticos ou autocompletar semântico de HTML/JS. O SLS continua verificando
+o programa Santafé, sem executar o conteúdo dos colares.
+
+## Concatenações e realce embutido
+
+A versão 1.0.5 delimita os colares Santafé antes de realçar HTML/JS. Assim,
+atributos e comentários podem continuar após `.. expressão ..`, sem capturar
+o código intermediário nem o código depois do colar:
+
+```santafé
+local html = [[<b class="prefixo-]] .. nome .. [[-final">Olá</b>]]
+local js = --[[javascript]] [[/* início ]] .. nome .. [[ final */ const n=1;]]
+```
+
+O contexto é preservado dentro da mesma expressão concatenada, não entre
+atribuições ou funções distintas. Expressões dinâmicas são espaços reservados:
+o editor não executa o programa nem adivinha tags/aspas que elas produziriam.
+As gramáticas HTML/JS/CSS são as nativas do editor; o runtime acompanha o VSIX.
+Não é necessário instalar Node, bibliotecas ou outro servidor de linguagem.
+
+As cores são aplicadas pela API pública de tokens semânticos do VS Code,
+mas o recurso é **léxico**, independente do SLS. A configuração de linguagem
+habilita `editor.semanticHighlighting.enabled`; se o usuário desabilitá-la,
+o texto conserva o realce básico Santafé, com delimitadores corretos.
+O mesmo fallback vale para documentos acima de 1.000.000 unidades UTF-16,
+expressões com profundidade acima de 128, linhas virtuais acima de 20.000
+unidades ou tokenização que exceda o orçamento de tempo. Limites do realce não
+restringem o compilador. Espaços de trabalho não confiáveis conservam somente
+o TextMate, pois esta extensão exige confiança para ativar suas funcionalidades.
+
+## SLS
 
 O SLS atual analisa sintaxe no conteúdo aberto, alterado ou salvo e não executa
 o programa. As conclusões e a navegação desta extensão são locais; referências,

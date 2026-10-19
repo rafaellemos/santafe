@@ -1,0 +1,451 @@
+{
+  "versão": "1.0.5",
+  "tokens": [
+    {
+      "line": 1,
+      "character": 28,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 1,
+      "character": 29,
+      "length": 3,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 1,
+      "character": 32,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 1,
+      "character": 33,
+      "length": 5,
+      "tipo": "santafeEmbeddedAttribute"
+    },
+    {
+      "line": 1,
+      "character": 38,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 1,
+      "character": 39,
+      "length": 1,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 1,
+      "character": 40,
+      "length": 8,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 1,
+      "character": 64,
+      "length": 6,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 1,
+      "character": 70,
+      "length": 1,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 1,
+      "character": 71,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 2,
+      "character": 0,
+      "length": 2,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 2,
+      "character": 2,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 2,
+      "character": 3,
+      "length": 2,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 2,
+      "character": 5,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 2,
+      "character": 6,
+      "length": 13,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 2,
+      "character": 19,
+      "length": 2,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 2,
+      "character": 21,
+      "length": 2,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 2,
+      "character": 23,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 0,
+      "length": 2,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 2,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 3,
+      "length": 6,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 3,
+      "character": 9,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 10,
+      "length": 2,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 3,
+      "character": 12,
+      "length": 12,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 3,
+      "character": 43,
+      "length": 10,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 3,
+      "character": 53,
+      "length": 2,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 3,
+      "character": 55,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 3,
+      "character": 56,
+      "length": 5,
+      "tipo": "santafeEmbeddedStorage"
+    },
+    {
+      "line": 3,
+      "character": 61,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 3,
+      "character": 62,
+      "length": 5,
+      "tipo": "santafeEmbeddedVariable"
+    },
+    {
+      "line": 3,
+      "character": 67,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 3,
+      "character": 68,
+      "length": 1,
+      "tipo": "santafeEmbeddedOperator"
+    },
+    {
+      "line": 3,
+      "character": 69,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 3,
+      "character": 70,
+      "length": 1,
+      "tipo": "santafeEmbeddedNumber"
+    },
+    {
+      "line": 3,
+      "character": 71,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 72,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 73,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 3,
+      "character": 74,
+      "length": 6,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 3,
+      "character": 80,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 4,
+      "character": 0,
+      "length": 2,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 4,
+      "character": 2,
+      "length": 3,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 4,
+      "character": 5,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 8,
+      "character": 34,
+      "length": 2,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 8,
+      "character": 36,
+      "length": 8,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 8,
+      "character": 60,
+      "length": 7,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 8,
+      "character": 67,
+      "length": 2,
+      "tipo": "santafeEmbeddedComment"
+    },
+    {
+      "line": 9,
+      "character": 0,
+      "length": 5,
+      "tipo": "santafeEmbeddedStorage"
+    },
+    {
+      "line": 9,
+      "character": 5,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 9,
+      "character": 6,
+      "length": 5,
+      "tipo": "santafeEmbeddedVariable"
+    },
+    {
+      "line": 9,
+      "character": 11,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 9,
+      "character": 12,
+      "length": 1,
+      "tipo": "santafeEmbeddedOperator"
+    },
+    {
+      "line": 9,
+      "character": 13,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 9,
+      "character": 14,
+      "length": 2,
+      "tipo": "santafeEmbeddedNumber"
+    },
+    {
+      "line": 9,
+      "character": 16,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 10,
+      "character": 0,
+      "length": 7,
+      "tipo": "santafeEmbeddedVariable"
+    },
+    {
+      "line": 10,
+      "character": 7,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 10,
+      "character": 8,
+      "length": 3,
+      "tipo": "santafeEmbeddedFunction"
+    },
+    {
+      "line": 10,
+      "character": 11,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 10,
+      "character": 12,
+      "length": 5,
+      "tipo": "santafeEmbeddedVariable"
+    },
+    {
+      "line": 10,
+      "character": 17,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 10,
+      "character": 18,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 15,
+      "character": 16,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 15,
+      "character": 17,
+      "length": 3,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 15,
+      "character": 20,
+      "length": 1,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 15,
+      "character": 21,
+      "length": 5,
+      "tipo": "santafeEmbeddedAttribute"
+    },
+    {
+      "line": 15,
+      "character": 26,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 15,
+      "character": 27,
+      "length": 1,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 15,
+      "character": 33,
+      "length": 1,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 15,
+      "character": 50,
+      "length": 1,
+      "tipo": "santafeEmbeddedString"
+    },
+    {
+      "line": 15,
+      "character": 51,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 15,
+      "character": 52,
+      "length": 3,
+      "tipo": "santafeEmbeddedText"
+    },
+    {
+      "line": 15,
+      "character": 55,
+      "length": 2,
+      "tipo": "santafeEmbeddedPunctuation"
+    },
+    {
+      "line": 15,
+      "character": 57,
+      "length": 3,
+      "tipo": "santafeEmbeddedTag"
+    },
+    {
+      "line": 15,
+      "character": 60,
+      "length": 1,
+      "tipo": "santafeEmbeddedPunctuation"
+    }
+  ],
+  "ediçãoAoVivo": true,
+  "resultado": "ok"
+}

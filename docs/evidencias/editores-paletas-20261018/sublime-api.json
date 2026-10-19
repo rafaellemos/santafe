@@ -1,0 +1,88 @@
+{
+  "casos": 610,
+  "falhas": [],
+  "estilos": {
+    "®nome": {
+      "escopo": "source.santafe string.quoted.other.gabarito.santafe meta.interpolation.variable.santafe variable.parameter.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#fd971f",
+        "italic": false,
+        "source_column": 20,
+        "source_file": "Packages/Santafe/ColorSchemes/Monokai.sublime-color-scheme",
+        "source_line": 188
+      }
+    },
+    "Ⓡnome": {
+      "escopo": "source.santafe string.quoted.other.gabarito.santafe meta.interpolation.variable.santafe variable.parameter.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#fd971f",
+        "italic": false,
+        "source_column": 20,
+        "source_file": "Packages/Santafe/ColorSchemes/Monokai.sublime-color-scheme",
+        "source_line": 188
+      }
+    },
+    "®{": {
+      "escopo": "meta.interpolation.santafe meta.embedded.inline.santafe source.santafe punctuation.section.interpolation.begin.santafe keyword.operator.interpolation.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#fd971f",
+        "italic": false,
+        "source_column": 20,
+        "source_file": "Packages/Santafe/ColorSchemes/Monokai.sublime-color-scheme",
+        "source_line": 188
+      }
+    },
+    "Ⓡ{": {
+      "escopo": "meta.interpolation.santafe meta.embedded.inline.santafe source.santafe punctuation.section.interpolation.begin.santafe keyword.operator.interpolation.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#fd971f",
+        "italic": false,
+        "source_column": 20,
+        "source_file": "Packages/Santafe/ColorSchemes/Monokai.sublime-color-scheme",
+        "source_line": 188
+      }
+    },
+    "valor + mat": {
+      "escopo": "meta.interpolation.santafe meta.embedded.inline.santafe source.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#f8f8f2",
+        "italic": false,
+        "source_column": -1,
+        "source_file": "",
+        "source_line": -1
+      }
+    },
+    "valor + tamanho": {
+      "escopo": "meta.interpolation.santafe meta.embedded.inline.santafe source.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#f8f8f2",
+        "italic": false,
+        "source_column": -1,
+        "source_file": "",
+        "source_line": -1
+      }
+    },
+    "função": {
+      "escopo": "source.santafe meta.function.santafe storage.type.function.santafe ",
+      "estilo": {
+        "bold": false,
+        "foreground": "#66d9ef",
+        "italic": true,
+        "source_column": 20,
+        "source_file": "Packages/Santafe/ColorSchemes/Monokai.sublime-color-scheme",
+        "source_line": 193
+      }
+    }
+  },
+  "cores": {
+    "tema": "#f92472",
+    "suave": "#9bb5c7"
+  },
+  "reversivel": true
+}

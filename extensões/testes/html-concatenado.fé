@@ -1,0 +1,26 @@
+local web = importe "paodocafe.web"
+local páginas = {}
+
+local função cabeçalho(título)
+    retorne --[[html]] [[<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+  <meta name="theme-color" content="#5a2c12">
+  <meta name="description" content="Pão do Café — o sabor simples de se sentir em casa.">
+  <title>]] .. web.escapeHTML(título) .. [[ | Pão do Café</title>
+  <link rel="icon" href="/estático/paodocafe/imagens/marca-café.png">
+  <link rel="stylesheet" href="/estático/paodocafe/css/paodocafe.css?v=5">
+</head>
+<body><div class="pdc-página">]]
+fim
+
+função web.escapeHTML(valor)
+    retorne paraColar(valor ou ""):troque("&", "&amp;")
+        :troque("<", "&lt;"):troque(">", "&gt;")
+        :troque('"', "&quot;"):troque("'", "&#39;")
+fim
+
+local depois = verdadeiro
+mostre(depois)

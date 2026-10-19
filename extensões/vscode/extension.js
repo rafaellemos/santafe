@@ -6,6 +6,7 @@ const { spawn } = require("child_process");
 const vscode = require("vscode");
 
 const LINGUAGEM = "santafe";
+const VERSÃO_EXTENSÃO = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8")).version;
 
 /* O catálogo é gerado do manifesto da API pública. Ele não substitui uma
  * análise semântica: oferece, desde já, nomes confiáveis e independentes do
@@ -83,8 +84,8 @@ function contextoDeAcesso(documento, posição) {
 function nomesLocais(documento) {
   const nomes = new Set();
   const fonte = documento.getText();
-  const funções = /^\s*(?:local\s+)?função\s+([\p{L}_][\p{L}\p{N}_]*)/gmu;
-  const locais = /\blocal\s+([\p{L}_][\p{L}\p{N}_]*)/gu;
+  const funções = /^[\t ]*(?:local[\t ]+)?função[\t ]+([\p{L}_][\p{L}\p{M}\p{N}_]*)/gmu;
+  const locais = /\blocal\s+([\p{L}_][\p{L}\p{M}\p{N}_]*)/gu;
   for (const padrão of [funções, locais]) {
     let encontrado;
     while ((encontrado = padrão.exec(fonte)) !== null) nomes.add(encontrado[1]);
@@ -131,7 +132,7 @@ function conclusõesDoSantafé(documento, posição) {
 }
 
 function informaçãoDoSímbolo(documento, posição) {
-  const intervalo = documento.getWordRangeAtPosition(posição, /[\p{L}\p{N}_]+/u);
+  const intervalo = documento.getWordRangeAtPosition(posição, /[\p{L}\p{M}\p{N}_]+/u);
   if (!intervalo) return undefined;
   const palavra = documento.getText(intervalo);
   const acesso = contextoDeAcesso(documento, posição);
@@ -139,11 +140,11 @@ function informaçãoDoSímbolo(documento, posição) {
 }
 
 function símboloDaFunção(documento, nome) {
-  const padrão = /^\s*(?:local\s+)?função\s+([\p{L}_][\p{L}\p{N}_]*)/gmu;
+  const padrão = /^[\t ]*(?:local[\t ]+)?função[\t ]+([\p{L}_][\p{L}\p{M}\p{N}_]*)/gmu;
   let encontrado;
   while ((encontrado = padrão.exec(documento.getText())) !== null) {
     if (encontrado[1] !== nome) continue;
-    const início = documento.positionAt(encontrado.index + encontrado[0].indexOf(nome));
+    const início = documento.positionAt(encontrado.index + encontrado[0].length - nome.length);
     const fim = new vscode.Position(início.line, início.character + nome.length);
     return new vscode.Location(documento.uri, new vscode.Range(início, fim));
   }
@@ -152,13 +153,13 @@ function símboloDaFunção(documento, nome) {
 
 function símbolosDoDocumento(documento) {
   const símbolos = [];
-  const padrão = /^\s*(?:local\s+)?função\s+([\p{L}_][\p{L}\p{N}_]*)/gmu;
+  const padrão = /^[\t ]*(?:local[\t ]+)?função[\t ]+([\p{L}_][\p{L}\p{M}\p{N}_]*)/gmu;
   const fonte = documento.getText();
   let encontrado;
   while ((encontrado = padrão.exec(fonte)) !== null) {
     const início = documento.positionAt(encontrado.index);
     const nome = encontrado[1];
-    const posiçãoDoNome = new vscode.Position(início.line, início.character + encontrado[0].indexOf(nome));
+    const posiçãoDoNome = documento.positionAt(encontrado.index + encontrado[0].length - nome.length);
     const alcance = new vscode.Range(início, documento.lineAt(início.line).range.end);
     const seleção = new vscode.Range(posiçãoDoNome, new vscode.Position(posiçãoDoNome.line, posiçãoDoNome.character + nome.length));
     símbolos.push(new vscode.DocumentSymbol(nome, "função Santafé", vscode.SymbolKind.Function, alcance, seleção));
@@ -332,7 +333,7 @@ class ClienteSls {
         processId: process.pid,
         rootUri: vscode.workspace.workspaceFolders?.[0]?.uri.toString() ?? null,
         capabilities: { textDocument: { publishDiagnostics: { relatedInformation: false } } },
-        clientInfo: { name: "Santafé para VS Code", version: "1.0.1" }
+        clientInfo: { name: "Santafé para VS Code", version: VERSÃO_EXTENSÃO }
       }
     });
   }
@@ -481,6 +482,7 @@ class ClienteSls {
 let cliente;
 
 function activate(contexto) {
+  require("./realce-vscode").registre(vscode, contexto);
   cliente = new ClienteSls(contexto);
   for (const documento of vscode.workspace.textDocuments) cliente.registre(documento);
   cliente.inicie();
@@ -527,6 +529,14 @@ function activate(contexto) {
       }
     ),
     vscode.commands.registerCommand("santafe.reiniciarSLS", () => cliente.reinicie()),
+    vscode.commands.registerCommand("santafe.paletaEmbutida", async () => {
+      const opção = await vscode.window.showQuickPick([
+        {label: "Acompanhar o tema", valor: "tema"},
+        {label: "Paleta suave para HTML e JavaScript", valor: "suave"}
+      ], {placeHolder: "Cores dos colares HTML/JS, sem alterar outros arquivos"});
+      if (opção) await vscode.workspace.getConfiguration("santafe").update(
+        "highlight.embeddedPalette", opção.valor, vscode.ConfigurationTarget.Global);
+    }),
     vscode.commands.registerCommand("santafe.abrirRegistroSLS", () => cliente.saída.show(true))
   );
 }

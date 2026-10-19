@@ -169,6 +169,17 @@ def principal() -> None:
     módulo.SantafeNovaLinhaCommand(visão_do_laço).run(None)
     assert visão_do_laço.texto == "para índice = 1, 10 início\n    \nfim"
     assert visão_do_laço.seleções[0].begin() == len("para índice = 1, 10 início\n    ")
+    for cabeçalho in ("função teste(índice)", "local função teste() início", "    função aninhada()", "se verdadeiro então"):
+        v = Visão(cabeçalho)
+        módulo.SantafeNovaLinhaCommand(v).run(None)
+        recuo = "    " if cabeçalho.startswith("    ") else ""
+        assert v.texto == cabeçalho + "\n" + recuo + "    \n" + recuo + "fim"
+    v = Visão("função teste()\nfim")
+    v.seleções = Seleções([Região(len("função teste()"))])
+    módulo.SantafeNovaLinhaCommand(v).run(None)
+    assert v.texto.count("fim") == 1
+    atalhos = json.loads((RAIZ / "Default.sublime-keymap").read_text())
+    assert any(a["keys"] == ["enter"] and a["command"] == "santafe_nova_linha" for a in atalhos)
     with tempfile.TemporaryDirectory() as diretório:
         iniciador = pathlib.Path(diretório) / "santafé-sls"
         iniciador.write_text("#!/bin/sh\n", encoding="utf-8")

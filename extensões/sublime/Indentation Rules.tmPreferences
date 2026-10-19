@@ -8,7 +8,7 @@
         <key>decreaseIndentPattern</key>
         <string>^\s*(?:fim|senão|até)\b.*$</string>
         <key>increaseIndentPattern</key>
-        <string>^\s*(?:(?:local\s+)?função\b.*\binício\b|se\b.*\bentão\b|(?:para|enquanto)\b.*\binício\b|senão\b|repita\b)(?:\s*--.*)?$</string>
+        <string>^\s*(?:(?:local\s+)?função\b.*\)(?:\s+início)?|se\b.*\bentão\b|(?:para|enquanto)\b.*\binício\b|senão\b|repita\b)(?:\s*--.*)?$</string>
     </dict>
 </dict>
 </plist>

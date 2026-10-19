@@ -15,32 +15,453 @@ variables:
   ident_before: '(?<!{{ident_char}})'
   ident_break: '(?!{{ident_char}})'
   palavra_reservada: '{{ident_before}}(?:local|função|retorne|se|então|senão|enquanto|para|em|repita|até|início|fim|pare|vápara|nulo|verdadeiro|falso|e|ou|não){{ident_break}}'
-  função_global: '(?:mostre|tipo|tamanho|octetos|importe|carregue|carregueArquivo|executeArquivo|garanta|proteja|protejaMais|paraNúmero|paraColar|pares|ipares|próximo|erro|coleteLixo){{ident_break}}'
 
 contexts:
   prototype:
     - include: comentários
 
   main:
+    - include: embutidos-anotados
+    - include: embutidos
+    - include: código
+
+  código:
+    - include: comentários
     - include: declarações
     - include: gabaritos
     - include: colares
     - include: números
+    - match: '{{ident_before}}função{{ident_break}}'
+      scope: storage.type.function.santafe
     - match: '{{palavra_reservada}}'
       scope: keyword.control.santafe
-    - match: '{{ident_before}}_(?:AMBIENTE|VERSÃO){{ident_break}}'
-      scope: support.constant.santafe
-    - match: '{{ident_before}}{{função_global}}'
-      scope: support.function.builtin.santafe
-    - match: '{{ident_before}}{{ident}}(?=\s*[.:])'
-      scope: variable.namespace.santafe
+    - include: api-pública
     - match: '(?:\.\.|//|<<|>>|==|~=|<=|>=|[+\-*/%^#=<>~&|])'
       scope: keyword.operator.santafe
     - match: '[{}()\[\],;:]'
       scope: punctuation.separator.santafe
 
+  api-pública:
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(?:definaMetatabela|carregueArquivo|obterMetatabela|executeArquivo|protejaMais|coleteLixo|paraNúmero|paraColar|selecione|carregue|garanta|importe|octetos|proteja|próximo|tamanho|defina|ipares|mostre|igual|obter|pares|erro|tipo)(?![\p{L}\p{M}\p{N}_])'
+      scope: support.function.builtin.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(?:utf8\.padrãoCaractere|mat\.máximoInteiro|mat\.mínimoInteiro|json\.matrizVazia|json\.valorNulo|nomes\.CLASSES|nomes\.CÓDIGOS|json\._VERSÃO|mat\.infinito|nomes\.TIPOS|json\._NOME|_AMBIENTE|_VERSÃO|mat\.pi|_G)(?![\p{L}\p{M}\p{N}_])'
+      scope: support.constant.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*multibanco)\s*(\.)\s*((?:inicie|novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*transporte)\s*(\.)\s*((?:prepareRetransmissor|endereçoASCII))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(nomes\s*\.\s*autoridade)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(nomes\s*\.\s*resolvedor)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*agência)\s*(\.)\s*((?:nova))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*mariadb)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*triagem)\s*(\.)\s*((?:nova))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(decodificador)\s*(:)\s*((?:alimente|pendente|reinicie))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(autenticador)\s*(:)\s*((?:avalieAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(autenticação)\s*(\.)\s*((?:nova))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*imap)\s*(\.)\s*((?:servidor))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*util)\s*(\.)\s*((?:nomeSeguroDoAnexo|separeEndereços|escapeHTML|idNatural|resumo|apare))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(nomes\s*\.\s*acesso)\s*(\.)\s*((?:novoLimitador|pertence|novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(nomes\s*\.\s*dnssec)\s*(\.)\s*((?:assineZona))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(agendamento)\s*(:)\s*((?:cancele|ativo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(filaMemória)\s*(:)\s*((?:receba))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(repositório)\s*(:)\s*((?:existeDestinatárioLocal|obtenhaUsuárioPorSessão|decidaTriagemDaCarta|listeRegrasDaTriagem|removaRegraDaTriagem|salveRegraDaTriagem|obtenhaOuCrieCaixa|confiraEstrutura|atualizeEntrega|obtenhaMensagem|listeMensagens|adicioneSaída|movaMensagem|obtenhaAnexo|marqueLida|recebaSMTP))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(autoridade)\s*(:)\s*((?:estatísticas|responda|escute|inicie|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(caminheiro)\s*(\.)\s*((?:formulárioEmPartes|form|novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio\s*\.\s*cd)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(multibanco)\s*(:)\s*((?:atualizeSinalizadoresIMAP|existeDestinatárioLocal|adicioneMensagemIMAP|obtenhaMensagemIMAP|copieMensagensIMAP|listeMensagensIMAP|removaMensagemIMAP|confiraEstrutura|movaMensagemIMAP|autentiqueCaixa|bancoDoEndereço|chaveDoEndereço|esvazieLixeira|adicioneSaída|obtenhaAnexo|recebaSMTP|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(nomes\s*\.\s*zona)\s*(\.)\s*((?:nova))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(resolvedor)\s*(:)\s*((?:inicieSomenteSaída|respondaAssíncrono|estatísticas|limpeMemrap|resolva|escute|inicie|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(antivírus)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(antivírus)\s*(:)\s*((?:confiraAssíncrono|examineAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(corrotina)\s*(\.)\s*((?:executando|podeCeder|envolva|estado|retome|ceda|crie))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(limitador)\s*(:)\s*((?:estatísticas|permita))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(resultado)\s*(:)\s*((?:linhasAfetadas|númeroDeLinhas|idInserido|obterLinha|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(transação)\s*(:)\s*((?:executePreparadoAssíncrono|prepareConsultaAssíncrona|confirmeAssíncrono|desfaçaAssíncrono|executeAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(carteiro)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(carteiro)\s*(:)\s*((?:deixeDeConfiarNoRemetente|listeCartasDaConversa|decidaTriagemDaCarta|listeRegrasDaTriagem|marqueCartasNãoLidas|obtenhaCartaOriginal|removaRegraDaTriagem|listeCartasParaAção|salveRegraDaTriagem|marqueCartaNãoLida|remetenteConfiável|confieNoRemetente|marqueCartasLidas|usuárioPorSessão|marqueCartaLida|caixaDoUsuário|esvazieLixeira|obtenhaAnexo|obtenhaCarta|conteCartas|listeCartas|envieCarta|movaCartas|movaCarta|pastas))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(consulta)\s*(:)\s*((?:númeroDeParâmetros|executeAssíncrono|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(depósito)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(depósito)\s*(:)\s*((?:prepareAssíncrono|caminhoDoObjeto|graveAssíncrono|leiaAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(mensagem)\s*(:)\s*((?:destinatários|forme))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(proteção)\s*(:)\s*((?:registreFalha|estatísticas|bloqueie|conclua|admita|estado|libere|limpe))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(servidor)\s*(:)\s*((?:definaTempoLimite|aceiteAssíncrono|estatísticas|cancele|amarre|escute|inicie|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(agência)\s*(:)\s*((?:autorizeDestinatário|autorizeRemetente|autentique|receba))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(arquivo)\s*(\.)\s*((?:crieDiretóriosComPermissõesAssíncrono|graveDurávelComPermissõesAssíncrono|crieDiretóriosAssíncrono|graveDurávelAssíncrono|existeAssíncrono|removaAssíncrono|leiaAssíncrono|movaAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(arquivo)\s*(:)\s*((?:definaMemint|escreva|esvazie|busque|linhas|feche|leia))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(cliente)\s*(:)\s*((?:definaValidaçãoTLS|conecteAssíncrono|definaTempoLimite|envieAssíncrono|definaTLS|cancele|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(conexão)\s*(:)\s*((?:executePreparadoAssíncrono|prepareConsultaAssíncrona|recebaDadosAssíncrono|recebaHTTPAssíncrono|aceiteTLSAssíncrono|inicieTLSAssíncrono|definaLimitesHTTP|definaTempoLimite|executeAssíncrono|recebaAssíncrono|envieAssíncrono|escapeColar|parRemoto|parLocal|cancele|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(correio)\s*(\.)\s*((?:entregueDiretamenteAssíncrono|inspecioneCabeçalhos|desprotejaPontos|protejaPontos|leiaMensagem|novaMensagem|filaMariaDB|filaMemória|servidor|cliente))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(destino)\s*(:)\s*((?:esvazie|envie|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(entrega)\s*(\.)\s*((?:formeAviso|espera))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(mariadb)\s*(\.)\s*((?:criePiscinaAssíncrona|conecteAssíncrono|versãoDoConector))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(piscina)\s*(:)\s*((?:executePreparadoAssíncrono|inicieTransaçãoAssíncrona|adquiraAssíncrono|executeAssíncrono|estado|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(segredo)\s*(\.)\s*((?:confiraSenhaAssíncrono|protejaSenhaAssíncrono|precisaAtualizarSenha|chavePúblicaRSA|verifiqueRSA256|confiraBilhete|resumaBilhete|assineRSA256|resumaSHA256|novoBilhete|resuma))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(triagem)\s*(:)\s*((?:avalie))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(acesso)\s*(:)\s*((?:permita))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(depure)\s*(\.)\s*((?:definaValorDeUsuário|obterValorDeUsuário|definaValorExterno|junteValorExterno|obterValorExterno|definaMetatabela|obterInformação|obterMetatabela|idValorExterno|obterRegistro|rastroDePilha|definaGancho|definaLocal|obterGancho|obterLocal|depure))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(dnssec)\s*(:)\s*((?:encontreNSEC|formateDS))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(imagem)\s*(\.)\s*((?:identifique|codifique|paraPDF|salve|leia))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(módulo)\s*(\.)\s*((?:pesquisarCaminho|pesquisadores|carregarBib|carregados|caminhoC|caminho|pré))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(sessão)\s*(:)\s*((?:executePreparadoAssíncrono|prepareConsultaAssíncrona|executeAssíncrono|devolva))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(tabela)\s*(\.)\s*((?:desempacote|maiorÍndice|concatene|empacote|insira|ordene|remova|mova))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(turing)\s*(\.)\s*((?:validarBilhete|registrar))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(bit32)\s*(\.)\s*((?:desloqueAritméticoDireita|desloqueEsquerda|desloqueDireita|gireEsquerda|gireDireita|substitua|extraia|bTeste|bnão|boux|bou|be))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(canal)\s*(:)\s*((?:adicioneDestino|removaDestino|estatísticas|confirmação|pulsoDeVida|operação|despeje|leitura|recusa|emita|feche|sinal))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(colar)\s*(\.)\s*((?:descompacte|desempacote|caractere|decBase64|maiúscula|minúscula|compacte|empacote|replique|binário|capture|formate|inverta|procure|tamanho|base64|decHex|separe|troque|apare|corte|crc32|junte|porte|byte|taco|hex))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(dmarc)\s*(\.)\s*((?:avalieAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(nomes)\s*(\.)\s*((?:decodifiqueMensagem|codifiqueMensagem|decodifiqueNome|tipoParaNúmero|codifiqueNome|nomeCanônico|novaConsulta|nomeDoTipo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(pulso)\s*(\.)\s*((?:novoDecodificador|registrador|codifique|terminal|memória|valide|novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(Vigia)\s*(\.)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(dkim)\s*(\.)\s*((?:verifiqueAssíncrono|assine))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(fila)\s*(:)\s*((?:canceleAvisosDesatualizadosAssíncrono|recupereReservasExpiradasAssíncrono|recupereAvisosExpiradosAssíncrono|registreFalhaInternaAssíncrono|reprocesseQuarentenaAssíncrono|reservePróximoAvisoAssíncrono|marqueFalhouEAviseAssíncrono|adicioneFormadaAssíncrono|listeQuarentenaAssíncrono|marqueEntregueAssíncrono|reservePróximaAssíncrono|crieEstruturaAssíncrona|soliciteAvisoAssíncrono|marqueFalhouAssíncrono|adieParcialAssíncrono|quarenteneAssíncrono|adieAvisoAssíncrono|adicioneAssíncrono|adieAssíncrono|receba))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(json)\s*(\.)\s*((?:decodNúmerosInválidos|codNúmerosInválidos|codNúmeroPrecisão|codMatrizEsparsa|codManterMemint|decodProfundo|codProfundo|decod|novo|cod))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(rede)\s*(\.)\s*((?:resolvaEndereçosAssíncrono|carregueCertificadoTLS|consulteDNSAssíncrono|domínioUnicode|domínioASCII|novaResposta|respostaHTTP|analiseHTTP|servidorTCP|clienteTCP|pareLaço|agende|laço|udp))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(RPDF)\s*(:)\s*((?:novo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(utf8)\s*(\.)\s*((?:caracteres|caractere|posição|tamanho|código))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(zona)\s*(:)\s*((?:adicione|consulte|contém))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(mat)\s*(\.)\s*((?:tangenteHiperbólica|cossenoHiperbólico|senoHiperbólico|menorSemSinal|arcoTangente|arcoCosseno|paraInteiro|aleatório|arredonde|decompõe2|logaritmo|recompõe2|absoluto|arcoSeno|expoente|potência|radianos|tangente|cosseno|semente|máximo|mínimo|separa|graus|log10|resto|piso|raiz|seno|teto|tipo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(pdf)\s*(:)\s*((?:CélulaAjustadaHorizontalForçada|CélulaAjustadaEscapadaForçada|DefinaConfiguraçõesDaFonte|PeguePseudoNúmeroDePáginas|PegueConfiguraçõesDaFonte|CélulaAjustadaHorizontal|DefinaAutoQuebraDePágina|DefinaAbscissaEOrdenada|DefinaEspessuraDoQuadro|CélulaAjustadaEscapada|MultiCélulaEngarrafada|ConfereQuebraDePágina|PseudoNúmeroDePáginas|AceitaQuebraDePágina|DefinaMargemEsquerda|DefinaMargemSuperior|DefinaTamanhoDaFonte|CódigoDeBarras2de5i|DefinaMargemDireita|DefinaPalavrasChave|PegueLarguraDoColar|PegueMargemEsquerda|PegueTamanhoDaFonte|AdicioneJavaScript|PegueMargemDireita|DefinaModoExibido|RetânguloAbaulado|DefinaCompressão|DefinaCorDaLinha|DefinaCorDoTexto|DefinaCorInterna|RetânguloCortado|TextoRotacionado|AdicioneLigação|CorteIndefinido|DefinaDuplaFace|LinearGradiente|PegueCorDaLinha|PegueCorDoTexto|PegueCorInterna|RadialGradiente|AdicionePágina|CélulaAjustada|DefinaAbscissa|DefinaOrdenada|NúmeroDaPágina|TextoSombreado|CalculeLinhas|CélulaCortada|DefinaAssunto|DefinaCriador|DefinaLigação|DefinaMargens|PegueAbscissa|PegueOrdenada|DefinaTítulo|PegueLargura|TextoCortado|AutoImprima|DefinaAutor|DefinaFonte|DefinaTraço|MultiCélula|PegueAltura|DefinaAlfa|Cabeçalho|NovaLinha|Retângulo|Rotacione|Polígono|Círculo|Escreva|Ligação|Célula|Elipse|Imagem|Rodapé|Feche|Linha|Saída|Texto|Abra))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(req)\s*(\.)\s*((?:caminhoOriginal|portaRemota|parâmetros|cabeçalho|arquivos|consulta|caminho|método|versão|corpo|form|ip))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.other.member.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(res)\s*(:)\s*((?:definaCabeçalho|código|dados|texto|html|json))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(spf)\s*(\.)\s*((?:verifiqueAssíncrono))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(udp)\s*(:)\s*((?:envieParaAssíncrono|definaTempoLimite|inicieRecepção|pareRecepção|enviePara|cancele|amarre|feche))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(ap)\s*(\.)\s*((?:aoFalhar|encerre|depure|escute|parada|rota))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(cd)\s*(:)\s*((?:entregueAvisoDaFila|aceiteDestinatário|atualizeEntrega|recebaCarta|posteCarta))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(es)\s*(\.)\s*((?:arquivoTemp|entrada|escreva|esvazie|linhas|feche|pAbra|saída|abra|leia|tipo))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(so)\s*(\.)\s*((?:obterVariável|definaLocal|aleatório|difTempo|nomeTemp|renomeie|execute|relógio|remova|tempo|data|saia))(?![\p{L}\p{M}\p{N}_])'
+      captures:
+        1: support.namespace.santafe
+        2: punctuation.accessor.santafe
+        3: support.function.santafe
+    - match: '(:)\s*([\p{L}_][\p{L}\p{M}\p{N}_]*)(?=\s*\()'
+      captures:
+        1: punctuation.accessor.santafe
+        2: variable.function.method.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_])[\p{L}_][\p{L}\p{M}\p{N}_]*(?=\s*[.:])'
+      scope: variable.namespace.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_])[\p{L}_][\p{L}\p{M}\p{N}_]*(?=\s*\()'
+      scope: entity.name.function.call.santafe
+
   comentários:
-    - match: '--\[(=*)\['
+    - match: '--(?!\[\[(?:html|javascript)\]\][ \t]*(?:\[=*\[|["''`]))\[(=*)\['
       scope: punctuation.definition.comment.begin.santafe
       push:
         - meta_scope: comment.block.santafe
@@ -48,7 +469,7 @@ contexts:
         - match: '\]\1\]'
           scope: punctuation.definition.comment.end.santafe
           pop: true
-    - match: '--'
+    - match: '--(?!\[\[(?:html|javascript)\]\][ \t]*(?:\[=*\[|["''`]))'
       scope: punctuation.definition.comment.santafe
       push:
         - meta_scope: comment.line.double-dash.santafe
@@ -61,8 +482,152 @@ contexts:
       scope: meta.function.santafe
       captures:
         1: storage.modifier.santafe
-        2: keyword.declaration.function.santafe
+        2: storage.type.function.santafe
         3: entity.name.function.santafe
+
+  embutidos-anotados:
+    - match: '(--\[\[html\]\])[ \t]*(?:\[(=*)\[)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.basic
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '\]\2\]'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[html\]\])[ \t]*(?:`)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.santafe-template
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '(?<!\\)(?:\\\\)*`'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[html\]\])[ \t]*(?:")'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.basic
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '(?<!\\)(?:\\\\)*"'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[html\]\])[ \t]*(?:'')'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.basic
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '(?<!\\)(?:\\\\)*'''
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[javascript\]\])[ \t]*(?:\[(=*)\[)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '\]\2\]'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[javascript\]\])[ \t]*(?:`)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js.santafe-template
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '(?<!\\)(?:\\\\)*`'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[javascript\]\])[ \t]*(?:")'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '(?<!\\)(?:\\\\)*"'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '(--\[\[javascript\]\])[ \t]*(?:'')'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '(?<!\\)(?:\\\\)*'''
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+
+  embutidos:
+    - match: '\[(=*)\[(?=(?:(?!\]\1\]).)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.basic
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '\]\1\]'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '`(?=(?:(?!`).)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.santafe-template
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '(?<!\\)(?:\\\\)*`'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '"(?=(?:(?!").)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.basic
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '(?<!\\)(?:\\\\)*"'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '''(?=(?:(?!'').)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:text.html.basic
+      embed_scope: meta.embedded.block.html.santafe
+      escape: '(?<!\\)(?:\\\\)*'''
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '\[(=*)\[[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '\]\1\]'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '`[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js.santafe-template
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '(?<!\\)(?:\\\\)*`'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '"[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '(?<!\\)(?:\\\\)*"'
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+    - match: '''[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
+      scope: punctuation.definition.string.begin.santafe
+      embed: scope:source.js
+      embed_scope: meta.embedded.block.javascript.santafe
+      escape: '(?<!\\)(?:\\\\)*'''
+      escape_captures:
+        0: punctuation.definition.string.end.santafe
+
+  escape-colar:
+    - match: '\\.'
+      scope: constant.character.escape.santafe
+
+  interpolação:
+    - match: '[®Ⓡ]\{'
+      scope: punctuation.section.interpolation.begin.santafe keyword.operator.interpolation.santafe
+      push:
+        - clear_scopes: true
+        - meta_scope: meta.interpolation.santafe meta.embedded.inline.santafe source.santafe
+        - meta_include_prototype: false
+        - match: '\}'
+          scope: punctuation.section.interpolation.end.santafe keyword.operator.interpolation.santafe
+          pop: true
+        - include: chaves-interpolação
+        - include: código
+    - match: '[®Ⓡ][A-Za-z_][A-Za-z_0-9]*'
+      scope: meta.interpolation.variable.santafe variable.parameter.santafe
+
+  chaves-interpolação:
+    - match: '\{'
+      push:
+        - meta_include_prototype: false
+        - match: '\}'
+          pop: true
+        - include: chaves-interpolação
+        - include: código
 
   gabaritos:
     - match: '`'
@@ -73,16 +638,8 @@ contexts:
         - match: '`'
           scope: punctuation.definition.string.end.santafe
           pop: true
-        - match: '[®Ⓡ]\{'
-          scope: punctuation.section.interpolation.begin.santafe
-          push:
-            - meta_scope: meta.interpolation.santafe
-            - match: '\}'
-              scope: punctuation.section.interpolation.end.santafe
-              pop: true
-            - include: main
-        - match: '\\.'
-          scope: constant.character.escape.santafe
+        - include: escape-colar
+        - include: interpolação
 
   colares:
     - match: '\[(=*)\['
@@ -97,18 +654,14 @@ contexts:
         - meta_include_prototype: false
         - match: "'"
           pop: true
-        - match: '\\.'
-          scope: constant.character.escape.santafe
+        - include: escape-colar
     - match: '"'
-      scope: punctuation.definition.string.begin.santafe
       push:
         - meta_scope: string.quoted.double.santafe
         - meta_include_prototype: false
         - match: '"'
-          scope: punctuation.definition.string.end.santafe
           pop: true
-        - match: '\\.'
-          scope: constant.character.escape.santafe
+        - include: escape-colar
 
   números:
     - match: '(?<!{{ident_char}})(?:0[xX][0-9A-Fa-f]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?!{{ident_char}})'

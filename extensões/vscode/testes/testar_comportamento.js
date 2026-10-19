@@ -19,16 +19,23 @@ class CompletionItem { constructor(label, kind) { this.label = label; this.kind 
 class SnippetString { constructor(value) { this.value = value; } }
 class MarkdownString { constructor(value = "") { this.value = value; } appendCodeblock(value) { this.value += value; } appendMarkdown(value) { this.value += value; } }
 class Diagnostic { constructor() {} }
-class DocumentSymbol { constructor(name, detail, kind, range, selectionRange) { this.name = name; this.detail = detail; this.kind = kind; this.range = range; this.selectionRange = selectionRange; } }
+class DocumentSymbol { constructor(name, detail, kind, range, selectionRange) {
+  const before = (a, b) => a.line < b.line || (a.line === b.line && a.character <= b.character);
+  if (!before(range.start, selectionRange.start) || !before(selectionRange.end, range.end))
+    throw new Error('selectionRange must be contained in fullRange');
+  this.name = name; this.detail = detail; this.kind = kind; this.range = range; this.selectionRange = selectionRange;
+} }
 class Location { constructor(uri, range) { this.uri = uri; this.range = range; } }
 class Hover { constructor(contents) { this.contents = contents; } }
 const descarte = { dispose() {} };
 module.exports = {
   Position, Range, CompletionItem, SnippetString, MarkdownString, Diagnostic, DocumentSymbol, Location, Hover,
   CompletionItemKind: { Keyword: 1, Module: 2, Variable: 3, Method: 4, Function: 5 },
+  SemanticTokensLegend: class { constructor(types, modifiers) { this.tokenTypes = types; this.tokenModifiers = modifiers; } },
   SymbolKind: { Function: 12 }, DiagnosticSeverity: { Error: 1, Warning: 2, Information: 3, Hint: 4 },
   window: { createOutputChannel() { return { appendLine() {}, append() {}, show() {}, dispose() {} }; }, showWarningMessage() {} },
   languages: {
+    registerDocumentSemanticTokensProvider(_, provider) { registrados.realce = provider; return descarte; },
     createDiagnosticCollection() { return { delete() {}, set() {}, dispose() {} }; },
     registerCompletionItemProvider(_, provider) { registrados.conclusões = provider; return descarte; },
     registerHoverProvider(_, provider) { registrados.ajuda = provider; return descarte; },
@@ -76,7 +83,10 @@ function documento(texto) {
 try {
   fs.mkdirSync(path.join(temporário, "node_modules", "vscode"), { recursive: true });
   fs.copyFileSync(path.join(raiz, "extension.js"), path.join(temporário, "extension.js"));
+  fs.copyFileSync(path.join(raiz, "package.json"), path.join(temporário, "package.json"));
   fs.copyFileSync(path.join(raiz, "api-publica.json"), path.join(temporário, "api-publica.json"));
+  for (const nome of ["realce-vscode.js", "realce-embutido.js", "aparencia.js", "paletas.json"])
+    fs.copyFileSync(path.join(raiz, nome), path.join(temporário, nome));
   fs.writeFileSync(path.join(temporário, "node_modules", "vscode", "index.js"), apiFalsa);
 
   const extensão = require(path.join(temporário, "extension.js"));
@@ -93,6 +103,17 @@ try {
   assert(colar.some(item => item.label === "tamanho"), 'catálogo deve incluir o núcleo C');
   assert(vscode.__registrados.ajuda.provideHover(fonte, { line: 1, character: 10 }));
   assert.strictEqual(vscode.__registrados.símbolos.provideDocumentSymbols(fonte)[0].name, "saudação");
+  for (const quebra of ["\n", "\r\n"]) {
+    for (const nome of ["saudação", "saudac\u0327a\u0303o", "loc", "fun"]) {
+      const doc = documento(["-- 🟢", "", "", `\tlocal função ${nome}()`, "fim"].join(quebra));
+      const símbolo = vscode.__registrados.símbolos.provideDocumentSymbols(doc)[0];
+      assert.strictEqual(símbolo.name, nome);
+      assert.strictEqual(símbolo.range.start.line, 3);
+      assert.strictEqual(símbolo.selectionRange.start.line, 3);
+      assert.strictEqual(símbolo.selectionRange.start.character, "\tlocal função ".length);
+      assert.strictEqual(doc.getText(símbolo.selectionRange), nome);
+    }
+  }
   assert(vscode.__registrados.definições.provideDefinition(fonte, { line: 0, character: 16 }));
   extensão.deactivate();
   console.log("Extensão VS Code: conclusões, ajuda e símbolos locais: ok");

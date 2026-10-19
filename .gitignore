@@ -33,6 +33,8 @@ publicar/
 *.tar.gz
 *.deb
 *.pdf
+# Capturas locais preservadas fora do histórico público; relatórios JSON podem entrar.
+docs/evidencias/**/*.png
 testes/**/*.png
 testes/**/*.jpg
 testes/**/*.jpeg

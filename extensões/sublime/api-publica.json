@@ -1322,6 +1322,76 @@
       "categoria": "API C / núcleo"
     },
     {
+      "rótulo": "json._NOME",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json._VERSÃO",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.cod",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.codManterMemint",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.codMatrizEsparsa",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.codNúmeroPrecisão",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.codNúmerosInválidos",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.codProfundo",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.decod",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.decodNúmerosInválidos",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.decodProfundo",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.matrizVazia",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.novo",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
+      "rótulo": "json.valorNulo",
+      "origem": "src/lua_cjson.c",
+      "categoria": "API C / núcleo"
+    },
+    {
       "rótulo": "limitador:estatísticas",
       "origem": "bibs/bibf/nomes/acesso.fé",
       "categoria": "Nomes"

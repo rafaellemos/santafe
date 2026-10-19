@@ -1,0 +1,38 @@
+{
+  "data": "2026-10-18",
+  "versoes": {"vscode": "1.0.6", "sublime": "1.0.13"},
+  "cobertura_api_por_editor": 610,
+  "validacoes": {
+    "vscode_textmate_regressoes": 55,
+    "vscode_concatenacoes": 40,
+    "vscode_extension_host_real": "ok",
+    "sublime_nativo_regressoes": 55,
+    "sublime_nativo_concatenacoes": 43,
+    "sublime_nativo_temas": 5,
+    "sublime_assercao_python_optimize": 0,
+    "paleta_suave_reversivel": "ok",
+    "marcadores_ambos_laranja_sem_italico": "ok",
+    "expressoes_interpoladas_como_codigo": "ok",
+    "conclusoes_e_ajuda": "ok",
+    "pacotes_e_integridade": "ok",
+    "publicador_preservacao_idempotencia_limites": "ok",
+    "preflight_servidorsfdev": "ok"
+  },
+  "pacote": {
+    "nome": "santafe-editores-vscode-1.0.6-sublime-1.0.13.tar.gz",
+    "sha256": "9297a97b2fb97772b618cb72e3da4e379d886f11b424440bbfb049cdce2efaea"
+  },
+  "publicador": {
+    "nome": "publicar-editores-corrigidos-v5.sh",
+    "sha256": "f18077c997b6a9e613b623c01f83a2a24c9efaa0290c05b1a04c01f581df11e9",
+    "enviado_para": "servidorsfdev:/tmp/",
+    "producao_instalada_nesta_validacao": false,
+    "servicos_reiniciados_nesta_validacao": []
+  },
+  "limites": [
+    "Cobertura sintatica: aliases locais recebem realce de chamadas, sem resolver tipos ou executar importacoes.",
+    "No Sublime, regras da paleta acompanham cinco esquemas nativos; temas de terceiros precisam das regras correspondentes.",
+    "As cores de marcadores e metodos nao substituem a classificacao do codigo dentro da expressao.",
+    "O nucleo e o SLS nao foram alterados nem publicados por este pacote."
+  ]
+}

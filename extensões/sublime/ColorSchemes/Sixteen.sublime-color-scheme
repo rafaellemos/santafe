@@ -1,0 +1,193 @@
+{
+  "rules": [
+    {
+      "scope": "meta.santafe-embedded",
+      "background": "#00000001"
+    },
+    {
+      "scope": "meta.santafe-soft-escura-tag",
+      "foreground": "#9BB5C7",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-attribute",
+      "foreground": "#B5C2B8",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-comment",
+      "foreground": "#9B9B92",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-string",
+      "foreground": "#B6C493",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-number",
+      "foreground": "#C7AD92",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-constant",
+      "foreground": "#C7AD92",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-keyword",
+      "foreground": "#B7A6C9",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-storage",
+      "foreground": "#B7A6C9",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-operator",
+      "foreground": "#B3B3AB",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-function",
+      "foreground": "#9CBFBA",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-type",
+      "foreground": "#9CBFBA",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-support",
+      "foreground": "#9CBFBA",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-variable",
+      "foreground": "#C3C4BD",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-parameter",
+      "foreground": "#C7AD92",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-property",
+      "foreground": "#B5C2B8",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-entity",
+      "foreground": "#C7AD92",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-punctuation",
+      "foreground": "#B3B3AB",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-escura-text",
+      "foreground": "#C3C4BD",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-tag",
+      "foreground": "#425D71",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-attribute",
+      "foreground": "#4E6254",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-comment",
+      "foreground": "#68685F",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-string",
+      "foreground": "#4E642C",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-number",
+      "foreground": "#77522E",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-constant",
+      "foreground": "#77522E",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-keyword",
+      "foreground": "#705482",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-storage",
+      "foreground": "#705482",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-operator",
+      "foreground": "#5B5B53",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-function",
+      "foreground": "#35675F",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-type",
+      "foreground": "#35675F",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-support",
+      "foreground": "#35675F",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-variable",
+      "foreground": "#4C4F45",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-parameter",
+      "foreground": "#77522E",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-property",
+      "foreground": "#4E6254",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-entity",
+      "foreground": "#77522E",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-punctuation",
+      "foreground": "#5B5B53",
+      "font_style": ""
+    },
+    {
+      "scope": "meta.santafe-soft-clara-text",
+      "foreground": "#4C4F45",
+      "font_style": ""
+    },
+    {
+      "scope": "keyword.operator.interpolation.santafe, meta.interpolation.variable.santafe variable.parameter.santafe, variable.function.method.santafe",
+      "foreground": "#FD971F",
+      "font_style": ""
+    }
+  ]
+}

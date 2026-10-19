@@ -1,0 +1,152 @@
+[
+  {
+    "nome": "variável simples",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.gabarito.santafe meta.interpolation.variable.santafe variable.parameter.santafe "
+  },
+  {
+    "nome": "marcador alternativo",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.gabarito.santafe meta.interpolation.variable.santafe variable.parameter.santafe "
+  },
+  {
+    "nome": "expressão",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.gabarito.santafe meta.interpolation.santafe meta.embedded.inline.santafe support.function.builtin.santafe "
+  },
+  {
+    "nome": "chaves aninhadas",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.gabarito.santafe meta.interpolation.santafe meta.embedded.inline.santafe constant.numeric.santafe "
+  },
+  {
+    "nome": "retorno ao gabarito",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.gabarito.santafe "
+  },
+  {
+    "nome": "escape",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.gabarito.santafe "
+  },
+  {
+    "nome": "colar não interpola",
+    "ok": true,
+    "scope": "source.santafe string.quoted.single.santafe "
+  },
+  {
+    "nome": "identificador Unicode",
+    "ok": true,
+    "scope": "source.santafe "
+  },
+  {
+    "nome": "HTML longo",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.block.any.html entity.name.tag.block.any.html "
+  },
+  {
+    "nome": "HTML atributo",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.block.any.html meta.attribute-with-value.class.html entity.other.attribute-name.class.html "
+  },
+  {
+    "nome": "HTML em aspas",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.inline.any.html entity.name.tag.inline.any.html "
+  },
+  {
+    "nome": "HTML delimitador igual",
+    "ok": true,
+    "scope": "source.santafe "
+  },
+  {
+    "nome": "HTML multilinha anotado",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.block.any.html entity.name.tag.block.any.html "
+  },
+  {
+    "nome": "JS longo",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.javascript.santafe keyword.declaration.js "
+  },
+  {
+    "nome": "JS multilinha anotado",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.javascript.santafe keyword.declaration.js "
+  },
+  {
+    "nome": "JS dentro HTML",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe source.js.embedded.html keyword.declaration.js "
+  },
+  {
+    "nome": "gabarito HTML",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.interpolation.variable.santafe variable.parameter.santafe "
+  },
+  {
+    "nome": "interpolação no atributo",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.block.any.html meta.attribute-with-value.class.html meta.class-name.html meta.string.html string.quoted.double.html meta.interpolation.variable.santafe variable.parameter.santafe "
+  },
+  {
+    "nome": "expressão no atributo",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.block.any.html meta.attribute-with-value.class.html meta.class-name.html meta.string.html string.quoted.double.html meta.interpolation.santafe meta.embedded.inline.santafe support.function.builtin.santafe "
+  },
+  {
+    "nome": "expressão no JS",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.javascript.santafe meta.interpolation.santafe meta.embedded.inline.santafe support.function.builtin.santafe "
+  },
+  {
+    "nome": "escape no atributo",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe meta.tag.block.any.html meta.attribute-with-value.class.html meta.class-name.html meta.string.html string.quoted.double.html "
+  },
+  {
+    "nome": "texto comum",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.long.santafe "
+  },
+  {
+    "nome": "SQL não é HTML",
+    "ok": true,
+    "scope": "source.santafe string.quoted.other.long.santafe "
+  },
+  {
+    "nome": "retorno após HTML",
+    "ok": true,
+    "scope": "source.santafe support.function.builtin.santafe "
+  },
+  {
+    "nome": "retorno após JS",
+    "ok": true,
+    "scope": "source.santafe support.function.builtin.santafe "
+  },
+  {
+    "nome": "variável na string JS",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.javascript.santafe meta.string.js string.quoted.double.js meta.interpolation.variable.santafe variable.parameter.santafe "
+  },
+  {
+    "nome": "expressão na string JS",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.javascript.santafe meta.string.js string.quoted.double.js meta.interpolation.santafe meta.embedded.inline.santafe support.function.builtin.santafe "
+  },
+  {
+    "nome": "interpolação no script HTML",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe source.js.embedded.html meta.string.js string.quoted.double.js meta.interpolation.variable.santafe variable.parameter.santafe "
+  },
+  {
+    "nome": "HTML comum não interpola",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.html.santafe "
+  },
+  {
+    "nome": "JS comum não interpola",
+    "ok": true,
+    "scope": "source.santafe meta.embedded.block.javascript.santafe meta.string.js string.quoted.double.js "
+  }
+]

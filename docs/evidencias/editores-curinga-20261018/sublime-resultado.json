@@ -1,0 +1,54 @@
+{
+  "casos": 42,
+  "falhas": [],
+  "estilos": {
+    "texto": {
+      "bold": false,
+      "foreground": "#e7db74",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 56
+    },
+    "curinga": {
+      "bold": false,
+      "foreground": "#fd9621",
+      "italic": true,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 128
+    },
+    "variavel": {
+      "bold": false,
+      "foreground": "#fd9621",
+      "italic": true,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 128
+    },
+    "expressao": {
+      "bold": false,
+      "foreground": "#f92472",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 91
+    },
+    "abre": {
+      "bold": false,
+      "foreground": "#f92472",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 91
+    },
+    "fecha": {
+      "bold": false,
+      "foreground": "#f92472",
+      "italic": false,
+      "source_column": 26,
+      "source_file": "Packages/Color Scheme - Default/Monokai.sublime-color-scheme",
+      "source_line": 91
+    }
+  }
+}

@@ -1,0 +1,22 @@
+-- HTML: o atributo continua depois da expressão Santafé.
+local página = --[[html]] [[<div class="prefixo-]] .. nome .. [[-final">
+  <h1>Olá, Santafé!</h1>
+  <script>/* comentário ]] .. detalhe .. [[ retomado */ const total = 3;</script>
+</div>]]
+mostre(página)
+
+-- JavaScript: o comentário continua, mas não engole a expressão.
+local código = --[[javascript]] [[/* início ]] .. nome .. [[ final */
+const total = 42;
+console.log(total);
+]]
+mostre(código)
+
+-- Curingas e delimitação da linguagem original continuam intactos.
+local modelo = `<div title="®nome Ⓡ{tamanho(nome)}">Olá</div>`
+função escapeHTML(valor)
+    retorne paraColar(valor ou ""):troque("&", "&amp;")
+        :troque("<", "&lt;"):troque(">", "&gt;")
+        :troque('"', "&quot;"):troque("'", "&#39;")
+fim
+mostre(verdadeiro)

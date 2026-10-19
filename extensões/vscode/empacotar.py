@@ -14,6 +14,19 @@ SAÍDA = RAIZ / "dist" / f"{MANIFESTO['name']}-{MANIFESTO['version']}.vsix"
 ARQUIVOS = (
     "package.json",
     "extension.js",
+    "realce-embutido.js",
+    "realce-vscode.js",
+    "aparencia.js",
+    "paletas.json",
+    "vendor/README.md",
+    "vendor/vscode-textmate/package.json",
+    "vendor/vscode-textmate/LICENSE.md",
+    "vendor/vscode-textmate/release/main.js",
+    "vendor/vscode-oniguruma/package.json",
+    "vendor/vscode-oniguruma/LICENSE.txt",
+    "vendor/vscode-oniguruma/NOTICES.txt",
+    "vendor/vscode-oniguruma/release/main.js",
+    "vendor/vscode-oniguruma/release/onig.wasm",
     "api-publica.json",
     "icon.png",
     "language-configuration.json",
@@ -47,7 +60,13 @@ def principal() -> None:
         assert (RAIZ / relativo).is_file(), f"arquivo ausente: {relativo}"
     SAÍDA.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(SAÍDA, "w", compression=zipfile.ZIP_DEFLATED) as pacote:
-        pacote.writestr(
+        def grave(nome, dados):
+            info = zipfile.ZipInfo(nome, date_time=(2026, 10, 18, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            pacote.writestr(info, dados)
+
+        grave(
             "[Content_Types].xml",
             """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">
@@ -55,14 +74,16 @@ def principal() -> None:
   <Default Extension=\"js\" ContentType=\"application/javascript\" />
   <Default Extension=\"md\" ContentType=\"text/markdown\" />
   <Default Extension=\"png\" ContentType=\"image/png\" />
+  <Default Extension=\"wasm\" ContentType=\"application/wasm\" />
+  <Default Extension=\"txt\" ContentType=\"text/plain\" />
   <Default Extension=\"xml\" ContentType=\"application/xml\" />
   <Default Extension=\"vsixmanifest\" ContentType=\"text/xml\" />
 </Types>
 """,
         )
-        pacote.writestr("extension.vsixmanifest", manifesto_vsix())
+        grave("extension.vsixmanifest", manifesto_vsix())
         for relativo in ARQUIVOS:
-            pacote.write(RAIZ / relativo, f"extension/{relativo}")
+            grave(f"extension/{relativo}", (RAIZ / relativo).read_bytes())
     print(SAÍDA)
 
 
