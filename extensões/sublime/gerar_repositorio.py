@@ -18,6 +18,11 @@ DIST = RAIZ / "dist"
 CATALOGO = DIST / "packages.json"
 ENTRADA_CONTROLE = DIST / "package-control-entrada.json"
 GITHUB = DIST / "github"
+# A 1.0.13 lê o catálogo da API ao importar o plugin. Essa operação é segura
+# desde o build 4171. Declare o requisito no canal sem reescrever os arquivos
+# 1.0.13 já publicados no portal nem alterar etiquetas anteriores.
+SUBLIME_CATALOGO = ">=4171"
+ARQUIVOS_DO_CATALOGO = ("Main.sublime-menu", "Default.sublime-commands")
 
 
 def catálogo() -> dict:
@@ -65,6 +70,9 @@ def exporte_github() -> None:
         destino.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(origem, destino)
     shutil.copy2(RAIZ / "CHANGELOG.md", GITHUB / "CHANGELOG.md")
+    shutil.copy2(RAIZ.parents[1] / "LICENSE", GITHUB / "LICENSE")
+    for nome in ARQUIVOS_DO_CATALOGO:
+        shutil.copy2(RAIZ / "catalogo" / nome, GITHUB / nome)
     escreva(
         ENTRADA_CONTROLE,
         json.dumps(
@@ -73,8 +81,10 @@ def exporte_github() -> None:
                 "details": "https://github.com/rafaellemos/santafe-sublime",
                 "releases": [
                     {
-                        "sublime_text": METADADOS["sublime_text"],
-                        "python_versions": ["3.8", "3.14"],
+                        "sublime_text": SUBLIME_CATALOGO,
+                        # O canal central usa esquema 3.0.0 e não aceita
+                        # python_versions. O pacote seleciona o host pelo
+                        # arquivo .python-version, também exportado.
                         "tags": True,
                     }
                 ],

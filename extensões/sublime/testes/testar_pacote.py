@@ -75,7 +75,20 @@ def principal() -> None:
     assert not (exportação / "package-metadata.json").exists()
     assert not (exportação / "package-control-entrada.json").exists()
     assert (RAIZ / "dist" / "package-control-entrada.json").is_file()
-    json.loads((RAIZ / "dist" / "package-control-entrada.json").read_text())
+    entrada = json.loads((RAIZ / "dist" / "package-control-entrada.json").read_text())
+    assert entrada["releases"][0]["sublime_text"] == ">=4171"
+    assert "python_versions" not in entrada["releases"][0]
+    assert (exportação / ".python-version").read_text().strip() == "3.8"
+    assert (exportação / "LICENSE").read_bytes() == (RAIZ.parents[1] / "LICENSE").read_bytes()
+    comandos = json.loads((exportação / "Default.sublime-commands").read_text())
+    assert {item["args"]["base_file"] for item in comandos} == {
+        "${packages}/Santafe/Santafe.sublime-settings",
+        "${packages}/Santafe/Default.sublime-keymap",
+    }
+    menu = json.loads((exportação / "Main.sublime-menu").read_text())
+    assert menu[0]["id"] == "preferences"
+    for arquivo in nomes:
+        assert (exportação / arquivo).read_bytes() == (RAIZ / arquivo).read_bytes()
     assert (exportação / "README.md").read_text() == (RAIZ / "README.md").read_text()
     print("Pacote Sublime Santafé: estrutura e arquivo instalável: ok")
 

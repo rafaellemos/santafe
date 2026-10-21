@@ -1,0 +1,15 @@
+[
+    {
+        "caption": "Preferences: Santafé Settings",
+        "command": "edit_settings",
+        "args": {"base_file": "${packages}/Santafe/Santafe.sublime-settings"}
+    },
+    {
+        "caption": "Preferences: Santafé Key Bindings",
+        "command": "edit_settings",
+        "args": {
+            "base_file": "${packages}/Santafe/Default.sublime-keymap",
+            "default": "[\n\t$0\n]\n"
+        }
+    }
+]
