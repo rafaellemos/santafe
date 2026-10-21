@@ -90,6 +90,14 @@ com conteúdo diferente.
   A etiqueta e os downloads já publicados da revisão 2 permanecem intactos;
   os resultados do CI devem sempre ser associados ao commit efetivamente
   testado, sem atribuir aprovação retroativa à execução anterior.
+- A execução seguinte passou pela suíte principal nos dois runners e revelou
+  uma falha real da RPDF em prefixos personalizados: a busca da fonte Unicode
+  dependia de caminhos fixos. A correção posterior localiza a fonte ao lado do
+  módulo carregado, preservando a precedência de `RPDF_FONTE`. As regressões
+  conferem o caminho efetivamente usado e a geração de PDF fora da árvore-fonte,
+  para que uma instalação global preexistente não mascare a falha. Esta correção
+  de biblioteca não altera retroativamente a etiqueta nem os pacotes 2.0.2
+  já publicados; sua distribuição requer uma nova revisão identificável.
 - Núcleo/bibliotecas: suítes macOS Intel e Debian com MariaDB isolado.
 - Editores: testes reais de VS Code e Sublime em macOS Intel, incluindo
   gabaritos, HTML/JS e reversibilidade da paleta suave.

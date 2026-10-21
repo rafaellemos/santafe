@@ -80,6 +80,9 @@ done
 echo "==> Validando o Carteiro em diferentes fusos horários"
 python3 ./testes/integracao/testar_carteiro_fusos.py
 
+echo "==> Validando a fonte RPDF em instalação isolada"
+python3 ./testes/integracao/testar_rpdf_instalacao.py
+
 echo "==> Validando o isolamento concorrente dos temporários"
 python3 ./testes/integracao/testar_temporarios.py
 

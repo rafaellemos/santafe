@@ -38,7 +38,7 @@ A biblioteca Santafé `imagem` é instalada junto com o RPDF e pode identificar 
 
 ## Instalação
 
-`make ibibf` instala `rpdf.fé`, `imagem.fé` e suas implementações privadas, o leitor TrueType `rpdf_unicode.fé`, a fonte e sua licença. Em uma instalação personalizada, a variável de ambiente `RPDF_FONTE` pode indicar o caminho completo da fonte padrão.
+`make ibibf` instala `rpdf.fé`, `imagem.fé` e suas implementações privadas, o leitor TrueType `rpdf_unicode.fé`, a fonte e sua licença. A fonte é localizada ao lado da biblioteca, inclusive em prefixos personalizados e fora da pasta dos fontes. A variável de ambiente `RPDF_FONTE` pode indicar outro caminho completo e tem precedência sobre a fonte distribuída.
 
 ## Limites desta primeira versão Unicode
 

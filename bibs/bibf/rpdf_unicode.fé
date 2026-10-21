@@ -3,6 +3,16 @@
 
 local unicodePdf = {}
 
+-- importe fornece o caminho resolvido ao carregador. executeArquivo não o
+-- fornece; nesse caso, obtenha o fonte do próprio módulo, não do chamador.
+local _, caminhoDoMódulo = ...
+se tipo(caminhoDoMódulo) ~= "colar" então
+    local informação = depure e depure.obterInformação(1, "S")
+    caminhoDoMódulo = informação e informação.fonte:separe("^@(.+)$")
+fim
+local diretórioDoMódulo = caminhoDoMódulo e
+    caminhoDoMódulo:separe("^(.*[/\\])")
+
 local função u16(dados, posição)
     local a, b = dados:byte(posição, posição + 1)
     garanta(a e b, "fonte TrueType truncada")
@@ -202,6 +212,13 @@ função unicodePdf.localizeFonte()
     se configurada então
         local arquivo = es.abra(configurada, "leiturabin")
         se arquivo então arquivo:feche(); retorne configurada fim
+    fim
+    -- A fonte acompanha a biblioteca mesmo em prefixos não globais. Uma
+    -- instalação em /usr/local não deve mascarar uma cópia incompleta.
+    se diretórioDoMódulo então
+        local caminho = diretórioDoMódulo .. "rpdf/fontes/NotoSans-Regular.ttf"
+        local arquivo = es.abra(caminho, "leiturabin")
+        se arquivo então arquivo:feche(); retorne caminho fim
     fim
     local candidatos = {
         "fonte/bibs/bibf/rpdf/fontes/NotoSans-Regular.ttf",
