@@ -42,4 +42,4 @@ jobs:
       - run: python3 testes/integracao/testar_publicador_editores.py
       - run: python3 testes/integracao/testar_fechamento.py
       - run: make dist
-      - run: python3 testes/integracao/testar_distribuicao.py dist/santafe-2.0.2.tar.gz dist/santafe-2.0.2.zip
+      - run: python3 testes/integracao/testar_distribuicao.py dist/santafe-2.0.3.tar.gz dist/santafe-2.0.3.zip

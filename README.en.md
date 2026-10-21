@@ -23,6 +23,11 @@ in the actual editors, including concatenated HTML/JS and the optional muted
 palette. See the [release closure](docs/LANCAMENTO-2.0.2.md) for deployment
 status and tested limits. Windows and Apple Silicon are not yet fully validated.
 
+Maintenance release [2.0.3](docs/LANCAMENTO-2.0.3.md) includes the subsequent
+timezone regression-test fix and portable RPDF font lookup. These fixes passed
+GitHub Actions on Ubuntu 24.04 and macOS 14. Production publication and creation
+of the new Git tag are separate steps.
+
 Version 2.0 changes public vocabulary relative to 1.0; read the
 [change log](CHANGELOG.md) and the [migration guide](docs/MIGRACAO-VOCABULARIO-LOGICO.md)
 before upgrading a project.
@@ -87,6 +92,7 @@ native structural meaning for both strings and tables.
 - [Ecosystem architecture (Portuguese)](docs/ARQUITETURA-DO-ECOSSISTEMA.md)
 - [SLS language server](docs/SLS.md)
 - [2.0.2 release](docs/LANCAMENTO-2.0.2.md)
+- [2.0.3 maintenance](docs/LANCAMENTO-2.0.3.md)
 
 ## Repository layout
 

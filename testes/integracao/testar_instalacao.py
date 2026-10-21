@@ -13,7 +13,12 @@ env = dict(os.environ, GSETTINGS_BACKEND='memory',
 env.pop('RPDF_FONTE', None)  # a instalação precisa localizar sua própria fonte
 binary = prefix / 'bin/santafé'
 version = subprocess.run([str(binary), '-v'], capture_output=True, check=True, timeout=10)
-assert b'2.0.2' in version.stdout + version.stderr
+assert b'Santaf\xc3\xa9 2.0.3 ' in version.stdout + version.stderr
+pc = (prefix / 'lib/pkgconfig/santafe.pc').read_text()
+pc_prefixes = [line[len('prefix='):] for line in pc.splitlines() if line.startswith('prefix=')]
+assert len(pc_prefixes) == 1 and Path(pc_prefixes[0]).is_absolute()
+assert Path(pc_prefixes[0]).resolve() == prefix, 'pkg-config aponta para outro prefixo'
+assert 'Version: 2.0.3\n' in pc
 source = '; '.join('garanta(importe "%s")' % name for name in
                    ['arquivo', 'rede', 'mariadb', 'segredo', 'tomada', 'correio.imap', 'nomes', 'rpdf', 'vigia'])
 subprocess.run([str(binary), '-e', source], env=env, cwd='/tmp', check=True, timeout=10)

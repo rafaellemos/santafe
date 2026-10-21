@@ -53,6 +53,11 @@ editores reais, incluindo HTML/JS concatenados e a paleta suave opcional.
 Consulte [o fechamento da versão](docs/LANCAMENTO-2.0.2.md) para distinguir
 o pacote aprovado da instalação operacional e conhecer os limites ensaiados.
 
+A manutenção [2.0.3](docs/LANCAMENTO-2.0.3.md) incorpora as correções posteriores
+do teste de fuso horário e da fonte RPDF em prefixos personalizados. Essas
+correções passaram no GitHub Actions em Ubuntu 24.04 e macOS 14; a publicação
+operacional e a criação da nova etiqueta são etapas separadas.
+
 O fonte conserva pontos de preparação para outras plataformas, mas Windows ainda não faz parte da matriz validada desta versão.
 
 A versão 2.0 altera vocabulário público em relação à 1.0; consulte o
@@ -146,6 +151,7 @@ de funções, mesmo sem depender do SLS. Veja [SLS](docs/SLS.md),
 - [SLS — Servidor de Linguagem Santafé](docs/SLS.md)
 - [Auditoria 2.0](docs/AUDITORIA-2.0-20261017.md)
 - [Lançamento 2.0.2](docs/LANCAMENTO-2.0.2.md)
+- [Manutenção 2.0.3](docs/LANCAMENTO-2.0.3.md)
 - [API pública das bibliotecas Fé](docs/API-PUBLICA-DAS-BIBLIOTECAS-FE.md)
 
 ## Estrutura

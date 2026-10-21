@@ -32,8 +32,8 @@ with tempfile.TemporaryDirectory(prefix='santafe-instalador-') as folder:
     assert (prefix / 'bin/arquivo-do-usuario').exists()
     assert not (prefix / 'bin/santafec').exists()
     assert not (prefix / 'include/lauxlib.h').exists()
-    subprocess.run(['bash', str(ROOT / 'ferramentas/instalar-arquivos.sh'), 'pc', str(prefix), 'macosx', '2.0.2'],
+    subprocess.run(['bash', str(ROOT / 'ferramentas/instalar-arquivos.sh'), 'pc', str(prefix), 'macosx', '2.0.3'],
                    check=True, timeout=10)
-    assert 'Version: 2.0.2' in (prefix / 'lib/pkgconfig/santafe.pc').read_text()
+    assert 'Version: 2.0.3' in (prefix / 'lib/pkgconfig/santafe.pc').read_text()
 print('Instalador: erros propagados e execução fora da raiz: ok')
 print('Desinstalador: destinos individuais e arquivos de terceiros preservados: ok')

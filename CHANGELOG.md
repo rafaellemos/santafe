@@ -1,5 +1,22 @@
 # Histórico de alterações
 
+## 2.0.3 — manutenção em 2026-10-20
+
+Sem novas funcionalidades ou alterações de ABI. Incorpora as duas correções
+encontradas no GitHub Actions depois da publicação de `v2.0.2-r2`:
+
+- teste HTTP do Carteiro independente do fuso, exercitado em UTC, São Paulo e Tóquio;
+- RPDF localiza sua fonte Unicode junto do módulo instalado, preservando
+  `RPDF_FONTE`; ensaios de prefixo isolado verificam o caminho real e geram PDF;
+- publicador instala a correção `rpdf_unicode` e sua documentação sem substituir
+  as demais bibliotecas operacionais; novos downloads e WebAssembly têm URLs
+  2.0.3, preservando os arquivos e etiquetas históricos;
+- metadado `pkg-config` publicado aponta para o destino definitivo, não para
+  o prefixo temporário usado na pré-validação;
+- SLS 0.1.1, VS Code 1.0.6 e Sublime 1.0.13 permanecem inalterados.
+
+Consulte [o escopo e a validação da manutenção](docs/LANCAMENTO-2.0.3.md).
+
 ## 2.0.2 — fechamento em 2026-10-19
 
 Revisão corretiva da linha 2.0, sem novas funcionalidades nesta etapa de

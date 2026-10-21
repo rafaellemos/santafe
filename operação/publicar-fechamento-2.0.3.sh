@@ -8,7 +8,7 @@ RAIZ="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 TRABALHO="$(dirname -- "$RAIZ")"
 PACOTES="${SANTAFE_PACOTES_FECHAMENTO:?lançador deve informar os pacotes conferidos}"
 PREFIXO="$TRABALHO/prefixo instalado"
-SNAPSHOT="$TRABALHO/fonte-publica/santafe-2.0.2"
+SNAPSHOT="$TRABALHO/fonte-publica/santafe-2.0.3"
 PREPARADO="$TRABALHO/preparado"
 COPIA=''
 AJUDANTE="$RAIZ/operação/fechamento-2.0.py"
@@ -42,14 +42,15 @@ if [[ "$MODO" == publicar ]]; then
 fi
 cd "$RAIZ"
 export GSETTINGS_BACKEND=memory
-echo 'Publicador Santafé 2.0.2 revisão 2 — fixtures temporárias isoladas'
+echo 'Publicador Santafé 2.0.3 — testes independentes de fuso e fonte RPDF portátil'
 echo '==> Conferindo a distribuição e compilando sem alterar a instalação'
-python3 testes/integracao/testar_distribuicao.py "$PACOTES/santafe-2.0.2.tar.gz" "$PACOTES/santafe-2.0.2.zip"
+python3 testes/integracao/testar_distribuicao.py "$PACOTES/santafe-2.0.3.tar.gz" "$PACOTES/santafe-2.0.3.zip"
 mkdir -p "$TRABALHO/fonte-publica"
-tar -xzf "$PACOTES/santafe-2.0.2.tar.gz" -C "$TRABALHO/fonte-publica"
+tar -xzf "$PACOTES/santafe-2.0.3.tar.gz" -C "$TRABALHO/fonte-publica"
 make cbin cbibc
 bash testar.sh
 python3 testes/integracao/testar_instalador.py
+python3 testes/integracao/testar_fechamento.py
 python3 extensões/vscode/testes/testar_extensao.py
 python3 extensões/sublime/testes/testar_pacote.py
 python3 extensões/sublime/testes/testar_recorte.py
@@ -87,13 +88,13 @@ python3 docs/validar-manual.py "$PREPARADO/manual.html" --fonte "$RAIZ" --compil
 systemctl is-active --quiet sfdev.service
 
 if [[ "$MODO" == --preflight ]]; then
-    echo 'FECHAMENTO_2_0_2_PREFLIGHT_OK — nenhuma instalação ou serviço alterado'
+    echo 'FECHAMENTO_2_0_3_PREFLIGHT_OK — nenhuma instalação ou serviço alterado'
     echo "Evidências e compilação: $TRABALHO"
     exit 0
 fi
 
-echo '==> Instalando núcleo/SLS, manual, downloads e executor versionado'
-COPIA="$(mktemp -d /var/backups/santafe-fechamento-2.0.2-XXXXXXXX)"
+echo '==> Instalando núcleo/SLS, correção RPDF, manual, downloads e executor versionado'
+COPIA="$(mktemp -d /var/backups/santafe-fechamento-2.0.3-XXXXXXXX)"
 # O ajudante cria seu subdiretório privado e só então começa a transação.
 COPIA="$COPIA/transacao"
 python3 "$AJUDANTE" install --plan "$PREPARADO/plan.json" --backup "$COPIA"
@@ -104,21 +105,22 @@ python3 docs/validar-manual.py "$ESTATICO/manual/index.html" --fonte "$SNAPSHOT"
 echo '==> Reiniciando somente o portal e verificando o conteúdo público'
 systemctl restart sfdev.service
 for tentativa in $(seq 1 30); do
-    if curl -fsS --max-time 5 "$URL/baixar?fechamento=2.0.2" -o "$TRABALHO/pagina.html" &&
-       grep -Fq 'Santafé 2.0.2</h5>' "$TRABALHO/pagina.html"; then break; fi
+    if curl -fsS --max-time 5 "$URL/baixar?fechamento=2.0.3" -o "$TRABALHO/pagina.html" &&
+       grep -Fq 'Santafé 2.0.3</h5>' "$TRABALHO/pagina.html"; then break; fi
     sleep 1
 done
-grep -Fq 'Santafé 2.0.2</h5>' "$TRABALHO/pagina.html"
+grep -Fq 'Santafé 2.0.3</h5>' "$TRABALHO/pagina.html"
 systemctl is-active --quiet sfdev.service
-for item in baixar/santafe-2.0.2.tar.gz baixar/santafe-2.0.2.zip baixar/santafe-2.0.2.json \
-            wasm/2.0.2/santafe.js wasm/2.0.2/santafe.wasm manual/index.html; do
-    curl -fsSL --max-time 60 "$URL/est%C3%A1tico/$item?verificacao=2.0.2" -o "$TRABALHO/publicado"
+for item in baixar/santafe-2.0.3.tar.gz baixar/santafe-2.0.3.zip baixar/santafe-2.0.3.json \
+            wasm/2.0.3/santafe.js wasm/2.0.3/santafe.wasm manual/index.html; do
+    curl -fsSL --max-time 60 "$URL/est%C3%A1tico/$item?verificacao=2.0.3" -o "$TRABALHO/publicado"
     cmp "$ESTATICO/$item" "$TRABALHO/publicado"
 done
 python3 "$AJUDANTE" verify --plan "$PREPARADO/plan.json"
 trap - ERR INT TERM
-echo 'Santafé 2.0.2 publicado e validado; SLS 0.1.1; editores preservados.'
+echo 'Santafé 2.0.3 publicado e validado; SLS 0.1.1; editores preservados.'
 echo "Cópia reversível: $COPIA"
-echo 'Fonte exato: /home/rafael/santafe-fonte/versoes/2.0.2'
-echo 'Bancos, aplicações empresariais e bibliotecas dos serviços não foram alterados.'
+echo 'Fonte exato: /home/rafael/santafe-fonte/versoes/2.0.3'
+echo 'Biblioteca corrigida: rpdf_unicode. Bancos, Correio e aplicações empresariais preservados.'
+echo 'Etiqueta v2.0.3 ainda não criada; registrar no GitHub após confirmar a publicação.'
 echo 'Somente sfdev.service reiniciado; demais processos persistentes mantidos.'

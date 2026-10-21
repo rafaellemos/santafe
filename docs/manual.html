@@ -11516,6 +11516,7 @@ mostre(vetor.formato, vetor.tipo, #vetor.elementos)
                 <h3 id="lib-rpdf">rpdf</h3>
                 <img class="sf-ilustracao-biblioteca" loading="lazy" decoding="async" src="/estático/fotos/rpdf-santafe.png?v=20260824.1" alt="Impressora tipográfica produzindo um documento PDF com português, grego, cirílico e símbolos matemáticos Unicode">
                 <p>Gerador de documentos PDF 2.0 escrito em Santafé. Recebe texto em UTF-8, incorpora a fonte Noto Sans e produz páginas, textos, desenhos, imagens e metadados sem chamar programas externos.</p>
+                <p>Desde a revisão 2.0.3, a fonte Noto Sans é localizada junto da biblioteca instalada, inclusive em prefixos personalizados e ao executar fora da árvore-fonte. A variável de ambiente <code>RPDF_FONTE</code> mantém precedência quando aponta para uma fonte acessível.</p>
                 <div class="sf-nota"><strong>Unicode de verdade:</strong> o texto usa fonte composta <code>Type0</code>, <code>CIDFontType2</code>, <code>Identity-H</code>, <code>CIDToGIDMap</code> e <code>ToUnicode</code>. Não existe conversão para ANSI ou Windows-1252. Nesta versão, um caractere ausente na Noto Sans causa erro explícito; emojis coloridos ainda exigirão uma fonte de reserva.</div>
                 <div class="sf-code" style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.10);">
                   <div class="sf-codebar" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(0,0,0,.22);border-bottom:1px solid rgba(255,255,255,.08);"><svg width="37" height="9" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="none" fill-rule="evenodd"><circle fill="#FF6461" cx="4.5" cy="4.5" r="4.5"></circle><circle fill="#FFC500" cx="18.5" cy="4.5" r="4.5"></circle><circle fill="#00D23D" cx="32.5" cy="4.5" r="4.5"></circle></g></svg><span style="opacity:.75;font-size:12px;font-family:monospace;">relatório.fé</span><div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-rpdf-inicio">Copiar</button></div></div>
@@ -13098,10 +13099,10 @@ mostre(válido, motivo)</code></pre>
 <script>
 window.Module = window.Module || {};
 Module.locateFile = function (path) {
-  return "/estático/wasm/2.0.2/" + path;
+  return "/estático/wasm/2.0.3/" + path;
 };
 </script>
-<script src="/estático/wasm/2.0.2/santafe.js"></script>
+<script src="/estático/wasm/2.0.3/santafe.js"></script>
 
 <script>
 (function () {

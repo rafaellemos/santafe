@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plano e transação reversível do fechamento 2.0.2; sem executar aplicações."""
+"""Plano e transação reversível da manutenção 2.0.3; sem executar aplicações."""
 import argparse
 import hashlib
 import importlib.util
@@ -13,8 +13,8 @@ import tempfile
 import pwd
 import grp
 
-VERSION = "2.0.2"
-BASE_WASM = "/estático/wasm/2.0.2/"
+VERSION = "2.0.3"
+BASE_WASM = "/estático/wasm/2.0.3/"
 
 
 def sha(path):
@@ -23,7 +23,7 @@ def sha(path):
 
 def cache_wasm(text):
     # Somente URLs do executor, nunca os links para a página do playground.
-    text = re.sub(r'/estático/wasm/(?:2\.0\.2/)?(?=santafe\.(?:js|wasm)|["\']\s*\+\s*path\b)',
+    text = re.sub(r'/estático/wasm/(?:2\.0\.[23]/)?(?=santafe\.(?:js|wasm)|["\']\s*\+\s*path\b)',
                   BASE_WASM, text)
     return re.sub(r'(?<=src=")santafe\.js(?:\?v=[^"<>]*)?', BASE_WASM + "santafe.js", text)
 
@@ -40,9 +40,9 @@ def download_page(text):
     part = text[start:end]
     if not all(s in part for s in ('santafe-vscode-1.0.6.vsix', 'Santafe.sublime-package?v=1.0.13')):
         raise ValueError("Publique primeiro os editores já homologados")
-    if 'Santafé 2.0.1</h5>' not in part and 'Santafé 2.0.2</h5>' not in part:
+    if 'Santafé 2.0.2</h5>' not in part and 'Santafé 2.0.3</h5>' not in part:
         raise ValueError("Versão inesperada na página; não substituir cegamente")
-    part = part.replace("2.0.1", VERSION)
+    part = part.replace("2.0.2", VERSION)
     for ext in ("tar.gz", "zip"):
         if f'santafe-{VERSION}.{ext}' not in part:
             raise ValueError("Download esperado ausente: " + ext)
@@ -105,7 +105,21 @@ def prepare(source, snapshot, prefix, downloads, system, site, public, out, owne
         add(prefix / "bin" / name, system / "bin" / name, "root:root", 0o755)
     for name in ("lua.h", "luaconf.h", "lauxlib.h", "lualib.h", "lua.hpp"):
         add(prefix / "include" / name, system / "include" / name, "root:root")
-    for rel in ("lib/liblua.a", "lib/pkgconfig/santafe.pc", "share/santafé/1.0/ferramentas/sls.fé"):
+    for rel in ("lib/liblua.a", "share/santafé/1.0/ferramentas/sls.fé"):
+        add(prefix / rel, system / rel, "root:root")
+    # A instalação ensaiada usa um prefixo temporário; o metadado publicado
+    # precisa apontar para o destino definitivo, não para essa pasta de teste.
+    pc_text = (prefix / "lib/pkgconfig/santafe.pc").read_text()
+    expected_prefix = f"prefix={prefix}\n"
+    if pc_text.count(expected_prefix) != 1 or f"Version: {VERSION}\n" not in pc_text:
+        raise ValueError("pkg-config da instalação de teste inesperado")
+    pc = out / "santafe.pc"
+    pc.write_text(pc_text.replace(expected_prefix, f"prefix={system}\n", 1))
+    add(pc, system / "lib/pkgconfig/santafe.pc", "root:root")
+    # Única biblioteca operacional alterada nesta manutenção. Não substitui
+    # os módulos C/Fé do Correio, dos bancos ou de aplicações empresariais.
+    for rel in ("share/santafé/1.0/bibf/rpdf_unicode.fé",
+                "share/santafé/1.0/bibf/rpdf/LEIA-ME.md"):
         add(prefix / rel, system / rel, "root:root")
     spec = importlib.util.spec_from_file_location("editor_publish", source / "operação/preparar-editores-portal.py")
     module = importlib.util.module_from_spec(spec)
@@ -126,12 +140,14 @@ def prepare(source, snapshot, prefix, downloads, system, site, public, out, owne
             add(file, site.parent / "versoes" / VERSION / file.relative_to(snapshot),
                 f"{owner}:{owner}", stat.S_IMODE(file.stat().st_mode), immutable=True)
     manifest = out / "release.json"
-    manifest.write_text(json.dumps(dict(version=VERSION, publication_revision=2,
-        source_tag="v2.0.2-r2", sls="0.1.1", vscode="1.0.6", sublime="1.0.13",
+    manifest.write_text(json.dumps(dict(version=VERSION, publication_revision=1,
+        source_tag=None, intended_source_tag="v2.0.3",
+        sls="0.1.1", vscode="1.0.6", sublime="1.0.13",
         downloads=hashes, source=str(site.parent / "versoes" / VERSION),
         wasm_url=BASE_WASM, restarted_services=["sfdev.service"],
-        persistent_services_not_restarted=True), ensure_ascii=False, indent=2) + "\n")
-    add(manifest, public / "baixar/santafe-2.0.2.json", "www-data:www-data", immutable=True)
+        persistent_services_not_restarted=True,
+        updated_libraries=["rpdf_unicode"]), ensure_ascii=False, indent=2) + "\n")
+    add(manifest, public / f"baixar/santafe-{VERSION}.json", "www-data:www-data", immutable=True)
     add(manifest, site.parent / "VERSAO-PUBLICADA.json", f"{owner}:{owner}")
     targets = [e["target"] for e in entries]
     if len(set(targets)) != len(targets):

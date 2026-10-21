@@ -304,7 +304,7 @@ desinstalar:
 
 
 PROJECT := santafe
-VERSION := 2.0.2
+VERSION := 2.0.3
 DISTDIR := $(PROJECT)-$(VERSION)
 vscode-catalogo:
 	@python3 extensões/vscode/gerar_catalogo.py
