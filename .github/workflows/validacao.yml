@@ -43,6 +43,7 @@ jobs:
       - run: python3 testes/integracao/testar_fechamento.py
       - run: python3 testes/integracao/testar_publicacao_conjunta.py
       - run: python3 testes/integracao/testar_textos_2_1.py
+      - run: python3 testes/integracao/testar_verificador_conjunto.py
       - run: python3 operação/verificar-conjunto.py --preflight
       - run: make dist
       - name: Distribuição e lançador verificáveis

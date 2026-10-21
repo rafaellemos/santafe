@@ -95,3 +95,17 @@ O upload foi aceito e entrou em `Verifying`; aguarde a confirmação pública
 antes de anunciar que essa revisão já pode ser instalada pela galeria.
 
 Os downloads 1.1.0 do portal e as etiquetas do núcleo permanecem inalterados.
+
+Na primeira execução de CI desta revisão, o ensaio conjunto ainda procurava
+os editores 1.1.0 da entrega 2.1.0. O manifesto de preparação do fonte agora
+identifica os editores 1.1.1 e fica explicitamente **não homologado para uma
+nova entrega conjunta**. As evidências da 2.1.0 e sua etiqueta não mudaram.
+Não republique núcleo ou distribuição histórica com esse manifesto.
+
+O verificador operacional e sua execução original no workflow foram
+preservados. Oito testes adicionais exercitam aceitação dos metadados
+históricos e recusa de versões divergentes, evidências ausentes e gates
+pendentes. O pré-voo verifica coerência, mas a validação final do conjunto
+continua recusando o fonte até haver identidade e homologação próprias para
+outra entrega conjunta. A publicação independente dos editores não exige
+reinstalar o núcleo nem alterar o servidor.
