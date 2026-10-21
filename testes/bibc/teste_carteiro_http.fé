@@ -13,6 +13,12 @@ local Carteiro = importe "carteiro"
 local Aplicação = importe "carteiro.aplicação"
 local util = importe "carteiro.web"
 
+-- A apresentação usa o fuso local. Construa a fixture no mesmo fuso, em vez
+-- de exigir 19:13 de Brasília para um instante que em UTC representa 22:13.
+local carimboDaMensagem = so.tempo {
+    year = 2023, month = 11, day = 14, hour = 19, min = 13, sec = 20
+}
+
 garanta(util.endereçoLegível("josé@xn--santaf-gva.dev.br") ==
     "josé@santafé.dev.br", "endereço simples não ficou legível")
 garanta(util.endereçoLegível("José <josé@xn--santaf-gva.dev.br>") ==
@@ -104,7 +110,7 @@ função repositório.listeMensagens(_, caixaId, pasta, busca, limite,
         assunto = "Mensagem de integração", resumo = "Olá pelo Carteiro",
         texto = "Olá pelo Carteiro", html = nulo, tamanho = 18,
         lida = falso, importante = falso, estadoDaEntrega = "recebida",
-        criadaEm = 1700000000, atualizadaEm = 1700000000,
+        criadaEm = carimboDaMensagem, atualizadaEm = carimboDaMensagem,
         remetentesNaConversa = { "Ana <ana@exemplo.org>",
             "Bruno <bruno@exemplo.org>" },
         anexosNaConversa = {
@@ -137,7 +143,7 @@ função repositório.obtenhaMensagem(_, caixaId, id, tratador)
         tratador(mensagemHTMLDeSaída(id,
             id == 42 e "Primeira carta formatada" ou
                 "Segunda carta formatada",
-            id == 42 e 1700000100 ou 1700000200), nulo)
+            carimboDaMensagem + (id == 42 e 100 ou 200)), nulo)
         retorne
     fim
     garanta(id == 41)
@@ -154,7 +160,7 @@ função repositório.obtenhaMensagem(_, caixaId, id, tratador)
             "<img src=\"https://rastreador.exemplo/pixel.png\">",
         tamanho = 18,
         lida = falso, importante = falso, estadoDaEntrega = "recebida",
-        criadaEm = 1700000000, atualizadaEm = 1700000000,
+        criadaEm = carimboDaMensagem, atualizadaEm = carimboDaMensagem,
         remetenteEnvelope = "retorno@exemplo.org",
         resultadoSPF = "nenhum", resultadoDKIM = "passa",
         resultadoDMARC = "passa", domínioDoAutor = "exemplo.org",

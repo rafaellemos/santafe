@@ -82,6 +82,14 @@ com conteúdo diferente.
 
 ## Homologação e limites
 
+- O primeiro GitHub Actions de `v2.0.2-r2` compilou em Ubuntu 24.04 e macOS
+  14, mas interrompeu a suíte HTTP por uma expectativa de horário fixa em
+  Brasília. Os runners estavam em UTC. A correção posterior constrói a data
+  da fixture no fuso local e repete o ensaio em UTC, America/Sao_Paulo e
+  Asia/Tokyo, sem modificar o relógio nem o comportamento do Carteiro.
+  A etiqueta e os downloads já publicados da revisão 2 permanecem intactos;
+  os resultados do CI devem sempre ser associados ao commit efetivamente
+  testado, sem atribuir aprovação retroativa à execução anterior.
 - Núcleo/bibliotecas: suítes macOS Intel e Debian com MariaDB isolado.
 - Editores: testes reais de VS Code e Sublime em macOS Intel, incluindo
   gabaritos, HTML/JS e reversibilidade da paleta suave.
