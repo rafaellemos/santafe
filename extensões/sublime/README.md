@@ -1,12 +1,13 @@
 # Santafé para Sublime Text
 
-Pacote 1.1.0 para Sublime Text 4 (build 4107 ou superior), disponível no portal oficial.
+Pacote 1.1.0 para Sublime Text 4, disponível no portal oficial.
+O catálogo oficial do Package Control exige build 4171 ou superior.
 
 Integra o SLS 1.0.0 pelo cliente LSP do Sublime: recursos semânticos são
 negociados por sessão e substituem os provedores locais equivalentes sem
 duplicação. O iniciador do SLS usa `-E -P`, sem executar fontes/dependências
 do projeto. Atualize núcleo 2.1.0 e SLS juntos. As notas 1.0.13 abaixo são
-históricas; a homologação visual desta revisão é um gate separado.
+históricas; esta revisão foi homologada no Sublime Text 4215 em macOS Intel.
 
 Ele reconhece `.fé` e `.fe`, aplica realce de sintaxe, oferece snippets,
 conclusões da linguagem e da API pública, exibe ajuda curta ao repousar o mouse
@@ -43,13 +44,13 @@ inclusive em atributos HTML e strings JavaScript. Chaves aninhadas são
 balanceadas; `®nome`, `Ⓡnome` e os delimitadores `®{`, `Ⓡ{` e `}` são laranja,
 sem itálico. O interior das chaves é código Santafé, sem herdar a cor do colar.
 Sequências como
-`\®` permanecem literais. Na revisão em desenvolvimento, `®variável` e
+`\®` permanecem literais. Desde a versão 1.1.0, `®variável` e
 `Ⓡíndice` também aceitam acentos compostos (NFC) e combinados (NFD), inclusive
 em HTML/JS. O nome começa com letra Unicode ou `_` e continua com letras,
 marcas combinantes, números ou `_`. O marcador e o nome inteiro mantêm o estilo
 laranja, sem itálico. Não há normalização automática: declaração e referência
-precisam usar a mesma sequência Unicode. A correção requer também o núcleo
-corrigido; nas versões publicadas, use `®{índice}`/`Ⓡ{índice}` como alternativa.
+precisam usar a mesma sequência Unicode. Essa forma requer o núcleo Santafé
+2.1.0 ou posterior; em núcleos anteriores, use `®{índice}`/`Ⓡ{índice}` como alternativa.
 
 HTML é reconhecido por tags, comentários HTML ou `<!DOCTYPE`/`<!doctype>` na
 linha do delimitador, inclusive em fragmentos como `[[ | Site</title>]]`.
@@ -139,11 +140,16 @@ grava a configuração do servidor e pede ao Package Control o cliente comunitá
 **LSP**. Reabra o Sublime Text uma vez para concluir a instalação. Não é preciso
 editar preferências nem ajustar o `PATH` gráfico do macOS.
 
-O SLS 0.1.1 publicado diagnostica sintaxe. O perfil 0.2.0-dev.1 deste fonte
-acrescenta intervalos precisos e sincronização incremental, mas exige recompilar
-e instalar núcleo e SLS juntos; os binários 2.0.3 publicados não têm a nova API.
-Conclusões semânticas entre arquivos, referências, formatação e depuração são
-evoluções futuras do servidor.
+O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0, oferece diagnósticos com
+intervalos precisos, sincronização incremental, conclusões, ajuda de parâmetros,
+definições e referências, renomeação com verificação de escopo e formatação
+conservadora do recuo. Analisa importações estáticas sem executar o programa nem
+suas dependências. Não oferece inferência completa de tipos nem depuração de
+execução; análise sintática e indexação ainda percorrem o documento completo.
+
+O cliente LSP negocia os recursos do servidor. Conclusões e ajuda locais ficam
+desativadas apenas quando uma sessão ativa oferece o recurso equivalente.
+Snippets, realce de HTML/JS e gabaritos continuam independentes do servidor.
 
 ## Catálogo público
 

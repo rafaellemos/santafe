@@ -1,5 +1,19 @@
 # Registro de mudanças — Santafé para Sublime Text
 
+## 1.1.0 — 21 de outubro de 2026
+
+- Integração semântica com SLS 1.0.0: navegação, referências, renomeação,
+  ajuda de parâmetros, símbolos, formatação e tokens, conforme as capacidades
+  negociadas pelo cliente LSP. Provedores locais permanecem como alternativa.
+- Gabaritos curtos `®variável` e `Ⓡvariável` com letras e marcas combinantes
+  Unicode, em NFC ou NFD, sem normalizar identificadores automaticamente.
+- Preserva realce HTML/JS concatenado, paleta suave, snippets e o estilo
+  laranja sem itálico dos gabaritos. Corrige snippets de função com acentos.
+- Atualiza o catálogo comum da API para 612 entradas; requer núcleo 2.1.0
+  para o SLS novo e a execução dos gabaritos curtos Unicode.
+- Exportação para o catálogo oficial com licença e preferências acessíveis;
+  Sublime Text >=4171 e host Python 3.8. Aprovação do canal é independente.
+
 ## 1.0.13 — 18 de outubro de 2026
 
 - Realce da API C/Fé gerado do catálogo público, incluindo JSON; chamadas locais e métodos.

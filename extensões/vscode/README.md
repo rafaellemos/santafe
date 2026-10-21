@@ -97,13 +97,13 @@ acentos graves. Chaves aninhadas são balanceadas; `\®` permanece literal.
 O curinga integra o realce de `®nome`; `®{` e `}` recebem o estilo de operador,
 enquanto o conteúdo da expressão mantém seu próprio realce.
 Colares com aspas ou colchetes não passam a interpolar por serem realçados.
-Na revisão em desenvolvimento, a forma curta também reconhece `®variável`,
+Desde a versão 1.1.0, a forma curta também reconhece `®variável`,
 `Ⓡíndice` e acentos combinados (NFD), sem cortar o nome no acento. O nome começa
 com letra Unicode ou `_`; em seguida aceita letras, marcas combinantes, números
 e `_`. O curinga inteiro mantém a cor laranja e o estilo normal, inclusive em
 HTML/JS. Não há normalização: declaração e referência precisam usar a mesma
-sequência Unicode. A correção deve ser distribuída junto com o núcleo corrigido;
-nas versões já publicadas, use `®{índice}`/`Ⓡ{índice}` como alternativa.
+sequência Unicode. Essa forma requer o núcleo Santafé 2.1.0 ou posterior;
+em núcleos anteriores, use `®{índice}`/`Ⓡ{índice}` como alternativa.
 
 HTML é reconhecido por uma tag, comentário HTML ou `<!DOCTYPE`/`<!doctype>`
 na linha de abertura, inclusive depois de texto como `[[ | Site</title>]]`.
@@ -158,7 +158,13 @@ o TextMate, pois esta extensão exige confiança para ativar suas funcionalidade
 
 ## SLS
 
-O SLS atual analisa sintaxe no conteúdo aberto, alterado ou salvo e não executa
-o programa. As conclusões e a navegação desta extensão são locais; referências,
-tipos, importações e definição entre arquivos, formatação e depuração dependem
-de uma análise semântica futura do SLS.
+O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0, oferece diagnósticos com
+intervalos precisos, sincronização incremental, conclusões, ajuda de parâmetros,
+definições e referências, renomeação com verificação de escopo e formatação
+conservadora do recuo. Analisa importações estáticas sem executar o programa nem
+suas dependências. Não oferece inferência completa de tipos nem depuração de
+execução; análise sintática e indexação ainda percorrem o documento completo.
+
+Quando o servidor está disponível, a extensão negocia esses recursos pelo LSP.
+Sem ele, mantém os provedores locais de conclusão, ajuda e navegação. O realce
+de HTML/JS e dos gabaritos continua independente do servidor.
