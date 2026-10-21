@@ -63,11 +63,15 @@ Referência: [publicação oficial de extensões](https://code.visualstudio.com/
 ## Registro do envio 1.1.0 — 21/10/2026
 
 O VSIX gerado pelo vsce 4.0.0 foi aceito pela gerência do Marketplace e entrou
-em `Verifying`. Esse estado não confirma disponibilidade pública.
+em `Verifying`. Depois, a Microsoft liberou a 1.1.0: a gerência deixou de
+mostrar a verificação pendente e o histórico público passou a listar 1.1.0.
 SHA-256 do arquivo enviado:
 `d80aaea20e1c485077b1ba7342cb3435bb83744ebc28d5dc68096625bb4d6578`.
 O runtime e o ícone são idênticos aos do pacote 1.1.0 homologado no portal.
 A instalação desse VSIX passou em perfil temporário isolado do VS Code.
+A instalação diretamente da galeria, em outro perfil temporário, também passou:
+`code --install-extension santafe.santafe@1.1.0`. A listagem retornou
+`santafe.santafe@1.1.0`; as extensões pessoais do usuário não foram alteradas.
 
 Errata documental identificada após o envio: o último parágrafo de SLS ainda
 descrevia limitações de uma versão anterior, em contradição com a introdução.
