@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import pathlib
+import struct
 import subprocess
 import sys
 import zipfile
@@ -28,6 +30,11 @@ def principal() -> None:
     assert (RAIZ / "snippets/santafe.code-snippets").is_file()
     assert (RAIZ / "api-publica.json").is_file()
     assert (RAIZ / "icon.png").is_file()
+    icone = (RAIZ / "icon.png").read_bytes()
+    assert icone.startswith(b"\x89PNG\r\n\x1a\n")
+    assert struct.unpack(">II", icone[16:24]) == (256, 256)
+    assert hashlib.sha256(icone).hexdigest() == "f01ecdbc52c06934e18919a62b0eb4400e7e35be63fbf99e5cc04df47937db6c", "o PNG precisa ser a marca oficial registrada em MARCA.md"
+    assert hashlib.sha256((RAIZ / "icon.svg").read_bytes()).hexdigest() == "9ce5cab0e3fb7eea923712240e05c68d0fdddad817ed75160220426d43ad82fa", "SVG oficial divergente"
     cliente = (RAIZ / "extension.js").read_text(encoding="utf-8")
     assert "execuçãoDoSls" in cliente
     assert "ferramentas\", \"sls\", \"sls.fé" in cliente

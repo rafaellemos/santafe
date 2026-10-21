@@ -2,7 +2,7 @@
   "name": "santafe",
   "displayName": "Santafé",
   "description": "Sintaxe, conclusões, navegação local e diagnósticos para Santafé.",
-	"version": "1.0.6",
+	"version": "1.0.7",
   "capabilities": {
     "untrustedWorkspaces": { "supported": false }
   },
