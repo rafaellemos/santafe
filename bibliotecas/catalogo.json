@@ -1,0 +1,23 @@
+{
+  "formato": 1,
+  "pacotes": [
+    {
+      "manifesto": {
+        "formato": 1,
+        "nome": "semver",
+        "versao": "1.0.0",
+        "descricao": "Leitura, comparação e intervalos de versões semânticas, sem execução de código ou acesso à rede.",
+        "licenca": "MIT",
+        "autores": ["Rafael Alves Lemos"],
+        "fonte": "https://xn--santaf-gva.dev.br/est%C3%A1tico/baixar/santafe-2.1.0.tar.gz",
+        "dependencias": {},
+        "modulos": {"semver": "bibf/semver.fé"}
+      },
+      "fontes": {
+        "bibf/semver.fé": "ferramentas/pacotes/versoes.fé",
+        "README.md": "bibliotecas/semver/README.md",
+        "LICENSE": "LICENSE"
+      }
+    }
+  ]
+}

@@ -19,6 +19,7 @@ with tarfile.open(sys.argv[1]) as archive:
         names.add(name)
         assert not Path(name).is_absolute() and '..' not in Path(name).parts
         assert not member.issym() and not member.islnk(), name
+        assert member.isfile() or member.isdir(), 'entrada especial no TAR: ' + name
         if not member.isfile():
             continue
         count += 1
@@ -31,6 +32,9 @@ with tarfile.open(sys.argv[1]) as archive:
             assert name.endswith('/testes/recursos/tls-local-chave.pem'), name
         assert not re.search(rb'(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36,})', data), name
     for required in ['docs/manual.html', 'docs/validar-manual.py', 'ferramentas/sls/sls.fé',
+                     'ferramentas/sls/analisador.fé', 'ferramentas/sls/nativo.c',
+                     'ferramentas/pacotes/cli.fé', 'ferramentas/pacotes/nativo.c',
+                     'bibliotecas/catalogo.json',
                      'testes/recursos/temporarios.fé',
                      'extensões/vscode/vendor/vscode-oniguruma/release/onig.wasm',
                      'extensões/vscode/vendor/vscode-oniguruma/LICENSE.txt',
@@ -39,6 +43,7 @@ with tarfile.open(sys.argv[1]) as archive:
                      'ferramentas/unicode/17.0.0/LICENSE.txt']:
         assert any(name.endswith('/' + required) for name in names), required
     assert not any('/docs/evidencias/' in name for name in names), 'evidências locais no pacote'
+    assert not any('/.santafe/' in name for name in names), 'cache privado de projeto no pacote'
 if len(sys.argv) > 2:
     with zipfile.ZipFile(sys.argv[2]) as archive:
         assert archive.testzip() is None, 'ZIP corrompido'

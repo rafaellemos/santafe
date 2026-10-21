@@ -349,6 +349,8 @@ static void closegoto (LexState *ls, int g, Labeldesc *label) {
     const char *msg = luaO_pushfstring(ls->L,
       "<v\xC3\xA1para %s> na linha %d entra no escopo da vari\xC3\xA1vel local '%s'",
       getstr(gt->name), gt->line, getstr(vname));
+    ls->t.start = gt->start;
+    ls->t.end = gt->end;
     semerror(ls, msg);
   }
   luaK_patchlist(fs, gt->pc, label->pc);
@@ -389,6 +391,8 @@ static int newlabelentry (LexState *ls, Labellist *l, TString *name,
                   Labeldesc, SHRT_MAX, "r\xC3\xB3tulos e desvios");
   l->arr[n].name = name;
   l->arr[n].line = line;
+  l->arr[n].start = ls->t.start;
+  l->arr[n].end = ls->t.end;
   l->arr[n].nactvar = ls->fs->nactvar;
   l->arr[n].pc = pc;
   l->n = n + 1;
@@ -466,6 +470,8 @@ static l_noret undefgoto (LexState *ls, Labeldesc *gt) {
                     ? "<%s> na linha %d n\xC3\xA3o est\xC3\xA1 dentro de um la\xC3\xA7o"
                     : "nenhum r\xC3\xB3tulo vis\xC3\xADvel '%s' para <v\xC3\xA1para> na linha %d";
   msg = luaO_pushfstring(ls->L, msg, getstr(gt->name), gt->line);
+  ls->t.start = gt->start;
+  ls->t.end = gt->end;
   semerror(ls, msg);
 }
 
@@ -1187,15 +1193,20 @@ static int cond (LexState *ls) {
 
 static void gotostat (LexState *ls, int pc) {
   int line = ls->linenumber;
+  size_t start = ls->t.start, end = ls->t.end;
   TString *label;
   int g;
-  if (testnext(ls, TK_GOTO))
+  if (testnext(ls, TK_GOTO)) {
+    end = ls->t.end;
     label = str_checkname(ls);
+  }
   else {
     luaX_next(ls);  /* skip break */
     label = luaS_new(ls->L, "pare");
   }
   g = newlabelentry(ls, &ls->dyd->gt, label, line, pc);
+  ls->dyd->gt.arr[g].start = start;
+  ls->dyd->gt.arr[g].end = end;
   findlabel(ls, g);  /* close it if label already defined */
 }
 

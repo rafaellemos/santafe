@@ -19,162 +19,226 @@
     {
       "rótulo": "agendamento:ativo",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "agendamento:ativo()",
+      "documentação": "Informa se o tratador ainda está agendado."
     },
     {
       "rótulo": "agendamento:cancele",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "agendamento:cancele()",
+      "documentação": "Cancela um agendamento ainda ativo."
     },
     {
       "rótulo": "agência:autentique",
       "origem": "bibs/bibf/correio/agência.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "agência:autentique(usuário, senha, tratador)",
+      "documentação": "Confere a identidade postal."
     },
     {
       "rótulo": "agência:autorizeDestinatário",
       "origem": "bibs/bibf/correio/agência.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "agência:autorizeDestinatário(identidade, remetente, destinatário, tratador)",
+      "documentação": "Autoriza um destino externo."
     },
     {
       "rótulo": "agência:autorizeRemetente",
       "origem": "bibs/bibf/correio/agência.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "agência:autorizeRemetente(identidade, remetente, tratador)",
+      "documentação": "Vincula MAIL FROM à caixa."
     },
     {
       "rótulo": "agência:receba",
       "origem": "bibs/bibf/correio/agência.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "agência:receba(envelope, tratador)",
+      "documentação": "Valida e enfileira a submissão."
     },
     {
       "rótulo": "antivírus.novo",
       "origem": "bibs/bibf/correio/antivírus.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "antivírus.novo([opções])",
+      "documentação": "Cria o cliente do ClamAV."
     },
     {
       "rótulo": "antivírus:confiraAssíncrono",
       "origem": "bibs/bibf/correio/antivírus.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "antivírus:confiraAssíncrono(tratador [, dado])",
+      "documentação": "Confere se o motor responde."
     },
     {
       "rótulo": "antivírus:examineAssíncrono",
       "origem": "bibs/bibf/correio/antivírus.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "antivírus:examineAssíncrono(conteúdo, tratador [, dado])",
+      "documentação": "Examina tacos em memória."
     },
     {
       "rótulo": "ap.aoFalhar",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "ap.aoFalhar(tratador)",
+      "documentação": "Define o tratador central das falhas de rotas e paradas."
     },
     {
       "rótulo": "ap.depure",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "ap.depure()",
+      "documentação": "Imprime informações internas."
     },
     {
       "rótulo": "ap.encerre",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "ap.encerre()",
+      "documentação": "Encerra o servidor e o laço do Caminheiro."
     },
     {
       "rótulo": "ap.escute",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "ap.escute(porta [, opções] [, retorno])",
+      "documentação": "Sobe o servidor HTTP na porta indicada."
     },
     {
       "rótulo": "ap.parada",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "ap.parada(tratadorDeParada)",
+      "documentação": "Registra uma parada (middleware)."
     },
     {
       "rótulo": "ap.rota",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "ap.rota(método, caminho, tratador)",
+      "documentação": "Registra uma rota para o método HTTP indicado."
     },
     {
       "rótulo": "arquivo.crieDiretóriosAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.crieDiretóriosAssíncrono(caminho, tratador [, dado])",
+      "documentação": "Cria uma árvore privada de diretórios."
     },
     {
       "rótulo": "arquivo.crieDiretóriosComPermissõesAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.crieDiretóriosComPermissõesAssíncrono(caminho, permissões, tratador [, dado])",
+      "documentação": "Cria diretórios com modo POSIX definido."
     },
     {
       "rótulo": "arquivo.existeAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.existeAssíncrono(caminho, tratador [, dado])",
+      "documentação": "Consulta a existência de um caminho."
     },
     {
       "rótulo": "arquivo.graveDurávelAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.graveDurávelAssíncrono(caminho, conteúdo, tratador [, dado])",
+      "documentação": "Publica um conteúdo de forma atômica e durável."
     },
     {
       "rótulo": "arquivo.graveDurávelComPermissõesAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.graveDurávelComPermissõesAssíncrono(caminho, conteúdo, permissões, tratador [, dado])",
+      "documentação": "Grava duravelmente com modo POSIX definido."
     },
     {
       "rótulo": "arquivo.leiaAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.leiaAssíncrono(caminho, limite, tratador [, dado])",
+      "documentação": "Lê um arquivo inteiro sem bloquear o laço."
     },
     {
       "rótulo": "arquivo.movaAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.movaAssíncrono(origem, destino, tratador [, dado])",
+      "documentação": "Renomeia ou move atomicamente."
     },
     {
       "rótulo": "arquivo.removaAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.removaAssíncrono(caminho, tratador [, dado])",
+      "documentação": "Remove arquivo ou diretório vazio."
     },
     {
       "rótulo": "arquivo:busque",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:busque([modo [, deslocamento]])",
+      "documentação": "Move o cursor de leitura/escrita do arquivo (seek)."
     },
     {
       "rótulo": "arquivo:definaMemint",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:definaMemint(modo [, tamanho])",
+      "documentação": "Define o modo de memória intermediária (buffer) de escrita do arquivo."
     },
     {
       "rótulo": "arquivo:escreva",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:escreva(...)",
+      "documentação": "Escreve no arquivo."
     },
     {
       "rótulo": "arquivo:esvazie",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:esvazie()",
+      "documentação": "Força a escrita dos dados pendentes deste arquivo."
     },
     {
       "rótulo": "arquivo:feche",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:feche()",
+      "documentação": "Fecha este arquivo e libera seus recursos."
     },
     {
       "rótulo": "arquivo:leia",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:leia(...)",
+      "documentação": "Lê o arquivo, no formato indicado."
     },
     {
       "rótulo": "arquivo:linhas",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo:linhas(...)",
+      "documentação": "Percorre este arquivo usando os formatos informados."
     },
     {
       "rótulo": "autenticador:avalieAssíncrono",
       "origem": "bibs/bibf/correio/autenticação.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "autenticador:avalieAssíncrono(envelope, tratador)",
+      "documentação": "Autentica uma carta antes de persistir."
     },
     {
       "rótulo": "autenticação.nova",
       "origem": "bibs/bibf/correio/autenticação.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "autenticação.nova(opções)",
+      "documentação": "Compõe SPF, DKIM e DMARC."
     },
     {
       "rótulo": "autoridade:escute",
@@ -204,627 +268,877 @@
     {
       "rótulo": "bit32.be",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.be(...)",
+      "documentação": "Aplica E bit a bit aos valores."
     },
     {
       "rótulo": "bit32.bnão",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.bnão(...)",
+      "documentação": "E, ou, ou-exclusivo, negação bit a bit."
     },
     {
       "rótulo": "bit32.bou",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.bou(...)",
+      "documentação": "Aplica OU bit a bit aos valores."
     },
     {
       "rótulo": "bit32.boux",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.boux(...)",
+      "documentação": "Aplica OU exclusivo bit a bit aos valores."
     },
     {
       "rótulo": "bit32.bTeste",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.bTeste(...)",
+      "documentação": "Testa se o \"E\" bit a bit de todos os argumentos é diferente de zero."
     },
     {
       "rótulo": "bit32.desloqueAritméticoDireita",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.desloqueAritméticoDireita(x, n)",
+      "documentação": "Desloca os bits de x pra direita em n posições preservando o bit de sinal."
     },
     {
       "rótulo": "bit32.desloqueDireita",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.desloqueDireita(x, n)",
+      "documentação": "Desloca os bits para a direita, preenchendo com zero."
     },
     {
       "rótulo": "bit32.desloqueEsquerda",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.desloqueEsquerda(x, n)",
+      "documentação": "Desloca os bits para a esquerda, preenchendo com zero."
     },
     {
       "rótulo": "bit32.extraia",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.extraia(x, campo [, largura])",
+      "documentação": "Extrai um grupo de largura bits de x a partir da posição campo."
     },
     {
       "rótulo": "bit32.gireDireita",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.gireDireita(x, n)",
+      "documentação": "Gira os 32 bits para a direita."
     },
     {
       "rótulo": "bit32.gireEsquerda",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.gireEsquerda(x, n)",
+      "documentação": "Gira os 32 bits para a esquerda."
     },
     {
       "rótulo": "bit32.substitua",
       "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32"
+      "categoria": "bit32",
+      "assinatura": "bit32.substitua(x, v, campo [, largura])",
+      "documentação": "Devolve uma cópia de x com largura bits a partir da posição campo substituídos pelos bits de v."
     },
     {
       "rótulo": "caminheiro.form",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "caminheiro.form(corpo)",
+      "documentação": "Decodifica um formulário enviado como application/x-www-form-urlencoded."
     },
     {
       "rótulo": "caminheiro.formulárioEmPartes",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "caminheiro.formulárioEmPartes(corpo, tipoConteúdo)",
+      "documentação": "Decodifica campos e arquivos de multipart/form-data."
     },
     {
       "rótulo": "caminheiro.novo",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "caminheiro.novo()",
+      "documentação": "Cria uma nova aplicação."
     },
     {
       "rótulo": "canal:adicioneDestino",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:adicioneDestino(destino)",
+      "documentação": "Acrescenta um consumidor local."
     },
     {
       "rótulo": "canal:confirmação",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:confirmação(nome, correlação, dados [, opções])",
+      "documentação": "Confirma uma operação aplicada."
     },
     {
       "rótulo": "canal:despeje",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:despeje()",
+      "documentação": "Entrega a fila aos destinos."
     },
     {
       "rótulo": "canal:emita",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:emita(tipo, nome, dados [, opções])",
+      "documentação": "Cria e distribui qualquer tipo aceito."
     },
     {
       "rótulo": "canal:estatísticas",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:estatísticas()",
+      "documentação": "Obtém contadores do canal."
     },
     {
       "rótulo": "canal:feche",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:feche()",
+      "documentação": "Despeja e encerra o canal."
     },
     {
       "rótulo": "canal:leitura",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:leitura(nome, dados [, opções])",
+      "documentação": "Emite uma medida observada."
     },
     {
       "rótulo": "canal:operação",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:operação(nome, dados [, opções])",
+      "documentação": "Emite uma solicitação de mudança."
     },
     {
       "rótulo": "canal:pulsoDeVida",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:pulsoDeVida(dados [, opções])",
+      "documentação": "Emite o estado atual da origem."
     },
     {
       "rótulo": "canal:recusa",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:recusa(nome, correlação, dados [, opções])",
+      "documentação": "Recusa uma operação."
     },
     {
       "rótulo": "canal:removaDestino",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:removaDestino(destino)",
+      "documentação": "Desliga um consumidor local."
     },
     {
       "rótulo": "canal:sinal",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "canal:sinal(nome, dados [, opções])",
+      "documentação": "Emite um acontecimento."
     },
     {
       "rótulo": "carregue",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "carregue(código [, nome])",
+      "documentação": "Compila um colar com código Santafé em uma função, sem executar."
     },
     {
       "rótulo": "carregueArquivo",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "carregueArquivo(caminho)",
+      "documentação": "Compila um arquivo em função, sem executar."
     },
     {
       "rótulo": "carteiro.novo",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro.novo(opções)",
+      "documentação": "Cria o serviço postal do usuário."
     },
     {
       "rótulo": "carteiro:caixaDoUsuário",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:caixaDoUsuário(usuário, tratador)",
+      "documentação": "Obtém ou cria a caixa postal."
     },
     {
       "rótulo": "carteiro:confieNoRemetente",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:confieNoRemetente(caixa, remetente, tratador)",
+      "documentação": "Confia no endereço exato."
     },
     {
       "rótulo": "carteiro:conteCartas",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:conteCartas(caixa, pasta, busca, tratador)",
+      "documentação": "Conta os resultados de uma pasta ou pesquisa."
     },
     {
       "rótulo": "carteiro:decidaTriagemDaCarta",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:decidaTriagemDaCarta(caixa, carta, decisão, tratador)",
+      "documentação": "Marca ou corrige uma carta recebida."
     },
     {
       "rótulo": "carteiro:deixeDeConfiarNoRemetente",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:deixeDeConfiarNoRemetente(caixa, remetente, tratador)",
+      "documentação": "Revoga a confiança no endereço."
     },
     {
       "rótulo": "carteiro:envieCarta",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:envieCarta(caixa, dados, tratador)",
+      "documentação": "Posta uma carta pelo Centro de Distribuição."
     },
     {
       "rótulo": "carteiro:esvazieLixeira",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:esvazieLixeira(caixa, tratador)",
+      "documentação": "Remove definitivamente as cartas da Lixeira."
     },
     {
       "rótulo": "carteiro:listeCartas",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:listeCartas(caixa, pasta, busca, limite [, deslocamento], tratador)",
+      "documentação": "Lista ou pesquisa cartas de uma pasta."
     },
     {
       "rótulo": "carteiro:listeCartasDaConversa",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:listeCartasDaConversa(caixa, pasta, identificação, tratador)",
+      "documentação": "Lista as cartas agrupadas na mesma conversa."
     },
     {
       "rótulo": "carteiro:listeCartasParaAção",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:listeCartasParaAção(caixa, pasta, busca, tratador)",
+      "documentação": "Resolve todas as cartas alcançadas por uma ação em lote."
     },
     {
       "rótulo": "carteiro:listeRegrasDaTriagem",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:listeRegrasDaTriagem(caixa, tratador)",
+      "documentação": "Lista as preferências da Triagem."
     },
     {
       "rótulo": "carteiro:marqueCartaLida",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:marqueCartaLida(caixa, identificação, tratador)",
+      "documentação": "Marca a carta como lida."
     },
     {
       "rótulo": "carteiro:marqueCartaNãoLida",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:marqueCartaNãoLida(caixa, identificação, tratador)",
+      "documentação": "Marca a carta como não lida."
     },
     {
       "rótulo": "carteiro:marqueCartasLidas",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:marqueCartasLidas(caixa, identificações, tratador)",
+      "documentação": "Marca em lote as cartas como lidas."
     },
     {
       "rótulo": "carteiro:marqueCartasNãoLidas",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:marqueCartasNãoLidas(caixa, identificações, tratador)",
+      "documentação": "Marca em lote as cartas como não lidas."
     },
     {
       "rótulo": "carteiro:movaCarta",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:movaCarta(caixa, identificação, pasta, tratador)",
+      "documentação": "Move uma carta sem trocar sua direção."
     },
     {
       "rótulo": "carteiro:movaCartas",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:movaCartas(caixa, identificações, pasta, tratador)",
+      "documentação": "Move cartas em lote com a mesma política da operação unitária."
     },
     {
       "rótulo": "carteiro:obtenhaAnexo",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:obtenhaAnexo(caixa, carta, anexo, tratador)",
+      "documentação": "Lê um anexo autorizado."
     },
     {
       "rótulo": "carteiro:obtenhaCarta",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:obtenhaCarta(caixa, identificação, tratador)",
+      "documentação": "Abre uma carta da caixa."
     },
     {
       "rótulo": "carteiro:obtenhaCartaOriginal",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:obtenhaCartaOriginal(caixa, identificação, tratador)",
+      "documentação": "Obtém a representação MIME original autorizada."
     },
     {
       "rótulo": "carteiro:pastas",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:pastas()",
+      "documentação": "Lista as pastas reconhecidas."
     },
     {
       "rótulo": "carteiro:remetenteConfiável",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:remetenteConfiável(caixa, remetente, tratador)",
+      "documentação": "Consulta a permissão de HTML de um endereço."
     },
     {
       "rótulo": "carteiro:removaRegraDaTriagem",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:removaRegraDaTriagem(caixa, escopo, valor, tratador)",
+      "documentação": "Remove uma regra pessoal."
     },
     {
       "rótulo": "carteiro:salveRegraDaTriagem",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:salveRegraDaTriagem(caixa, escopo, valor, decisão, tratador)",
+      "documentação": "Salva uma regra pessoal."
     },
     {
       "rótulo": "carteiro:usuárioPorSessão",
       "origem": "bibs/bibf/carteiro.fé",
-      "categoria": "Carteiro"
+      "categoria": "Carteiro",
+      "assinatura": "carteiro:usuárioPorSessão(resumo, tratador)",
+      "documentação": "Resolve uma sessão autenticada."
     },
     {
       "rótulo": "cd:aceiteDestinatário",
       "origem": "bibs/bibf/correio/cd.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "cd:aceiteDestinatário(endereço, tratador)",
+      "documentação": "Confere um destinatário local."
     },
     {
       "rótulo": "cd:atualizeEntrega",
       "origem": "bibs/bibf/correio/cd.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "cd:atualizeEntrega(idDaFila, estado, falha, tratador)",
+      "documentação": "Reflete a entrega na caixa enviada."
     },
     {
       "rótulo": "cd:entregueAvisoDaFila",
       "origem": "bibs/bibf/correio/cd.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "cd:entregueAvisoDaFila(aviso, tratador)",
+      "documentação": "Entrega ao repositório um aviso reservado da fila."
     },
     {
       "rótulo": "cd:posteCarta",
       "origem": "bibs/bibf/correio/cd.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "cd:posteCarta(caixa, dados, tratador)",
+      "documentação": "Examina e enfileira uma saída."
     },
     {
       "rótulo": "cd:recebaCarta",
       "origem": "bibs/bibf/correio/cd.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "cd:recebaCarta(envelope, tratador)",
+      "documentação": "Examina, classifica e distribui."
     },
     {
       "rótulo": "cliente:cancele",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "cliente:cancele()",
+      "documentação": "Cancela a conexão em andamento."
     },
     {
       "rótulo": "cliente:conecteAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "cliente:conecteAssíncrono(endereço, porta, retorno [, dado])",
+      "documentação": "Conecta de forma assíncrona."
     },
     {
       "rótulo": "cliente:definaTempoLimite",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "cliente:definaTempoLimite(ms)",
+      "documentação": "Define o prazo das próximas conexões."
     },
     {
       "rótulo": "cliente:definaTLS",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "cliente:definaTLS(usar)",
+      "documentação": "Liga ou desliga TLS antes da conexão."
     },
     {
       "rótulo": "cliente:definaValidaçãoTLS",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "cliente:definaValidaçãoTLS(validar)",
+      "documentação": "Liga ou desliga a validação do certificado TLS."
     },
     {
       "rótulo": "cliente:envieAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "cliente:envieAssíncrono(mensagem, tratador [, dado])",
+      "documentação": "Envia sem bloquear o laço."
     },
     {
       "rótulo": "cliente:feche",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "cliente:feche()",
+      "documentação": "Fecha o cliente."
     },
     {
       "rótulo": "colar.apare",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.apare(s)",
+      "documentação": "Remove espaços das extremidades."
     },
     {
       "rótulo": "colar.base64",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.base64(s)",
+      "documentação": "Codifica bytes em Base64."
     },
     {
       "rótulo": "colar.binário",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.binário(função [, retireInformações])",
+      "documentação": "Serializa uma função em bytecode."
     },
     {
       "rótulo": "colar.byte",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.byte(s [, i [, j]])",
+      "documentação": "Devolve os valores dos bytes."
     },
     {
       "rótulo": "colar.capture",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.capture(s, padrão)",
+      "documentação": "Percorre todas as ocorrências."
     },
     {
       "rótulo": "colar.caractere",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.caractere(byte1, ...)",
+      "documentação": "Cria um colar a partir de bytes."
     },
     {
       "rótulo": "colar.compacte",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.compacte(s)",
+      "documentação": "Compacta dados com zlib."
     },
     {
       "rótulo": "colar.corte",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.corte(s, i [, j])",
+      "documentação": "Recorta um trecho do colar."
     },
     {
       "rótulo": "colar.crc32",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.crc32(s)",
+      "documentação": "Calcula a soma de verificação CRC32."
     },
     {
       "rótulo": "colar.decBase64",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.decBase64(s)",
+      "documentação": "Decodifica Base64 em bytes."
     },
     {
       "rótulo": "colar.decHex",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.decHex(s)",
+      "documentação": "Decodifica hexadecimal em bytes."
     },
     {
       "rótulo": "colar.descompacte",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.descompacte(s [, máximo])",
+      "documentação": "Descompacta dados zlib sob um teto de memória."
     },
     {
       "rótulo": "colar.desempacote",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.desempacote(modelo, dados [, posição])",
+      "documentação": "Lê valores de dados binários."
     },
     {
       "rótulo": "colar.empacote",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.empacote(modelo, ...)",
+      "documentação": "Converte valores em dados binários."
     },
     {
       "rótulo": "colar.formate",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.formate(modelo, ...)",
+      "documentação": "Monta um colar formatado."
     },
     {
       "rótulo": "colar.hex",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.hex(s)",
+      "documentação": "Codifica bytes em hexadecimal."
     },
     {
       "rótulo": "colar.inverta",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.inverta(s)",
+      "documentação": "Inverte a ordem dos bytes."
     },
     {
       "rótulo": "colar.junte",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.junte(separador, valor1, valor2, ...)",
+      "documentação": "Une valores com um separador."
     },
     {
       "rótulo": "colar.maiúscula",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.maiúscula(s)",
+      "documentação": "Converte letras ASCII para maiúsculas."
     },
     {
       "rótulo": "colar.minúscula",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.minúscula(s)",
+      "documentação": "Converte letras ASCII para minúsculas."
     },
     {
       "rótulo": "colar.porte",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.porte(modelo)",
+      "documentação": "Calcula o tamanho fixo de um modelo."
     },
     {
       "rótulo": "colar.procure",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.procure(s, padrão [, início [, plano]])",
+      "documentação": "Localiza a primeira ocorrência."
     },
     {
       "rótulo": "colar.replique",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.replique(s, quantidade [, separador])",
+      "documentação": "Repete um colar."
     },
     {
       "rótulo": "colar.separe",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.separe(s, padrão [, início])",
+      "documentação": "Extrai uma ocorrência ou suas capturas."
     },
     {
       "rótulo": "colar.taco",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.taco(s [, i [, j]])",
+      "documentação": "Apelido de colar.byte."
     },
     {
       "rótulo": "colar.tamanho",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.tamanho(s)",
+      "documentação": "Conta os grafemas visíveis do colar UTF-8."
     },
     {
       "rótulo": "colar.troque",
       "origem": "src/lstrlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "colar.troque(s, padrão, substituto [, limite])",
+      "documentação": "Substitui ocorrências."
     },
     {
       "rótulo": "coleteLixo",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "coleteLixo(...)",
+      "documentação": "Controla o coletor de lixo (coleta, para, ajusta parâmetros)."
     },
     {
       "rótulo": "conexão:aceiteTLSAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:aceiteTLSAssíncrono(certificado, tratador [, dado])",
+      "documentação": "Promove uma conexão aceita pelo servidor para TLS."
     },
     {
       "rótulo": "conexão:cancele",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:cancele()",
+      "documentação": "Cancela leituras e escritas pendentes."
     },
     {
       "rótulo": "conexão:definaLimitesHTTP",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:definaLimitesHTTP(cabeçalhos, corpo)",
+      "documentação": "Define limites separados da leitura HTTP."
     },
     {
       "rótulo": "conexão:definaTempoLimite",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:definaTempoLimite(ms)",
+      "documentação": "Define o prazo de leituras e escritas futuras."
     },
     {
       "rótulo": "conexão:envieAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:envieAssíncrono(dados, retorno [, dado])",
+      "documentação": "Envia bytes pela conexão."
     },
     {
       "rótulo": "conexão:escapeColar",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:escapeColar(texto)",
+      "documentação": "Escapa um texto para uso seguro dentro de uma consulta SQL."
     },
     {
       "rótulo": "conexão:executeAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:executeAssíncrono(sql, tratador [, dado])",
+      "documentação": "Executa uma consulta SQL de forma assíncrona."
     },
     {
       "rótulo": "conexão:executePreparadoAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:executePreparadoAssíncrono(sql, parâmetros, tratador [, dado])",
+      "documentação": "Prepara, vincula, executa e libera uma consulta de uso único."
     },
     {
       "rótulo": "conexão:feche",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:feche()",
+      "documentação": "Fecha a conexão."
     },
     {
       "rótulo": "conexão:inicieTLSAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:inicieTLSAssíncrono(nome [, opções], tratador [, dado])",
+      "documentação": "Promove uma conexão cliente existente para TLS."
     },
     {
       "rótulo": "conexão:parLocal",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:parLocal()",
+      "documentação": "Informa o endereço e a porta locais da conexão."
     },
     {
       "rótulo": "conexão:parRemoto",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:parRemoto()",
+      "documentação": "Informa o endereço e a porta do par remoto."
     },
     {
       "rótulo": "conexão:prepareConsultaAssíncrona",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:prepareConsultaAssíncrona(sql, tratador [, dado])",
+      "documentação": "Cria uma consulta preparada reutilizável."
     },
     {
       "rótulo": "conexão:recebaAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:recebaAssíncrono(máximoBytes, retorno [, dado])",
+      "documentação": "Nome de compatibilidade para a leitura HTTP completa."
     },
     {
       "rótulo": "conexão:recebaDadosAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:recebaDadosAssíncrono(máximoBytes, retorno [, dado])",
+      "documentação": "Lê um fragmento binário sem interpretar HTTP."
     },
     {
       "rótulo": "conexão:recebaHTTPAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "conexão:recebaHTTPAssíncrono(máximoBytes, retorno [, dado])",
+      "documentação": "Acumula e interpreta uma requisição HTTP completa."
     },
     {
       "rótulo": "consulta:executeAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "consulta:executeAssíncrono(parâmetros, tratador [, dado])",
+      "documentação": "Executa novamente uma consulta já preparada."
     },
     {
       "rótulo": "consulta:feche",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "consulta:feche()",
+      "documentação": "Libera a consulta preparada reutilizável."
     },
     {
       "rótulo": "consulta:númeroDeParâmetros",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "consulta:númeroDeParâmetros()",
+      "documentação": "Conta os marcadores da consulta preparada."
     },
     {
       "rótulo": "correio.agência.nova",
       "origem": "bibs/bibf/correio/agência.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "correio.agência.nova(opções)",
+      "documentação": "Cria a política da Agência."
     },
     {
       "rótulo": "correio.cd.novo",
       "origem": "bibs/bibf/correio/cd.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "correio.cd.novo(opções)",
+      "documentação": "Compõe o Centro de Distribuição."
     },
     {
       "rótulo": "correio.cliente",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.cliente(opções)",
+      "documentação": "Cria um cliente SMTP."
     },
     {
       "rótulo": "correio.desprotejaPontos",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.desprotejaPontos(dados)",
+      "documentação": "Desfaz a proteção do DATA."
     },
     {
       "rótulo": "correio.entregueDiretamenteAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.entregueDiretamenteAssíncrono(mensagem, opções, tratador [, dado])",
+      "documentação": "Entrega diretamente pelos registros MX."
     },
     {
       "rótulo": "correio.filaMariaDB",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.filaMariaDB(piscina [, opções])",
+      "documentação": "Cria uma fila durável."
     },
     {
       "rótulo": "correio.filaMemória",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.filaMemória([limite])",
+      "documentação": "Cria uma fila volátil."
     },
     {
       "rótulo": "correio.imap.servidor",
       "origem": "bibs/bibf/correio/imap.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "correio.imap.servidor(opções)",
+      "documentação": "Cria o acesso IMAP cifrado."
     },
     {
       "rótulo": "correio.inspecioneCabeçalhos",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.inspecioneCabeçalhos(conteúdo)",
+      "documentação": "Confere a integridade dos cabeçalhos."
     },
     {
       "rótulo": "correio.leiaMensagem",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.leiaMensagem(conteúdo)",
+      "documentação": "Interpreta uma carta MIME."
     },
     {
       "rótulo": "correio.mariadb.novo",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.mariadb.novo(piscina, configuração [, depósito])",
+      "documentação": "Cria o repositório postal."
     },
     {
       "rótulo": "correio.multibanco.inicie",
@@ -839,17 +1153,23 @@
     {
       "rótulo": "correio.novaMensagem",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.novaMensagem(opções)",
+      "documentação": "Valida e cria uma carta."
     },
     {
       "rótulo": "correio.protejaPontos",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.protejaPontos(dados)",
+      "documentação": "Protege pontos no comando DATA."
     },
     {
       "rótulo": "correio.servidor",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "correio.servidor(opções)",
+      "documentação": "Cria um servidor SMTP."
     },
     {
       "rótulo": "correio.transporte.endereçoASCII",
@@ -864,87 +1184,121 @@
     {
       "rótulo": "correio.triagem.nova",
       "origem": "bibs/bibf/correio/triagem.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "correio.triagem.nova([opções])",
+      "documentação": "Cria uma Triagem explicável."
     },
     {
       "rótulo": "correio.util.apare",
       "origem": "bibs/bibf/correio/util.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.util.apare(valor)",
+      "documentação": "Normaliza e apara um valor."
     },
     {
       "rótulo": "correio.util.escapeHTML",
       "origem": "bibs/bibf/correio/util.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.util.escapeHTML(valor)",
+      "documentação": "Escapa texto para conteúdo HTML."
     },
     {
       "rótulo": "correio.util.idNatural",
       "origem": "bibs/bibf/correio/util.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.util.idNatural(valor)",
+      "documentação": "Valida uma identificação natural."
     },
     {
       "rótulo": "correio.util.nomeSeguroDoAnexo",
       "origem": "bibs/bibf/correio/util.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.util.nomeSeguroDoAnexo(nome)",
+      "documentação": "Higieniza o nome de um anexo."
     },
     {
       "rótulo": "correio.util.resumo",
       "origem": "bibs/bibf/correio/util.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.util.resumo(texto, limite)",
+      "documentação": "Produz uma prévia curta."
     },
     {
       "rótulo": "correio.util.separeEndereços",
       "origem": "bibs/bibf/correio/util.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "correio.util.separeEndereços(texto, limite)",
+      "documentação": "Separa uma lista de endereços."
     },
     {
       "rótulo": "corrotina.ceda",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.ceda(...)",
+      "documentação": "Pausa a corrotina atual, devolvendo valores a quem chamou retome."
     },
     {
       "rótulo": "corrotina.crie",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.crie(f)",
+      "documentação": "Cria uma corrotina a partir de uma função."
     },
     {
       "rótulo": "corrotina.envolva",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.envolva(f)",
+      "documentação": "Como crie, mas devolve uma função que já faz retome internamente."
     },
     {
       "rótulo": "corrotina.estado",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.estado(co)",
+      "documentação": "Estado da corrotina: \"suspenso\", \"rodando\", \"parado\"..."
     },
     {
       "rótulo": "corrotina.executando",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.executando()",
+      "documentação": "Devolve a corrotina em execução."
     },
     {
       "rótulo": "corrotina.podeCeder",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.podeCeder()",
+      "documentação": "Se a corrotina atual pode ser pausada com ceda."
     },
     {
       "rótulo": "corrotina.retome",
       "origem": "src/lcorolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "corrotina.retome(co, ...)",
+      "documentação": "Retoma/inicia a execução."
     },
     {
       "rótulo": "decodificador:alimente",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "decodificador:alimente(fragmento)",
+      "documentação": "Entrega fragmentos e retira quadros completos."
     },
     {
       "rótulo": "decodificador:pendente",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "decodificador:pendente()",
+      "documentação": "Conta os tacos ainda acumulados."
     },
     {
       "rótulo": "decodificador:reinicie",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "decodificador:reinicie()",
+      "documentação": "Descarta o lote e libera o decodificador."
     },
     {
       "rótulo": "defina",
@@ -957,139 +1311,207 @@
       "categoria": "API C / núcleo"
     },
     {
+      "rótulo": "depure.analise",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.analise(fonte [, nome])",
+      "documentação": "Analisa um colar de código sem executá-lo. Devolve verdadeiro ou falso, diagnóstico com o primeiro erro sintático e seu intervalo original."
+    },
+    {
       "rótulo": "depure.definaGancho",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.definaGancho(...)",
+      "documentação": "Instala ou remove um gancho de depuração."
     },
     {
       "rótulo": "depure.definaLocal",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.definaLocal(...)",
+      "documentação": "Altera uma variável local em um nível ativo da pilha."
     },
     {
       "rótulo": "depure.definaMetatabela",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.definaMetatabela(...)",
+      "documentação": "Troca a metatabela sem respeitar sua proteção."
     },
     {
       "rótulo": "depure.definaValorDeUsuário",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.definaValorDeUsuário(...)",
+      "documentação": "Troca o valor de usuário associado a um dado C."
     },
     {
       "rótulo": "depure.definaValorExterno",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.definaValorExterno(...)",
+      "documentação": "Altera um valor externo capturado por uma função."
     },
     {
       "rótulo": "depure.depure",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.depure([...])",
+      "documentação": "Entra num prompt de depuração interativo — cada linha digitada roda como código SantaFé no ponto atual da execução; cont encerra e continua o programa."
     },
     {
       "rótulo": "depure.idValorExterno",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.idValorExterno(...)",
+      "documentação": "Devolve a identidade de um valor externo para comparação."
     },
     {
       "rótulo": "depure.junteValorExterno",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.junteValorExterno(...)",
+      "documentação": "Faz duas funções compartilharem o mesmo valor externo."
+    },
+    {
+      "rótulo": "depure.lexemas",
+      "origem": "src/ldblib.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.lexemas(fonte [, nome [, limite]])",
+      "documentação": "Devolve os tokens do leitor lexical real, sem executar código. Preserva os intervalos originais em octetos e devolve o prefixo válido mesmo quando encontra erro lexical."
     },
     {
       "rótulo": "depure.obterGancho",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterGancho(...)",
+      "documentação": "Consulta o gancho de depuração ativo."
     },
     {
       "rótulo": "depure.obterInformação",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterInformação([corrotina,] funçãoOuNível [, opções])",
+      "documentação": "Devolve uma tabela com informações sobre uma função ou um nível da pilha de chamadas (código-fonte, linha atual, tipo, número de parâmetros...)."
     },
     {
       "rótulo": "depure.obterLocal",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterLocal(...)",
+      "documentação": "Lê uma variável local de uma função ou nível da pilha."
     },
     {
       "rótulo": "depure.obterMetatabela",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterMetatabela(...)",
+      "documentação": "Lê a metatabela sem respeitar sua proteção."
     },
     {
       "rótulo": "depure.obterRegistro",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterRegistro()",
+      "documentação": "Devolve a tabela de registro do interpretador — um espaço interno (fora do alcance normal do código) onde bibliotecas C guardam referências que precisam sobreviver entre chamadas."
     },
     {
       "rótulo": "depure.obterValorDeUsuário",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterValorDeUsuário(...)",
+      "documentação": "Lê o valor de usuário associado a um dado C."
     },
     {
       "rótulo": "depure.obterValorExterno",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.obterValorExterno(...)",
+      "documentação": "Lê um valor externo capturado por uma função."
     },
     {
       "rótulo": "depure.rastroDePilha",
       "origem": "src/ldblib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "depure.rastroDePilha([msg])",
+      "documentação": "Monta um rastro de pilha (a sequência de chamadas até aqui) como texto, prefixado por msg se dada."
     },
     {
       "rótulo": "depósito.novo",
       "origem": "bibs/bibf/correio/depósito.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "depósito.novo([opções])",
+      "documentação": "Cria um depósito por conteúdo."
     },
     {
       "rótulo": "depósito:caminhoDoObjeto",
       "origem": "bibs/bibf/correio/depósito.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "depósito:caminhoDoObjeto(resumo)",
+      "documentação": "Deriva o caminho interno."
     },
     {
       "rótulo": "depósito:graveAssíncrono",
       "origem": "bibs/bibf/correio/depósito.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "depósito:graveAssíncrono(conteúdo, tratador [, dado])",
+      "documentação": "Grava duravelmente pelos tacos."
     },
     {
       "rótulo": "depósito:leiaAssíncrono",
       "origem": "bibs/bibf/correio/depósito.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "depósito:leiaAssíncrono(resumo [, tamanho], tratador [, dado])",
+      "documentação": "Lê e verifica um objeto."
     },
     {
       "rótulo": "depósito:prepareAssíncrono",
       "origem": "bibs/bibf/correio/depósito.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "depósito:prepareAssíncrono(tratador [, dado])",
+      "documentação": "Prepara a árvore de objetos."
     },
     {
       "rótulo": "destino:envie",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "destino:envie(mensagem)",
+      "documentação": "Recebe um envelope do canal."
     },
     {
       "rótulo": "destino:esvazie",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "destino:esvazie()",
+      "documentação": "Conclui dados pendentes do destino."
     },
     {
       "rótulo": "destino:feche",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "destino:feche()",
+      "documentação": "Libera os recursos do destino."
     },
     {
       "rótulo": "dkim.assine",
       "origem": "bibs/bibf/correio/dkim.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "dkim.assine(conteúdo, opções)",
+      "documentação": "Assina uma carta com RSA-SHA256."
     },
     {
       "rótulo": "dkim.verifiqueAssíncrono",
       "origem": "bibs/bibf/correio/dkim.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "dkim.verifiqueAssíncrono(conteúdo, opções, tratador)",
+      "documentação": "Confere as assinaturas DKIM recebidas."
     },
     {
       "rótulo": "dmarc.avalieAssíncrono",
       "origem": "bibs/bibf/correio/dmarc.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "dmarc.avalieAssíncrono(opções, tratador)",
+      "documentação": "Alinha identidades e aplica a política DMARC."
     },
     {
       "rótulo": "dnssec:encontreNSEC",
@@ -1104,222 +1526,310 @@
     {
       "rótulo": "entrega.espera",
       "origem": "bibs/bibf/correio/entrega.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "entrega.espera(tentativas [, intervalos])",
+      "documentação": "Calcula o próximo intervalo."
     },
     {
       "rótulo": "entrega.formeAviso",
       "origem": "bibs/bibf/correio/entrega.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "entrega.formeAviso(opções)",
+      "documentação": "Forma um aviso DSN em português."
     },
     {
       "rótulo": "erro",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "erro(msg [, nível])",
+      "documentação": "Lança um erro imediatamente."
     },
     {
       "rótulo": "es.abra",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.abra(caminho [, modo])",
+      "documentação": "Abre um arquivo."
     },
     {
       "rótulo": "es.arquivoTemp",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.arquivoTemp()",
+      "documentação": "Cria um arquivo temporário."
     },
     {
       "rótulo": "es.entrada",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.entrada([arquivo])",
+      "documentação": "Consulta ou troca a entrada padrão."
     },
     {
       "rótulo": "es.escreva",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.escreva(...)",
+      "documentação": "Escreve valores na saída padrão."
     },
     {
       "rótulo": "es.esvazie",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.esvazie()",
+      "documentação": "Força a escrita dos dados pendentes da saída padrão."
     },
     {
       "rótulo": "es.feche",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.feche([arquivo])",
+      "documentação": "Fecha arquivo ou a saída padrão atual."
     },
     {
       "rótulo": "es.leia",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.leia(...)",
+      "documentação": "Lê valores da entrada padrão."
     },
     {
       "rótulo": "es.linhas",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.linhas([caminho])",
+      "documentação": "Percorre as linhas de um arquivo e o fecha ao terminar."
     },
     {
       "rótulo": "es.pAbra",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.pAbra(comando [, modo])",
+      "documentação": "Abre um processo (pipe)."
     },
     {
       "rótulo": "es.saída",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.saída([arquivo])",
+      "documentação": "Consulta ou troca a saída padrão."
     },
     {
       "rótulo": "es.tipo",
       "origem": "src/liolib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "es.tipo(v)",
+      "documentação": "Identifica se v é um arquivo (aberto ou fechado)."
     },
     {
       "rótulo": "executeArquivo",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "executeArquivo(caminho)",
+      "documentação": "Executa um arquivo .fé no contexto atual."
     },
     {
       "rótulo": "fila:adicioneAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:adicioneAssíncrono(mensagem, tratador [, dado])",
+      "documentação": "Forma e enfileira uma saída."
     },
     {
       "rótulo": "fila:adicioneFormadaAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:adicioneFormadaAssíncrono(mensagem, conteúdo, objeto, tratador [, dado])",
+      "documentação": "Enfileira MIME já persistido."
     },
     {
       "rótulo": "fila:adieAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:adieAssíncrono(id, falha, segundos, tratador [, dado])",
+      "documentação": "Agenda uma nova tentativa."
     },
     {
       "rótulo": "fila:adieAvisoAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:adieAvisoAssíncrono(aviso, falha, segundos, máximo, tratador [, dado])",
+      "documentação": "Repete ou separa um aviso."
     },
     {
       "rótulo": "fila:adieParcialAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:adieParcialAssíncrono(id, pendentes, permanentes, falha, segundos, tratador [, dado])",
+      "documentação": "Adia somente destinos temporários."
     },
     {
       "rótulo": "fila:canceleAvisosDesatualizadosAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:canceleAvisosDesatualizadosAssíncrono(tratador [, dado])",
+      "documentação": "Cancela atrasos que perderam o sentido."
     },
     {
       "rótulo": "fila:crieEstruturaAssíncrona",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:crieEstruturaAssíncrona(tratador [, dado])",
+      "documentação": "Cria a tabela da fila MariaDB."
     },
     {
       "rótulo": "fila:listeQuarentenaAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:listeQuarentenaAssíncrono([limite], tratador [, dado])",
+      "documentação": "Lista itens separados."
     },
     {
       "rótulo": "fila:marqueEntregueAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:marqueEntregueAssíncrono(id, tratador [, dado])",
+      "documentação": "Conclui uma entrega."
     },
     {
       "rótulo": "fila:marqueFalhouAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:marqueFalhouAssíncrono(id, falha, permanentes, tratador [, dado])",
+      "documentação": "Encerra uma entrega fracassada."
     },
     {
       "rótulo": "fila:marqueFalhouEAviseAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:marqueFalhouEAviseAssíncrono(id, falha, permanentes, detalhes, tratador [, dado])",
+      "documentação": "Encerra e agenda o aviso final."
     },
     {
       "rótulo": "fila:quarenteneAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:quarenteneAssíncrono(id, motivo, tratador [, dado])",
+      "documentação": "Separa um item defeituoso."
     },
     {
       "rótulo": "fila:receba",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:receba(mensagem, conclua)",
+      "documentação": "Persiste uma carta recebida."
     },
     {
       "rótulo": "fila:recupereAvisosExpiradosAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:recupereAvisosExpiradosAssíncrono(tratador [, dado])",
+      "documentação": "Recupera avisos abandonados."
     },
     {
       "rótulo": "fila:recupereReservasExpiradasAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:recupereReservasExpiradasAssíncrono(tratador [, dado])",
+      "documentação": "Recupera entregas abandonadas."
     },
     {
       "rótulo": "fila:registreFalhaInternaAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:registreFalhaInternaAssíncrono(id, motivo [, limite], tratador [, dado])",
+      "documentação": "Conta defeitos internos repetidos."
     },
     {
       "rótulo": "fila:reprocesseQuarentenaAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:reprocesseQuarentenaAssíncrono(id, tratador [, dado])",
+      "documentação": "Libera um item para nova análise."
     },
     {
       "rótulo": "fila:reservePróximaAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:reservePróximaAssíncrono(tratador [, dado])",
+      "documentação": "Arrenda a próxima entrega."
     },
     {
       "rótulo": "fila:reservePróximoAvisoAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:reservePróximoAvisoAssíncrono(tratador [, dado])",
+      "documentação": "Arrenda o próximo aviso."
     },
     {
       "rótulo": "fila:soliciteAvisoAssíncrono",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "fila:soliciteAvisoAssíncrono(id, tipo, detalhes, tratador [, dado])",
+      "documentação": "Agenda um aviso de entrega."
     },
     {
       "rótulo": "filaMemória:receba",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "filaMemória:receba(mensagem [, conclua])",
+      "documentação": "Acrescenta uma entrada volátil."
     },
     {
       "rótulo": "garanta",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "garanta(v [, mensagem])",
+      "documentação": "Interrompe a execução se v for falso ou nulo; caso contrário devolve todos os argumentos."
     },
     {
       "rótulo": "igual",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "igual(a, b)",
+      "documentação": "Compara a e b ignorando o metamétodo __igual."
     },
     {
       "rótulo": "imagem.codifique",
       "origem": "bibs/bibf/imagem.fé",
-      "categoria": "Imagem"
+      "categoria": "Imagem",
+      "assinatura": "imagem.codifique(\"png\", largura, altura, pixels)",
+      "documentação": "Cria um PNG RGBA em memória."
     },
     {
       "rótulo": "imagem.identifique",
       "origem": "bibs/bibf/imagem.fé",
-      "categoria": "Imagem"
+      "categoria": "Imagem",
+      "assinatura": "imagem.identifique(fonte [, binário])",
+      "documentação": "Reconhece PNG, JPEG ou SVG."
     },
     {
       "rótulo": "imagem.leia",
       "origem": "bibs/bibf/imagem.fé",
-      "categoria": "Imagem"
+      "categoria": "Imagem",
+      "assinatura": "imagem.leia(fonte [, binário])",
+      "documentação": "Lê uma imagem reconhecida."
     },
     {
       "rótulo": "imagem.paraPDF",
       "origem": "bibs/bibf/imagem.fé",
-      "categoria": "Imagem"
+      "categoria": "Imagem",
+      "assinatura": "imagem.paraPDF(fonte [, binário])",
+      "documentação": "Prepara PNG, JPEG ou SVG para o RPDF."
     },
     {
       "rótulo": "imagem.salve",
       "origem": "bibs/bibf/imagem.fé",
-      "categoria": "Imagem"
+      "categoria": "Imagem",
+      "assinatura": "imagem.salve(caminho, \"png\", largura, altura, pixels)",
+      "documentação": "Cria e grava um PNG."
     },
     {
       "rótulo": "ipares",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "ipares(t)",
+      "documentação": "Iterador para percorrer a parte de lista (índices 1..n) de uma tabela."
     },
     {
       "rótulo": "json._NOME",
@@ -1334,47 +1844,65 @@
     {
       "rótulo": "json.cod",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.cod(valor)",
+      "documentação": "Codifica uma tabela ou valor Santafé em um colar JSON."
     },
     {
       "rótulo": "json.codManterMemint",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.codManterMemint([manter])",
+      "documentação": "Define se o buffer (memória intermediária) de codificação fica guardado entre chamadas."
     },
     {
       "rótulo": "json.codMatrizEsparsa",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.codMatrizEsparsa([converte [, razão [, seguro]]])",
+      "documentação": "Configura como json.cod lida com listas esparsas (com buracos nos índices)."
     },
     {
       "rótulo": "json.codNúmeroPrecisão",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.codNúmeroPrecisão([n])",
+      "documentação": "Define quantos dígitos significativos usar ao converter números de ponto flutuante pra texto."
     },
     {
       "rótulo": "json.codNúmerosInválidos",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.codNúmerosInválidos([modo])",
+      "documentação": "Controla a codificação de infinito e NaN."
     },
     {
       "rótulo": "json.codProfundo",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.codProfundo([n])",
+      "documentação": "Consulta ou define a profundidade máxima da codificação."
     },
     {
       "rótulo": "json.decod",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.decod(colar)",
+      "documentação": "Decodifica um colar JSON para um valor Santafé."
     },
     {
       "rótulo": "json.decodNúmerosInválidos",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.decodNúmerosInválidos([permitir])",
+      "documentação": "Controla a aceitação de infinito e NaN ao decodificar."
     },
     {
       "rótulo": "json.decodProfundo",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.decodProfundo([n])",
+      "documentação": "Consulta ou define a profundidade máxima da decodificação."
     },
     {
       "rótulo": "json.matrizVazia",
@@ -1384,7 +1912,9 @@
     {
       "rótulo": "json.novo",
       "origem": "src/lua_cjson.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "json.novo()",
+      "documentação": "Cria uma instância independente do módulo json, com sua própria configuração."
     },
     {
       "rótulo": "json.valorNulo",
@@ -1404,72 +1934,100 @@
     {
       "rótulo": "mariadb.conecteAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mariadb.conecteAssíncrono(endereço, usuário, senha, banco [, porta], tratador [, dado])",
+      "documentação": "Conecta a um servidor MariaDB/MySQL de forma assíncrona."
     },
     {
       "rótulo": "mariadb.criePiscinaAssíncrona",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mariadb.criePiscinaAssíncrona(configuração, tratador [, dado])",
+      "documentação": "Cria e aquece uma piscina de conexões."
     },
     {
       "rótulo": "mariadb.versãoDoConector",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mariadb.versãoDoConector()",
+      "documentação": "Devolve a versão da biblioteca cliente MySQL/MariaDB em uso."
     },
     {
       "rótulo": "mat.absoluto",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.absoluto(x)",
+      "documentação": "Devolve a distância de x até zero."
     },
     {
       "rótulo": "mat.aleatório",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.aleatório([m [, n]])",
+      "documentação": "Produz um número pseudoaleatório."
     },
     {
       "rótulo": "mat.arcoCosseno",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.arcoCosseno(x)",
+      "documentação": "Calcula o arco cujo cosseno é x."
     },
     {
       "rótulo": "mat.arcoSeno",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.arcoSeno(x)",
+      "documentação": "Calcula o arco cujo seno é x."
     },
     {
       "rótulo": "mat.arcoTangente",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.arcoTangente(y [, x])",
+      "documentação": "Calcula o arco tangente, com quadrante opcional."
     },
     {
       "rótulo": "mat.arredonde",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.arredonde(x [, casas])",
+      "documentação": "Arredonda x para a precisão escolhida."
     },
     {
       "rótulo": "mat.cosseno",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.cosseno(x)",
+      "documentação": "Calcula o cosseno de um ângulo."
     },
     {
       "rótulo": "mat.cossenoHiperbólico",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.cossenoHiperbólico(x)",
+      "documentação": "Calcula o cosseno hiperbólico de x."
     },
     {
       "rótulo": "mat.decompõe2",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.decompõe2(x)",
+      "documentação": "Decompõe x em mantissa e potência de dois."
     },
     {
       "rótulo": "mat.expoente",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.expoente(x)",
+      "documentação": "Calcula e elevado a x."
     },
     {
       "rótulo": "mat.graus",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.graus(radianos)",
+      "documentação": "Converte radianos para graus."
     },
     {
       "rótulo": "mat.infinito",
@@ -1479,22 +2037,30 @@
     {
       "rótulo": "mat.log10",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.log10(x)",
+      "documentação": "Calcula o logaritmo de base 10."
     },
     {
       "rótulo": "mat.logaritmo",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.logaritmo(x [, base])",
+      "documentação": "Calcula o logaritmo de x."
     },
     {
       "rótulo": "mat.menorSemSinal",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.menorSemSinal(a, b)",
+      "documentação": "Compara dois inteiros como valores sem sinal."
     },
     {
       "rótulo": "mat.máximo",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.máximo(x, ...)",
+      "documentação": "Devolve o maior entre os valores."
     },
     {
       "rótulo": "mat.máximoInteiro",
@@ -1504,7 +2070,9 @@
     {
       "rótulo": "mat.mínimo",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.mínimo(x, ...)",
+      "documentação": "Devolve o menor entre os valores."
     },
     {
       "rótulo": "mat.mínimoInteiro",
@@ -1514,7 +2082,9 @@
     {
       "rótulo": "mat.paraInteiro",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.paraInteiro(x)",
+      "documentação": "Converte x somente quando ele representa um inteiro exato."
     },
     {
       "rótulo": "mat.pi",
@@ -1524,87 +2094,121 @@
     {
       "rótulo": "mat.piso",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.piso(x)",
+      "documentação": "Arredonda x para baixo."
     },
     {
       "rótulo": "mat.potência",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.potência(x, y)",
+      "documentação": "Eleva x à potência y."
     },
     {
       "rótulo": "mat.radianos",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.radianos(graus)",
+      "documentação": "Converte graus para radianos."
     },
     {
       "rótulo": "mat.raiz",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.raiz(x)",
+      "documentação": "Calcula a raiz quadrada de x."
     },
     {
       "rótulo": "mat.recompõe2",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.recompõe2(mantissa, expoente)",
+      "documentação": "Recompõe um número usando uma potência de dois."
     },
     {
       "rótulo": "mat.resto",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.resto(x, y)",
+      "documentação": "Calcula o resto com o sinal de x."
     },
     {
       "rótulo": "mat.semente",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.semente(x)",
+      "documentação": "Reinicia o gerador pseudoaleatório."
     },
     {
       "rótulo": "mat.seno",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.seno(x)",
+      "documentação": "Calcula o seno de um ângulo."
     },
     {
       "rótulo": "mat.senoHiperbólico",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.senoHiperbólico(x)",
+      "documentação": "Calcula o seno hiperbólico de x."
     },
     {
       "rótulo": "mat.separa",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.separa(x)",
+      "documentação": "Separa as partes inteira e fracionária."
     },
     {
       "rótulo": "mat.tangente",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.tangente(x)",
+      "documentação": "Calcula a tangente de um ângulo."
     },
     {
       "rótulo": "mat.tangenteHiperbólica",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.tangenteHiperbólica(x)",
+      "documentação": "Calcula a tangente hiperbólica de x."
     },
     {
       "rótulo": "mat.teto",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.teto(x)",
+      "documentação": "Arredonda x para cima."
     },
     {
       "rótulo": "mat.tipo",
       "origem": "src/lmathlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mat.tipo(x)",
+      "documentação": "Identifica o subtipo de um número."
     },
     {
       "rótulo": "mensagem:destinatários",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "mensagem:destinatários()",
+      "documentação": "Reúne todos os destinos."
     },
     {
       "rótulo": "mensagem:forme",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "mensagem:forme()",
+      "documentação": "Forma o objeto MIME."
     },
     {
       "rótulo": "mostre",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "mostre(...)",
+      "documentação": "Imprime valores no terminal, separados por tabulação."
     },
     {
       "rótulo": "multibanco:adicioneMensagemIMAP",
@@ -1709,7 +2313,9 @@
     {
       "rótulo": "módulo.carregarBib",
       "origem": "src/loadlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "módulo.carregarBib(caminho, nomeFunção)",
+      "documentação": "Carrega uma biblioteca C dinamicamente (.so) e chama dentro dela a função de abertura nomeFunção."
     },
     {
       "rótulo": "módulo.pesquisadores",
@@ -1719,7 +2325,9 @@
     {
       "rótulo": "módulo.pesquisarCaminho",
       "origem": "src/loadlib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "módulo.pesquisarCaminho(nome, caminho [, ...])",
+      "documentação": "Procura nome seguindo o padrão de caminho, e devolve o primeiro arquivo que existir."
     },
     {
       "rótulo": "módulo.pré",
@@ -1754,12 +2362,16 @@
     {
       "rótulo": "nomes.codifiqueMensagem",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.codifiqueMensagem(mensagem)",
+      "documentação": "Monta uma mensagem DNS binária."
     },
     {
       "rótulo": "nomes.codifiqueNome",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.codifiqueNome(nome)",
+      "documentação": "Transforma um nome no formato binário DNS."
     },
     {
       "rótulo": "nomes.CÓDIGOS",
@@ -1769,12 +2381,16 @@
     {
       "rótulo": "nomes.decodifiqueMensagem",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.decodifiqueMensagem(pacote)",
+      "documentação": "Interpreta uma mensagem DNS binária."
     },
     {
       "rótulo": "nomes.decodifiqueNome",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.decodifiqueNome(pacote [, posição])",
+      "documentação": "Lê um nome binário DNS."
     },
     {
       "rótulo": "nomes.dnssec.assineZona",
@@ -1784,17 +2400,23 @@
     {
       "rótulo": "nomes.nomeCanônico",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.nomeCanônico(nome)",
+      "documentação": "Normaliza um nome DNS."
     },
     {
       "rótulo": "nomes.nomeDoTipo",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.nomeDoTipo(número)",
+      "documentação": "Nomeia um tipo DNS numérico."
     },
     {
       "rótulo": "nomes.novaConsulta",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.novaConsulta(nome [, tipo [, identificação [, recursiva]]])",
+      "documentação": "Cria um pacote de consulta DNS."
     },
     {
       "rótulo": "nomes.resolvedor.novo",
@@ -1804,7 +2426,9 @@
     {
       "rótulo": "nomes.tipoParaNúmero",
       "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
+      "categoria": "Nomes",
+      "assinatura": "nomes.tipoParaNúmero(tipo)",
+      "documentação": "Converte um tipo DNS para seu número."
     },
     {
       "rótulo": "nomes.TIPOS",
@@ -1819,77 +2443,107 @@
     {
       "rótulo": "obter",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "obter(t, chave) / defina(t, chave, v)",
+      "documentação": "Leitura/escrita em tabela ignorando __índice e __novoÍndice."
     },
     {
       "rótulo": "obterMetatabela",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "obterMetatabela(t) / definaMetatabela(t, mt)",
+      "documentação": "Lê/define a metatabela de t."
     },
     {
       "rótulo": "octetos",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "octetos(s)",
+      "documentação": "Conta todos os octetos armazenados no colar s, inclusive zeros; atende a dados binários. A consulta é constante e não converte números implicitamente."
     },
     {
       "rótulo": "paraColar",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "paraColar(v)",
+      "documentação": "Converte qualquer valor para texto."
     },
     {
       "rótulo": "paraNúmero",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "paraNúmero(v [, base])",
+      "documentação": "Converte texto para número; aceita base numérica opcional."
     },
     {
       "rótulo": "pares",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "pares(t)",
+      "documentação": "Iterador para percorrer todas as chaves/valores de uma tabela (ordem não garantida)."
     },
     {
       "rótulo": "pdf:Abra",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Abra()",
+      "documentação": "Abre explicitamente o documento."
     },
     {
       "rótulo": "pdf:AceitaQuebraDePágina",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:AceitaQuebraDePágina()",
+      "documentação": "Gancho que autoriza a quebra automática."
     },
     {
       "rótulo": "pdf:AdicioneJavaScript",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:AdicioneJavaScript(script)",
+      "documentação": "Incorpora JavaScript ao PDF."
     },
     {
       "rótulo": "pdf:AdicioneLigação",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:AdicioneLigação()",
+      "documentação": "Cria uma ligação interna."
     },
     {
       "rótulo": "pdf:AdicionePágina",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:AdicionePágina([orientação [, tamanho]])",
+      "documentação": "Começa uma página nova."
     },
     {
       "rótulo": "pdf:AutoImprima",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:AutoImprima()",
+      "documentação": "Solicita impressão ao abrir."
     },
     {
       "rótulo": "pdf:Cabeçalho",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Cabeçalho()",
+      "documentação": "Gancho chamado no início de cada página."
     },
     {
       "rótulo": "pdf:CalculeLinhas",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:CalculeLinhas(largura, texto)",
+      "documentação": "Calcula quantas linhas MultiCélula usará."
     },
     {
       "rótulo": "pdf:ConfereQuebraDePágina",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:ConfereQuebraDePágina(altura)",
+      "documentação": "Abre uma página antes do próximo bloco quando a altura informada ultrapassa o limite inferior."
     },
     {
       "rótulo": "pdf:CorteIndefinido",
@@ -1899,12 +2553,16 @@
     {
       "rótulo": "pdf:Célula",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Célula(largura, altura, texto [, borda [, linha [, alinhamento [, preenchimento [, ligação]]]]])",
+      "documentação": "Desenha uma célula com texto."
     },
     {
       "rótulo": "pdf:CélulaAjustada",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:CélulaAjustada(...)pdf:CélulaAjustadaHorizontal(...)pdf:CélulaAjustadaHorizontalForçada(...)pdf:CélulaAjustadaEscapada(...)pdf:CélulaAjustadaEscapadaForçada(...)",
+      "documentação": "Ajustam texto largo por escala horizontal ou espaçamento entre caracteres; as variantes forçadas também ocupam toda a largura quando o texto já caberia."
     },
     {
       "rótulo": "pdf:CélulaAjustadaEscapada",
@@ -1929,52 +2587,72 @@
     {
       "rótulo": "pdf:CélulaCortada",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:CélulaCortada(largura, altura, texto, ...)",
+      "documentação": "Desenha uma célula cujo texto fica limitado ao retângulo, sem invadir a coluna vizinha."
     },
     {
       "rótulo": "pdf:Círculo",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Círculo(x, y, raio [, estilo])",
+      "documentação": "Desenha um círculo."
     },
     {
       "rótulo": "pdf:CódigoDeBarras2de5i",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:CódigoDeBarras2de5i(código [, estreita [, larga [, x [, y [, altura]]]]])",
+      "documentação": "Desenha código de barras 2 de 5 intercalado."
     },
     {
       "rótulo": "pdf:DefinaAbscissa",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaAbscissa(x)",
+      "documentação": "Define a posição horizontal."
     },
     {
       "rótulo": "pdf:DefinaAbscissaEOrdenada",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaAbscissaEOrdenada(x, y)",
+      "documentação": "Define x e y de uma vez."
     },
     {
       "rótulo": "pdf:DefinaAlfa",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaAlfa(alfa [, mistura])",
+      "documentação": "Define transparência e modo de mistura."
     },
     {
       "rótulo": "pdf:DefinaAssunto",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaAssunto(assunto)",
+      "documentação": "Define o assunto do documento."
     },
     {
       "rótulo": "pdf:DefinaAutoQuebraDePágina",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaAutoQuebraDePágina(ativa [, margemInferior])",
+      "documentação": "Configura a quebra automática de página."
     },
     {
       "rótulo": "pdf:DefinaAutor",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaAutor(autor)",
+      "documentação": "Define a autoria."
     },
     {
       "rótulo": "pdf:DefinaCompressão",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaCompressão(ativa)",
+      "documentação": "Solicita compressão dos fluxos quando a compilação possui o recurso correspondente; sem ele, o pedido permanece inativo."
     },
     {
       "rótulo": "pdf:DefinaConfiguraçõesDaFonte",
@@ -1984,167 +2662,233 @@
     {
       "rótulo": "pdf:DefinaCorDaLinha",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaCorDaLinha(r, g [, b])",
+      "documentação": "Define a cor dos contornos."
     },
     {
       "rótulo": "pdf:DefinaCorDoTexto",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaCorDoTexto(r, g [, b])",
+      "documentação": "Define a cor do texto."
     },
     {
       "rótulo": "pdf:DefinaCorInterna",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaCorInterna(r, g [, b])",
+      "documentação": "Define a cor de preenchimento."
     },
     {
       "rótulo": "pdf:DefinaCriador",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaCriador(criador)",
+      "documentação": "Identifica a aplicação criadora."
     },
     {
       "rótulo": "pdf:DefinaDuplaFace",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaDuplaFace([interior [, exterior]])",
+      "documentação": "Alterna margens para impressão frente e verso."
     },
     {
       "rótulo": "pdf:DefinaEspessuraDoQuadro",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaEspessuraDoQuadro(largura)",
+      "documentação": "Define a espessura das linhas."
     },
     {
       "rótulo": "pdf:DefinaFonte",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaFonte(\"notoSans\", [estilo [, pontos]])",
+      "documentação": "Seleciona a fonte Unicode incorporada."
     },
     {
       "rótulo": "pdf:DefinaLigação",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaLigação(ligação [, y [, página]])",
+      "documentação": "Define o destino de uma ligação interna."
     },
     {
       "rótulo": "pdf:DefinaMargemDireita",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaMargemDireita(margem)",
+      "documentação": "Altera a margem direita."
     },
     {
       "rótulo": "pdf:DefinaMargemEsquerda",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaMargemEsquerda(margem)",
+      "documentação": "Altera a margem esquerda."
     },
     {
       "rótulo": "pdf:DefinaMargemSuperior",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaMargemSuperior(margem)",
+      "documentação": "Altera a margem superior."
     },
     {
       "rótulo": "pdf:DefinaMargens",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaMargens(esquerda, superior [, direita])",
+      "documentação": "Define as margens do documento."
     },
     {
       "rótulo": "pdf:DefinaModoExibido",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaModoExibido(ampliação [, visual])",
+      "documentação": "Configura a abertura no leitor de PDF."
     },
     {
       "rótulo": "pdf:DefinaOrdenada",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaOrdenada(y [, redefinaX])",
+      "documentação": "Define a posição vertical."
     },
     {
       "rótulo": "pdf:DefinaPalavrasChave",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaPalavrasChave(palavras)",
+      "documentação": "Define palavras-chave."
     },
     {
       "rótulo": "pdf:DefinaTamanhoDaFonte",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaTamanhoDaFonte(pontos)",
+      "documentação": "Muda somente o tamanho da fonte."
     },
     {
       "rótulo": "pdf:DefinaTraço",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaTraço(preto, branco)",
+      "documentação": "Define um padrão tracejado."
     },
     {
       "rótulo": "pdf:DefinaTítulo",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:DefinaTítulo(título)",
+      "documentação": "Define o título Unicode."
     },
     {
       "rótulo": "pdf:Elipse",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Elipse(x, y, raioX, raioY [, estilo])",
+      "documentação": "Desenha uma elipse."
     },
     {
       "rótulo": "pdf:Escreva",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Escreva(altura, texto [, ligação])",
+      "documentação": "Escreve texto em fluxo contínuo."
     },
     {
       "rótulo": "pdf:Feche",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Feche()",
+      "documentação": "Finaliza páginas e objetos PDF."
     },
     {
       "rótulo": "pdf:Imagem",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Imagem(arquivo, x, y [, largura [, altura [, tipo [, ligação]]]])",
+      "documentação": "Insere PNG, JPEG ou SVG."
     },
     {
       "rótulo": "pdf:Ligação",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Ligação(x, y, largura, altura, destino)",
+      "documentação": "Cria uma área clicável."
     },
     {
       "rótulo": "pdf:LinearGradiente",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:LinearGradiente(x, y, largura, altura, cor1, cor2 [, coordenadas])",
+      "documentação": "Preenche uma área com gradiente linear."
     },
     {
       "rótulo": "pdf:Linha",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Linha(x1, y1, x2, y2)",
+      "documentação": "Desenha um segmento de reta."
     },
     {
       "rótulo": "pdf:MultiCélula",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:MultiCélula(largura, altura, texto [, borda [, alinhamento [, preenchimento]]])",
+      "documentação": "Quebra texto Unicode em várias linhas."
     },
     {
       "rótulo": "pdf:MultiCélulaEngarrafada",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:MultiCélulaEngarrafada(largura, altura, rótulo, texto, ...)",
+      "documentação": "Reserva uma célula curta para o rótulo e faz o texto restante fluir em uma multicélula ao lado."
     },
     {
       "rótulo": "pdf:NovaLinha",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:NovaLinha([altura])",
+      "documentação": "Move o cursor para a linha seguinte."
     },
     {
       "rótulo": "pdf:NúmeroDaPágina",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:NúmeroDaPágina()",
+      "documentação": "Devolve o número da página atual."
     },
     {
       "rótulo": "pdf:PegueAbscissa",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueAbscissa()",
+      "documentação": "Devolve a posição horizontal atual."
     },
     {
       "rótulo": "pdf:PegueAltura",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueAltura()",
+      "documentação": "Devolve a altura da página."
     },
     {
       "rótulo": "pdf:PegueConfiguraçõesDaFonte",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueConfiguraçõesDaFonte()pdf:DefinaConfiguraçõesDaFonte(configuração)",
+      "documentação": "Salvam e restauram família, estilo e tamanho da fonte corrente. A distribuição atual continua limitada à Noto Sans incorporada."
     },
     {
       "rótulo": "pdf:PegueCorDaLinha",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueCorDaLinha()pdf:PegueCorInterna()pdf:PegueCorDoTexto()",
+      "documentação": "Devolvem a cor RGB atual de traço, preenchimento ou texto."
     },
     {
       "rótulo": "pdf:PegueCorDoTexto",
@@ -2159,12 +2903,16 @@
     {
       "rótulo": "pdf:PegueLargura",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueLargura()",
+      "documentação": "Devolve a largura da página."
     },
     {
       "rótulo": "pdf:PegueLarguraDoColar",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueLarguraDoColar(texto)",
+      "documentação": "Mede um texto na fonte atual."
     },
     {
       "rótulo": "pdf:PegueMargemDireita",
@@ -2174,357 +2922,499 @@
     {
       "rótulo": "pdf:PegueMargemEsquerda",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueMargemEsquerda()pdf:PegueMargemDireita()",
+      "documentação": "Consultam as margens laterais atuais na unidade do documento."
     },
     {
       "rótulo": "pdf:PegueOrdenada",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueOrdenada()",
+      "documentação": "Devolve a posição vertical atual."
     },
     {
       "rótulo": "pdf:PeguePseudoNúmeroDePáginas",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PeguePseudoNúmeroDePáginas()",
+      "documentação": "Consulta o marcador definido por PseudoNúmeroDePáginas."
     },
     {
       "rótulo": "pdf:PegueTamanhoDaFonte",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PegueTamanhoDaFonte()",
+      "documentação": "Devolve o tamanho atual em pontos."
     },
     {
       "rótulo": "pdf:Polígono",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Polígono(pontos [, estilo])",
+      "documentação": "Desenha um polígono."
     },
     {
       "rótulo": "pdf:PseudoNúmeroDePáginas",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:PseudoNúmeroDePáginas(marcador)",
+      "documentação": "Define um marcador para o total de páginas."
     },
     {
       "rótulo": "pdf:RadialGradiente",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:RadialGradiente(x, y, largura, altura, cor1, cor2 [, coordenadas])",
+      "documentação": "Preenche uma área com gradiente radial."
     },
     {
       "rótulo": "pdf:Retângulo",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Retângulo(x, y, largura, altura [, estilo])",
+      "documentação": "Desenha um retângulo."
     },
     {
       "rótulo": "pdf:RetânguloAbaulado",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:RetânguloAbaulado(x, y, largura, altura, raio [, estilo])",
+      "documentação": "Desenha um retângulo com cantos arredondados."
     },
     {
       "rótulo": "pdf:RetânguloCortado",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:RetânguloCortado(x, y, largura, altura [, borda])pdf:CorteIndefinido()",
+      "documentação": "Abrem e encerram uma região retangular de recorte. Toda abertura precisa do encerramento correspondente."
     },
     {
       "rótulo": "pdf:Rodapé",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Rodapé()",
+      "documentação": "Gancho chamado no fim de cada página."
     },
     {
       "rótulo": "pdf:Rotacione",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Rotacione(ângulo [, x, y])",
+      "documentação": "Aplica rotação ao conteúdo seguinte em torno do ponto indicado. Use ângulo zero para encerrar a transformação."
     },
     {
       "rótulo": "pdf:Saída",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Saída([nome [, destino]])",
+      "documentação": "Finaliza e entrega o PDF."
     },
     {
       "rótulo": "pdf:Texto",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:Texto(x, y, texto)",
+      "documentação": "Desenha texto a partir de uma coordenada."
     },
     {
       "rótulo": "pdf:TextoCortado",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:TextoCortado(x, y, texto [, borda])",
+      "documentação": "Usa o contorno do texto como recorte."
     },
     {
       "rótulo": "pdf:TextoRotacionado",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:TextoRotacionado(x, y, texto, graus)",
+      "documentação": "Desenha texto rotacionado."
     },
     {
       "rótulo": "pdf:TextoSombreado",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "pdf:TextoSombreado(x, y, texto [, deslocamento])",
+      "documentação": "Desenha texto com sombra."
     },
     {
       "rótulo": "piscina:adquiraAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "piscina:adquiraAssíncrono(tratador [, dado])",
+      "documentação": "Reserva uma conexão e entrega uma sessão."
     },
     {
       "rótulo": "piscina:estado",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "piscina:estado()",
+      "documentação": "Retrata ocupação, fila e limites da piscina."
     },
     {
       "rótulo": "piscina:executeAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "piscina:executeAssíncrono(sql, tratador [, dado])",
+      "documentação": "Executa SQL fixo na próxima conexão livre."
     },
     {
       "rótulo": "piscina:executePreparadoAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "piscina:executePreparadoAssíncrono(sql, parâmetros, tratador [, dado])",
+      "documentação": "Executa uma consulta preparada de uso único."
     },
     {
       "rótulo": "piscina:feche",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "piscina:feche()",
+      "documentação": "Fecha todas as conexões livres da piscina."
     },
     {
       "rótulo": "piscina:inicieTransaçãoAssíncrona",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "piscina:inicieTransaçãoAssíncrona(tratador [, dado])",
+      "documentação": "Reserva uma conexão e inicia uma transação."
     },
     {
       "rótulo": "proteja",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "proteja(f, ...)",
+      "documentação": "Chama f protegido: devolve ok, resultado... em vez de propagar erro."
     },
     {
       "rótulo": "protejaMais",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "protejaMais(f, tratador, ...)",
+      "documentação": "Como proteja, mas com uma função tratadora de erro customizada."
     },
     {
       "rótulo": "proteção:admita",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:admita(chave [, peso])",
+      "documentação": "Decide se um trabalho pode começar."
     },
     {
       "rótulo": "proteção:bloqueie",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:bloqueie(chave [, duração [, motivo]])",
+      "documentação": "Aplica um bloqueio local explícito."
     },
     {
       "rótulo": "proteção:conclua",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:conclua(chave [, peso])",
+      "documentação": "Encerra um trabalho admitido."
     },
     {
       "rótulo": "proteção:estado",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:estado(chave)",
+      "documentação": "Consulta uma fotografia da chave."
     },
     {
       "rótulo": "proteção:estatísticas",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:estatísticas()",
+      "documentação": "Resume a atividade da proteção."
     },
     {
       "rótulo": "proteção:libere",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:libere(chave)",
+      "documentação": "Retira um bloqueio antes do prazo."
     },
     {
       "rótulo": "proteção:limpe",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:limpe()",
+      "documentação": "Remove chaves inativas antigas."
     },
     {
       "rótulo": "proteção:registreFalha",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "proteção:registreFalha(chave [, peso])",
+      "documentação": "Conta falhas e pode bloquear."
     },
     {
       "rótulo": "próximo",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "próximo(t [, chave])",
+      "documentação": "Devolve a próxima chave/valor de t após chave. Base do pares."
     },
     {
       "rótulo": "pulso.codifique",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.codifique(mensagem [, limite])",
+      "documentação": "Cria um quadro binário PULSO/1."
     },
     {
       "rótulo": "pulso.memória",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.memória([limite])",
+      "documentação": "Conserva os envelopes mais recentes."
     },
     {
       "rótulo": "pulso.novo",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.novo(opções)",
+      "documentação": "Cria um canal produtor."
     },
     {
       "rótulo": "pulso.novoDecodificador",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.novoDecodificador([opções])",
+      "documentação": "Cria um leitor incremental de quadros."
     },
     {
       "rótulo": "pulso.registrador",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.registrador(caminho [, opções])",
+      "documentação": "Acrescenta envelopes a um arquivo JSONL."
     },
     {
       "rótulo": "pulso.terminal",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.terminal()",
+      "documentação": "Escreve cada envelope como uma linha JSON."
     },
     {
       "rótulo": "pulso.valide",
       "origem": "bibs/bibf/pulso.fé",
-      "categoria": "PULSO"
+      "categoria": "PULSO",
+      "assinatura": "pulso.valide(mensagem)",
+      "documentação": "Valida a estrutura de um envelope."
     },
     {
       "rótulo": "rede.agende",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.agende(atrasoMs, tratador [, dado])",
+      "documentação": "Agenda uma chamada única no laço de eventos."
     },
     {
       "rótulo": "rede.analiseHTTP",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.analiseHTTP(dados)",
+      "documentação": "Interpreta bytes brutos como uma requisição HTTP."
     },
     {
       "rótulo": "rede.carregueCertificadoTLS",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.carregueCertificadoTLS(certificado, chave)",
+      "documentação": "Carrega um certificado e sua chave privada para TLS servidor."
     },
     {
       "rótulo": "rede.clienteTCP",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.clienteTCP()",
+      "documentação": "Cria um objeto cliente TCP."
     },
     {
       "rótulo": "rede.consulteDNSAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.consulteDNSAssíncrono(nome, tipo [, opções], tratador [, dado])",
+      "documentação": "Consulta registros MX ou TXT sem bloquear o laço."
     },
     {
       "rótulo": "rede.domínioASCII",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.domínioASCII(domínio)",
+      "documentação": "Converte um domínio Unicode para IDNA/Punycode."
     },
     {
       "rótulo": "rede.domínioUnicode",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.domínioUnicode(domínio)",
+      "documentação": "Converte um domínio Punycode para Unicode."
     },
     {
       "rótulo": "rede.laço",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.laço()",
+      "documentação": "Entra no laço principal de eventos."
     },
     {
       "rótulo": "rede.novaResposta",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.novaResposta(conexão)",
+      "documentação": "Cria um objeto de resposta HTTP de alto nível, vinculado a uma conexão."
     },
     {
       "rótulo": "rede.pareLaço",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.pareLaço()",
+      "documentação": "Solicita o encerramento do laço de eventos."
     },
     {
       "rótulo": "rede.resolvaEndereçosAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.resolvaEndereçosAssíncrono(nome [, opções], tratador [, dado])",
+      "documentação": "Resolve um nome para endereços IPv4 e IPv6."
     },
     {
       "rótulo": "rede.respostaHTTP",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.respostaHTTP(código, corpo [, tipoConteúdo])",
+      "documentação": "Monta a string bruta de uma resposta HTTP."
     },
     {
       "rótulo": "rede.servidorTCP",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.servidorTCP()",
+      "documentação": "Cria um objeto servidor TCP."
     },
     {
       "rótulo": "rede.udp",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "rede.udp([família])",
+      "documentação": "Cria um objeto conector (socket) UDP."
     },
     {
       "rótulo": "repositório:adicioneSaída",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:adicioneSaída(caixa, mensagem, fila, tratador)",
+      "documentação": "Registra carta enviada e fila."
     },
     {
       "rótulo": "repositório:atualizeEntrega",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:atualizeEntrega(idDaFila, estado, falha [, tratador])",
+      "documentação": "Atualiza o estado em Enviadas."
     },
     {
       "rótulo": "repositório:confiraEstrutura",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:confiraEstrutura(tratador)",
+      "documentação": "Valida banco e Depósito."
     },
     {
       "rótulo": "repositório:decidaTriagemDaCarta",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:decidaTriagemDaCarta(caixa, carta, decisão, tratador)",
+      "documentação": "Registra a correção feita pelo usuário."
     },
     {
       "rótulo": "repositório:existeDestinatárioLocal",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:existeDestinatárioLocal(endereço, tratador)",
+      "documentação": "Confere e provisiona destinatário local."
     },
     {
       "rótulo": "repositório:listeMensagens",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:listeMensagens(caixaId, pasta, busca, limite, tratador)",
+      "documentação": "Lista cartas de uma pasta."
     },
     {
       "rótulo": "repositório:listeRegrasDaTriagem",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:listeRegrasDaTriagem(caixa, tratador)",
+      "documentação": "Lista as regras pessoais da caixa."
     },
     {
       "rótulo": "repositório:marqueLida",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:marqueLida(caixaId, cartaId, tratador)",
+      "documentação": "Marca uma carta como lida."
     },
     {
       "rótulo": "repositório:movaMensagem",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:movaMensagem(caixaId, cartaId, pasta, tratador)",
+      "documentação": "Atualiza a pasta de uma carta."
     },
     {
       "rótulo": "repositório:obtenhaAnexo",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:obtenhaAnexo(caixaId, cartaId, anexoId, tratador)",
+      "documentação": "Lê um anexo autorizado."
     },
     {
       "rótulo": "repositório:obtenhaMensagem",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:obtenhaMensagem(caixaId, cartaId, tratador)",
+      "documentação": "Obtém carta e metadados dos anexos."
     },
     {
       "rótulo": "repositório:obtenhaOuCrieCaixa",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:obtenhaOuCrieCaixa(usuário, tratador)",
+      "documentação": "Provisiona a caixa do usuário."
     },
     {
       "rótulo": "repositório:obtenhaUsuárioPorSessão",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:obtenhaUsuárioPorSessão(resumo, tratador)",
+      "documentação": "Resolve uma sessão ativa."
     },
     {
       "rótulo": "repositório:recebaSMTP",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:recebaSMTP(envelope, tratador)",
+      "documentação": "Persiste uma entrega SMTP local."
     },
     {
       "rótulo": "repositório:removaRegraDaTriagem",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:removaRegraDaTriagem(caixa, escopo, valor, tratador)",
+      "documentação": "Remove uma regra pessoal."
     },
     {
       "rótulo": "repositório:salveRegraDaTriagem",
       "origem": "bibs/bibf/correio/mariadb.fé",
-      "categoria": "Correio — persistência, multiambiente e transporte"
+      "categoria": "Correio — persistência, multiambiente e transporte",
+      "assinatura": "repositório:salveRegraDaTriagem(caixa, escopo, valor, decisão, tratador)",
+      "documentação": "Cria ou substitui uma regra pessoal."
     },
     {
       "rótulo": "req.arquivos",
@@ -2589,32 +3479,44 @@
     {
       "rótulo": "res:código",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "res:código(número)",
+      "documentação": "Define o código HTTP da resposta."
     },
     {
       "rótulo": "res:dados",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "res:dados(corpo, tipoDoConteúdo)",
+      "documentação": "Envia uma resposta binária com tipo explícito."
     },
     {
       "rótulo": "res:definaCabeçalho",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "res:definaCabeçalho(nome, valor)",
+      "documentação": "Define um cabeçalho extra na resposta."
     },
     {
       "rótulo": "res:html",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "res:html(corpo)",
+      "documentação": "Monta uma resposta com corpo HTML."
     },
     {
       "rótulo": "res:json",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "res:json(corpo)",
+      "documentação": "Monta uma resposta com conteúdo JSON."
     },
     {
       "rótulo": "res:texto",
       "origem": "bibs/bibf/caminheiro.fé",
-      "categoria": "Caminheiro"
+      "categoria": "Caminheiro",
+      "assinatura": "res:texto(corpo)",
+      "documentação": "Monta uma resposta de texto simples."
     },
     {
       "rótulo": "resolvedor:escute",
@@ -2659,362 +3561,506 @@
     {
       "rótulo": "resultado:feche",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "resultado:feche()",
+      "documentação": "Libera o resultado."
     },
     {
       "rótulo": "resultado:idInserido",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "resultado:idInserido()",
+      "documentação": "Devolve o identificador automático gerado."
     },
     {
       "rótulo": "resultado:linhasAfetadas",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "resultado:linhasAfetadas()",
+      "documentação": "Informa quantas linhas um comando alterou."
     },
     {
       "rótulo": "resultado:númeroDeLinhas",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "resultado:númeroDeLinhas()",
+      "documentação": "Total de linhas do resultado."
     },
     {
       "rótulo": "resultado:obterLinha",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "resultado:obterLinha()",
+      "documentação": "Lê a próxima linha de um resultado."
     },
     {
       "rótulo": "RPDF:novo",
       "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui"
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "RPDF:novo()",
+      "documentação": "Cria um documento PDF 2.0 vazio."
     },
     {
       "rótulo": "segredo.assineRSA256",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.assineRSA256(dados, chavePrivadaPEM)",
+      "documentação": "Assina dados com RSA PKCS#1 v1.5 e SHA-256."
     },
     {
       "rótulo": "segredo.chavePúblicaRSA",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.chavePúblicaRSA(chavePEM)",
+      "documentação": "Extrai o campo público RSA no formato usado por DNSKEY."
     },
     {
       "rótulo": "segredo.confiraBilhete",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.confiraBilhete(a, b)",
+      "documentação": "Compara bilhetes sem revelar em qual posição diferem."
     },
     {
       "rótulo": "segredo.confiraSenhaAssíncrono",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.confiraSenhaAssíncrono(resumo, senha, tratador [, dado])",
+      "documentação": "Confere uma senha contra um resumo Argon2id."
     },
     {
       "rótulo": "segredo.novoBilhete",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.novoBilhete([tacos])",
+      "documentação": "Cria um bilhete imprevisível e seguro para URL."
     },
     {
       "rótulo": "segredo.precisaAtualizarSenha",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.precisaAtualizarSenha(resumo)",
+      "documentação": "Informa se um resumo antigo deve ser refeito com os parâmetros atuais."
     },
     {
       "rótulo": "segredo.protejaSenhaAssíncrono",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.protejaSenhaAssíncrono(senha, tratador [, dado])",
+      "documentação": "Protege uma senha com Argon2id sem bloquear o laço."
     },
     {
       "rótulo": "segredo.resuma",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.resuma(dados)",
+      "documentação": "Nome de compatibilidade para resumaBilhete."
     },
     {
       "rótulo": "segredo.resumaBilhete",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.resumaBilhete(bilhete)",
+      "documentação": "Produz um identificador fixo para guardar o bilhete sem guardar seu valor original."
     },
     {
       "rótulo": "segredo.resumaSHA256",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.resumaSHA256(dados)",
+      "documentação": "Calcula SHA-256 e devolve os 32 tacos binários."
     },
     {
       "rótulo": "segredo.verifiqueRSA256",
       "origem": "bibs/bibc/segredo/segredo.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "segredo.verifiqueRSA256(dados, assinatura, chavePública)",
+      "documentação": "Confere uma assinatura RSA/SHA-256."
     },
     {
       "rótulo": "selecione",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "selecione(n, ...)",
+      "documentação": "Com número: devolve os argumentos a partir da posição n. Com \"#\": devolve a quantidade de argumentos."
     },
     {
       "rótulo": "servidor:aceiteAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "servidor:aceiteAssíncrono(retorno [, dado])",
+      "documentação": "Aguarda uma conexão."
     },
     {
       "rótulo": "servidor:amarre",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "servidor:amarre(endereço, porta)",
+      "documentação": "Vincula o servidor a um endereço/porta (bind)."
     },
     {
       "rótulo": "servidor:cancele",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "servidor:cancele()",
+      "documentação": "Cancela o aceite pendente."
     },
     {
       "rótulo": "servidor:definaTempoLimite",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "servidor:definaTempoLimite(ms)",
+      "documentação": "Define o prazo dos próximos aceites."
     },
     {
       "rótulo": "servidor:escute",
       "origem": "bibs/bibf/correio/imap.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "servidor:escute()",
+      "documentação": "Inicia e entra no laço."
     },
     {
       "rótulo": "servidor:estatísticas",
       "origem": "bibs/bibf/correio.fé",
-      "categoria": "Correio — mensagem, SMTP e filas"
+      "categoria": "Correio — mensagem, SMTP e filas",
+      "assinatura": "servidor:estatísticas()",
+      "documentação": "Fotografa os contadores do Recebedor."
     },
     {
       "rótulo": "servidor:feche",
       "origem": "bibs/bibf/correio/imap.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "servidor:feche()",
+      "documentação": "Fecha o servidor."
     },
     {
       "rótulo": "servidor:inicie",
       "origem": "bibs/bibf/correio/imap.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "servidor:inicie()",
+      "documentação": "Abre a porta e arma os aceites."
     },
     {
       "rótulo": "sessão:devolva",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "sessão:devolva()",
+      "documentação": "Devolve a conexão reservada à piscina."
     },
     {
       "rótulo": "sessão:executeAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "sessão:executeAssíncrono(sql, tratador [, dado])",
+      "documentação": "Executa SQL fixo na conexão reservada."
     },
     {
       "rótulo": "sessão:executePreparadoAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "sessão:executePreparadoAssíncrono(sql, parâmetros, tratador [, dado])",
+      "documentação": "Executa uma preparação de uso único na sessão."
     },
     {
       "rótulo": "sessão:prepareConsultaAssíncrona",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "sessão:prepareConsultaAssíncrona(sql, tratador [, dado])",
+      "documentação": "Cria uma consulta reutilizável ligada à sessão."
     },
     {
       "rótulo": "so.aleatório",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.aleatório()",
+      "documentação": "Obtém um inteiro aleatório seguro de 32 bits do sistema."
     },
     {
       "rótulo": "so.data",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.data([modelo [, tempo]])",
+      "documentação": "Formata tempo (padrão: agora) segundo modelo, no formato do strftime."
     },
     {
       "rótulo": "so.definaLocal",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.definaLocal([modelo [, categoria]])",
+      "documentação": "Define a localidade (locale) do processo."
     },
     {
       "rótulo": "so.difTempo",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.difTempo(t2, t1)",
+      "documentação": "Diferença em segundos entre dois carimbos de data e hora (t2 - t1)."
     },
     {
       "rótulo": "so.execute",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.execute([comando])",
+      "documentação": "Executa comando no interpretador de comandos do sistema."
     },
     {
       "rótulo": "so.nomeTemp",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.nomeTemp()",
+      "documentação": "Gera um nome de arquivo temporário único (não cria o arquivo, só devolve o nome)."
     },
     {
       "rótulo": "so.obterVariável",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.obterVariável(nome)",
+      "documentação": "Lê o valor de uma variável de ambiente do processo, ou nulo se ela não existir."
     },
     {
       "rótulo": "so.relógio",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.relógio()",
+      "documentação": "Segundos de tempo de CPU consumidos pelo programa até agora."
     },
     {
       "rótulo": "so.remova",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.remova(caminho)",
+      "documentação": "Apaga o arquivo indicado por caminho."
     },
     {
       "rótulo": "so.renomeie",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.renomeie(de, para)",
+      "documentação": "Renomeia ou move um arquivo de de para para."
     },
     {
       "rótulo": "so.saia",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.saia([código])",
+      "documentação": "Encerra o processo imediatamente com o código de saída dado (padrão: sucesso)."
     },
     {
       "rótulo": "so.tempo",
       "origem": "src/loslib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "so.tempo([data])",
+      "documentação": "Obtém o carimbo atual ou converte uma tabela de data."
     },
     {
       "rótulo": "spf.verifiqueAssíncrono",
       "origem": "bibs/bibf/correio/spf.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "spf.verifiqueAssíncrono(opções, tratador)",
+      "documentação": "Autoriza a origem pelo envelope SMTP."
     },
     {
       "rótulo": "tabela.concatene",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.concatene(t [, sep [, i [, j]]])",
+      "documentação": "Reúne os elementos de uma sequência em um colar."
     },
     {
       "rótulo": "tabela.desempacote",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.desempacote(t [, i [, j]])",
+      "documentação": "Devolve uma faixa da tabela como valores separados."
     },
     {
       "rótulo": "tabela.empacote",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.empacote(...)",
+      "documentação": "Guarda todos os argumentos em uma tabela."
     },
     {
       "rótulo": "tabela.insira",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.insira(t, [pos,] v)",
+      "documentação": "Insere um valor (no fim, ou numa posição específica)."
     },
     {
       "rótulo": "tabela.maiorÍndice",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.maiorÍndice(t)",
+      "documentação": "Percorre as chaves numéricas: custo linear. Serve para diagnóstico ou estruturas esparsas, não como contador geral."
     },
     {
       "rótulo": "tabela.mova",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.mova(a1, f, e, t [, a2])",
+      "documentação": "Copia uma faixa para outra posição ou tabela."
     },
     {
       "rótulo": "tabela.ordene",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.ordene(t [, comp])",
+      "documentação": "Ordena a sequência na própria tabela."
     },
     {
       "rótulo": "tabela.remova",
       "origem": "src/ltablib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.remova(t [, pos])",
+      "documentação": "Remove e devolve um valor."
     },
     {
       "rótulo": "tamanho",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tamanho(colar) e colar.tamanho(colar)",
+      "documentação": "Percorrem UTF-8 para contar grafemas visíveis. Use para interface, validação textual e relatórios; não repita a chamada a cada concatenação de um texto grande."
     },
     {
       "rótulo": "tipo",
       "origem": "src/lbaselib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "tipo(v)",
+      "documentação": "Devolve o tipo de v como texto (\"número\", \"colar\", \"tabela\"...)."
     },
     {
       "rótulo": "transação:confirmeAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "transação:confirmeAssíncrono(tratador [, dado])",
+      "documentação": "Confirma as alterações e libera a conexão."
     },
     {
       "rótulo": "transação:desfaçaAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "transação:desfaçaAssíncrono(tratador [, dado])",
+      "documentação": "Desfaz as alterações e libera a conexão."
     },
     {
       "rótulo": "transação:executeAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "transação:executeAssíncrono(sql, tratador [, dado])",
+      "documentação": "Executa SQL fixo dentro da transação."
     },
     {
       "rótulo": "transação:executePreparadoAssíncrono",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "transação:executePreparadoAssíncrono(sql, parâmetros, tratador [, dado])",
+      "documentação": "Executa valores vinculados dentro da transação."
     },
     {
       "rótulo": "transação:prepareConsultaAssíncrona",
       "origem": "bibs/bibc/mariadb/mariadb.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "transação:prepareConsultaAssíncrona(sql, tratador [, dado])",
+      "documentação": "Prepara uma consulta reutilizável na transação."
     },
     {
       "rótulo": "triagem:avalie",
       "origem": "bibs/bibf/correio/triagem.fé",
-      "categoria": "Correio — componentes"
+      "categoria": "Correio — componentes",
+      "assinatura": "triagem:avalie(envelope, mensagem)",
+      "documentação": "Classifica e explica a decisão."
     },
     {
       "rótulo": "turing.registrar",
       "origem": "bibs/bibf/turing.fé",
-      "categoria": "Turing"
+      "categoria": "Turing",
+      "assinatura": "turing.registrar(ap)",
+      "documentação": "Registra as rotas de desafio numa aplicação caminheiro."
     },
     {
       "rótulo": "turing.validarBilhete",
       "origem": "bibs/bibf/turing.fé",
-      "categoria": "Turing"
+      "categoria": "Turing",
+      "assinatura": "turing.validarBilhete(bilhete, ip)",
+      "documentação": "Confere se um bilhete é válido, não expirado e ainda não usado."
     },
     {
       "rótulo": "udp:amarre",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:amarre(endereço, porta)",
+      "documentação": "Vincula o conector a um endereço/porta."
     },
     {
       "rótulo": "udp:cancele",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:cancele()",
+      "documentação": "Cancela a recepção e o envio pendentes."
     },
     {
       "rótulo": "udp:definaTempoLimite",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:definaTempoLimite(ms)",
+      "documentação": "Define o prazo dos envios assíncronos futuros."
     },
     {
       "rótulo": "udp:enviePara",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:enviePara(endereço, porta, dados)",
+      "documentação": "Envia um datagrama pra um destino."
     },
     {
       "rótulo": "udp:envieParaAssíncrono",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:envieParaAssíncrono(endereço, porta, dados, retorno [, dado])",
+      "documentação": "Envia um datagrama sem bloquear o laço."
     },
     {
       "rótulo": "udp:feche",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:feche()",
+      "documentação": "Fecha o conector."
     },
     {
       "rótulo": "udp:inicieRecepção",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:inicieRecepção(máximoBytes, retorno [, dado])",
+      "documentação": "Inicia o recebimento assíncrono de datagramas."
     },
     {
       "rótulo": "udp:pareRecepção",
       "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "udp:pareRecepção()",
+      "documentação": "Para o recebimento assíncrono iniciado por inicieRecepção."
     },
     {
       "rótulo": "utf8.caractere",
       "origem": "src/lutf8lib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "utf8.caractere(...)",
+      "documentação": "Constrói texto a partir de códigos de caractere."
     },
     {
       "rótulo": "utf8.caracteres",
       "origem": "src/lutf8lib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "utf8.caracteres(s)",
+      "documentação": "Iterador de caracteres UTF-8."
     },
     {
       "rótulo": "utf8.código",
       "origem": "src/lutf8lib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "utf8.código(s [, i [, j]])",
+      "documentação": "Códigos dos caracteres num intervalo."
     },
     {
       "rótulo": "utf8.padrãoCaractere",
@@ -3024,17 +4070,23 @@
     {
       "rótulo": "utf8.posição",
       "origem": "src/lutf8lib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "utf8.posição(s, n [, i])",
+      "documentação": "Posição em bytes do n-ésimo caractere."
     },
     {
       "rótulo": "utf8.tamanho",
       "origem": "src/lutf8lib.c",
-      "categoria": "API C / núcleo"
+      "categoria": "API C / núcleo",
+      "assinatura": "utf8.tamanho(s [, início [, fim]])",
+      "documentação": "Número de pontos de código UTF-8 (não bytes)."
     },
     {
       "rótulo": "Vigia.novo",
       "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia"
+      "categoria": "Vigia",
+      "assinatura": "Vigia.novo([opções])",
+      "documentação": "Cria uma proteção independente."
     },
     {
       "rótulo": "zona:adicione",

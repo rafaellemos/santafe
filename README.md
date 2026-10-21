@@ -38,7 +38,18 @@ dêBoasVindas("programador")
   Turing;
 - execução nativa em macOS e Linux e uma compilação WebAssembly para o navegador.
 - `santafé-sls`, servidor de linguagem local por LSP para diagnósticos de sintaxe
-  em tempo real.
+  e análise semântica estática, sem executar os fontes;
+- bibliotecas por projeto: `santafé instale`, resolução, lock e integridade.
+
+## Entrega conjunta 2.1.0
+
+Santafé 2.1.0, SLS 1.0.0, gerenciador de bibliotecas 1.0.0 e extensões 1.1.0
+foram **publicados no portal e conferidos em 21/10/2026**.
+Os hosts reais e a inspeção visual dos dois editores foram conferidos em 21/10.
+Consulte [o estado da entrega](docs/LANCAMENTO-2.1.0.md).
+O catálogo HTTPS está disponível com `semver 1.0.0`; siga as instruções de
+[Bibliotecas](docs/REPOSITORIO-BIBLIOTECAS-1.0.md). A distribuição no portal
+não implica publicação das extensões em catálogos de terceiros.
 
 ## Plataformas
 

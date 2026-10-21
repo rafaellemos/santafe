@@ -18,6 +18,20 @@ case "$stage" in
   sls)
     install -d "$prefix/share/santafé/1.0/ferramentas"
     install -m 644 ferramentas/sls/sls.fé "$prefix/share/santafé/1.0/ferramentas/"
+    install -d "$prefix/share/santafé/1.0/ferramentas/sls"
+    install -m 644 ferramentas/sls/analisador.fé ferramentas/sls/projetos.fé ferramentas/sls/semantica.fé ferramentas/sls/transporte.fé ferramentas/sls/api-publica.json "$prefix/share/santafé/1.0/ferramentas/sls/"
+    if [[ "$platform" != mingw ]]; then
+      install -m 755 ferramentas/sls/nativo.so "$prefix/share/santafé/1.0/ferramentas/sls/"
+    fi
+    ;;
+  pacotes)
+    if [[ "$platform" != mingw ]]; then
+      install -d "$prefix/share/santafé/1.0/ferramentas/pacotes"
+      for name in versoes resolvedor formatos cliente administracao ambiente cli; do
+        install -m 644 "ferramentas/pacotes/$name.fé" "$prefix/share/santafé/1.0/ferramentas/pacotes/"
+      done
+      install -m 755 ferramentas/pacotes/nativo.so "$prefix/share/santafé/1.0/ferramentas/pacotes/"
+    fi
     ;;
   c)
     install -d "$prefix/lib/santafé/1.0/bibc"

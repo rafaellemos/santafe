@@ -1,0 +1,24 @@
+local fonte = '--[[html]]\r\nlocal índice = "não"; local x = `®índice Ⓡ{índice}`'
+local tokens, falha = depure.lexemas(fonte)
+garanta(falha == nulo e #tokens == 9, json.cod(tokens))
+garanta(tokens[1].texto == "local" e tokens[1]["início"] == 12)
+garanta(tokens[2].tipo == "nome" e tokens[2].valor == "índice")
+garanta(tokens[4].tipo == "colar" e tokens[4].valor == "não")
+garanta(tokens[9].tipo == "gabarito" e tokens[9].texto == '`®índice Ⓡ{índice}`')
+para _, token em ipares(tokens) início
+    garanta(fonte:corte(token["início"] + 1, token["fim"]) == token.texto)
+fim
+local parcial, erroLéxico = depure.lexemas('local x = "incompleto')
+garanta(#parcial == 3 e erroLéxico["código"] == "lexico")
+garanta(erroLéxico["início"] == 10 e erroLéxico["fim"] == 21)
+local limitado, erroLimite = depure.lexemas("local x = 1", nulo, 2)
+garanta(#limitado == 2 e erroLimite["código"] == "limite-lexemas")
+garanta(não proteja(depure.lexemas, 42))
+garanta(não proteja(depure.lexemas, "", nulo, 0))
+garanta(#depure.lexemas('erro("NÃO EXECUTAR")') == 4)
+garanta(#depure.lexemas('-- não há lexemas') == 0)
+para i = 1, 100 início
+    local lista = depure.lexemas(('local índice = "' .. colar.replique("á", 1000) .. '";'):replique(100))
+    garanta(#lista == 500)
+fim
+mostre("Lexemas: intervalos reais, Unicode, gabaritos, limites e erros protegidos: ok")

@@ -90,9 +90,25 @@ echo "==> Auditando o vocabulário público"
 ./testes/integracao/testar_vocabulario_publico.sh
 
 echo "==> Validando o Servidor de Linguagem Santafé"
+python3 ./testes/integracao/testar_analise_c.py
 python3 ./testes/integracao/testar_sls.py
 python3 ./testes/integracao/testar_sls_robustez.py
+python3 ./testes/integracao/testar_sls_incremental.py
+python3 ./testes/integracao/testar_sls_semantica.py
+python3 ./testes/integracao/testar_sls_cancelamento.py
+python3 ./testes/integracao/testar_sls_memoria.py
+python3 ./testes/integracao/testar_sls_infraestrutura.py
+python3 ./testes/integracao/testar_sls_aceitacao.py --perfil atual
 python3 ./testes/integracao/testar_unicode.py
+python3 ./testes/integracao/testar_gabaritos_unicode.py
+python3 ./extensões/testes/testar_snippets.py
+echo "==> Validando o gerenciador e o catálogo local de bibliotecas"
+make -C ferramentas/pacotes
+python3 ./testes/integracao/testar_pacotes.py
+python3 ./testes/integracao/testar_pacotes_cli.py
+python3 ./testes/integracao/testar_catalogo_bibliotecas.py
+python3 ./testes/integracao/testar_pacotes_https.py
+python3 ./testes/integracao/testar_pacotes_memoria.py
 python3 ./docs/validar-manual.py
 
 echo "✅ Todos os testes disponíveis passaram."

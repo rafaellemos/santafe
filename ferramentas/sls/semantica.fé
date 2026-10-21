@@ -1,0 +1,432 @@
+-- Recursos LSP construídos a partir dos vínculos do analisador, não de buscas
+-- textuais. Edições são devolvidas ao cliente; nunca gravadas pelo servidor.
+local S={}
+local função acrescente(t,v) t[#t+1]=v; retorne v fim
+local função matriz(t) se #t==0 então retorne json.matrizVazia fim; retorne t fim
+local função nuloJSON(v) retorne v ou json.valorNulo fim
+
+função S.novo(A, P, configuração)
+    local docs, posição, offset, diretório = configuração.documentos, configuração.posição,
+        configuração.offset, configuração.diretório
+    local hash
+    local carreguePacotes=módulo.carregarBib(diretório.."/../pacotes/nativo.so","luaopen_pacotes_nativo")
+    se carreguePacotes então hash=carreguePacotes().sha256 fim
+    local projetos=P.novo(configuração.nativo,docs,configuração.indexe,hash)
+    local catálogo, porNome={},{}
+    local f=es.abra(diretório.."/api-publica.json","rb")
+    se f então
+        local raw=f:leia(2*1024*1024); f:feche()
+        local ok, valor=proteja(json.decod,raw)
+        se ok e tipo(valor)=="tabela" e tipo(valor.itens)=="tabela" então
+            catálogo=valor.itens
+            para _,item em ipares(catálogo) início porNome[item["rótulo"]]=item fim
+        fim
+    fim
+    local self={projetos=projetos}
+    local função intervalo(d,a,b)
+        retorne {start=posição(d.texto,d.linhas,a),["end"]=posição(d.texto,d.linhas,b)}
+    fim
+    local função intervaloToken(d,t) retorne intervalo(d,t["início"],t["fim"]) fim
+    local função análise(d,u)
+        se não d.análise então
+            d.análise=A.analise(d.texto,u)
+            d.uri=u
+            para _,s em ipares(d.análise.símbolos) início s.documento=d; s.uri=u fim
+        fim
+        retorne d.análise
+    fim
+    self.analise=análise
+    local função resolva(r,d,visitados)
+        se não r então retorne nulo fim
+        se r.símbolo então retorne r.símbolo fim
+        se não r.dono ou não r.dono.símbolo então retorne nulo fim
+        local s=r.dono.símbolo
+        se s.ambíguo ou não s.importação então retorne nulo fim
+        visitados=visitados ou {}
+        local chave=d.uri.."\0"..s.importação
+        se visitados[chave] então retorne nulo fim
+        visitados[chave]=verdadeiro
+        local outro,u=projetos.módulo(d.uri,s.importação)
+        se outro então
+            local a=análise(outro,u)
+            local exportado=a.exportações[r.token.texto]
+            se exportado e não exportado.ambíguo então retorne exportado fim
+        fim
+    fim
+    local função noPonto(params)
+        local td=params.textDocument
+        se tipo(td)~="tabela" ou tipo(td.uri)~="colar" então retorne nulo fim
+        local d=docs[td.uri]
+        se não d ou d.dessincronizado então retorne nulo fim
+        local p=params.position e offset(d.texto,d.linhas,params.position) ou nulo
+        retorne d,análise(d,td.uri),p
+    fim
+    local função alvo(params)
+        local d,a,p=noPonto(params)
+        se não d ou p==nulo então retorne nulo fim
+        local r=A.referênciaEm(a,p)
+        retorne resolva(r,d),d,r,a,p
+    fim
+    local função localização(s)
+        retorne {uri=s.uri,range=intervaloToken(s.documento,s.token)}
+    fim
+    local função todasReferências(s,documentoSomente)
+        local lista, únicos={},{}
+        -- Um vínculo léxico nunca cruza arquivos. Não exigir índice global
+        -- nem impor o limite do projeto a uma renomeação local.
+        se s.escopo e não s.propriedade então documentoSomente=s.documento fim
+        local arquivos,problema
+        se documentoSomente então arquivos={[s.uri]=documentoSomente}
+        senão arquivos,problema=projetos.indexe(projetos.raiz(s.uri)) fim
+        arquivos[s.uri]=s.documento
+        para u,d em pares(arquivos) início
+            se (não documentoSomente ou d==documentoSomente) e não d.dessincronizado então
+                local a=análise(d,u)
+                para _,r em ipares(a.referências) início
+                    se resolva(r,d)==s então
+                        local chave=u..":"..r.token["início"]..":"..r.token["fim"]
+                        se não únicos[chave] então
+                            únicos[chave]=verdadeiro; acrescente(lista,{uri=u,d=d,r=r})
+                        fim
+                    fim
+                fim
+            fim
+        fim
+        tabela.ordene(lista,função(a,b)
+            se a.uri==b.uri então retorne a.r.token["início"]<b.r.token["início"] fim
+            retorne a.uri<b.uri
+        fim)
+        retorne lista,problema
+    fim
+    local função assinatura(s)
+        retorne s.nome.."("..tabela.concatene(s.parâmetros ou {},", ")..")"
+    fim
+    local função informação(s)
+        se s.classe=="função" então retorne assinatura(s) fim
+        retorne s.classe.." "..s.nome
+    fim
+    local função itemDoCatálogo(r)
+        local label=r.token.texto
+        se r.dono então
+            local dono=r.dono.símbolo
+            label=(dono e dono.importação ou r.dono.nome ou "").."."..label
+        fim
+        retorne porNome[label]
+    fim
+
+    função self.complete(params)
+        local d,a,p=noPonto(params); se não d ou p==nulo então retorne json.matrizVazia fim
+        se A.emTexto(a,p) então retorne json.matrizVazia fim
+        local prefixo=d.texto:corte(1,p)
+        local dono,sep,parcial=prefixo:separe("([A-Za-z0-9_\128-\255]+)([.:])([A-Za-z0-9_\128-\255]*)$")
+        parcial=parcial ou prefixo:separe("([A-Za-z0-9_\128-\255]*)$") ou ""
+        local visíveis=A.visíveis(a,p); local itens,guardados={},{}
+        local função inclua(label,detalhe,kind)
+            se label:corte(1,#parcial)==parcial e não guardados[label] e #itens<1000 então
+                guardados[label]=verdadeiro; acrescente(itens,{label=label,detail=detalhe,kind=kind ou 3})
+            fim
+        fim
+        se dono então
+            local s=visíveis[dono] ou a.globais[dono]
+            local espaço=s e s.importação ou dono
+            se s e não s.ambíguo então
+                local campos=s.campos
+                se s.importação então
+                    local outro,u=projetos.módulo(d.uri,s.importação)
+                    se outro então campos=análise(outro,u).exportações fim
+                fim
+                para label,campo em pares(campos) início inclua(label,informação(campo),campo.classe=="função" e 3 ou 5) fim
+            fim
+            para _,item em ipares(catálogo) início
+                local label=item["rótulo"]
+                local membro=label:corte(1,#espaço+1)==espaço..sep e label:corte(#espaço+2) ou nulo
+                se membro e não membro:procure("[.:]") então inclua(membro,item.assinatura ou item.categoria) fim
+            fim
+        senão
+            para _,palavra em ipares({"local","função","retorne","se","então","senão","senãose",
+                "enquanto","para","em","repita","até","início","fim","pare","vápara",
+                "nulo","verdadeiro","falso","e","ou","não"}) início inclua(palavra,"palavra reservada",14) fim
+            para nome,s em pares(visíveis) início inclua(nome,informação(s),s.classe=="função" e 3 ou 6) fim
+            para nome,s em pares(a.globais) início inclua(nome,informação(s),s.classe=="função" e 3 ou 6) fim
+            para _,item em ipares(catálogo) início
+                local label=item["rótulo"]
+                se não label:procure("[.:]") então inclua(label,item.assinatura ou item.categoria) fim
+            fim
+        fim
+        tabela.ordene(itens,função(x,y) retorne x.label<y.label fim)
+        retorne matriz(itens)
+    fim
+    função self.hover(params)
+        local s,d,r=alvo(params)
+        se não d ou não r então retorne json.valorNulo fim
+        local conteúdo
+        se s então conteúdo=informação(s).."\n\nDefinido estaticamente neste projeto."
+        senão
+            local item=itemDoCatálogo(r)
+            se item então conteúdo=(item.assinatura ou item["rótulo"]).."\n\n"..(item["documentação"] ou item.categoria).."\n\nFonte: "..item.origem fim
+        fim
+        se não conteúdo então retorne json.valorNulo fim
+        retorne {contents={kind="plaintext",value=conteúdo},range=intervaloToken(d,r.token)}
+    fim
+    função self.definição(params)
+        local s=alvo(params)
+        retorne s e não s.implícito e localização(s) ou json.valorNulo
+    fim
+    função self.referências(params, sóDocumento)
+        local s,d=alvo(params); local resposta={}
+        se s então
+            para _,v em ipares(todasReferências(s,sóDocumento e d ou nulo)) início
+                se sóDocumento então acrescente(resposta,{range=intervaloToken(v.d,v.r.token),kind=v.r.escrita e 3 ou 2})
+                senãose não v.r.declaração ou (tipo(params.context)=="tabela" e params.context.includeDeclaration) então
+                    acrescente(resposta,{uri=v.uri,range=intervaloToken(v.d,v.r.token)})
+                fim
+            fim
+        fim
+        retorne matriz(resposta)
+    fim
+    função self.prepareRename(params)
+        local s,d,r,a=alvo(params)
+        se não s ou s.implícito ou s.ambíguo ou a.incompleto ou a.comErros ou a.interpolaçãoAmbígua então retorne json.valorNulo fim
+        se projetos.biblioteca(s.uri) então retorne json.valorNulo fim
+        se não s.escopo e não s.propriedade então retorne json.valorNulo fim
+        retorne {range=intervaloToken(d,r.token),placeholder=s.nome}
+    fim
+    função self.rename(params)
+        -- Uma edição destrutiva não pode confiar em um cache de arquivo
+        -- fechado, mesmo se o cliente perdeu a notificação do watcher.
+        projetos.invalide()
+        local s,d,r,a=alvo(params)
+        se não s ou s.implícito ou s.ambíguo ou a.incompleto ou a.comErros ou a.interpolaçãoAmbígua então retorne nulo,"símbolo ambíguo ou indisponível" fim
+        se projetos.biblioteca(s.uri) então retorne nulo,"biblioteca instalada é imutável; altere o projeto de origem" fim
+        se não s.escopo e não s.propriedade então
+            retorne nulo,"global dinâmico; não é possível garantir todos os vínculos"
+        fim
+        local novo=params.newName
+        se tipo(novo)~="colar" ou #novo>1024 então retorne nulo,"nome inválido" fim
+        local ts,falha=depure.lexemas(novo)
+        se falha ou #ts~=1 ou ts[1].tipo~="nome" ou ts[1].texto~=novo ou ts[1].octetosIdentificador~=#novo então retorne nulo,"nome inválido ou reservado" fim
+        local refs,problema=todasReferências(s)
+        se problema então retorne nulo,"índice incompleto; renomeação recusada: "..problema fim
+        se s.propriedade então
+            para u,arquivo em pares(projetos.indexe(projetos.raiz(s.uri))) início
+                local an=análise(arquivo,u)
+                se an.incompleto ou an.comErros ou an.propriedadesDinâmicas então
+                    retorne nulo,"uso dinâmico ou análise incompleta no projeto; renomeação de campo recusada"
+                fim
+            fim
+        fim
+        local edições,ordem,conferidos={},{},{}
+        para _,v em ipares(refs) início
+            local an=análise(v.d,v.uri)
+            se an.incompleto ou an.comErros ou an.interpolaçãoAmbígua então retorne nulo,"análise incompleta; renomeação recusada" fim
+            se não conferidos[v.uri] então
+                conferidos[v.uri]=verdadeiro
+                para _,outra em ipares(an.referências) início
+                    se outra.token.texto==novo e resolva(outra,v.d)~=s e não outra.dono então
+                        local vis=A.visíveis(an,outra.token["início"])
+                        se (s.escopo e vis[s.nome]==s) ou (não s.escopo e não s.propriedade e não vis[novo]) então
+                            retorne nulo,"novo nome capturaria outra referência"
+                        fim
+                    fim
+                fim
+            fim
+            local visíveis=A.visíveis(an,v.r.token["início"])
+            se visíveis[novo] e visíveis[novo]~=s então retorne nulo,"novo nome colide com outro símbolo" fim
+            se s.escopo e s.escopo.nomes[novo] então
+                para _,outro em ipares(s.escopo.nomes[novo]) início
+                    se outro~=s então retorne nulo,"novo nome colide no escopo" fim
+                fim
+            fim
+            se s.dono e s.dono.campos[novo] e s.dono.campos[novo]~=s então retorne nulo,"campo já existe" fim
+            se não edições[v.uri] então
+                edições[v.uri]={textDocument={uri=v.uri,version=v.d.versão ou json.valorNulo},edits={}}
+                acrescente(ordem,edições[v.uri])
+            fim
+            acrescente(edições[v.uri].edits,{range=intervaloToken(v.d,v.r.token),newText=novo})
+        fim
+        retorne {documentChanges=matriz(ordem)}
+    fim
+    função self.assinatura(params)
+        local d,a,p=noPonto(params); se não d ou p==nulo então retorne json.valorNulo fim
+        local pilha={}
+        para _,t em ipares(a.tokens) início
+            se t["início"]>=p então pare fim
+            se t.texto=="(" ou t.texto=="[" ou t.texto=="{" então acrescente(pilha,{t=t,vírgulas=0})
+            senãose t.texto==")" ou t.texto=="]" ou t.texto=="}" então tabela.remova(pilha)
+            senãose t.texto=="," e #pilha>0 então pilha[#pilha].vírgulas=pilha[#pilha].vírgulas+1 fim
+        fim
+        para k=#pilha,1,-1 início
+            local entrada=pilha[k]
+            se entrada.t.texto=="(" então
+                local referência
+                para _,r em ipares(a.referências) início
+                    se r.token["fim"]<=entrada.t["início"] e
+                       (não referência ou r.token["fim"]>referência.token["fim"]) então referência=r fim
+                fim
+                se referência e d.texto:corte(referência.token["fim"]+1,entrada.t["início"]):separe("^%e*$") então
+                    local s=resolva(referência,d)
+                    se s e s.classe=="função" então
+                        local parâmetros={}; para _,nome em ipares(s.parâmetros) início acrescente(parâmetros,{label=nome}) fim
+                        retorne {signatures={{label=assinatura(s),parameters=matriz(parâmetros)}},activeSignature=0,
+                            activeParameter=mat.mínimo(entrada.vírgulas,mat.máximo(0,#parâmetros-1))}
+                    senãose não s então
+                        local item=itemDoCatálogo(referência)
+                        local texto=item e item.assinatura
+                        local interior=texto e texto:separe("%((.*)%)")
+                        se interior então
+                            local parâmetros={}
+                            para parte em interior:capture("[^,]+") início
+                                local nome=parte:troque("^%e+",""):troque("%e+$","")
+                                acrescente(parâmetros,{label=nome})
+                            fim
+                            retorne {signatures={{label=texto,parameters=matriz(parâmetros),
+                                documentation={kind="plaintext",value=item["documentação"] ou ""}}},
+                                activeSignature=0,activeParameter=mat.mínimo(entrada.vírgulas,mat.máximo(0,#parâmetros-1))}
+                        fim
+                    fim
+                fim
+            fim
+        fim
+        retorne json.valorNulo
+    fim
+    função self.símbolos(params,workspace)
+        local resposta={}
+        local função inspecione(d,u)
+            para _,s em ipares(análise(d,u).símbolos) início
+                se não s.implícito e (não workspace ou não params.query ou s.nome:procure(params.query,1,verdadeiro)) então
+                    se workspace então acrescente(resposta,{name=s.nome,kind=s.classe=="função" e 12 ou 13,location=localização(s)})
+                    senão acrescente(resposta,{name=s.nome,kind=s.classe=="função" e 12 ou 13,
+                        range=intervalo(d,s.token["início"],s.corpo e s.corpo.final ou s.token["fim"]),selectionRange=intervaloToken(d,s.token)}) fim
+                fim
+            fim
+        fim
+        se workspace então para u,d em pares(projetos.indexe()) início se não d.dessincronizado então inspecione(d,u) fim fim
+        senão local d=noPonto(params); se d então inspecione(d,d.uri) fim fim
+        retorne matriz(resposta)
+    fim
+    função self.tokens(params)
+        local d,a=noPonto(params); local itens={}
+        se não d então retorne {data=json.matrizVazia} fim
+        local ordenados,únicos={},{}
+        para _,r em ipares(a.referências) início
+            local t=r.token
+            se t["fim"]>t["início"] e não únicos[t["início"]] então
+                únicos[t["início"]]=verdadeiro; acrescente(ordenados,r)
+            fim
+        fim
+        tabela.ordene(ordenados,função(x,y) retorne x.token["início"]<y.token["início"] fim)
+        local linha,coluna=0,0
+        para _,r em ipares(ordenados) início
+            local começo=posição(d.texto,d.linhas,r.token["início"])
+            local final=posição(d.texto,d.linhas,r.token["fim"])
+            se começo.line==final.line então
+                local s=resolva(r,d)
+                local tipoToken=s e s.classe=="função" e 1 ou (s e s.classe=="parâmetro" e 2 ou 0)
+                acrescente(itens,começo.line-linha); acrescente(itens,começo.line==linha e começo.character-coluna ou começo.character)
+                acrescente(itens,final.character-começo.character); acrescente(itens,tipoToken); acrescente(itens,r.declaração e 1 ou 0)
+                linha,coluna=começo.line,começo.character
+            fim
+        fim
+        retorne {data=matriz(itens),resultId=paraColar(d.versão)}
+    fim
+    função self.dobre(params)
+        local d,a=noPonto(params); local itens={}
+        se d então
+            para _,s em ipares(a.escopos) início
+                se s~=a.raiz então
+                    local r=intervalo(d,s.começo,s.final)
+                    se r["end"].line>r.start.line então acrescente(itens,{startLine=r.start.line,endLine=r["end"].line,kind="region"}) fim
+                fim
+            fim
+        fim
+        retorne matriz(itens)
+    fim
+    função self.selecione(params)
+        local d,a=noPonto(params); local respostas={}
+        se não d ou tipo(params.positions)~="tabela" ou #params.positions>128 então retorne json.matrizVazia fim
+        para _,p em ipares(params.positions) início
+            local o=offset(d.texto,d.linhas,p); se o==nulo então retorne json.matrizVazia fim
+            local candidatos={{começo=0,final=#d.texto}}
+            para _,n em ipares(a.nós) início se n.começo<=o e o<n.final então acrescente(candidatos,n) fim fim
+            para _,t em ipares(a.tokens) início se t["início"]<=o e o<t["fim"] então acrescente(candidatos,{começo=t["início"],final=t["fim"]}) fim fim
+            tabela.ordene(candidatos,função(x,y) retorne x.final-x.começo>y.final-y.começo fim)
+            local pai,anterior=nulo,nulo
+            para _,n em ipares(candidatos) início
+                se não anterior ou (n.começo>=anterior.começo e n.final<=anterior.final e
+                   (n.começo~=anterior.começo ou n.final~=anterior.final)) então
+                    pai={range=intervalo(d,n.começo,n.final),parent=pai}; anterior=n
+                fim
+            fim
+            acrescente(respostas,pai)
+        fim
+        retorne matriz(respostas)
+    fim
+    função self.formate(params)
+        local d,a=noPonto(params); local edições={}
+        se d e projetos.biblioteca(d.uri) então retorne json.matrizVazia fim
+        se não d ou a.incompleto ou não depure.analise(d.texto) então retorne json.matrizVazia fim
+        local opções=tipo(params.options)=="tabela" e params.options ou {}
+        local tamanho=opções.tabSize
+        se tipo(tamanho)~="número" ou tamanho%1~=0 ou tamanho<1 ou tamanho>8 então tamanho=4 fim
+        local unidade=opções.insertSpaces==falso e "\t" ou (" "):replique(tamanho)
+        local eventos,protegidas={},{}
+        local função protejaLinhas(começo,final)
+            local p=intervalo(d,começo,final)
+            para linha=p.start.line+1,p["end"].line início protegidas[linha]=verdadeiro fim
+        fim
+        local anterior=0
+        para _,t em ipares(a.tokens) início
+            se t.tipo=="colar" ou t.tipo=="gabarito" então protejaLinhas(t["início"],t["fim"]) fim
+            local lacuna=d.texto:corte(anterior+1,t["início"])
+            local cursor=1
+            enquanto cursor<=#lacuna início
+                local inícioC,fimC,iguais=lacuna:procure("%-%-%[(=*)%[",cursor)
+                se não inícioC então pare fim
+                local primeiro,último=lacuna:procure("]"..iguais.."]",fimC+1,verdadeiro)
+                se não primeiro então pare fim
+                protejaLinhas(anterior+inícioC-1,anterior+último); cursor=último+1
+            fim
+            anterior=t["fim"]
+        fim
+        para _,s em ipares(a.escopos) início
+            se s~=a.raiz então
+                local r=intervalo(d,s.começo,s.final)
+                se r["end"].line>r.start.line então
+                    eventos[r.start.line+1]=(eventos[r.start.line+1] ou 0)+1
+                    eventos[r["end"].line]=(eventos[r["end"].line] ou 0)-1
+                fim
+            fim
+        fim
+        local nível=0
+        para i,começo em ipares(d.linhas) início
+            local linha=i-1; nível=nível+(eventos[linha] ou 0)
+            se não protegidas[linha] então
+                local final=d.linhas[i+1] ou #d.texto
+                local texto=d.texto:corte(começo+1,final)
+                local espaço=texto:separe("^[ \t]*") ou ""
+                se não texto:separe("^[ \t\r\n]*$") então
+                    local desejado=unidade:replique(mat.máximo(0,mat.mínimo(nível,128)))
+                    se espaço~=desejado então acrescente(edições,{range=intervalo(d,começo,começo+#espaço),newText=desejado}) fim
+                fim
+            fim
+        fim
+        retorne matriz(edições)
+    fim
+    função self.corrija(params)
+        local d,a=noPonto(params)
+        se não d ou a.incompleto ou a.falhaLéxica ou depure.analise(d.texto) então retorne json.matrizVazia fim
+        -- Oferecer fechamento somente se o compilador confirmar o resultado.
+        -- Não executar, não modificar arquivo e não inferir conteúdo arbitrário.
+        local quebra=d.texto:procure("\r\n",1,verdadeiro) e "\r\n" ou "\n"
+        local adição=quebra.."fim"..quebra
+        se não depure.analise(d.texto..adição) então retorne json.matrizVazia fim
+        retorne {{title="Adicionar fim ausente",kind="quickfix",
+            edit={documentChanges={{textDocument={uri=d.uri,version=d.versão},edits={{
+                range=intervalo(d,#d.texto,#d.texto),newText=adição
+            }}}}}}}
+    fim
+    self.intervalo=intervalo
+    self.noPonto=noPonto
+    retorne self
+fim
+retorne S

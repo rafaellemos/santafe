@@ -167,13 +167,7 @@ function símbolosDoDocumento(documento) {
   return símbolos;
 }
 
-/** Cliente LSP mínimo, deliberadamente sem dependências de produção.
- *
- * O SLS 0.1.0 anuncia sincronização integral e diagnósticos por notificação.
- * Usar diretamente o protocolo mantém a primeira extensão pequena; quando o
- * SLS ganhar recursos semânticos, este adaptador poderá dar lugar ao cliente
- * oficial vscode-languageclient sem alterar o servidor Santafé.
- */
+/** Adaptador stdio limitado, com negociação, cancelamento e fallback local. */
 class ClienteSls {
   constructor(contexto) {
     this.contexto = contexto;
@@ -185,7 +179,11 @@ class ClienteSls {
     this.próximoId = 1;
     this.buffer = Buffer.alloc(0);
     this.documentos = new Map();
+    this.versõesEnviadas = new Map();
     this.reinício = undefined;
+    this.capacidades = {};
+    this.pendentes = new Map();
+    this.aoMudarEstado = new vscode.EventEmitter();
   }
 
   configuração() {
@@ -220,7 +218,8 @@ class ClienteSls {
         fs.existsSync(binárioDoFonte) && fs.existsSync(fonteDoSls)) {
       return {
         comando: binárioDoFonte,
-        argumentos: [fonteDoSls],
+        // O servidor não deve ativar o carregador de bibliotecas do projeto.
+        argumentos: ["-E", "-P", fonteDoSls],
         origem: "fonte do projeto"
       };
     }
@@ -249,13 +248,22 @@ class ClienteSls {
     if (this.pronto) this.envieAbertura(documento);
   }
 
-  atualize(documento) {
+  atualize(documento, mudanças) {
     if (documento.languageId !== LINGUAGEM) return;
     this.documentos.set(documento.uri.toString(), documento);
     if (!this.pronto) return;
+    if (documento.version <= (this.versõesEnviadas.get(documento.uri.toString()) || 0)) return;
+    this.versõesEnviadas.set(documento.uri.toString(),documento.version);
     this.notifique("textDocument/didChange", {
       textDocument: { uri: documento.uri.toString(), version: documento.version },
-      contentChanges: [{ text: documento.getText() }]
+      // Os intervalos de um evento VS Code referem-se ao documento anterior.
+      // Ordem decrescente os torna alterações sequenciais válidas em LSP.
+      contentChanges: this.capacidades.textDocumentSync?.change === 2 && mudanças?.length
+        ? [...mudanças].sort((a,b)=>b.rangeOffset-a.rangeOffset).map(m=>({
+          range:{start:{line:m.range.start.line,character:m.range.start.character},
+                 end:{line:m.range.end.line,character:m.range.end.character}},
+          rangeLength:m.rangeLength, text:m.text}))
+        : [{ text: documento.getText() }]
     });
   }
 
@@ -271,6 +279,7 @@ class ClienteSls {
     if (documento.languageId !== LINGUAGEM) return;
     const uri = documento.uri.toString();
     this.documentos.delete(uri);
+    this.versõesEnviadas.delete(uri);
     this.diagnósticos.delete(documento.uri);
     if (this.pronto) {
       this.notifique("textDocument/didClose", { textDocument: { uri } });
@@ -313,12 +322,14 @@ class ClienteSls {
       if (this.processo !== processo) return;
       this.processo = undefined;
       this.pronto = false;
+      this.cancelePendentes();
       this.aviseFalha(erro);
     });
     processo.on("close", (código, sinal) => {
       if (this.processo !== processo) return;
       this.processo = undefined;
       this.pronto = false;
+      this.cancelePendentes();
       if (!this.encerrando) {
         this.saída.appendLine(`SLS encerrou (código ${código ?? "nulo"}, sinal ${sinal ?? "nenhum"}).`);
       }
@@ -332,7 +343,15 @@ class ClienteSls {
       params: {
         processId: process.pid,
         rootUri: vscode.workspace.workspaceFolders?.[0]?.uri.toString() ?? null,
-        capabilities: { textDocument: { publishDiagnostics: { relatedInformation: false } } },
+        workspaceFolders: (vscode.workspace.workspaceFolders || []).map(f=>({uri:f.uri.toString(),name:f.name})),
+        capabilities: {
+          general:{positionEncodings:["utf-16"]},
+          workspace:{workspaceFolders:true,workspaceEdit:{documentChanges:true}},
+          textDocument: { publishDiagnostics: { relatedInformation: false,versionSupport:true },
+            completion:{completionItem:{snippetSupport:false}},rename:{prepareSupport:true},
+            semanticTokens:{requests:{full:true},formats:["relative"],
+              tokenTypes:["variable","function","parameter"],tokenModifiers:["declaration"]} }
+        },
         clientInfo: { name: "Santafé para VS Code", version: VERSÃO_EXTENSÃO }
       }
     });
@@ -350,6 +369,7 @@ class ClienteSls {
     this.processo = undefined;
     this.pronto = false;
     this.encerrando = true;
+    this.cancelePendentes();
     if (!processo || processo.killed) return;
     try {
       this.escrevaNoProcesso(processo, {
@@ -366,6 +386,7 @@ class ClienteSls {
   }
 
   envieAbertura(documento) {
+    this.versõesEnviadas.set(documento.uri.toString(),documento.version);
     this.notifique("textDocument/didOpen", {
       textDocument: {
         uri: documento.uri.toString(),
@@ -378,6 +399,34 @@ class ClienteSls {
 
   notifique(método, parâmetros) {
     this.escreva({ jsonrpc: "2.0", method: método, params: parâmetros });
+  }
+
+  suporta(capacidade) { return this.pronto && !!this.capacidades[capacidade]; }
+
+  cancelePendentes() {
+    this.capacidades = {};
+    for (const pedido of this.pendentes.values()) pedido.conclua(undefined);
+    this.pendentes.clear();
+    this.aoMudarEstado.fire();
+  }
+
+  solicite(método, parâmetros, cancelamento) {
+    if (!this.pronto || cancelamento?.isCancellationRequested) return Promise.resolve(undefined);
+    if (this.pendentes.size >= 128) return Promise.reject(new Error("Fila do SLS cheia; tente novamente."));
+    const id = this.próximoId++;
+    return new Promise((resolve,reject)=>{
+      let tempo, inscrição;
+      const conclua=(resultado,erro)=>{
+        clearTimeout(tempo); inscrição?.dispose(); this.pendentes.delete(id);
+        erro ? reject(erro) : resolve(resultado);
+      };
+      const cancele=()=>{this.notifique("$/cancelRequest",{id}); conclua(undefined);};
+      this.pendentes.set(id,{conclua});
+      tempo=setTimeout(cancele,10000);
+      inscrição=cancelamento?.onCancellationRequested(cancele);
+      this.escreva({jsonrpc:"2.0",id,method:método,params:parâmetros});
+      if (cancelamento?.isCancellationRequested) cancele();
+    });
   }
 
   escreva(mensagem) {
@@ -395,9 +444,13 @@ class ClienteSls {
 
   leiaSaída(trecho) {
     this.buffer = Buffer.concat([this.buffer, Buffer.from(trecho)]);
+    if (this.buffer.length>32*1024*1024) { this.saída.appendLine("SLS: resposta excessiva."); this.pare(); return; }
     while (true) {
       const fimDoCabeçalho = this.buffer.indexOf("\r\n\r\n");
-      if (fimDoCabeçalho < 0) return;
+      if (fimDoCabeçalho < 0) {
+        if (this.buffer.length>8192) this.pare();
+        return;
+      }
       const cabeçalho = this.buffer.subarray(0, fimDoCabeçalho).toString("ascii");
       const encontrado = /^content-length:\s*(\d+)\s*$/im.exec(cabeçalho);
       if (!encontrado) {
@@ -406,6 +459,8 @@ class ClienteSls {
         return;
       }
       const tamanho = Number(encontrado[1]);
+      if (fimDoCabeçalho>8192 || !Number.isSafeInteger(tamanho) || tamanho>16*1024*1024 || tamanho<1 ||
+          (cabeçalho.match(/^content-length:/gim)||[]).length!==1) {this.pare();return;}
       const início = fimDoCabeçalho + 4;
       if (this.buffer.length < início + tamanho) return;
       const conteúdo = this.buffer.subarray(início, início + tamanho).toString("utf8");
@@ -421,15 +476,31 @@ class ClienteSls {
   }
 
   processe(mensagem) {
+    if (!mensagem || mensagem.jsonrpc!=="2.0") return;
+    if (mensagem.id===this.idInicialização && mensagem.error) {
+      this.saída.appendLine(`SLS recusou inicialização: ${mensagem.error.message}`);
+      this.pare(); return;
+    }
     if (mensagem.id === this.idInicialização && Object.prototype.hasOwnProperty.call(mensagem, "result")) {
+      this.capacidades=mensagem.result?.capabilities || {};
+      this.informação=mensagem.result?.serverInfo;
       this.pronto = true;
+      this.saída.appendLine(`SLS pronto: ${this.informação?.version || "versão não informada"}`);
       this.notifique("initialized", {});
       for (const documento of this.documentos.values()) this.envieAbertura(documento);
+      this.aoMudarEstado.fire();
+      return;
+    }
+    const pendente=this.pendentes.get(mensagem.id);
+    if (pendente) {
+      const erro=mensagem.error;
+      pendente.conclua(mensagem.result,erro && erro.code!==-32800 ? new Error(erro.message) : undefined);
       return;
     }
     if (mensagem.method === "textDocument/publishDiagnostics") {
       this.publiqueDiagnósticos(mensagem.params);
     }
+    if(mensagem.method === "window/logMessage") this.saída.appendLine(String(mensagem.params?.message||""));
   }
 
   publiqueDiagnósticos(parâmetros) {
@@ -451,6 +522,7 @@ class ClienteSls {
         this.severidade(item.severity)
       );
       diagnóstico.source = item.source ?? "SLS";
+      diagnóstico.code = item.code;
       return diagnóstico;
     });
     this.diagnósticos.set(uri, diagnósticos);
@@ -476,14 +548,17 @@ class ClienteSls {
     this.pare();
     this.diagnósticos.dispose();
     this.saída.dispose();
+    this.aoMudarEstado.dispose();
   }
 }
 
 let cliente;
 
 function activate(contexto) {
-  require("./realce-vscode").registre(vscode, contexto);
   cliente = new ClienteSls(contexto);
+  const provedores=require("./provedores-sls");
+  require("./realce-vscode").registre(vscode, contexto, cliente);
+  provedores.registre(vscode,contexto,cliente);
   for (const documento of vscode.workspace.textDocuments) cliente.registre(documento);
   cliente.inicie();
 
@@ -491,7 +566,7 @@ function activate(contexto) {
     cliente.diagnósticos,
     cliente.saída,
     vscode.workspace.onDidOpenTextDocument((documento) => cliente.registre(documento)),
-    vscode.workspace.onDidChangeTextDocument((evento) => cliente.atualize(evento.document)),
+    vscode.workspace.onDidChangeTextDocument((evento) => cliente.atualize(evento.document,evento.contentChanges)),
     vscode.workspace.onDidSaveTextDocument((documento) => cliente.salve(documento)),
     vscode.workspace.onDidCloseTextDocument((documento) => cliente.feche(documento)),
     vscode.workspace.onDidChangeConfiguration((evento) => {
@@ -499,13 +574,15 @@ function activate(contexto) {
     }),
     vscode.languages.registerCompletionItemProvider(
       { language: LINGUAGEM },
-      { provideCompletionItems: (documento, posição) => conclusõesDoSantafé(documento, posição) },
+      { provideCompletionItems: (documento, posição, cancelamento) => cliente.suporta("completionProvider")
+        ? provedores.complete(vscode,cliente,documento,posição,cancelamento) : conclusõesDoSantafé(documento, posição) },
       ".", ":"
     ),
     vscode.languages.registerHoverProvider(
       { language: LINGUAGEM },
       {
-        provideHover(documento, posição) {
+        provideHover(documento, posição, cancelamento) {
+          if (cliente.suporta("hoverProvider")) return provedores.hover(vscode,cliente,documento,posição,cancelamento);
           const informação = informaçãoDoSímbolo(documento, posição);
           if (!informação) return undefined;
           const conteúdo = new vscode.MarkdownString();
@@ -517,13 +594,15 @@ function activate(contexto) {
     ),
     vscode.languages.registerDocumentSymbolProvider(
       { language: LINGUAGEM },
-      { provideDocumentSymbols: (documento) => símbolosDoDocumento(documento) }
+      { provideDocumentSymbols: (documento,cancelamento) => cliente.suporta("documentSymbolProvider")
+        ? provedores.símbolos(vscode,cliente,documento,cancelamento) : símbolosDoDocumento(documento) }
     ),
     vscode.languages.registerDefinitionProvider(
       { language: LINGUAGEM },
       {
-        provideDefinition(documento, posição) {
-          const intervalo = documento.getWordRangeAtPosition(posição, /[\p{L}\p{N}_]+/u);
+        provideDefinition(documento, posição, cancelamento) {
+          if (cliente.suporta("definitionProvider")) return provedores.definição(vscode,cliente,documento,posição,cancelamento);
+          const intervalo = documento.getWordRangeAtPosition(posição, /[\p{L}\p{M}\p{N}_]+/u);
           return intervalo ? símboloDaFunção(documento, documento.getText(intervalo)) : undefined;
         }
       }
@@ -539,6 +618,7 @@ function activate(contexto) {
     }),
     vscode.commands.registerCommand("santafe.abrirRegistroSLS", () => cliente.saída.show(true))
   );
+  return {estadoSLS:()=>({pronto:cliente.pronto,informação:cliente.informação,capacidades:cliente.capacidades})};
 }
 
 function deactivate() {
@@ -546,4 +626,4 @@ function deactivate() {
   cliente = undefined;
 }
 
-module.exports = { activate, deactivate, ClienteSls };
+module.exports = { activate, deactivate, ClienteSls, estadoSLS:()=>({pronto:cliente?.pronto,informação:cliente?.informação,capacidades:cliente?.capacidades}) };

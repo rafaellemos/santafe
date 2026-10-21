@@ -14,6 +14,7 @@ SAÍDA = RAIZ / "dist" / f"{MANIFESTO['name']}-{MANIFESTO['version']}.vsix"
 ARQUIVOS = (
     "package.json",
     "extension.js",
+    "provedores-sls.js",
     "realce-embutido.js",
     "realce-vscode.js",
     "aparencia.js",
@@ -63,7 +64,8 @@ def principal() -> None:
         def grave(nome, dados):
             info = zipfile.ZipInfo(nome, date_time=(2026, 10, 18, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
             pacote.writestr(info, dados)
 
         grave(

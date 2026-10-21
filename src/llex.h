@@ -50,6 +50,8 @@ typedef union {
 typedef struct Token {
   int token;
   SemInfo seminfo;
+  size_t start;  /* exact source byte interval, even after lookahead */
+  size_t end;
 } Token;
 
 
@@ -59,6 +61,9 @@ typedef struct LexState {
   int current;  /* current character (charint) */
   int linenumber;  /* input line counter */
   int lastline;  /* line of last token 'consumed' */
+  size_t offset;  /* byte offset of current; input firstchar is at offset zero */
+  size_t tokenstart;
+  int scanning;  /* distinguishes an unfinished lexeme from a parser token */
   Token t;  /* current token */
   Token lookahead;  /* look ahead token */
   struct FuncState *fs;  /* current function (parser) */
@@ -73,6 +78,7 @@ typedef struct LexState {
   /* --- gabarito literal (backtick) --- */
   int tem_gabarito;         /* há um TK_STRING pendente de gabarito? */
   SemInfo gabarito_seminfo; /* SemInfo da string do template */
+  size_t gabarito_start;   /* both synthetic tokens refer to the same literal */
 } LexState;
 
 
@@ -82,6 +88,8 @@ LUAI_FUNC void luaX_setinput (lua_State *L, LexState *ls, ZIO *z,
 LUAI_FUNC TString *luaX_newstring (LexState *ls, const char *str, size_t l);
 LUAI_FUNC void luaX_next (LexState *ls);
 LUAI_FUNC int luaX_lookahead (LexState *ls);
+/* Protected, non-executing token stream for developer tooling. */
+LUAI_FUNC int luaX_lexemes (lua_State *L);
 LUAI_FUNC l_noret luaX_syntaxerror (LexState *ls, const char *s);
 LUAI_FUNC const char *luaX_token2str (LexState *ls, int token);
 

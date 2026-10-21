@@ -1,5 +1,5 @@
 <snippet>
-    <content><![CDATA[função ${1:nome}(${2}) início
+    <content><![CDATA[função ${1:nome}(${2})
     ${0}
 fim]]></content>
     <tabTrigger>função</tabTrigger>

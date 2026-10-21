@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import stat
 import subprocess
 import sys
 import zipfile
@@ -17,7 +18,7 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 def principal() -> None:
     metadados = json.loads((RAIZ / "package-metadata.json").read_text(encoding="utf-8"))
     assert metadados["name"] == "Santafe"
-    assert metadados["version"] == "1.0.13"
+    assert metadados["version"] == "1.1.0"
     assert (RAIZ / ".python-version").read_text(encoding="ascii").strip() == "3.8"
     sintaxe = (RAIZ / "Santafe.sublime-syntax").read_text(encoding="utf-8")
     assert "scope: source.santafe" in sintaxe
@@ -39,6 +40,7 @@ def principal() -> None:
     pacote = RAIZ / "dist" / "Santafe.sublime-package"
     with zipfile.ZipFile(pacote) as arquivo:
         assert arquivo.testzip() is None
+        assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         nomes = set(arquivo.namelist())
     esperados = {
         ".python-version", "Indentation Rules.tmPreferences", "Santafe.py", "Santafe.sublime-syntax", "Santafe.sublime-build", "Santafe.sublime-commands", "Default.sublime-keymap",
@@ -57,6 +59,7 @@ def principal() -> None:
     controle = RAIZ / "dist" / f"Santafe-{metadados['version']}.sublime-package"
     with zipfile.ZipFile(controle) as arquivo:
         assert arquivo.testzip() is None
+        assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         nomes = set(arquivo.namelist())
     assert "package-metadata.json" not in nomes
     assert ".python-version" in nomes

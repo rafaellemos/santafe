@@ -221,11 +221,19 @@ cbin:
 sls:
 	@cp "$(SLS_INICIALIZADOR)" "src/santafé-sls"
 	@chmod 0755 "src/santafé-sls"
+	@if [ "$(AUTO_PLAT)" != mingw ]; then $(MAKE) -C ferramentas/sls PLAT=$(AUTO_PLAT); fi
 
 # A instalação completa exige todas as bibliotecas. Para somente o núcleo:
 # make cbin ibin isls DEPENDENCIAS=0
 cbibc:
 	@set -e; for d in $(BIBC_DIRS); do $(MAKE) -C "$$d" PLAT=$(AUTO_PLAT); done
+	@$(MAKE) pacotes
+
+pacotes:
+	@if [ "$(AUTO_PLAT)" != mingw ]; then $(MAKE) -C ferramentas/pacotes PLAT=$(AUTO_PLAT); fi
+
+ipacotes:
+	@$(SUDO_OU_SU) bash ferramentas/instalar-arquivos.sh pacotes "$(INSTALL_TOP)" "$(AUTO_PLAT)"
 
 ibin:
 	@$(SUDO_OU_SU) bash ferramentas/instalar-arquivos.sh bin "$(INSTALL_TOP)" "$(AUTO_PLAT)"
@@ -284,6 +292,7 @@ instalar:
 	@$(MAKE) isls
 	@$(MAKE) ibibc
 	@$(MAKE) ibibf
+	@$(MAKE) ipacotes
 	@$(MAKE) instalar-pc
 	@printf "$(LARANJA_ESCURO)✅ Santafé compilado e instalado com sucesso!$(RESET)\n"
 
@@ -298,13 +307,13 @@ desinstalar:
 
 
 .PHONY: all $(PLATS) clean test testar testar-correio-mariadb install local none dummy echo dist vscode vscode-catalogo sublime sublime-catalogo sublime-repositorio \
-        ideps cbin cbibc ibin isls ibibc ibibf instalar-pc pc sls \
+        ideps cbin cbibc ibin isls ibibc ibibf instalar-pc pc sls pacotes ipacotes \
         limpar instalar desinstalar
 
 
 
 PROJECT := santafe
-VERSION := 2.0.3
+VERSION := 2.1.0
 DISTDIR := $(PROJECT)-$(VERSION)
 vscode-catalogo:
 	@python3 extensões/vscode/gerar_catalogo.py

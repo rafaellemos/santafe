@@ -56,7 +56,8 @@ def empacote(saída, arquivos) -> None:
             arquivo = RAIZ / relativo
             informação = zipfile.ZipInfo(relativo, date_time=(2026, 10, 17, 0, 0, 0))
             informação.compress_type = zipfile.ZIP_DEFLATED
-            informação.external_attr = 0o644 << 16
+            informação.create_system = 3
+            informação.external_attr = 0o100644 << 16
             pacote.writestr(informação, arquivo.read_bytes())
 
 

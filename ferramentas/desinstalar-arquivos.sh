@@ -14,6 +14,12 @@ case "$stage" in
     for name in lua.h luaconf.h lauxlib.h lualib.h lua.hpp; do remove_file "include/$name"; done
     remove_file lib/liblua.a
     remove_file share/santafé/1.0/ferramentas/sls.fé
+    for name in analisador.fé projetos.fé semantica.fé transporte.fé api-publica.json nativo.so; do
+      remove_file "share/santafé/1.0/ferramentas/sls/$name"
+    done
+    for name in versoes.fé resolvedor.fé formatos.fé cliente.fé administracao.fé ambiente.fé cli.fé nativo.so; do
+      remove_file "share/santafé/1.0/ferramentas/pacotes/$name"
+    done
     ;;
   bibs)
     suffix=so; [[ "$platform" != mingw ]] || suffix=dll

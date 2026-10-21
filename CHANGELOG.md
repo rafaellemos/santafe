@@ -1,5 +1,38 @@
 # Histórico de alterações
 
+## 2.1.0 — publicado em 2026-10-21
+
+Novas APIs e ferramentas justificam a versão menor 2.1; não
+substitui silenciosamente a distribuição histórica 2.0.3. A ABI C 503 e os
+caminhos de bibliotecas operacionais continuam preservados.
+
+- gabaritos `®variável`/`Ⓡvariável` reconhecem letras, marcas combinantes e
+  números Unicode; NFC/NFD aceitos sem normalização automática;
+- correção de corrupção de pilha na expansão de gabaritos grandes;
+- APIs aditivas `depure.analise`, `depure.lexemas` e `lua_loaddiagnostic`;
+- SLS 1.0.0: sincronização incremental UTF-16, diagnósticos precisos,
+  escopos/importações estáticas, conclusões, ajuda de parâmetros, navegação,
+  referências, rename conservador, símbolos, recuo, dobramento e tokens;
+- índice confinado e limitado, cancelamento de pedidos, análise sem executar
+  módulos; iniciador ignora inicialização/caminhos Lua do ambiente e bootstrap
+  do projeto (`-E -P`);
+- VS Code/Sublime 1.1.0: provedores semânticos negociados, realce Unicode e
+  preservação da paleta HTML/JS; não confundir testes automatizados com visuais;
+- bibliotecas 1.0.0: manifesto/lock por projeto, SemVer, resolução transitiva,
+  catálogo HTTPS curado, SHA-256, cache/offline, instalação recuperável;
+- C somente com `--permitir-nativo`, receita declarativa e compilador local:
+  não é sandbox de código nativo; nenhum hook arbitrário ou sudo automático;
+- catálogo inicial real `semver 1.0.0`, extraído do resolvedor ensaiado;
+- publicador transacional conjunto, versões imutáveis e validação prévia,
+  sem alterar bancos, aplicações empresariais ou catálogos de terceiros.
+
+A etiqueta `v2.1.0` inclui as revisões textuais r1/r2 do manual e da ajuda,
+publicadas após o pacote inicial, e a atualização deste registro. O TAR/ZIP
+original permanece imutável; não se presume igualdade byte a byte com um
+pacote reconstruído do Git. Nenhuma lógica foi alterada por essas revisões.
+
+Limites, hashes e evidências em [LANCAMENTO-2.1.0](docs/LANCAMENTO-2.1.0.md).
+
 ## 2.0.3 — manutenção em 2026-10-20
 
 Sem novas funcionalidades ou alterações de ABI. Incorpora as duas correções

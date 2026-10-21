@@ -96,6 +96,7 @@ const extensions = {getExtension(id) {
   }
   const contexto = {subscriptions: []}, logs = [];
   const provedor = registre({extensions, SemanticTokens, SemanticTokensBuilder,
+    EventEmitter: class { constructor(){this.event=()=>({dispose(){}});} fire(){} dispose(){} },
     SemanticTokensLegend: class {},
     window: {createOutputChannel: () => ({appendLine: s => logs.push(s), dispose() {}})},
     languages: {registerDocumentSemanticTokensProvider: () => ({dispose() {}})}}, contexto);

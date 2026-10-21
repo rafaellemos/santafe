@@ -35,6 +35,8 @@ publicar/
 *.pdf
 # Capturas locais preservadas fora do histórico público; relatórios JSON podem entrar.
 docs/evidencias/**/*.png
+# Evidências locais da homologação conjunta: preservadas fora do Git público.
+docs/evidencias/conjunto-20261021/
 testes/**/*.png
 testes/**/*.jpg
 testes/**/*.jpeg

@@ -79,6 +79,7 @@ typedef struct Labeldesc {
   TString *name;  /* label identifier */
   int pc;  /* position in code */
   int line;  /* line where it appeared */
+  size_t start, end;  /* original source range for deferred errors */
   lu_byte nactvar;  /* local level where it appears in current block */
 } Labeldesc;
 

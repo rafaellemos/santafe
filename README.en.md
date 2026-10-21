@@ -10,6 +10,16 @@ Operations), the local telemetry foundation planned for the future Forte.
 
 [Versão em português → README.md](README.md)
 
+## Joint 2.1.0 delivery
+
+Core 2.1.0, SLS 1.0.0, the project library manager 1.0.0, and editor extensions
+1.1.0 were **published on the official portal and verified on 2026-10-21**.
+Qualification includes both real editor hosts and visual inspection.
+See the [release notes](docs/LANCAMENTO-2.1.0.md). The library manager uses
+per-project dependency resolution, a lockfile, integrity checks and recoverable
+generations. The HTTPS registry is live with `semver 1.0.0`. Portal availability
+does not imply publication of these extensions in third-party catalogs.
+
 ## Try it in the browser
 
 [Open the Santafé WebAssembly playground](https://xn--santaf-gva.dev.br/est%C3%A1tico/wasm/)
@@ -56,7 +66,8 @@ santafé exemplos/01-ola.fé
 ```
 
 Editors start the local language server through `santafé-sls` over standard
-input/output. It reports syntax diagnostics on open, edit, and save without
+input/output. Version 1.0 reports precise syntax diagnostics, static
+scope/import information, navigation, references and conservative rename without
 executing the edited program. The VS Code and Sublime Text extensions also
 offer public-API completion, hover help, and local function navigation without
 depending on the SLS. See [SLS](docs/SLS.md).

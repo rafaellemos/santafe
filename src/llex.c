@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "lua.h"
+#include "lauxlib.h"
 
 #include "lctype.h"
 #include "ldebug.h"
@@ -25,11 +26,13 @@
 #include "lstate.h"
 #include "lstring.h"
 #include "ltable.h"
+#include "lunicode.h"
 #include "lzio.h"
 
 
 
-#define next(ls) (ls->current = zgetc(ls->z))
+#define next(ls) ((ls)->offset += ((ls)->current != EOZ), \
+                  (ls)->current = zgetc((ls)->z))
 
 
 
@@ -107,6 +110,12 @@ static const char *txtToken (LexState *ls, int token) {
 
 
 static l_noret lexerror (LexState *ls, const char *msg, int token) {
+  lua_Diagnostic *diagnostic = ls->z->diagnostic;
+  if (diagnostic) {
+    diagnostic->start = ls->scanning ? ls->tokenstart : ls->t.start;
+    diagnostic->end = ls->scanning ? ls->offset : ls->t.end;
+    diagnostic->hasrange = 1;
+  }
   msg = luaG_addinfo(ls->L, msg, ls->source, ls->linenumber);
   if (token)
     luaO_pushfstring(ls->L, "%s pr\xC3\xB3ximo %s", msg, txtToken(ls, token));
@@ -164,6 +173,9 @@ void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source,
   ls->t.token = 0;
   ls->L = L;
   ls->current = firstchar;
+  ls->offset = ls->tokenstart = 0;
+  ls->t.start = ls->t.end = 0;
+  ls->scanning = 0;
   ls->lookahead.token = TK_EOS;  /* no look-ahead token */
   ls->z = z;
   ls->fs = NULL;
@@ -462,12 +474,14 @@ static int llex (LexState *ls, SemInfo *seminfo) {
      devolve-o agora. */
   if (ls->tem_gabarito) {
     ls->tem_gabarito = 0;
+    ls->tokenstart = ls->gabarito_start;
     if (seminfo != NULL)
       *seminfo = ls->gabarito_seminfo;
     return TK_STRING;
   }
 
   for (;;) {
+    ls->tokenstart = ls->offset;
     switch (ls->current) {
       case '\n': case '\r': {  /* line breaks */
         inclinenumber(ls);
@@ -539,6 +553,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         else return ':';
       }
       case '`': {  /* gabarito literal estilo JS */
+        ls->gabarito_start = ls->tokenstart;
         /* Lê o conteúdo entre crases como uma string normal,
            armazenando em gabarito_seminfo. */
         read_string(ls, ls->current, &ls->gabarito_seminfo);
@@ -604,6 +619,15 @@ static int llex (LexState *ls, SemInfo *seminfo) {
 }
 
 
+static void scan_token (LexState *ls, Token *token) {
+  ls->scanning = 1;
+  token->token = llex(ls, &token->seminfo);
+  token->start = ls->tokenstart;
+  token->end = ls->offset;
+  ls->scanning = 0;
+}
+
+
 void luaX_next (LexState *ls) {
   ls->lastline = ls->linenumber;
   if (ls->lookahead.token != TK_EOS) {  /* is there a look-ahead token? */
@@ -611,12 +635,181 @@ void luaX_next (LexState *ls) {
     ls->lookahead.token = TK_EOS;  /* and discharge it */
   }
   else
-    ls->t.token = llex(ls, &ls->t.seminfo);  /* read next token */
+    scan_token(ls, &ls->t);  /* read next token with its own source interval */
 }
 
 
 int luaX_lookahead (LexState *ls) {
   lua_assert(ls->lookahead.token == TK_EOS);
-  ls->lookahead.token = llex(ls, &ls->lookahead.seminfo);
+  scan_token(ls, &ls->lookahead);
   return ls->lookahead.token;
+}
+
+
+/* Tooling uses precisely the compiler lexer. Keep all allocations inside a
+** protected call: the caller frees Mbuffer on success, syntax error and OOM.
+** The partial output and source/name remain anchored on the caller's stack.
+** No parser, user reader, module loader or generated function is executed.
+*/
+typedef struct LexemesInput {
+  const char *text;
+  size_t length;
+  size_t remaining;
+  Mbuffer buffer;
+  lua_Diagnostic diagnostic;
+  lua_Integer limit;
+  lua_Integer work;
+  int limited;
+} LexemesInput;
+
+static const char *lexemes_reader (lua_State *L, void *data, size_t *size) {
+  LexemesInput *input = (LexemesInput *)data;
+  (void)L;
+  *size = input->remaining;
+  input->remaining = 0;
+  return *size ? input->text : NULL;
+}
+
+/* Raw template intervals. Match the runtime's brace balancing exactly; escape
+** decoding can move/synthesize delimiters, so consumers must treat templates
+** containing escapes conservatively. Each byte is visited at most twice. */
+static int lexemes_template (LexState *ls, LexemesInput *input, const char *s, size_t n, size_t base) {
+  lua_State *L = ls->L;
+  size_t i = 1;
+  lua_Integer count = 0;
+  int incomplete = 0;
+  lua_newtable(L);
+  while (i + 1 < n) {
+    size_t marker = 0, start, end;
+    int expression = 0;
+    if (s[i] == '\\') { i += 2; continue; }
+    if ((unsigned char)s[i] == 0xc2 && (unsigned char)s[i+1] == 0xae) marker = 2;
+    else if (i + 2 < n && (unsigned char)s[i] == 0xe2 &&
+             (unsigned char)s[i+1] == 0x93 && (unsigned char)s[i+2] == 0x87) marker = 3;
+    if (!marker) { i++; continue; }
+    start = i + marker;
+    if (start < n - 1 && s[start] == '{') {
+      size_t depth = 1, j = ++start;
+      expression = 1;
+      while (j < n - 1 && depth) {
+        if (s[j] == '{') depth++;
+        else if (s[j] == '}') depth--;
+        j++;
+      }
+      if (depth) { incomplete = 1; break; }
+      end = j - 1; i = j;
+    }
+    else {
+      end = start + luaU_identifier(s + start, n - 1 - start);
+      i = end;
+      if (end == start) continue;
+    }
+    if (++input->work > input->limit) {
+      input->limited = 1;
+      luaX_syntaxerror(ls, "limite de lexemas/interpolacoes excedido");
+    }
+    lua_createtable(L, 0, 3);
+    lua_pushinteger(L, (lua_Integer)(base + start)); lua_setfield(L, -2, "in\xC3\xAD" "cio");
+    lua_pushinteger(L, (lua_Integer)(base + end)); lua_setfield(L, -2, "fim");
+    lua_pushboolean(L, expression); lua_setfield(L, -2, "express\xC3\xA3o");
+    lua_rawseti(L, -2, ++count);
+  }
+  return incomplete;
+}
+
+static int lexemes_worker (lua_State *L) {
+  LexemesInput *input = (LexemesInput *)lua_touserdata(L, 4);
+  LexState ls;
+  ZIO z;
+  lua_Integer count = 0;
+  TString *source = luaS_new(L, lua_tostring(L, 2));
+  memset(&ls, 0, sizeof(ls));
+  ls.buff = &input->buffer;
+  lua_newtable(L);  /* lexer string anchors, alive for the entire scan */
+  ls.h = hvalue(L->top - 1);
+  luaZ_init(L, &z, lexemes_reader, input);
+  z.diagnostic = &input->diagnostic;
+  luaX_setinput(L, &ls, &z, source, zgetc(&z));
+  for (;;) {
+    const char *kind;
+    luaX_next(&ls);
+    if (ls.t.token == TK_EOS) break;
+    if (++input->work > input->limit) {
+      input->limited = 1;
+      luaX_syntaxerror(&ls, "limite de lexemas excedido");
+    }
+    if (ls.tem_gabarito) {
+      luaX_next(&ls);  /* collapse synthetic __gabarito + string into one token */
+      kind = "gabarito";
+    }
+    else if (ls.t.token == TK_NAME) kind = "nome";
+    else if (ls.t.token == TK_STRING) kind = "colar";
+    else if (ls.t.token == TK_INT || ls.t.token == TK_FLT) kind = "n\xC3\xBAmero";
+    else if (ls.t.token >= FIRST_RESERVED && ls.t.token <= TK_WHILE) kind = "palavra";
+    else kind = "s\xC3\xADmbolo";
+    lua_createtable(L, 0, 5);
+    lua_pushstring(L, kind);
+    lua_setfield(L, -2, "tipo");
+    lua_pushinteger(L, (lua_Integer)ls.t.start);
+    lua_setfield(L, -2, "in\xC3\xAD" "cio");
+    lua_pushinteger(L, (lua_Integer)ls.t.end);
+    lua_setfield(L, -2, "fim");
+    lua_pushlstring(L, input->text + ls.t.start, ls.t.end - ls.t.start);
+    lua_setfield(L, -2, "texto");
+    if (strcmp(kind, "gabarito") == 0) {
+      int incomplete = lexemes_template(&ls, input, input->text + ls.t.start, ls.t.end - ls.t.start, ls.t.start);
+      lua_setfield(L, -2, "interpola\xC3\xA7\xC3\xB5" "es");
+      lua_pushboolean(L, incomplete); lua_setfield(L, -2, "gabaritoIncompleto");
+    }
+    if (ls.t.token == TK_NAME || ls.t.token == TK_STRING) {
+      lua_pushlstring(L, getstr(ls.t.seminfo.ts), tsslen(ls.t.seminfo.ts));
+      lua_setfield(L, -2, "valor");
+    }
+    if (ls.t.token == TK_NAME) {
+      lua_pushinteger(L, (lua_Integer)luaU_identifier(input->text + ls.t.start,
+                                                     ls.t.end - ls.t.start));
+      lua_setfield(L, -2, "octetosIdentificador");
+    }
+    lua_rawseti(L, 3, ++count);
+  }
+  return 0;
+}
+
+int luaX_lexemes (lua_State *L) {
+  LexemesInput input;
+  int status;
+  memset(&input, 0, sizeof(input));
+  luaL_checktype(L, 1, LUA_TSTRING);
+  input.text = lua_tolstring(L, 1, &input.length);
+  luaL_argcheck(L, input.length <= 16 * 1024 * 1024, 1,
+                "fonte excede 16 MiB");
+  input.remaining = input.length;
+  input.limit = luaL_optinteger(L, 3, 100000);
+  luaL_argcheck(L, input.limit >= 1 && input.limit <= 1000000, 3,
+                "limite deve estar entre 1 e 1000000");
+  lua_settop(L, 3);
+  lua_pushstring(L, luaL_optstring(L, 2, "=(lexemas)"));
+  lua_replace(L, 2);
+  lua_settop(L, 2);
+  lua_newtable(L);  /* result stays anchored here across pcall */
+  lua_pushcfunction(L, lexemes_worker);
+  lua_pushvalue(L, 1);
+  lua_pushvalue(L, 2);
+  lua_pushvalue(L, 3);
+  lua_pushlightuserdata(L, &input);
+  status = lua_pcall(L, 4, 0, 0);
+  luaZ_freebuffer(L, &input.buffer);
+  if (status == LUA_OK) return 1;
+  if (status != LUA_ERRSYNTAX) luaD_throw(L, status);
+  lua_newtable(L);
+  lua_pushvalue(L, -2);
+  lua_setfield(L, -2, "mensagem");
+  lua_pushstring(L, input.limited ? "limite-lexemas" : "lexico");
+  lua_setfield(L, -2, "c\xC3\xB3" "digo");
+  lua_pushinteger(L, (lua_Integer)input.diagnostic.start);
+  lua_setfield(L, -2, "in\xC3\xAD" "cio");
+  lua_pushinteger(L, (lua_Integer)input.diagnostic.end);
+  lua_setfield(L, -2, "fim");
+  lua_remove(L, -2);  /* original error; return partial stream + diagnostic */
+  return 2;
 }

@@ -27,6 +27,34 @@ const {tipoDosEscopos}=require('../realce-vscode');
    assert(scopes(s,s.indexOf('mat.raiz')+4).includes('support.function'));
  }
  assert.equal(trechosDoHospedeiro('-- ®{n} função()\nlocal s="Ⓡnome :x() função()"').length,0);
+ const nomesUnicode=require('../../testes/identificadores-unicode.json');
+ for(const nome of nomesUnicode) for(const marca of ['®','Ⓡ']) {
+   const alvo=marca+nome;
+   for(const corpo of [alvo+'!', '<b title="'+alvo+'">Oi</b>', '/* js */ const nome="'+alvo+'";']) {
+     const s='local x = `🟢 '+corpo+'`', começo=s.indexOf(alvo);
+     assert.deepEqual(trechosDoHospedeiro(s).filter(t=>t.estilo==='marcador').map(t=>s.slice(t.início,t.fim)),[alvo]);
+     for(let p=começo;p<começo+alvo.length;p++)
+       assert(scopes(s,p).includes('variable.parameter.santafe'),nome+' cortado em '+p);
+     assert(!scopes(s,começo+alvo.length).includes('variable.parameter.santafe'));
+   }
+ }
+ const adjacentes='local a=`®açãoⓇíndice—®variável!`';
+ assert.deepEqual(trechosDoHospedeiro(adjacentes).map(t=>adjacentes.slice(t.início,t.fim)),['®ação','Ⓡíndice','®variável']);
+ for(const s of ['local a=`\\®ação \\Ⓡvariável`', 'local a="®ação Ⓡvariável"','local a=`®́nome Ⓡ1nome`'])
+   assert.equal(trechosDoHospedeiro(s).length,0,s);
+ // Compila a regra da gramática Sublime em Oniguruma, sem substituir o
+ // ensaio visual do plugin_host. Os recortes Python são testados à parte.
+ const sublime=fs.readFileSync(path.join(raiz,'../sublime/Santafe.sublime-syntax'),'utf8');
+ const regra=sublime.split('\n').find(l=>l.includes("match: '[®Ⓡ]["));
+ assert(regra,'regra Unicode do Sublime ausente');
+ const scanner=new onig.OnigScanner([regra.match(/match: '(.*)'/)[1]]);
+ for(const nome of nomesUnicode) for(const marca of ['®','Ⓡ']) {
+   const alvo=marca+nome, texto='🟢 '+alvo+'—';
+   const captura=scanner.findNextMatchSync(texto,0).captureIndices[0];
+   assert.equal(texto.slice(captura.start,captura.end),alvo,'Sublime: '+alvo);
+ }
+ assert.equal(scanner.findNextMatchSync('®́nome Ⓡ1nome',0),null);
+ scanner.dispose();
  const aninhado='local s=`Ⓡ{({x="}"}).x}`';
  assert.deepEqual(trechosDoHospedeiro(aninhado).map(t=>aninhado.slice(t.início,t.fim)),['Ⓡ{','}']);
  // Exercita aplicação/remoção de decorações e mudança de tema/paleta.

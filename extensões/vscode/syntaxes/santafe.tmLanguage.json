@@ -811,7 +811,7 @@
           }
         },
         {
-          "match": "(?<![\\p{L}\\p{M}\\p{N}_.:])(depure)\\s*(\\.)\\s*((?:definaValorDeUsuário|obterValorDeUsuário|definaValorExterno|junteValorExterno|obterValorExterno|definaMetatabela|obterInformação|obterMetatabela|idValorExterno|obterRegistro|rastroDePilha|definaGancho|definaLocal|obterGancho|obterLocal|depure))(?![\\p{L}\\p{M}\\p{N}_])",
+          "match": "(?<![\\p{L}\\p{M}\\p{N}_.:])(depure)\\s*(\\.)\\s*((?:definaValorDeUsuário|obterValorDeUsuário|definaValorExterno|junteValorExterno|obterValorExterno|definaMetatabela|obterInformação|obterMetatabela|idValorExterno|obterRegistro|rastroDePilha|definaGancho|definaLocal|obterGancho|obterLocal|analise|lexemas|depure))(?![\\p{L}\\p{M}\\p{N}_])",
           "captures": {
             "1": {
               "name": "support.namespace.santafe"
@@ -1316,7 +1316,7 @@
           ]
         },
         {
-          "match": "[®Ⓡ][A-Za-z_][A-Za-z_0-9]*",
+          "match": "[®Ⓡ][\\p{L}_][\\p{L}\\p{M}\\p{N}_]*",
           "name": "meta.interpolation.variable.santafe variable.parameter.santafe"
         }
       ]

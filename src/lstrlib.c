@@ -1982,6 +1982,8 @@ static int str_gabarito (lua_State *L) {
     if (tam_simbolo > 0) {
       /* O próximo caractere útil está em i + tam_simbolo */
       unsigned char c_prox = (i + tam_simbolo < tam) ? (unsigned char)src[i + tam_simbolo] : 0;
+      size_t nome_tamanho = luaU_identifier(src + i + tam_simbolo,
+                                          tam - i - tam_simbolo);
 
       /* CASO A: {expressão} */
       if (c_prox == '{') {
@@ -2041,44 +2043,31 @@ static int str_gabarito (lua_State *L) {
         lua_call(L, 0, 1);
 
         lua_getglobal(L, "paraColar");
-        lua_pushvalue(L, -2);
+        lua_insert(L, -2);
         lua_call(L, 1, 1);
         luaL_addvalue(&b);
-        lua_pop(L, 1);
 
         i = j;
         continue;
       }
 
-      /* CASO B: variavel (sem chaves) */
-      else if (isalpha(c_prox) || c_prox == '_') {
+      /* CASO B: identificador Unicode (sem chaves, sem normalização). */
+      else if (nome_tamanho > 0) {
         size_t inicio = i + tam_simbolo;
-        size_t j = inicio;
-        while (j < tam && (isalnum((unsigned char)src[j]) || src[j] == '_')) {
-            j++;
-        }
+        size_t j = inicio + nome_tamanho;
 
-        char *nome_var = malloc((j - inicio) + 1);
-        memcpy(nome_var, src + inicio, j - inicio);
-        nome_var[j - inicio] = '\0';
-
-        /* Função auxiliar que criamos antes para buscar local/global */
-        push_variable(L, nome_var);
-        free(nome_var);
+        /* Nome protegido pelo GC, inclusive quando a busca lança um erro. */
+        lua_pushlstring(L, src + inicio, nome_tamanho);
+        push_variable(L, lua_tostring(L, -1));
+        lua_remove(L, -2);
 
         if (!lua_isnil(L, -1)) {
             lua_getglobal(L, "paraColar");
-            lua_pushvalue(L, -2);
+            lua_insert(L, -2);
             lua_call(L, 1, 1);
+            /* Só o colar convertido pode ficar sobre o buffer: addvalue
+               precisa encontrar sua caixa logo abaixo ao redimensionar. */
             luaL_addvalue(&b);
-            /* pilha aqui: só sobra o valor 'V' empurrado por push_variable
-               (paraColar, a cópia e o resultado do paraColar já foram
-               consumidos por lua_call/luaL_addvalue); então falta remover
-               só ESSE valor, não dois. lua_pop(L, 2) estourava um nível a
-               mais da pilha do luaL_Buffer a cada ®var interpolado -- é
-               esse acúmulo que gerava o estouro de pilha em gabaritos com
-               várias interpolações. */
-            lua_pop(L, 1);
         } else {
             lua_pop(L, 1);
         }

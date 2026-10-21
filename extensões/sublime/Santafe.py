@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import unicodedata
 
 import sublime
 import sublime_plugin
@@ -21,13 +22,21 @@ CAMINHOS_SLS = (
     "/usr/local/bin/santafé-sls",
     os.path.expanduser("~/.local/bin/santafé-sls"),
 )
-INÍCIO_DE_IDENTIFICADOR = r"[^\W\d]"
-IDENTIFICADOR = rf"{INÍCIO_DE_IDENTIFICADOR}\w*"
-# O membro pode estar vazio: ao escrever `correio.` o editor já deve
-# oferecer os membros da biblioteca.  Não acrescente `*` a IDENTIFICADOR,
-# pois ele já contém uma repetição para os caracteres restantes.
-ACESSO_FINAL = re.compile(rf"((?:{IDENTIFICADOR}[.:])+)(?:{INÍCIO_DE_IDENTIFICADOR}\w*)?$")
-FUNÇÃO_LOCAL = re.compile(rf"^\s*(?:local\s+)?função\s+({IDENTIFICADOR})", re.MULTILINE)
+FUNÇÃO_LOCAL = re.compile(r"^[\t ]*(?:local[\t ]+)?função[\t ]+", re.MULTILINE)
+
+
+def fim_identificador(texto, início=0):
+    """Mesmo contrato [L_][LMN_]* dos gabaritos; não normaliza NFC/NFD.
+
+    O módulo re do Python não inclui marcas combinantes em \\w.
+    """
+    if início >= len(texto) or not (texto[início] == "_" or
+                                   unicodedata.category(texto[início])[0] == "L"):
+        return início
+    fim = início + 1
+    while fim < len(texto) and (texto[fim] == "_" or unicodedata.category(texto[fim])[0] in "LMN"):
+        fim += 1
+    return fim
 
 PALAVRAS_RESERVADAS = (
     "local", "função", "retorne", "se", "então", "senão", "enquanto",
@@ -36,7 +45,7 @@ PALAVRAS_RESERVADAS = (
 )
 
 GABARITOS_DE_BLOCO = {
-    "função": "função ${1:nome}(${2}) início\n    ${0}\nfim",
+    "função": "função ${1:nome}(${2})\n    ${0}\nfim",
     "se": "se ${1:condição} então\n    ${0}\nfim",
     "para": "para ${1:índice} = ${2:1}, ${3:10} início\n    ${0}\nfim",
     "enquanto": "enquanto ${1:condição} início\n    ${0}\nfim",
@@ -109,12 +118,27 @@ for item in CATÁLOGO_PÚBLICO:
 def acesso_antes_do(view: sublime.View, ponto: int) -> str:
     começo = max(0, ponto - 256)
     trecho = view.substr(sublime.Region(começo, ponto))
-    encontrado = ACESSO_FINAL.search(trecho)
-    return encontrado.group(1) if encontrado else ""
+    início = len(trecho)
+    while início and (trecho[início - 1] in "_.:" or
+                     unicodedata.category(trecho[início - 1])[0] in "LMN"):
+        início -= 1
+    candidato = trecho[início:]
+    partes = re.split(r"[.:]", candidato)
+    if len(partes) < 2:
+        return ""
+    # O membro final pode estar vazio (`correio.`), mas a base nunca.
+    if any(not nome or fim_identificador(nome) != len(nome) for nome in partes[:-1]):
+        return ""
+    if partes[-1] and fim_identificador(partes[-1]) != len(partes[-1]):
+        return ""
+    return candidato[:len(candidato) - len(partes[-1])]
 
 
 def nomes_locais(view: sublime.View) -> tuple[str, ...]:
-    return tuple(sorted({encontrado.group(1) for encontrado in FUNÇÃO_LOCAL.finditer(view.substr(sublime.Region(0, view.size())))}, key=str.casefold))
+    texto = view.substr(sublime.Region(0, view.size()))
+    nomes = {texto[m.end():fim_identificador(texto, m.end())] for m in FUNÇÃO_LOCAL.finditer(texto)}
+    nomes.discard("")
+    return tuple(sorted(nomes, key=str.casefold))
 
 
 def item_de_conclusão(rótulo, anotação, espécie, conteúdo=None, detalhes=""):
@@ -227,6 +251,7 @@ class SantafeAtivarDiagnosticosSLSCommand(sublime_plugin.ApplicationCommand):
             "selector": ESCOPO,
             "schemes": ["file", "buffer"],
             "diagnostics_mode": "workspace",
+            "file_watcher": {"patterns": ["**/*.fé", "**/*.fe", "**/.santafe/estado.json"]},
         })
         sublime.save_settings(ARQUIVO_CONFIGURAÇÕES_LSP)
 
@@ -252,6 +277,8 @@ class SantafeConclusões(sublime_plugin.EventListener):
 
     def on_query_completions(self, view, prefix, locations):
         if not locations or not view.match_selector(locations[0], ESCOPO):
+            return None
+        if sls_oferece(view, "completionProvider"):
             return None
 
         acesso = acesso_antes_do(view, locations[0])
@@ -287,6 +314,8 @@ class SantafeConclusões(sublime_plugin.EventListener):
     def on_hover(self, view, point, hover_zone):
         if hover_zone != sublime.HOVER_TEXT or not view.match_selector(point, ESCOPO):
             return
+        if sls_oferece(view, "hoverProvider"):
+            return
         palavra = view.substr(view.word(point))
         if not palavra:
             return
@@ -302,3 +331,21 @@ class SantafeConclusões(sublime_plugin.EventListener):
             location=point,
             max_width=520,
         )
+
+
+def sls_oferece(view, capacidade):
+    """Fallback só se a sessão desta view NÃO negociar a capacidade.
+
+    Importação tardia: LSP é opcional e pode ser carregado depois do Santafe.
+    Uma configuração enabled, sozinha, não prova que o servidor está ativo.
+    """
+    try:
+        from LSP.plugin.core.registry import windows
+        listener = windows.listener_for_view(view)
+        if listener:
+            return any(sv.session.config.name in ("Santafé", "Santafe", "santafe")
+                       and sv.has_capability_async(capacidade)
+                       for sv in listener.session_views_async())
+    except (ImportError, AttributeError):
+        pass
+    return False

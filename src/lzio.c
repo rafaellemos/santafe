@@ -41,6 +41,7 @@ void luaZ_init (lua_State *L, ZIO *z, lua_Reader reader, void *data) {
   z->data = data;
   z->n = 0;
   z->p = NULL;
+  z->diagnostic = NULL;
 }
 
 

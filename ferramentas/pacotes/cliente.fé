@@ -1,0 +1,214 @@
+local R=importe "pacotes.resolvedor"
+retorne função(N,F)
+    local C={}
+    local exija=F.exija
+    local função chaves(t)
+        local r={}; para k em pares(t) início r[#r+1]=k fim; tabela.ordene(r); retorne r
+    fim
+    local função leiaOpcional(raiz,caminho,limite)
+        local existe,falha=raiz:existe(caminho); exija(existe~=nulo,falha)
+        se não existe então retorne nulo fim
+        retorne garanta(raiz:leia(caminho,limite))
+    fim
+    local função grave(raiz,caminho,conteúdo,substitua)
+        local pai=caminho:separe("^(.*)/[^/]+$")
+        se pai então garanta(raiz:diretorio(pai)) fim
+        garanta(raiz:grave(caminho,conteúdo,substitua))
+    fim
+    local função fase(opções,nome) se opções.observador então opções.observador(nome) fim fim
+    função C.recupere(raiz)
+        local bruto=leiaOpcional(raiz,".santafe/transacao.json")
+        se não bruto então retorne falso fim
+        local t=F.json(bruto)
+        F.objeto(t,{formato=verdadeiro,geracao=verdadeiro,arquivos=verdadeiro},"transação")
+        exija(t.formato==1 e tipo(t.geracao)=="colar" e #t.geracao==32 e t.geracao:separe("^[0-9a-f]+$"),"transação inválida")
+        exija(F.lista(t.arquivos,2,"transação")==2,"transação incompleta")
+        local estadoBruto=leiaOpcional(raiz,".santafe/estado.json")
+        local estado=estadoBruto e F.json(estadoBruto) ou {}
+        local confirmado=estado.geracao==t.geracao
+        local preparados={}
+        para i,a em ipares(t.arquivos) início
+            F.objeto(a,{caminho=verdadeiro,antes=verdadeiro,depois=verdadeiro},"arquivo da transação")
+            exija(a.caminho==(i==1 e "santafe.json" ou "santafe.lock") e tipo(a.depois)=="colar","destino da transação inválido")
+            local antes=a.antes e N.decodBase64(a.antes) ou nulo
+            local depois=N.decodBase64(a.depois)
+            local atual=leiaOpcional(raiz,a.caminho)
+            exija(atual==antes ou atual==depois,"arquivo editado após interrupção; preservado: "..a.caminho)
+            preparados[#preparados+1]={caminho=a.caminho,conteúdo=confirmado e depois ou antes}
+        fim
+        para _,a em ipares(preparados) início
+            se a.conteúdo então grave(raiz,a.caminho,a.conteúdo,verdadeiro)
+            senão garanta(raiz:removaArquivo(a.caminho)) fim
+        fim
+        garanta(raiz:removaArquivo(".santafe/transacao.json"))
+        retorne verdadeiro
+    fim
+    local função origem(opções)
+        se opções.repositórioLocal então
+            exija(opções.repositórioLocal:corte(1,1)=="/","repositório local deve ter caminho absoluto")
+            retorne "local:"..opções.repositórioLocal,não opções.semRede e garanta(N.raiz(opções.repositórioLocal)) ou nulo
+        fim
+        local url=opções.repositório ou "https://xn--santaf-gva.dev.br/est%C3%A1tico/bibliotecas/v1"
+        exija(tipo(url)=="colar" e #url<=2048 e url:separe("^https://[a-z0-9][a-z0-9.:-]*/[A-Za-z0-9/_%%%-]+$") e não url:procure("..",9,verdadeiro),"URL de repositório inválida; HTTPS exigido")
+        -- Percentuais só podem codificar octetos válidos do caminho. O endereço
+        -- oficial contém est%C3%A1tico; '%' não pode ser confundido com escape
+        -- do próprio padrão Santafé, nem aceitar travessia codificada.
+        exija(não url:troque("%%[0-9A-Fa-f][0-9A-Fa-f]",""):procure("%",1,verdadeiro),"escape inválido na URL do repositório")
+        local caminho=url:separe("^https://[^/]+(/.*)$"):troque("%%(..)",função(h) retorne colar.caractere(paraNúmero(h,16)) fim)
+        exija(não caminho:procure("[%c\\?#%%]") e não caminho:procure("..",1,verdadeiro),"caminho inseguro na URL do repositório")
+        url=url:troque("/+$","")
+        retorne url,nulo
+    fim
+    local função baixe(raiz,origemURL,localRoot,caminho,limite,ca)
+        se localRoot então retorne garanta(localRoot:leia(caminho,limite)) fim
+        local argumentos={"/usr/bin/curl","--disable","--silent","--show-error","--fail",
+            "--proto","=https","--proto-redir","=https","--location","--max-redirs","3",
+            "--connect-timeout","10","--max-time","60","--max-filesize",paraColar(limite),
+            "--url",origemURL.."/"..caminho}
+        se ca então
+            exija(tipo(ca)=="colar" e ca:corte(1,1)=="/" e não ca:procure("%z"),"autoridade certificadora deve ser arquivo absoluto")
+            argumentos[#argumentos+1]="--cacert"; argumentos[#argumentos+1]=ca
+        fim
+        local código,conteúdo=raiz:execute(argumentos,65,limite)
+        exija(código==0,"download falhou ("..paraColar(código).."): "..(conteúdo ou ""):corte(1,1024))
+        retorne conteúdo
+    fim
+    local função valideLock(lock,origemURL,manifesto)
+        F.objeto(lock,{formato=verdadeiro,origem=verdadeiro,dependencias=verdadeiro,pacotes=verdadeiro},"lock")
+        exija(lock.formato==1 e lock.origem==origemURL,"lock pertence a outro formato/repositório")
+        F.dependências(lock.dependencias)
+        exija(tipo(lock.pacotes)=="tabela","pacotes ausentes do lock")
+        local índice={formato=1,pacotes={}}
+        para nome,p em pares(lock.pacotes) início
+            F.objeto(p,{versao=verdadeiro,arquivo=verdadeiro,sha256=verdadeiro,dependencias=verdadeiro},"pacote do lock")
+            exija(tipo(p.versao)=="colar","versão ausente do lock")
+            índice.pacotes[nome]={[p.versao]={arquivo=p.arquivo,sha256=p.sha256,dependencias=p.dependencias}}
+        fim
+        F.índice(índice)
+        se manifesto então exija(F.canônico(lock.dependencias)==F.canônico(manifesto.dependencias ou {}),"manifesto diverge do lock") fim
+        retorne índice
+    fim
+    função C.instale(caminho,pacote,faixa,opções)
+        opções=opções ou {}
+        local raiz=garanta(N.raiz(caminho))
+        local ok,resultado=proteja(função()
+            garanta(raiz:trave()); C.recupere(raiz)
+            local antesManifesto=leiaOpcional(raiz,"santafe.json")
+            local manifesto=antesManifesto e F.manifesto(F.json(antesManifesto),falso) ou {formato=1,dependencias={}}
+            manifesto.dependencias=manifesto.dependencias ou {}
+            se pacote então
+                exija(não opções.travado e não opções.semRede,"adição não permitida no modo travado/sem rede")
+                exija(R.nomeVálido(pacote),"nome de pacote inválido")
+                manifesto.dependencias[pacote]=faixa ou "*"
+                F.manifesto(manifesto,falso)
+            fim
+            local origemURL,localRoot=origem(opções)
+            local antesLock=leiaOpcional(raiz,"santafe.lock")
+            local lock=antesLock e F.json(antesLock) ou nulo
+            local versões,índice={},nulo
+            se lock então
+                índice=valideLock(lock,origemURL,(opções.travado ou opções.semRede) e manifesto ou nulo)
+                para nome,p em pares(lock.pacotes) início versões[nome]=p.versao fim
+            fim
+            se opções.travado ou opções.semRede então exija(lock,"modo travado/sem rede exige santafe.lock")
+            senão índice=F.índice(F.json(baixe(raiz,origemURL,localRoot,"indice.json",4*1024*1024,opções.autoridadeCertificadora))) fim
+            -- A previously locked immutable version may not change its digest.
+            se lock então
+                para nome,p em pares(lock.pacotes) início
+                    local atual=índice.pacotes[nome] e índice.pacotes[nome][p.versao]
+                    exija(não atual ou atual.sha256==p.sha256,"versão publicada foi alterada: "..nome.."@"..p.versao)
+                fim
+            fim
+            local resolvido=garanta(R.resolva(índice.pacotes,manifesto.dependencias,opções.atualize e {} ou versões,
+                {travado=opções.travado ou opções.semRede}))
+            local novoLock={formato=1,origem=origemURL,dependencias=manifesto.dependencias,pacotes={}}
+            local pacotes={}
+            local totalArquivos,totalOctetos,totalNativos=0,0,0
+            para _,nome em ipares(resolvido.ordem) início
+                local p=resolvido.pacotes[nome]; local dados=p.dados
+                local cache=".santafe/cache/"..dados.sha256..".sfp"
+                local bruto=leiaOpcional(raiz,cache,48*1024*1024)
+                se não bruto então
+                    exija(não opções.semRede,"pacote ausente do cache: "..nome)
+                    bruto=baixe(raiz,origemURL,localRoot,dados.arquivo,48*1024*1024,opções.autoridadeCertificadora)
+                fim
+                local m,arquivos=F.pacote(bruto,dados.sha256)
+                para _,conteúdo em pares(arquivos) início
+                    totalArquivos=totalArquivos+1; totalOctetos=totalOctetos+#conteúdo
+                    exija(totalArquivos<=8192 e totalOctetos<=128*1024*1024,"instalação excede 8.192 arquivos ou 128 MiB")
+                fim
+                para _ em pares(m.nativos ou {}) início totalNativos=totalNativos+1 fim
+                exija(totalNativos<=32,"instalação excede 32 módulos C")
+                exija(m.nome==nome e m.versao==p.versao e F.canônico(m.dependencias ou {})==F.canônico(dados.dependencias ou {}),"pacote diverge do índice")
+                exija(opções.permitaNativo ou próximo(m.nativos ou {})==nulo,"compilação C exige --permitir-nativo: "..nome)
+                se não leiaOpcional(raiz,cache,48*1024*1024) então grave(raiz,cache,bruto,falso) fim
+                pacotes[nome]={manifesto=m,arquivos=arquivos}
+                novoLock.pacotes[nome]={versao=p.versao,arquivo=dados.arquivo,sha256=dados.sha256,dependencias=dados.dependencias ou {}}
+            fim
+            se localRoot então localRoot:feche() fim
+            se opções.travado ou opções.semRede então
+                exija(F.canônico(novoLock)==F.canônico(lock),"lock contém resolução divergente ou pacotes excedentes")
+            fim
+            fase(opções,"verificado")
+            local geração=N.nonce(); local base=".santafe/geracoes/"..geração
+            garanta(raiz:diretorio(base))
+            local módulos={}
+            local colisões={}
+            local plataforma=N.plataforma()
+            para _,nome em ipares(resolvido.ordem) início
+                local p=pacotes[nome]; local destino=base.."/pacotes/"..nome
+                para _,arquivo em ipares(chaves(p.arquivos)) início grave(raiz,destino.."/"..arquivo,p.arquivos[arquivo],falso) fim
+                para módulo,caminhoMódulo em pares(p.manifesto.modulos ou {}) início
+                    local chave=N.chaveCaminho(módulo)
+                    exija(não colisões[chave],"módulo fornecido por dois pacotes: "..módulo)
+                    colisões[chave]=verdadeiro
+                    módulos[módulo]={tipo="fé",caminho="pacotes/"..nome.."/"..caminhoMódulo,sha256=N.sha256(p.arquivos[caminhoMódulo])}
+                fim
+                para módulo,receita em pares(p.manifesto.nativos ou {}) início
+                    local chave=N.chaveCaminho(módulo)
+                    exija(não colisões[chave],"módulo fornecido por dois pacotes: "..módulo)
+                    colisões[chave]=verdadeiro
+                    exija(opções.cabeçalhos e opções.cabeçalhos:corte(1,1)=="/","diretório de cabeçalhos Santafé ausente")
+                    local saída="nativo-"..módulo..".so"
+                    local argumentos={"/usr/bin/cc","-O2","-fPIC","-I"..opções.cabeçalhos,"-I.","-o",saída}
+                    se plataforma.sistema=="Darwin" então
+                        argumentos[#argumentos+1]="-bundle"; argumentos[#argumentos+1]="-undefined"; argumentos[#argumentos+1]="dynamic_lookup"
+                    senão argumentos[#argumentos+1]="-shared" fim
+                    para _,f em ipares(receita.fontes) início argumentos[#argumentos+1]="./"..f fim
+                    para _,b em ipares(receita.bibliotecas ou {}) início argumentos[#argumentos+1]="-l"..b fim
+                    local subraiz=garanta(raiz:subraiz(destino))
+                    local código,diagnóstico=subraiz:execute(argumentos,120); subraiz:feche()
+                    exija(código==0,"compilação falhou: "..nome.."\n"..(diagnóstico ou ""))
+                    local binário=garanta(raiz:leia(destino.."/"..saída,16*1024*1024))
+                    módulos[módulo]={tipo="c",caminho="pacotes/"..nome.."/"..saída,sha256=N.sha256(binário)}
+                fim
+            fim
+            local manifestoBruto=F.canônico(manifesto).."\n"
+            local lockBruto=F.canônico(novoLock).."\n"
+            local mapaBruto=F.canônico({formato=1,plataforma=plataforma,modulos=módulos}).."\n"
+            grave(raiz,base.."/santafe.json",manifestoBruto,falso)
+            grave(raiz,base.."/santafe.lock",lockBruto,falso)
+            grave(raiz,base.."/modulos.json",mapaBruto,falso)
+            fase(opções,"preparado")
+            exija(leiaOpcional(raiz,"santafe.json")==antesManifesto e leiaOpcional(raiz,"santafe.lock")==antesLock,"manifesto/lock alterado durante instalação; preservado")
+            local anteriorBruto=leiaOpcional(raiz,".santafe/estado.json")
+            local anterior=anteriorBruto e F.json(anteriorBruto) ou {}
+            local estado={formato=1,geracao=geração,anterior=anterior.geracao,
+                manifesto=N.sha256(manifestoBruto),lock=N.sha256(lockBruto),modulos=N.sha256(mapaBruto)}
+            local transação={formato=1,geracao=geração,arquivos={
+                {caminho="santafe.json",antes=antesManifesto e N.base64(antesManifesto),depois=N.base64(manifestoBruto)},
+                {caminho="santafe.lock",antes=antesLock e N.base64(antesLock),depois=N.base64(lockBruto)}}}
+            grave(raiz,".santafe/transacao.json",F.canônico(transação),falso)
+            fase(opções,"transacao")
+            grave(raiz,"santafe.json",manifestoBruto,verdadeiro); fase(opções,"manifesto")
+            grave(raiz,"santafe.lock",lockBruto,verdadeiro); fase(opções,"lock")
+            grave(raiz,".santafe/estado.json",F.canônico(estado).."\n",verdadeiro); fase(opções,"confirmado")
+            garanta(raiz:removaArquivo(".santafe/transacao.json"))
+            retorne {geracao=geração,pacotes=novoLock.pacotes,ordem=resolvido.ordem}
+        fim)
+        raiz:feche()
+        se não ok então retorne nulo,paraColar(resultado) fim
+        retorne resultado
+    fim
+    retorne C
+fim

@@ -65,12 +65,14 @@ async function crieRegistro(extensions) {
   });
 }
 
-function registre(vscode, contexto) {
+function registre(vscode, contexto, cliente) {
   const aparência = require("./aparencia").registre(vscode, contexto, tipoDosEscopos);
-  const legenda = new vscode.SemanticTokensLegend(TIPOS, []);
+  const legenda = new vscode.SemanticTokensLegend([...TIPOS,"variable","function","parameter"], ["declaration"]);
   let promessa, descartado = false, avisado = false;
   const saída = vscode.window.createOutputChannel("Santafé: realce embutido");
+  const mudança=new vscode.EventEmitter();
   const provedor = {
+    onDidChangeSemanticTokens:mudança.event,
     async provideDocumentSemanticTokens(documento, cancelamento) {
       const versão = documento.version;
       const cancelado = () => descartado || cancelamento.isCancellationRequested || documento.version !== versão;
@@ -83,6 +85,26 @@ function registre(vscode, contexto) {
         if (cancelado()) return undefined;
         aparência.atualize(documento, fonte, tokens);
         const builder = new vscode.SemanticTokensBuilder(legenda);
+        const faixas=[];
+        if(cliente?.suporta("semanticTokensProvider")) {
+          const resposta=await require("./provedores-sls").peça(cliente,"textDocument/semanticTokens/full",
+            {textDocument:{uri:documento.uri.toString()}},cancelamento);
+          if(cancelado()) return undefined;
+          const reservados=[...tokens,...require("./aparencia").trechosDoHospedeiro(fonte)
+            .filter(t=>t.estilo==="marcador")].sort((a,b)=>a.início-b.início);
+          let linha=0,coluna=0,cursor=0;
+          const tipos=cliente.capacidades.semanticTokensProvider.legend?.tokenTypes||[];
+          for(let i=0;i+4<(resposta?.data?.length||0);i+=5) {
+            const [dl,dc,tamanho,tipo,mod]=resposta.data.slice(i,i+5);
+            linha+=dl; coluna=dl?dc:coluna+dc;
+            const nome=tipos[tipo],posição=["variable","function","parameter"].indexOf(nome);
+            if(posição<0 || linha>=documento.lineCount || tamanho<1) continue;
+            const início=documento.offsetAt(new vscode.Position(linha,coluna)),fim=início+tamanho;
+            while(cursor<reservados.length && reservados[cursor].fim<=início) cursor++;
+            if(reservados[cursor]?.início<fim) continue;
+            faixas.push({linha,coluna,tamanho,tipo:TIPOS.length+posição,mod:mod&1});
+          }
+        }
         let fimAnterior = 0;
         for (const token of tokens) {
           // Escape Unicode pode gerar dois UTF-16 apontando ao mesmo escape.
@@ -91,11 +113,14 @@ function registre(vscode, contexto) {
           while (início < token.fim) {
             const posição = documento.positionAt(início);
             const fim = Math.min(token.fim, início + documento.lineAt(posição.line).text.length - posição.character);
-            if (fim > início) builder.push(posição.line, posição.character, fim - início, TIPOS.indexOf(tipoDosEscopos(token.scopes)), 0);
+            if (fim > início) faixas.push({linha:posição.line,coluna:posição.character,tamanho:fim-início,
+              tipo:TIPOS.indexOf(tipoDosEscopos(token.scopes)),mod:0});
             início = fim + 1;
           }
           fimAnterior = Math.max(fimAnterior, token.fim);
         }
+        faixas.sort((a,b)=>a.linha-b.linha||a.coluna-b.coluna);
+        for(const f of faixas) builder.push(f.linha,f.coluna,f.tamanho,f.tipo,f.mod);
         return builder.build();
       } catch (erro) {
         // Preserva o realce Santafé, sem interromper SLS/conclusões nem abrir
@@ -105,9 +130,10 @@ function registre(vscode, contexto) {
       }
     }
   };
-  contexto.subscriptions.push(saída,
+  contexto.subscriptions.push(saída,mudança,
     vscode.languages.registerDocumentSemanticTokensProvider({language: "santafe"}, provedor, legenda),
     {dispose() { descartado = true; promessa?.then(r => r.dispose(), () => {}); }});
+  if(cliente) contexto.subscriptions.push(cliente.aoMudarEstado.event(()=>mudança.fire()));
   return provedor;
 }
 

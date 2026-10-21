@@ -24,7 +24,7 @@ import zipfile
 
 RAIZ = Path(__file__).resolve().parents[1]
 SAIDA = RAIZ / "dist"
-DIRETORIOS_IGNORADOS = {".git", "dist", "publicar", "__pycache__", ".pytest_cache"}
+DIRETORIOS_IGNORADOS = {".git", ".santafe", "dist", "publicar", "__pycache__", ".pytest_cache"}
 SUFIXOS_IGNORADOS = {
     ".o", ".a", ".so", ".dylib", ".dll", ".exe", ".res", ".zip", ".tar.gz",
     ".deb", ".pdf", ".pyc", ".wasm",

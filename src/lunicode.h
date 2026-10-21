@@ -19,4 +19,9 @@
 LUAI_FUNC int luaU_graphemes (const char *s, size_t length,
                                size_t *count, size_t *invalid);
 
+/* Byte length of the identifier prefix: [L_][LMN_]*, without normalization.
+** Returns zero for an invalid start; malformed UTF-8 terminates the prefix.
+*/
+LUAI_FUNC size_t luaU_identifier (const char *s, size_t length);
+
 #endif

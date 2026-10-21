@@ -28,8 +28,8 @@
 #define LUA_VERSION_NUM		503
 
 #define SANTAFE_VERSION_MAJOR "2"
-#define SANTAFE_VERSION_MINOR "0"
-#define SANTAFE_VERSION_PATCH "3"
+#define SANTAFE_VERSION_MINOR "1"
+#define SANTAFE_VERSION_PATCH "0"
 #define LUA_VERSION	"Santafé " SANTAFE_VERSION_MAJOR "." SANTAFE_VERSION_MINOR
 #define LUA_RELEASE	LUA_VERSION "." SANTAFE_VERSION_PATCH
 #define LUA_COPYRIGHT	LUA_RELEASE "  (C) 2025-2026 Rafael Alves Lemos - Baseado em Lua 5.3.6"
@@ -324,6 +324,21 @@ LUA_API int   (lua_pcallk) (lua_State *L, int nargs, int nresults, int errfunc,
 
 LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
                           const char *chunkname, const char *mode);
+
+/* Santafe: optional, per-load syntax interval in source bytes [start, end).
+** Offsets are zero based. hasrange is false for errors without a source token
+** (for example an incompatible chunk mode or an allocation failure).
+** The stack result and status are identical to lua_load; no code is executed.
+*/
+typedef struct lua_Diagnostic {
+  size_t start;
+  size_t end;
+  int hasrange;
+} lua_Diagnostic;
+
+LUA_API int (lua_loaddiagnostic) (lua_State *L, lua_Reader reader, void *dt,
+                                 const char *chunkname, const char *mode,
+                                 lua_Diagnostic *diagnostic);
 
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data, int strip);
 

@@ -2,7 +2,7 @@
   "Função Santafé": {
     "prefix": "função",
     "body": [
-      "função ${1:nome}(${2}) início",
+      "função ${1:nome}(${2})",
       "    ${0}",
       "fim"
     ],

@@ -1,0 +1,165 @@
+-- Formatos fechados: validar todos os dados antes de escrever ou compilar.
+local V=importe "pacotes.versoes"
+local R=importe "pacotes.resolvedor"
+local função exija(ok,msg) se não ok então erro(msg,0) fim fim
+local função objeto(t,permitidos,descrição)
+    exija(tipo(t)=="tabela",descrição..": objeto esperado")
+    para k em pares(t) início exija(tipo(k)=="colar" e permitidos[k],descrição..": campo desconhecido "..paraColar(k)) fim
+fim
+local função lista(t,máximo,descrição)
+    exija(tipo(t)=="tabela",descrição..": lista esperada")
+    local n=0
+    para k em pares(t) início
+        exija(tipo(k)=="número" e k>=1 e k%1==0 e k<=máximo,descrição..": índice inválido")
+        n=n+1
+    fim
+    exija(n==#t e n<=máximo,descrição..": lista esparsa ou excessiva")
+    retorne n
+fim
+local função texto(v,máximo,descrição)
+    exija(tipo(v)=="colar" e #v>0 e #v<=máximo e não v:procure("%z"),descrição..": texto inválido")
+fim
+local função dependências(t)
+    exija(tipo(t)=="tabela","dependências: objeto esperado")
+    local n=0
+    para nome,faixa em pares(t) início
+        n=n+1; exija(n<=128 e R.nomeVálido(nome),"nome/limite de dependências inválido")
+        local ok,falha=V.intervalo(faixa); exija(ok,falha)
+    fim
+fim
+local função móduloVálido(nome)
+    se tipo(nome)~="colar" ou #nome==0 ou #nome>192 ou nome:separe("^%.") ou nome:separe("%.$") ou nome:procure("..",1,verdadeiro) então retorne falso fim
+    para parte em nome:capture("[^.]+") início
+        local t=depure.lexemas(parte)
+        se não t ou #t~=1 ou t[1].tipo~="nome" ou t[1].texto~=parte então retorne falso fim
+    fim
+    retorne verdadeiro
+fim
+retorne função(N)
+    local F={exija=exija,lista=lista,objeto=objeto,dependências=dependências,móduloVálido=móduloVálido}
+    função F.canônico(dados)
+        local passos=0
+        local função codifique(v,profundidade)
+            passos=passos+1; exija(passos<=1000000 e profundidade<=64,"JSON complexo demais")
+            se tipo(v)~="tabela" então retorne garanta(json.cod(v)) fim
+            local n,chaves=0,{}
+            para k em pares(v) início n=n+1; chaves[#chaves+1]=k fim
+            local partes={}
+            se n>0 e tipo(chaves[1])=="número" então
+                lista(v,1000000,"JSON")
+                para _,item em ipares(v) início partes[#partes+1]=codifique(item,profundidade+1) fim
+                retorne "["..tabela.concatene(partes,",").."]"
+            fim
+            para _,k em ipares(chaves) início exija(tipo(k)=="colar","chave JSON inválida") fim
+            tabela.ordene(chaves)
+            para _,k em ipares(chaves) início partes[#partes+1]=json.cod(k)..":"..codifique(v[k],profundidade+1) fim
+            retorne "{"..tabela.concatene(partes,",").."}"
+        fim
+        retorne codifique(dados,0)
+    fim
+    função F.hash(h) retorne tipo(h)=="colar" e #h==64 e h:separe("^[0-9a-f]+$")~=nulo fim
+    função F.json(bruto,limite)
+        exija(tipo(bruto)=="colar" e #bruto<=(limite ou 4*1024*1024),"JSON excessivo")
+        local ok,dados=proteja(json.decod,bruto); exija(ok e tipo(dados)=="tabela","JSON inválido")
+        retorne dados
+    fim
+    função F.manifesto(m,biblioteca)
+        objeto(m,{formato=verdadeiro,nome=verdadeiro,versao=verdadeiro,descricao=verdadeiro,
+            licenca=verdadeiro,autores=verdadeiro,fonte=verdadeiro,dependencias=verdadeiro,
+            modulos=verdadeiro,nativos=verdadeiro,arquivos=verdadeiro},"manifesto")
+        exija(m.formato==1,"formato de manifesto incompatível")
+        se biblioteca ou m.nome então exija(R.nomeVálido(m.nome),"nome de pacote inválido") fim
+        se biblioteca ou m.versao então local ok,falha=V.leia(m.versao); exija(ok,falha) fim
+        se m.dependencias~=nulo então dependências(m.dependencias) fim
+        se biblioteca então
+            texto(m.descricao,512,"descrição"); texto(m.licenca,128,"licença")
+            exija(lista(m.autores,32,"autores")>0,"autoria ausente")
+            para _,autor em ipares(m.autores) início texto(autor,256,"autor") fim
+            texto(m.fonte,1024,"fonte")
+            exija(m.fonte:separe("^https://")~=nulo,"fonte deve ser HTTPS")
+            exija(lista(m.arquivos,512,"arquivos do manifesto")>0,"manifesto deve declarar os arquivos a distribuir")
+            local vistos={}
+            para _,caminho em ipares(m.arquivos) início
+                texto(caminho,2048,"arquivo do manifesto"); local chave=N.chaveCaminho(caminho)
+                exija(não vistos[chave],"arquivo repetido no manifesto"); vistos[chave]=verdadeiro
+            fim
+        fim
+        exija((m.modulos==nulo ou tipo(m.modulos)=="tabela") e (m.nativos==nulo ou tipo(m.nativos)=="tabela"),"módulos devem ser objetos")
+        local módulos={}
+        para nome,caminho em pares(m.modulos ou {}) início
+            exija(móduloVálido(nome),"nome de módulo inválido: "..paraColar(nome))
+            texto(caminho,2048,"caminho do módulo"); N.chaveCaminho(caminho)
+            exija(caminho:separe("%.fé$") ou caminho:separe("%.fe$"),"módulo Fé deve apontar para fonte")
+            módulos[nome]=verdadeiro
+        fim
+        para nome,receita em pares(m.nativos ou {}) início
+            exija(móduloVálido(nome) e nome:separe("^[A-Za-z_][A-Za-z0-9_.]*$") e não módulos[nome],"módulo C inválido ou duplicado")
+            módulos[nome]=verdadeiro
+            objeto(receita,{fontes=verdadeiro,bibliotecas=verdadeiro},"receita C")
+            exija(lista(receita.fontes,32,"fontes C")>0,"receita C sem fontes")
+            para _,caminho em ipares(receita.fontes) início
+                texto(caminho,2048,"fonte C"); N.chaveCaminho(caminho)
+                exija(caminho:separe("%.c$"),"receita aceita somente fontes C")
+            fim
+            se receita.bibliotecas~=nulo então lista(receita.bibliotecas,16,"bibliotecas C") fim
+            para _,bib em ipares(receita.bibliotecas ou {}) início
+                exija(tipo(bib)=="colar" e #bib<=64 e bib:separe("^[A-Za-z][A-Za-z0-9_+-]*$"),"nome de biblioteca C inválido")
+            fim
+        fim
+        retorne m
+    fim
+    função F.pacote(bruto,esperado)
+        se esperado então exija(F.hash(esperado) e N.sha256(bruto)==esperado,"hash do pacote não confere") fim
+        local p=F.json(bruto,48*1024*1024)
+        objeto(p,{formato=verdadeiro,manifesto=verdadeiro,arquivos=verdadeiro},"pacote")
+        exija(p.formato==1,"formato do pacote incompatível"); F.manifesto(p.manifesto,verdadeiro)
+        exija(lista(p.arquivos,512,"arquivos")>0,"pacote vazio")
+        local vistos,arquivos,total={},{},0
+        para _,a em ipares(p.arquivos) início
+            objeto(a,{caminho=verdadeiro,sha256=verdadeiro,base64=verdadeiro},"arquivo")
+            texto(a.caminho,2048,"arquivo"); local chave=N.chaveCaminho(a.caminho)
+            exija(não vistos[chave],"caminhos duplicados por caixa/normalização")
+            exija(a.caminho:corte(1,1)~="." e não a.caminho:procure("/.",1,verdadeiro),"arquivo oculto não permitido")
+            vistos[chave]=verdadeiro
+            exija(F.hash(a.sha256) e tipo(a.base64)=="colar" e #a.base64<=12*1024*1024,"arquivo malformado ou excessivo")
+            local conteúdo=N.decodBase64(a.base64)
+            exija(#conteúdo<=8*1024*1024 e N.sha256(conteúdo)==a.sha256,"conteúdo do arquivo não confere")
+            total=total+#conteúdo; exija(total<=32*1024*1024,"conteúdo descompactado excessivo")
+            arquivos[a.caminho]=conteúdo
+        fim
+        -- Also reject file/directory prefix collisions, including case/NFC.
+        para chave em pares(vistos) início
+            local prefixo=""
+            para parte em chave:capture("[^/]+") início
+                se prefixo~="" então exija(não vistos[prefixo],"arquivo usado como diretório") fim
+                prefixo=prefixo=="" e parte ou prefixo.."/"..parte
+            fim
+        fim
+        exija(arquivos["LICENSE"] e arquivos["README.md"],"pacote exige LICENSE e README.md")
+        exija(#p.manifesto.arquivos==#p.arquivos,"lista de arquivos diverge do manifesto")
+        para _,caminho em ipares(p.manifesto.arquivos) início exija(arquivos[caminho]~=nulo,"arquivo declarado ausente") fim
+        para _,caminho em pares(p.manifesto.modulos ou {}) início exija(arquivos[caminho],"módulo ausente do pacote") fim
+        para _,receita em pares(p.manifesto.nativos ou {}) início
+            para _,caminho em ipares(receita.fontes) início exija(arquivos[caminho],"fonte C ausente do pacote") fim
+        fim
+        retorne p.manifesto,arquivos
+    fim
+    função F.índice(i)
+        objeto(i,{formato=verdadeiro,pacotes=verdadeiro},"índice")
+        exija(i.formato==1 e tipo(i.pacotes)=="tabela","índice incompatível")
+        local n=0
+        para nome,versões em pares(i.pacotes) início
+            n=n+1; exija(n<=10000 e R.nomeVálido(nome) e tipo(versões)=="tabela","índice inválido ou excessivo")
+            local quantidade=0
+            para versão,v em pares(versões) início
+                quantidade=quantidade+1; exija(quantidade<=256 e V.leia(versão),"versão inválida no índice")
+                objeto(v,{arquivo=verdadeiro,sha256=verdadeiro,dependencias=verdadeiro},"versão no índice")
+                exija(F.hash(v.sha256),"hash inválido no índice")
+                exija(v.arquivo=="pacotes/"..nome.."/"..versão.."/"..v.sha256..".sfp","endereço não canônico no índice")
+                se v.dependencias~=nulo então dependências(v.dependencias) fim
+            fim
+        fim
+        retorne i
+    fim
+    retorne F
+fim

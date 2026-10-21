@@ -68,6 +68,8 @@ def principal():
     itens = catalogue()
     for pasta in ('vscode', 'sublime'):
         (ROOT / pasta / 'api-publica.json').write_text(json.dumps({'versão': 1, 'itens': itens}, ensure_ascii=False, indent=2) + '\n')
+    (ROOT.parent / 'ferramentas/sls/api-publica.json').write_text(
+        json.dumps({'versão': 1, 'itens': itens}, ensure_ascii=False, indent=2) + '\n')
     regras = regras_api(itens)
     caminho = ROOT / 'vscode/syntaxes/santafe.tmLanguage.json'
     grammar = json.loads(caminho.read_text())

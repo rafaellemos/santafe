@@ -1,0 +1,55 @@
+name: SLS e bibliotecas — contrato 1.0
+
+# Critérios funcionais são exigidos em cada atualização e etiqueta;
+# o relatório não substitui a homologação real dos dois editores.
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  contrato:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependências Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libreadline-dev libglib2.0-dev pkg-config python3 curl ca-certificates openssl
+      - name: Dependências macOS
+        if: runner.os == 'macOS'
+        run: brew install readline glib pkg-config
+      - run: make cbin pacotes
+      - name: Verificador e contrato entregue
+        run: |
+          python3 testes/integracao/testar_sls_infraestrutura.py
+          python3 testes/integracao/testar_sls.py
+          python3 testes/integracao/testar_sls_robustez.py
+          python3 testes/integracao/testar_analise_c.py
+          python3 testes/integracao/testar_sls_incremental.py
+          python3 testes/integracao/testar_sls_semantica.py
+          python3 testes/integracao/testar_sls_cancelamento.py
+          python3 testes/integracao/testar_sls_memoria.py
+          python3 testes/integracao/testar_sls_aceitacao.py --perfil atual --relatorio relatorios/sls-atual.json
+      - name: Bibliotecas isoladas, integridade, HTTPS e memória
+        run: |
+          LUA_PATH='ferramentas/?.fé;;' src/santafé testes/bibf/teste_pacotes_resolucao.fé
+          python3 testes/integracao/testar_pacotes.py
+          python3 testes/integracao/testar_pacotes_cli.py
+          python3 testes/integracao/testar_catalogo_bibliotecas.py
+          python3 testes/integracao/testar_pacotes_https.py
+          python3 testes/integracao/testar_pacotes_memoria.py
+      - name: Contrato completo 1.0 (39 critérios obrigatórios)
+        run: python3 testes/integracao/testar_sls_aceitacao.py --perfil 1.0 --relatorio relatorios/sls-1.0.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sls-contrato-${{ matrix.os }}
+          path: relatorios/sls-*.json
+          if-no-files-found: warn

@@ -1,0 +1,39 @@
+-- Executado pelo intérprete instalado, nunca por um pacote baixado.
+-- Apenas registra um pesquisador; o fonte da biblioteca só roda no importe.
+local diretório=...
+local antigo=módulo.caminho
+módulo.caminho=diretório.."/../?.fé;"..antigo
+local N=garanta(módulo.carregarBib(diretório.."/nativo.so","luaopen_pacotes_nativo"))()
+local F=(importe "pacotes.formatos")(N)
+módulo.caminho=antigo
+local raiz=garanta(N.raiz("."))
+local estado=F.json(garanta(raiz:leia(".santafe/estado.json",16384)))
+F.objeto(estado,{formato=verdadeiro,geracao=verdadeiro,anterior=verdadeiro,manifesto=verdadeiro,lock=verdadeiro,modulos=verdadeiro},"estado do projeto")
+F.exija(estado.formato==1 e tipo(estado.geracao)=="colar" e #estado.geracao==32 e estado.geracao:separe("^[0-9a-f]+$"),"geração inválida")
+local base=".santafe/geracoes/"..estado.geracao
+local mapaBruto=garanta(raiz:leia(base.."/modulos.json",1024*1024))
+F.exija(N.sha256(mapaBruto)==estado.modulos,"mapa de módulos alterado")
+local mapa=F.json(mapaBruto)
+F.objeto(mapa,{formato=verdadeiro,plataforma=verdadeiro,modulos=verdadeiro},"mapa de módulos")
+F.exija(mapa.formato==1 e tipo(mapa.modulos)=="tabela","mapa de módulos inválido")
+local plataforma=N.plataforma()
+local absoluto=N.diretorioAtual().."/"..base
+local função pesquisador(nome)
+    local m=mapa.modulos[nome]
+    se não m então retorne "\n\tsem módulo no projeto travado" fim
+    F.objeto(m,{tipo=verdadeiro,caminho=verdadeiro,sha256=verdadeiro},"módulo instalado")
+    F.exija(F.móduloVálido(nome) e F.hash(m.sha256),"módulo instalado inválido")
+    N.chaveCaminho(m.caminho)
+    local conteúdo=garanta(raiz:leia(base.."/"..m.caminho,16*1024*1024))
+    F.exija(N.sha256(conteúdo)==m.sha256,"módulo alterado depois da instalação: "..nome)
+    se m.tipo=="fé" então
+        local carregador=garanta(carregue(conteúdo,"@"..absoluto.."/"..m.caminho,"t"))
+        retorne carregador,absoluto.."/"..m.caminho
+    fim
+    F.exija(m.tipo=="c" e F.canônico(mapa.plataforma)==F.canônico(plataforma),"módulo nativo exige reinstalação nesta plataforma")
+    F.exija(nome:separe("^[A-Za-z_][A-Za-z0-9_.]*$"),"nome nativo inválido")
+    -- Native loading trusts the local project owner after the explicit build
+    -- permission. No claim of sandboxing against the same user mutating files.
+    retorne garanta(módulo.carregarBib(absoluto.."/"..m.caminho,"luaopen_"..nome:troque("%.","_"))),absoluto.."/"..m.caminho
+fim
+tabela.insira(módulo.pesquisadores,2,pesquisador)

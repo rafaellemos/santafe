@@ -1,0 +1,34 @@
+-- NFC e NFD são preservados; nomes visualmente iguais continuam distintos.
+local variável, variável = "composto", "combinado"
+local vari, varia = "PREFIXO_ERRADO", "PREFIXO_ERRADO"
+local índice, índice, ação, ação = "índice", "índice", "ação", "ação"
+garanta(`®variável Ⓡvariável` == "composto composto")
+garanta(`®variável Ⓡvariável` == "combinado combinado")
+garanta(`®índice Ⓡíndice ®ação Ⓡação` == "índice índice ação ação")
+garanta(`®{variável} Ⓡ{variável}` == "composto combinado")
+garanta(`®variávelⓇvariável®ação` == "compostocombinadoação")
+garanta(`®variável—Ⓡvariável🟢` == "composto—combinado🟢")
+garanta(`\®variável \Ⓡvariável` == "®variável Ⓡvariável")
+garanta("®variável Ⓡvariável" == [[®variável Ⓡvariável]])
+garanta(`®́nome Ⓡ1nome ® Ⓡ` == "®́nome Ⓡ1nome ® Ⓡ")
+garanta(`®inexistênte Ⓡinexistênte` == " ")
+local lógico, número = falso, 256
+garanta(`®lógico Ⓡnúmero` == "falso 256")
+garanta(`<b title="®variável">Ⓡvariável</b>` == '<b title="composto">combinado</b>')
+garanta(`/* js */ const nome = "Ⓡvariável";` == '/* js */ const nome = "combinado";')
+-- Também atravessa o crescimento do luaL_Buffer sem desbalancear a pilha.
+local esperado = ""
+local texto = ""
+para i = 1, 3000 início
+    texto = texto .. "®variávelⓇvariável|"
+    esperado = esperado .. "compostocombinado|"
+fim
+garanta(__gabarito(texto) == esperado)
+texto = ""
+para i = 1, 3000 início
+    texto = texto .. "®{variável}Ⓡ{variável}|"
+fim
+garanta(__gabarito(texto) == esperado)
+local enorme = colar.replique("x", 50000)
+garanta(`®enormeⓇ{enorme}` == enorme .. enorme)
+mostre("Gabaritos Unicode: dois curingas, NFC/NFD, limites e pilha: ok")

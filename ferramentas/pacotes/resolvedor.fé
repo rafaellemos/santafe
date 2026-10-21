@@ -1,0 +1,134 @@
+-- Resolução pura, limitada e determinística. Nenhum pacote é executado.
+local V=importe "pacotes.versoes"
+local R={}
+função R.nomeVálido(nome)
+    retorne tipo(nome)=="colar" e #nome>=1 e #nome<=64 e
+        nome:separe("^[a-z0-9][a-z0-9-]*$")~=nulo e nome:corte(-1)~="-"
+fim
+local função chaves(t)
+    local lista={}; para k em pares(t) início lista[#lista+1]=k fim
+    tabela.ordene(lista); retorne lista
+fim
+função R.resolva(catálogo,pedidos,travado,opções)
+    opções,travado=opções ou {},travado ou {}
+    local passos,arestas=0,0
+    local limite=opções.limitePassos ou 20000
+    local cache,intervalos={},{}
+    local função falhe(msg) erro(msg,0) fim
+    local função intervalo(texto)
+        se tipo(texto)~="colar" então falhe("intervalo deve ser texto") fim
+        se não intervalos[texto] então
+            local valor,falha=V.intervalo(texto)
+            se não valor então falhe(falha..": "..texto) fim
+            intervalos[texto]=valor
+        fim
+        retorne intervalos[texto]
+    fim
+    local função dependências(t)
+        se tipo(t)~="tabela" então falhe("dependências devem ser um objeto") fim
+        local n=0
+        para nome,faixa em pares(t) início
+            n=n+1
+            se n>128 ou não R.nomeVálido(nome) então falhe("dependência inválida ou limite de 128 excedido") fim
+            intervalo(faixa)
+        fim
+    fim
+    local função versões(nome)
+        se cache[nome] então retorne cache[nome] fim
+        local pacote=catálogo[nome]
+        se pacote==nulo então cache[nome]={}; retorne cache[nome] fim
+        se tipo(pacote)~="tabela" então falhe("catálogo inválido para "..nome) fim
+        local lista={}
+        para texto,dados em pares(pacote) início
+            se #lista>=256 então falhe("limite de 256 versões excedido: "..nome) fim
+            local versão,falha=V.leia(texto)
+            se não versão ou tipo(dados)~="tabela" então falhe("versão inválida no catálogo: "..nome..": "..(falha ou "objeto esperado")) fim
+            dependências(dados.dependencias ou {})
+            lista[#lista+1]={versão=versão,dados=dados,texto=texto}
+        fim
+        tabela.ordene(lista,função(a,b)
+            se a.texto==travado[nome] então retorne b.texto~=travado[nome] fim
+            se b.texto==travado[nome] então retorne falso fim
+            local cmp=V.compare(a.versão,b.versão)
+            retorne cmp==0 e a.texto<b.texto ou cmp>0
+        fim)
+        cache[nome]=lista; retorne lista
+    fim
+    local função atende(item,restrições)
+        para _,r em ipares(restrições) início
+            se não V.satisfaz(item.versão,intervalo(r.faixa)) então retorne falso fim
+        fim
+        retorne verdadeiro
+    fim
+    local função busque(seleção,profundidade)
+        passos=passos+1
+        se passos>limite então falhe("limite de passos da resolução excedido") fim
+        se profundidade>128 então falhe("limite de 128 pacotes excedido") fim
+        local restrições={}
+        local função acrescente(nome,faixa,origem)
+            se não restrições[nome] então restrições[nome]={} fim
+            restrições[nome][#restrições[nome]+1]={faixa=faixa,origem=origem}
+            arestas=arestas+1
+            se arestas>2000000 então falhe("limite de trabalho da resolução excedido") fim
+        fim
+        para nome,faixa em pares(pedidos) início acrescente(nome,faixa,"projeto") fim
+        para nome,item em pares(seleção) início
+            para alvo,faixa em pares(item.dados.dependencias ou {}) início acrescente(alvo,faixa,nome.."@"..item.texto) fim
+        fim
+        local nomes=chaves(restrições)
+        se #nomes>128 então falhe("limite de 128 pacotes excedido") fim
+        local próximo,candidatos,últimaFalha
+        para _,nome em ipares(nomes) início
+            se seleção[nome] então
+                se não atende(seleção[nome],restrições[nome]) então retorne nulo,"conflito em "..nome fim
+            senão
+                local lista={}
+                para _,item em ipares(versões(nome)) início
+                    se atende(item,restrições[nome]) e (não opções.travado ou item.texto==travado[nome]) então lista[#lista+1]=item fim
+                fim
+                se #lista==0 então
+                    local razões={}
+                    para _,r em ipares(restrições[nome]) início razões[#razões+1]=r.origem.." exige "..r.faixa fim
+                    tabela.ordene(razões)
+                    retorne nulo,"sem versão de "..nome..": "..tabela.concatene(razões,"; ")
+                fim
+                se não candidatos ou #lista<#candidatos então próximo,candidatos=nome,lista fim
+            fim
+        fim
+        se não próximo então
+            local visitando,visitados,ordem={},{},{}
+            local função visite(nome)
+                se visitando[nome] então retorne nulo,"ciclo de dependências em "..nome fim
+                se visitados[nome] então retorne verdadeiro fim
+                visitando[nome]=verdadeiro
+                para _,alvo em ipares(chaves(seleção[nome].dados.dependencias ou {})) início
+                    local ok,falha=visite(alvo); se não ok então retorne nulo,falha fim
+                fim
+                visitando[nome]=nulo; visitados[nome]=verdadeiro; ordem[#ordem+1]=nome
+                retorne verdadeiro
+            fim
+            para _,nome em ipares(chaves(seleção)) início
+                local ok,falha=visite(nome); se não ok então retorne nulo,falha fim
+            fim
+            local resultado={pacotes={},ordem=ordem,passos=passos}
+            para nome,item em pares(seleção) início resultado.pacotes[nome]={versao=item.texto,dados=item.dados} fim
+            retorne resultado
+        fim
+        para _,item em ipares(candidatos) início
+            seleção[próximo]=item
+            local resultado,falha=busque(seleção,profundidade+1)
+            seleção[próximo]=nulo
+            se resultado então retorne resultado fim
+            últimaFalha=falha
+        fim
+        retorne nulo,últimaFalha
+    fim
+    local ok,resultado,falha=proteja(função()
+        se tipo(catálogo)~="tabela" ou tipo(travado)~="tabela" então falhe("catálogo ou trava inválidos") fim
+        dependências(pedidos)
+        retorne busque({},0)
+    fim)
+    se não ok então retorne nulo,paraColar(resultado) fim
+    retorne resultado,falha
+fim
+retorne R

@@ -911,7 +911,7 @@ LUA_API void lua_callk (lua_State *L, int nargs, int nresults,
   StkId func;
   lua_lock(L);
   api_check(L, k == NULL || !isLua(L->ci),
-    "n\xC3\xA3o \xC3\xA9 poss\xC3\xADvel usar continua\xC3\xA7\xC3\xB5es dentro de ganchos");
+    "n\xC3\xA3o \xC3\xA9 poss\xC3\xADvel usar continua\xC3\xA7\xC3\xB5" "es dentro de ganchos");
   api_checknelems(L, nargs+1);
   api_check(L, L->status == LUA_OK,
             "n\xC3\xA3o \xC3\xA9 poss\xC3\xADvel chamar em corrotina que n\xC3\xA3o esteja normal");
@@ -953,7 +953,7 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
   ptrdiff_t func;
   lua_lock(L);
   api_check(L, k == NULL || !isLua(L->ci),
-    "n\xC3\xA3o \xC3\xA9 poss\xC3\xADvel usar continua\xC3\xA7\xC3\xB5es dentro de ganchos");
+    "n\xC3\xA3o \xC3\xA9 poss\xC3\xADvel usar continua\xC3\xA7\xC3\xB5" "es dentro de ganchos");
   api_checknelems(L, nargs+1);
   api_check(L, L->status == LUA_OK,
             "n\xC3\xA3o \xC3\xA9 poss\xC3\xADvel chamar em corrotina que n\xC3\xA3o esteja normal");
@@ -993,11 +993,23 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
 
 LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
                       const char *chunkname, const char *mode) {
+  return lua_loaddiagnostic(L, reader, data, chunkname, mode, NULL);
+}
+
+
+LUA_API int lua_loaddiagnostic (lua_State *L, lua_Reader reader, void *data,
+                               const char *chunkname, const char *mode,
+                               lua_Diagnostic *diagnostic) {
   ZIO z;
   int status;
   lua_lock(L);
   if (!chunkname) chunkname = "?";
   luaZ_init(L, &z, reader, data);
+  if (diagnostic) {
+    diagnostic->start = diagnostic->end = 0;
+    diagnostic->hasrange = 0;
+  }
+  z.diagnostic = diagnostic;
   status = luaD_protectedparser(L, &z, chunkname, mode);
   if (status == LUA_OK) {  /* no errors? */
     LClosure *f = clLvalue(L->top - 1);  /* get newly created function */

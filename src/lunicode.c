@@ -104,6 +104,28 @@ static int property (unsigned int c, const luaU_Range *ranges, size_t count) {
 }
 
 
+size_t luaU_identifier (const char *s, size_t length) {
+  const char *position = s;
+  const char *end = s + length;
+  size_t result = 0;
+  while (position < end) {
+    unsigned int c;
+    int kind;
+    if (!utf8decode(&position, end, &c)) break;
+    /* ASCII fast path; classification never depends on the process locale. */
+    if (c < 0x80)
+      kind = (c == '_' || between(c, 'A', 'Z') || between(c, 'a', 'z'))
+             ? 1 : between(c, '0', '9') ? 2 : 0;
+    else
+      kind = property(c, luaU_identifier_ranges,
+                      sizeof(luaU_identifier_ranges) / sizeof(luaU_identifier_ranges[0]));
+    if (kind == 0 || (result == 0 && kind != 1)) break;
+    result = (size_t)(position - s);
+  }
+  return result;
+}
+
+
 static int graphemeproperty (unsigned int c) {
   unsigned int hangul;
   if (between(c, 0xAC00, 0xD7A3)) {

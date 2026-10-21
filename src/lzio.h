@@ -58,6 +58,7 @@ struct Zio {
   lua_Reader reader;		/* reader function */
   void *data;			/* additional data */
   lua_State *L;			/* Lua state (for reader) */
+  lua_Diagnostic *diagnostic;  /* optional result owned by this load, not by L */
 };
 
 

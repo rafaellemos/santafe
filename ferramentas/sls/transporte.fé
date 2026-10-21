@@ -1,0 +1,96 @@
+-- Framing incremental: pode recolher cancelamentos durante a análise Fé.
+-- Chunks do corpo só são concatenados uma vez. Nunca ler stdin via stdio em
+-- paralelo com este módulo (o buffer de stdio esconderia bytes de poll).
+local T={}
+função T.novo(nativo)
+    local self={cancelados={},ativo=nulo,terminado=falso,falha=nulo}
+    local fila,primeiroFila,final,naFila={},1,0,{}
+    local octetosFila=0
+    local linha,cabeçalho,tamanho,partes,recebidos="",0,nulo,{},0
+    local corpo=falso
+    local função descarte(motivo) self.falha=motivo; self.terminado=verdadeiro fim
+    local função enfileire(texto)
+        local ok,pedido=proteja(json.decod,texto)
+        se ok e tipo(pedido)=="tabela" e pedido.jsonrpc=="2.0" e pedido.method=="$/cancelRequest" e
+           tipo(pedido.params)=="tabela" e
+           (tipo(pedido.params.id)=="número" ou tipo(pedido.params.id)=="colar") então
+            local id=pedido.params.id
+            se id==self.ativo ou naFila[id] então self.cancelados[id]=verdadeiro fim
+            retorne
+        fim
+        se final-primeiroFila+1>=256 ou octetosFila+#texto>32*1024*1024 então
+            descarte("fila LSP excede o limite"); retorne
+        fim
+        final=final+1
+        fila[final]={pedido=ok e pedido ou nulo,inválido=não ok ou pedido==nulo,tamanho=#texto}
+        se ok e tipo(pedido)=="tabela" e
+           (tipo(pedido.id)=="número" ou tipo(pedido.id)=="colar") então naFila[pedido.id]=verdadeiro fim
+        octetosFila=octetosFila+#texto
+    fim
+    local função conclua()
+        enfileire(tabela.concatene(partes))
+        linha,cabeçalho,tamanho,partes,recebidos="",0,nulo,{},0
+        corpo=falso
+    fim
+    local função alimente(texto)
+        local i=1
+        enquanto i<=#texto e não self.falha início
+            se corpo então
+                local quantidade=mat.mínimo(tamanho-recebidos,#texto-i+1)
+                partes[#partes+1]=texto:corte(i,i+quantidade-1)
+                recebidos=recebidos+quantidade; i=i+quantidade
+                se recebidos==tamanho então conclua() fim
+            senão
+                local quebra=texto:procure("\n",i,verdadeiro)
+                local limite=quebra ou #texto
+                cabeçalho=cabeçalho+limite-i+1
+                se cabeçalho>8192 então descarte("cabeçalho LSP excede 8192 bytes"); retorne fim
+                linha=linha..texto:corte(i,quebra e quebra-1 ou limite); i=limite+1
+                se quebra então
+                    se linha:corte(-1)=="\r" então linha=linha:corte(1,-2) fim
+                    se linha=="" então
+                        se tamanho==nulo ou tamanho>16*1024*1024 então
+                            descarte("Content-Length ausente ou fora do limite"); retorne
+                        fim
+                        corpo=verdadeiro
+                        se tamanho==0 então conclua() fim
+                    senão
+                        local n=linha:minúscula():separe("^content%-length:[ \t]*([0-9]+)[ \t]*$")
+                        se n então
+                            se tamanho~=nulo então descarte("Content-Length duplicado"); retorne fim
+                            tamanho=paraNúmero(n)
+                        fim
+                    fim
+                    linha=""
+                fim
+            fim
+        fim
+    fim
+    função self.puxe(espera)
+        se self.terminado então retorne fim
+        para _=1,64 início
+            se não nativo.entradaPronta(espera ou 0) então retorne fim
+            espera=0
+            local texto=nativo.leiaEntrada()
+            se não texto então
+                self.terminado=verdadeiro
+                se corpo ou cabeçalho>0 então self.falha="quadro LSP incompleto" fim
+                retorne
+            fim
+            alimente(texto)
+            se self.falha então retorne fim
+        fim
+    fim
+    função self.próximo()
+        enquanto primeiroFila>final e não self.terminado início self.puxe(30) fim
+        se self.falha então retorne nulo,self.falha fim
+        se primeiroFila>final então retorne nulo fim
+        local item=fila[primeiroFila]; fila[primeiroFila]=nulo; primeiroFila=primeiroFila+1
+        octetosFila=octetosFila-item.tamanho
+        se tipo(item.pedido)=="tabela" e item.pedido.id~=nulo então naFila[item.pedido.id]=nulo fim
+        se primeiroFila>final então fila,primeiroFila,final={},1,0 fim
+        retorne item
+    fim
+    retorne self
+fim
+retorne T

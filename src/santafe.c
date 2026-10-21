@@ -17,6 +17,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if (defined(__linux__) || defined(__APPLE__)) && !defined(__EMSCRIPTEN__)
+#define SANTAFE_PROJECT_TOOLS 1
+#include <limits.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+#endif
 
 #include "lua.h"
 
@@ -145,6 +154,7 @@ static void print_usage (const char *badoption) {
   "  -l nome  inclua biblioteca 'nome' na global 'nome'\n"
   "  -v       mostrar informa\xC3\xA7\xC3\xA3o da vers\xC3\xA3o\n"
   "  -E       ignorar vari\xC3\xA1veis de ambiente\n"
+  "  -P       ignorar bibliotecas instaladas no projeto atual\n"
   "  --       parar de processar op\xC3\xA7\xC3\xB5" "es\n"
   "  -        parar de processar op\xC3\xA7\xC3\xB5" "es e executar a entrada padr\xC3\xA3o\n"
   ,
@@ -470,6 +480,7 @@ static int handle_script (lua_State *L, char **argv) {
 #define has_v		4	/* -v */
 #define has_e		8	/* -e */
 #define has_E		16	/* -E */
+#define has_P           32      /* no automatic project dependency loader */
 
 /*
 ** Traverses all arguments from 'argv', returning a mask with those
@@ -496,6 +507,10 @@ static int collectargs (char **argv, int *first) {
         if (argv[i][2] != '\0')  /* extra characters after 1st? */
           return has_error;  /* invalid option */
         args |= has_E;
+        break;
+      case 'P':
+        if (argv[i][2] != '\0') return has_error;
+        args |= has_P;
         break;
       case 'i':
         args |= has_i;  /* (-i implies -v) *//* FALLTHROUGH */
@@ -561,6 +576,45 @@ static int handle_luainit (lua_State *L) {
     return dostring(L, init, name);
 }
 
+/* Tools are located relative to this executable, never loaded from cwd or
+ * PATH. The source-checkout fallback is restricted to an executable in src/. */
+#if defined(SANTAFE_PROJECT_TOOLS)
+static int project_tool_paths(char directory[PATH_MAX],char prefix[PATH_MAX]) {
+  char raw[PATH_MAX],exe[PATH_MAX],*slash; struct stat st; int n;
+#ifdef __APPLE__
+  uint32_t size=sizeof(raw);
+  if(_NSGetExecutablePath(raw,&size)) return 0;
+#else
+  ssize_t size=readlink("/proc/self/exe",raw,sizeof(raw)-1);
+  if(size<0 || (size_t)size>=sizeof(raw)-1) return 0;
+  raw[size]=0;
+#endif
+  if(!realpath(raw,exe)) return 0;
+  slash=strrchr(exe,'/'); if(!slash) return 0; *slash=0;
+  slash=strrchr(exe,'/'); if(!slash) return 0;
+  if(!strcmp(slash+1,"src")) {
+    *slash=0; strcpy(prefix,exe);
+    n=snprintf(directory,PATH_MAX,"%s/ferramentas/pacotes",prefix);
+  } else {
+    *slash=0; strcpy(prefix,exe);
+    n=snprintf(directory,PATH_MAX,"%s/share/santaf\xc3\xa9/1.0/ferramentas/pacotes",prefix);
+  }
+  return n>0 && n<PATH_MAX && !stat(directory,&st) && S_ISDIR(st.st_mode);
+}
+static int run_project_tool(lua_State *L,const char *name) {
+  char directory[PATH_MAX],prefix[PATH_MAX],file[PATH_MAX]; int status,n;
+  if(!project_tool_paths(directory,prefix)) {
+    l_message(progname,"ferramentas de bibliotecas ausentes; instale a distribuicao completa ou use -P");
+    return LUA_ERRFILE;
+  }
+  n=snprintf(file,sizeof(file),"%s/%s.f\xc3\xa9",directory,name);
+  if(n<0 || n>=(int)sizeof(file)) return LUA_ERRFILE;
+  status=luaL_loadfilex(L,file,"t");
+  if(status==LUA_OK) { lua_pushstring(L,directory); lua_pushstring(L,prefix); status=docall(L,2,0); }
+  return report(L,status);
+}
+#endif
+
 
 /*
 ** Main body of stand-alone interpreter (to be called in protected mode).
@@ -570,6 +624,14 @@ static int pmain (lua_State *L) {
   int argc = (int)lua_tointeger(L, 1);
   char **argv = (char **)lua_touserdata(L, 2);
   int script;
+#if defined(SANTAFE_PROJECT_TOOLS)
+  if(argc>1 && (!strcmp(argv[1],"instale") || !strcmp(argv[1],"empacote") || !strcmp(argv[1],"catalogo"))) {
+    luaL_checkversion(L); progname=argv[0]; luaL_openlibs(L);
+    createargtable(L,argv,argc,1);
+    if(run_project_tool(L,"cli")!=LUA_OK) return 0;
+    lua_pushboolean(L,1); return 1;
+  }
+#endif
   int args = collectargs(argv, &script);
   luaL_checkversion(L);  /* check that interpreter has correct version */
   if (argv[0] && argv[0][0]) progname = argv[0];
@@ -585,6 +647,12 @@ static int pmain (lua_State *L) {
   }
   luaL_openlibs(L);  /* open standard libraries */
   createargtable(L, argv, argc, script);  /* create table 'arg' */
+#if defined(SANTAFE_PROJECT_TOOLS)
+  if(!(args & has_P)) {
+    struct stat st;
+    if(!lstat(".santafe/estado.json",&st) && run_project_tool(L,"ambiente")!=LUA_OK) return 0;
+  }
+#endif
   if (!(args & has_E)) {  /* no option '-E'? */
     if (handle_luainit(L) != LUA_OK)  /* run LUA_INIT */
       return 0;  /* error running LUA_INIT */

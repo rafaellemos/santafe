@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const children = [];
 const dispose = () => {};
 const vscode = {
+  EventEmitter: class { fire(){} dispose(){} event(){return {dispose(){}};} },
   workspace: { isTrusted: true, getConfiguration: () => ({get: (_, d) => d, inspect: () => ({})}) },
   window: { createOutputChannel: () => ({appendLine: dispose, append: dispose}), showWarningMessage: dispose },
   languages: { createDiagnosticCollection: () => ({set: dispose}) }
@@ -25,14 +26,19 @@ const sandbox = { __dirname: root, module: {exports: {}}, exports: {}, Buffer, p
   require: name => name === 'vscode' ? vscode : name === 'child_process' ? {spawn} : name.startsWith('./') ? require(path.join(root, name)) : require(name) };
 vm.runInNewContext(fs.readFileSync(path.join(root, 'extension.js'), 'utf8') + '\nmodule.exports.ClienteSls = ClienteSls;', sandbox);
 const client = new sandbox.module.exports.ClienteSls({subscriptions: []});
+vscode.workspace.workspaceFolders = [{uri: {fsPath: path.resolve(root, '../..')}}];
+const sourceLaunch = client.execuçãoDoSls();
+assert.deepStrictEqual(Array.from(sourceLaunch.argumentos), ['-E', '-P', path.resolve(root, '../../ferramentas/sls/sls.fé')],
+  'SLS do fonte deve desativar o carregador de dependências do projeto');
+delete vscode.workspace.workspaceFolders;
 client.inicie();
 const first = children[0];
-client.processe({id: first.sent[0].id, result: {}});
+client.processe({jsonrpc:'2.0',id: first.sent[0].id, result: {}});
 assert(client.pronto);
 client.pare(); client.inicie();
 const second = children[1];
 assert.notStrictEqual(second.sent[0].id, first.sent[0].id);
-client.processe({id: second.sent[0].id, result: {}});
+client.processe({jsonrpc:'2.0',id: second.sent[0].id, result: {}});
 assert(client.pronto, 'reinício deve aceitar o novo ID de initialize');
 first.emit('close', 0);
 assert(client.pronto, 'close atrasado não pode invalidar o processo novo');

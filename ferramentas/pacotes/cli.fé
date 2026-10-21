@@ -1,0 +1,66 @@
+-- Cliente distribuído junto do núcleo. Não exige Python, npm nem sudo.
+local diretório,prefixo=...
+local caminhoAntigo=módulo.caminho
+módulo.caminho=diretório.."/../?.fé;"..caminhoAntigo
+local N=garanta(módulo.carregarBib(diretório.."/nativo.so","luaopen_pacotes_nativo"))()
+local F=(importe "pacotes.formatos")(N)
+local C=(importe "pacotes.cliente")(N,F)
+local A=(importe "pacotes.administracao")(N,F)
+local opções={cabeçalhos=prefixo.."/include"}
+se diretório:separe("/ferramentas/pacotes$") e não diretório:procure("/share/",1,verdadeiro) então opções.cabeçalhos=prefixo.."/src" fim
+local comando=arg[0]
+local posicionais={}
+local i=1
+enquanto arg[i] início
+    local a=arg[i]
+    se a=="--travado" então opções.travado=verdadeiro
+    senãose a=="--sem-rede" então opções.semRede=verdadeiro
+    senãose a=="--permitir-nativo" então opções.permitaNativo=verdadeiro
+    senãose a=="--atualizar" então opções.atualize=verdadeiro
+    senãose a=="--repositorio" ou a=="--repositorio-local" ou a=="--autoridade-certificadora" então
+        i=i+1; F.exija(arg[i],"opção exige endereço")
+        se a=="--repositorio" então opções.repositório=arg[i]
+        senãose a=="--repositorio-local" então opções.repositórioLocal=arg[i]
+        senão opções.autoridadeCertificadora=arg[i] fim
+    senãose a=="--ajuda" então
+        mostre([[Santafé Bibliotecas 1.0.0
+  santafé instale nome [intervalo] [--repositorio HTTPS]
+  santafé instale --travado | --sem-rede
+  santafé instale --atualizar
+  santafé empacote DIRETORIO ARQUIVO.sfp
+  santafé catalogo DIRETORIO ARQUIVO.sfp
+Instalação por projeto; C exige --permitir-nativo. Sem sudo ou pós-instalação.
+--repositorio-local DIRETORIO: somente para curadoria/ensaios locais.
+Catálogo oficial: https://xn--santaf-gva.dev.br/est%C3%A1tico/bibliotecas/v1/
+Disponível na distribuição Santafé 2.1.0; pacote inicial: semver 1.0.0.]])
+        retorne
+    senão
+        F.exija(a:corte(1,1)~="-","opção desconhecida: "..a)
+        posicionais[#posicionais+1]=a
+    fim
+    i=i+1
+fim
+F.exija(não (opções.repositório e opções.repositórioLocal),"escolha uma origem")
+local atual=N.diretorioAtual()
+local função separe(caminho)
+    local pasta,nome=caminho:separe("^(.*)/([^/]+)$")
+    retorne pasta ou ".",nome ou caminho
+fim
+se comando=="instale" então
+    F.exija(#posicionais<=2,"instale recebe nome e intervalo opcionais")
+    local resultado=garanta(C.instale(atual,posicionais[1],posicionais[2],opções))
+    mostre("Bibliotecas instaladas na geração "..resultado.geracao)
+    para _,nome em ipares(resultado.ordem) início mostre(nome.." "..resultado.pacotes[nome].versao) fim
+senãose comando=="empacote" então
+    F.exija(#posicionais==2,"empacote exige diretório-fonte e arquivo de saída")
+    local bruto,hash=A.empacote(posicionais[1]); garanta(bruto,hash)
+    local pasta,nome=separe(posicionais[2]); local saída=garanta(N.raiz(pasta))
+    garanta(saída:grave(nome,bruto,falso)); saída:feche()
+    mostre(hash.."  "..posicionais[2])
+senãose comando=="catalogo" então
+    F.exija(#posicionais==2,"catalogo exige diretório local e pacote")
+    local pasta,nome=separe(posicionais[2]); local entrada=garanta(N.raiz(pasta))
+    local bruto=garanta(entrada:leia(nome,48*1024*1024)); entrada:feche()
+    local r=garanta(A.adicione(posicionais[1],bruto))
+    mostre("Catálogo local atualizado: "..r.nome.." "..r.versao.." "..r.sha256)
+senão erro("comando de bibliotecas desconhecido",0) fim

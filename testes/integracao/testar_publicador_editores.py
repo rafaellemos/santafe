@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Regressões do preparo: sem instalar nem reiniciar qualquer serviço."""
 import importlib.util
+import json
 from pathlib import Path
-import shutil
 import tempfile
+import zipfile
 
 RAIZ = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("preparo", RAIZ / "operação/preparar-editores-portal.py")
@@ -37,6 +38,36 @@ def rejeita(acao):
     raise AssertionError("alteração insegura não foi recusada")
 
 
+def artefatos_historicos(payload):
+    """Fixtures explícitos do publicador antigo; nunca são pacotes de entrega.
+
+    A regressão não pode depender de dist/ ignorado pelo Git ou relabelar o
+    código novo como uma versão histórica. O pacote corrente tem testes próprios.
+    """
+    with zipfile.ZipFile(payload/'baixar'/preparo.VSIX,'w') as z:
+        z.writestr('extension/package.json',json.dumps({'version':'1.0.6'}))
+        z.writestr('extension/syntaxes/santafe.tmLanguage.json',json.dumps({
+            'repository':{'interpolação':{'patterns':[
+                {'begin':r'[®Ⓡ]\{'},{'name':'variable.parameter.santafe'}]}}}))
+        for name in ('realce-embutido.js','realce-vscode.js','aparencia.js','paletas.json','vendor/vscode-oniguruma/release/onig.wasm'):
+            z.writestr('extension/'+name,'fixture do publicador histórico; não executar')
+    data={name:b'fixture do publicador historico; nao executar' for name in
+          ('Default.sublime-keymap','HTML-Santafe.sublime-syntax','JavaScript-Santafe.sublime-syntax','Realce.py','realce_embutido.py')}
+    data['Santafe.sublime-syntax']='[®Ⓡ] keyword.operator.interpolation.santafe'.encode()
+    rules=[{'scope':'meta.santafe-embedded','background':'#00000001'},
+           {'scope':'keyword.operator.interpolation.santafe','foreground':'#FD971F','font_style':''}]
+    rules += [{'scope':'meta.santafe-soft-'+str(i),'foreground':'#aaaaaa'} for i in range(36)]
+    for theme in ('Monokai','Mariana','Celeste','Breakers','Sixteen'):
+        data['ColorSchemes/'+theme+'.sublime-color-scheme']=json.dumps({'rules':rules}).encode()
+    for name,folder in ((preparo.MANUAL,'baixar'),(preparo.CONTROLE,'sublime')):
+        with zipfile.ZipFile(payload/folder/name,'w') as z:
+            for entry,content in data.items(): z.writestr(entry,content)
+            if name==preparo.MANUAL:
+                z.writestr('package-metadata.json',json.dumps({'version':'1.0.13'}))
+    (payload/'sublime/packages.json').write_text(json.dumps({'schema_version':'4.0.0','packages':[
+        {'name':'Santafe','releases':[{'version':'1.0.13','url':'https://xn--santaf-gva.dev.br/est%C3%A1tico/sublime/'+preparo.CONTROLE}]}]}))
+
+
 with tempfile.TemporaryDirectory(prefix="santafe-publicador-teste-") as temporario:
     raiz = Path(temporario)
     payload = raiz / "payload"
@@ -44,10 +75,7 @@ with tempfile.TemporaryDirectory(prefix="santafe-publicador-teste-") as temporar
     for base in (payload, fonte, estatico):
         for pasta in ("baixar", "sublime"):
             (base / pasta).mkdir(parents=True)
-    shutil.copy2(RAIZ / "extensões/vscode/dist/santafe-1.0.6.vsix", payload / "baixar" / preparo.VSIX)
-    for nome in (preparo.MANUAL, preparo.CONTROLE, "packages.json"):
-        pasta = "baixar" if nome == preparo.MANUAL else "sublime"
-        shutil.copy2(RAIZ / "extensões/sublime/dist" / nome, payload / pasta / nome)
+    artefatos_historicos(payload)
     app = raiz / "sfdev.fé"
     app.write_text(PAGINA)
     (fonte / "sfdev.fé").write_text(PAGINA)

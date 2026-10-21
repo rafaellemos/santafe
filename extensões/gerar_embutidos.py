@@ -40,7 +40,7 @@ def textmate():
          "patterns": [{"include": "#chaves"}, {"include": "$self"}]},
         # O marcador integra o token da variável; pontuação sem estilo próprio
         # herdava a cor do colar em temas como Monokai e Dark+.
-        {"match": r"[®Ⓡ][A-Za-z_][A-Za-z_0-9]*",
+        {"match": r"[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*",
          "name": "meta.interpolation.variable.santafe variable.parameter.santafe"},
     ]}
     repo["chaves"] = {"begin": r"\{", "end": r"\}",
@@ -117,7 +117,7 @@ def sublime():
           pop: true
         - include: chaves-interpolação
         - include: código
-    - match: '[®Ⓡ][A-Za-z_][A-Za-z_0-9]*'
+    - match: '[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*'
       scope: meta.interpolation.variable.santafe variable.parameter.santafe
 
   chaves-interpolação:

@@ -296,7 +296,7 @@ contexts:
         1: support.namespace.santafe
         2: punctuation.accessor.santafe
         3: variable.function.method.santafe
-    - match: '(?<![\p{L}\p{M}\p{N}_.:])(depure)\s*(\.)\s*((?:definaValorDeUsuário|obterValorDeUsuário|definaValorExterno|junteValorExterno|obterValorExterno|definaMetatabela|obterInformação|obterMetatabela|idValorExterno|obterRegistro|rastroDePilha|definaGancho|definaLocal|obterGancho|obterLocal|depure))(?![\p{L}\p{M}\p{N}_])'
+    - match: '(?<![\p{L}\p{M}\p{N}_.:])(depure)\s*(\.)\s*((?:definaValorDeUsuário|obterValorDeUsuário|definaValorExterno|junteValorExterno|obterValorExterno|definaMetatabela|obterInformação|obterMetatabela|idValorExterno|obterRegistro|rastroDePilha|definaGancho|definaLocal|obterGancho|obterLocal|analise|lexemas|depure))(?![\p{L}\p{M}\p{N}_])'
       captures:
         1: support.namespace.santafe
         2: punctuation.accessor.santafe
@@ -617,7 +617,7 @@ contexts:
           pop: true
         - include: chaves-interpolação
         - include: código
-    - match: '[®Ⓡ][A-Za-z_][A-Za-z_0-9]*'
+    - match: '[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*'
       scope: meta.interpolation.variable.santafe variable.parameter.santafe
 
   chaves-interpolação:

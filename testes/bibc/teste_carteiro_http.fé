@@ -1243,10 +1243,30 @@ executePróximo = função()
             se falhaDoEnvio então
                 concluir(falso, teste.nome .. ": " .. falhaDoEnvio); retorne
             fim
-            c:recebaDadosAssíncrono(65536, função(_, resposta, falhaDaLeitura)
+            -- TCP pode entregar a resposta em vários trechos. Validar só o
+            -- primeiro produzia falhas aleatórias quando o HTML era dividido.
+            local resposta = ""
+            local leiaResposta
+            leiaResposta = função()
+            c:recebaDadosAssíncrono(4096, função(_, trecho, falhaDaLeitura)
                 se falhaDaLeitura então
                     concluir(falso, teste.nome .. ": " .. falhaDaLeitura); retorne
                 fim
+                se trecho == nulo ou #trecho == 0 então
+                    concluir(falso, teste.nome .. ": resposta HTTP incompleta"); retorne
+                fim
+                resposta = resposta .. trecho
+                se #resposta > 4 * 1024 * 1024 então
+                    concluir(falso, teste.nome .. ": resposta HTTP excessiva"); retorne
+                fim
+                local _, fimDoCabeçalho = resposta:procure("\r\n\r\n", 1, verdadeiro)
+                se não fimDoCabeçalho então leiaResposta(); retorne fim
+                local comprimento = paraNúmero(resposta:corte(1, fimDoCabeçalho)
+                    :minúscula():separe("\r\ncontent%-length:[ \t]*([0-9]+)"))
+                se comprimento == nulo então
+                    concluir(falso, teste.nome .. ": Content-Length ausente"); retorne
+                fim
+                se #resposta - fimDoCabeçalho < comprimento então leiaResposta(); retorne fim
                 local passou = verdadeiro
                 se teste.verificar então
                     passou = não não teste.verificar(resposta)
@@ -1264,6 +1284,8 @@ executePróximo = função()
                 conexãoCliente = nulo
                 executePróximo()
             fim)
+            fim
+            leiaResposta()
         fim)
     fim)
 fim

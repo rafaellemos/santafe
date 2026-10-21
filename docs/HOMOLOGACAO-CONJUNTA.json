@@ -1,0 +1,75 @@
+{
+  "data": "2026-10-21",
+  "nucleo": "2.1.0",
+  "sls": "1.0.0",
+  "bibliotecas": "1.0.0",
+  "vscode": "1.1.0",
+  "sublime": "1.1.0",
+  "publicado": false,
+  "base_git": "aba35374154a0cdc5ecc4d55a3fbdf327f7f3355",
+  "observacao": "Homologação da árvore de trabalho; não declara commit, etiqueta, execução de CI remoto ou instalação em produção. Logs/capturas ficam na entrega de evidências, não nos fontes públicos.",
+  "macos": {
+    "resultado": "ok",
+    "evidencia": "docs/evidencias/conjunto-20261021/macos-regressao.log",
+    "sha256": "a2315ccbc2331e919f72b4e5fdf47af7a33c23dc9e2185a21d8bcc33d320a193",
+    "ambiente": "macOS 15.7.7 Intel; regressão, instalação isolada, Unicode, SLS e bibliotecas",
+    "nao_executados": "MariaDB/DNS dependentes de configuração: SKIP explícito"
+  },
+  "debian": {
+    "resultado": "ok",
+    "evidencia": "docs/evidencias/conjunto-20261021/debian-preflight-ensaio4.log",
+    "sha256": "013b5a409216792310ec1974b6f92b12d2359c09b8749b6f178282090c10a95d",
+    "arvore_isolada": "/tmp/santafe-conjunto.JW2rLJ78",
+    "tar_ensaiado_sha256": "1523a4cfa332ad6a314f8a8978e9b339eab1afac4f6d8c94289ad7c596a61b2e",
+    "criterios_sls_fonte": 39,
+    "criterios_sls_instalado": 39,
+    "escopo": "Compilação, regressão, instalação em prefixo temporário, bibliotecas/TLS/integridade/recuperação, WASM, manual e planejamento reversível. Nenhum sudo ou alteração operacional."
+  },
+  "wasm": {
+    "resultado": "ok",
+    "evidencia": "docs/evidencias/conjunto-20261021/debian-preflight-ensaio4.log; testes/integracao/testar_wasm.js",
+    "artefato_sha256": "f59d794cb75d504aaef48919cb618ce1794125142ef579fdf41135b47c1916e4",
+    "nota": "Reproduzido em dois ensaios Debian; gerenciador de bibliotecas não está disponível no WASM."
+  },
+  "vscode_host": {
+    "resultado": "ok",
+    "evidencia": "docs/evidencias/conjunto-20261021/vscode-host.json",
+    "sha256": "b67ca672a20250df03bdb0df39f4ed625a420cd4a4876b5fbc6b72b5267e29e2",
+    "cobertura": ["SLS 1.0.0 ativo", "extensão 1.1.0", "definição", "referências", "rename NFC/NFD", "assinaturas", "formatação", "tokens combinados HTML/Santafé", "diagnóstico incremental"],
+    "completion_evidencia": "docs/evidencias/conjunto-20261021/vscode-completion.json",
+    "completion_itens": 54,
+    "perfil": "Perfil temporário de homologação; extensão global do usuário não substituída."
+  },
+  "sublime_host": {
+    "resultado": "ok",
+    "evidencia": "docs/evidencias/conjunto-20261021/sublime-host.json",
+    "sha256": "21579e6b9dfd40ce2ae6810167fb198c8bb0ce57dbbbbe584f7fc87c351bc500",
+    "build": "4215",
+    "pacote": "1.1.0",
+    "cobertura": ["SLS pelo transporte LSP instalado", "fallback desativado com sessão ativa", "definição", "referências", "rename Unicode", "símbolos", "formatação", "tokens semânticos"],
+    "realce": {"casos": 175, "falhas": 0, "sha256": "b8634481b80e5aa871a5010b2ab91c3d0738a965177265cb8e8294ac80ee54e3"},
+    "concatenacoes": {"casos": 43, "falhas": 0, "edicao_e_limpeza": true, "sha256": "e060965639a47cdbd253006a11cbe225155ec1378645f3d63cc99d66c73b7de2"},
+    "api_paletas": {"casos": 612, "falhas": 0, "sha256": "bfa19759b8e4069dfb958d1a10dfc7c26bfcaf2418b4837b4fcaa7fe8a2da83f"}
+  },
+  "visual": {
+    "resultado": "ok",
+    "evidencia": "docs/evidencias/conjunto-20261021/sublime-visual.png; docs/evidencias/conjunto-20261021/vscode-visual.png",
+    "sublime_sha256": "0faf48a509a3722e25b2a68bd97a191066d0c8db83d5533bc158131baf8ec7b1",
+    "vscode_sha256": "83d32b0fb153973e1ee071a07b1d14baf57b3195697d6c6cf577d4928d4adbad",
+    "fixture_sha256": "a081e752e036a7557400b8d03696767d1b286abd50503278a2483f72395f9837",
+    "inspecao": "Pixels reais de ambos os editores inspecionados: ®/Ⓡ com NFC/NFD, laranja normal; expressão como código; função ciano oblíquo; paleta suave HTML/JS; atributos e comentários partidos por concatenação; isolamento de aspas em escapeHTML.",
+    "limite": "A anotação explícita documentada é --[[javascript]], não --[[js]]. O fixture inicial foi corrigido para usar o contrato documentado, sem alterar a implementação ou ampliar a sintaxe."
+  },
+  "publicador": {
+    "resultado": "ok",
+    "evidencia": "testes/integracao/testar_publicacao_conjunta.py e testar_fechamento.py, executados no preflight-ensaio4; 706 destinos planejados",
+    "rollback": "Transação completa/parcial, preservação de edições concorrentes e histórico conferidos em fixtures; produção não usada como ambiente de teste.",
+    "producao_executada": false
+  },
+  "distribuicao": {
+    "resultado": "ok",
+    "evidencia": "Ensaio4: testar_distribuicao.py e testar_entrega_conjunta.py; TAR/ZIP equivalentes, caminhos NFC, hashes, links e adulteração recusados; extensões Mac/Debian byte a byte idênticas.",
+    "nota": "O empacotamento final incorpora este registro e a remoção da indicação de candidato na ajuda. Seus hashes e sua pré-validação isolada devem constar no relatório externo da entrega, sem referência circular ao hash do próprio TAR."
+  },
+  "limites": ["Windows não homologado", "Sem DAP ou inferência completa de tipos", "Transporte incremental, não parser incremental", "Compilação nativa não é sandbox", "Catálogo curado sem upload público nem assinatura independente", "Nenhum GitHub/Marketplace/canal oficial alterado"]
+}

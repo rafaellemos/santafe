@@ -1,0 +1,57 @@
+módulo.caminho="ferramentas/?.fé;"..módulo.caminho
+local V=importe "pacotes.versoes"
+local R=importe "pacotes.resolvedor"
+local número=0
+local função teste(ok,msg) número=número+1; garanta(ok,msg ou "teste de pacotes falhou") fim
+para _,v em ipares({"0.0.0","1.2.3","2147483647.0.0","1.0.0-exp.3+abc.01","1.0.0-0","1.0.0-x"}) início teste(V.leia(v),v) fim
+para _,v em ipares({"","v1.2.3","1.2","1.2.3.4","01.2.3","1.2.03","1.0.0-01","1.0.0-","1.0.0+","1.0.0+a..b","1.0.0-α","2147483648.0.0","1.2.3\0"}) início teste(não V.leia(v),v) fim
+local sequência={"1.0.0-alpha","1.0.0-alpha.1","1.0.0-alpha.beta","1.0.0-beta","1.0.0-beta.2","1.0.0-beta.11","1.0.0-rc.1","1.0.0"}
+para i=1,#sequência-1 início teste(V.compare(sequência[i],sequência[i+1])<0) fim
+teste(V.compare("1.0.0+abc","1.0.0+xyz")==0)
+teste(V.compare("1.0.0-99999999999999999999","1.0.0-100000000000000000000")<0)
+para _,item em ipares({
+    {"1.2.3","^1.2.0",verdadeiro},{"2.0.0","^1.2.0",falso},
+    {"0.2.9","^0.2.3",verdadeiro},{"0.3.0","^0.2.3",falso},
+    {"0.0.4","^0.0.3",falso},{"0.0.3","^0.0.3",verdadeiro},
+    {"1.2.9","~1.2.3",verdadeiro},{"1.3.0","~1.2.3",falso},
+    {"3.0.0",">=1.0.0 <2.0.0 || =3.0.0",verdadeiro},
+    {"2.0.0",">=1.0.0 <2.0.0 || =3.0.0",falso},
+    {"1.2.3-exp.2",">=1.2.3-exp.1 <1.2.3",verdadeiro},
+    {"1.2.4-exp.2",">=1.2.3-exp.1 <2.0.0",falso},
+    {"1.2.3-alpha","*",falso},{"1.2.3-x","1.2.3-x",verdadeiro},
+    {"1.2.3","1",verdadeiro},{"2.0.0","1.x",falso},
+    {"1.2.3","1.2.*",verdadeiro},{"1.3.0","1.2",falso},
+    {"0.7.0","^0",verdadeiro},{"0.1.0","^0.0",falso},
+    {"1.8.0","^1.2",verdadeiro},{"1.8.0","~1.2",falso}
+}) início teste(V.satisfaz(item[1],item[2])==item[3],tabela.concatene({item[1],item[2]}," ")) fim
+para _,v em ipares({""," ","||1.2.3","1.2.3||",">=1.2",">*","1.x.2","1.2.3 || || 2.0.0","1.2.3;echo","1.2.3 - 2.0.0","^^1.2.3"}) início teste(não V.intervalo(v),v) fim
+local catálogo={
+    alfa={["1.0.0"]={dependencias={base="^1.0.0"}},["2.0.0"]={dependencias={base="^2.0.0"}}},
+    beta={["1.0.0"]={dependencias={base="^1.0.0"}}},
+    base={["1.0.0"]={},["1.1.0"]={},["2.0.0"]={}}
+}
+local solução=garanta(R.resolva(catálogo,{alfa="*",beta="*"}))
+teste(solução.pacotes.alfa.versao=="1.0.0" e solução.pacotes.base.versao=="1.1.0","backtracking diamante")
+teste(solução.ordem[1]=="base","ordem topológica")
+solução=garanta(R.resolva(catálogo,{alfa="1.0.0"},{base="1.0.0"}))
+teste(solução.pacotes.base.versao=="1.0.0","preservar lock compatível")
+teste(não R.resolva(catálogo,{alfa="1.0.0"},{alfa="1.0.0"},{travado=verdadeiro}),"lock incompleto")
+teste(não R.resolva(catálogo,{alfa="2.0.0",beta="1.0.0"}),"conflito")
+teste(não R.resolva(catálogo,{ausente="*"}),"ausente")
+teste(não R.resolva(catálogo,{["../base"]="*"}),"nome inválido")
+teste(não R.resolva(catálogo,{base="lol"}),"intervalo inválido")
+teste(não R.resolva(catálogo,{alfa="*"},{},{limitePassos=1}),"orçamento")
+local ciclo={a={["1.0.0"]={dependencias={b="*"}}},b={["1.0.0"]={dependencias={a="*"}}}}
+teste(não R.resolva(ciclo,{a="*"}),"ciclo")
+ciclo.b["0.9.0"]={}
+solução=garanta(R.resolva(ciclo,{a="*"}))
+teste(solução.pacotes.b.versao=="0.9.0","recuar de ciclo")
+para _,nome em ipares({"a","a-1","texto-markdown","123"}) início teste(R.nomeVálido(nome)) fim
+para _,nome em ipares({"A","-a","a-","a/b","a_b","é","","a\0","a.b"}) início teste(não R.nomeVálido(nome)) fim
+local muitas={base={}}
+para i=1,257 início muitas.base["1.0."..i]={} fim
+teste(não R.resolva(muitas,{base="*"}),"versões limitadas")
+local longo,pedidos={},{}
+para i=1,129 início local nome="p"..i; longo[nome]={["1.0.0"]={}}; pedidos[nome]="*" fim
+teste(não R.resolva(longo,pedidos),"pacotes limitados")
+mostre("Pacotes SemVer e resolução: "..número.." critérios ok")

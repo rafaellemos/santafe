@@ -1,0 +1,53 @@
+local A=executeArquivo("ferramentas/sls/analisador.fé")
+local função analise(texto)
+    local a=A.analise(texto,"teste")
+    garanta(não a.incompleto, a.incompleto)
+    garanta(#a.erros == 0, json.cod(a.erros))
+    garanta(não a.falhaLéxica)
+    retorne a
+fim
+local a=analise([[local índice = 1
+início
+ local índice = 2
+ mostre(índice)
+fim
+mostre(índice)
+-- índice
+local texto = "índice"]])
+garanta(#a.símbolos == 3)
+garanta(#a.símbolos[1].referências == 2 e #a.símbolos[2].referências == 2)
+local b=analise('local nome="Ana"; local s=`®nome Ⓡnome ®{nome} Ⓡ{nome} nome`')
+garanta(#b.símbolos[1].referências == 5)
+local c=analise('local variável, variável = 1,2; mostre(`®variávelⓇvariável ®{variável + variável}`)')
+garanta(#c.símbolos[1].referências == 3 e #c.símbolos[2].referências == 3)
+local d=analise([[local x=1
+início local x=x+1; mostre(x) fim
+mostre(x)]])
+garanta(#d.símbolos[1].referências == 3 e #d.símbolos[2].referências == 2)
+local função encontre(análise,nome)
+    para _,s em ipares(análise.símbolos) início se s.nome==nome então retorne s fim fim
+fim
+local f=analise([[local função somar(a,b)
+ local função dentro(c) retorne somar(a,c) fim
+ retorne a+b
+fim
+somar(1,2)]])
+garanta(#encontre(f,"somar").referências == 3)
+garanta(#encontre(f,"a").referências == 3 e #encontre(f,"b").referências == 2)
+garanta(#encontre(f,"somar").parâmetros == 2)
+local m=analise('local M={}; função M.somar(a,b) retorne a+b fim; retorne M')
+garanta(m.exportações.somar e m.exportações.somar.classe=="função")
+local imp=analise('local Calc=importe "calculadora"; mostre(Calc.somar(1,2))')
+garanta(imp.importações[1].importação=="calculadora")
+local laço=analise('local i=4; para i=1,i início mostre(i) fim; mostre(i)')
+garanta(#laço.símbolos[1].referências==3 e #laço.símbolos[2].referências==2)
+local repetição=analise('repita local x=1 até x==1; mostre(x)')
+garanta(#repetição.símbolos[1].referências==2)
+analise('se verdadeiro então local x=1 senãose falso então local y=2 senão local z=3 fim')
+local recuperado=A.analise('local x = )\nlocal y = )\nlocal z=3')
+garanta(#recuperado.erros>=2 e encontre(recuperado,"z"))
+local limites=A.analise('local x=' .. ('('):replique(200) .. '1' .. (')'):replique(200))
+garanta(limites.incompleto e limites.incompleto:procure("profundidade",1,verdadeiro))
+local escapado=analise('local nome="Ana"; local s=`\\®nome \\Ⓡnome ®nome`')
+garanta(#escapado.símbolos[1].referências==2)
+mostre("SLS analisador: escopos, sombras, Unicode, gabaritos, imports estáticos e limites: ok")

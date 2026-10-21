@@ -152,6 +152,13 @@ def carregue_módulo():
 
 def principal() -> None:
     módulo, sublime = carregue_módulo()
+    for nome in ("saudação", "saudac\u0327a\u0303o", "i\u0301ndice", "_ação2"):
+        assert módulo.nomes_locais(Visão("local função " + nome + "()\nfim")) == (nome,)
+        for final in ("", "valor", "a\u0301"):
+            trecho = "mostre(" + nome + "." + final
+            assert módulo.acesso_antes_do(Visão(trecho), len(trecho)) == nome + "."
+    assert módulo.nomes_locais(Visão("local função \u0301invalida()\nfim")) == ()
+    assert módulo.acesso_antes_do(Visão("2invalido."), 10) == ""
     assert len(json.loads((RAIZ / "api-publica.json").read_text(encoding="utf-8"))["itens"]) >= 300
     ouvinte = módulo.SantafeConclusões()
     visão = Visão("local função saudação(nome) início\n    mostre(nome)\nfim\ncorreio.")
@@ -159,7 +166,7 @@ def principal() -> None:
     assert sinalizadores == sublime.INHIBIT_WORD_COMPLETIONS
     assert {item.trigger for item in gerais} >= {"mostre", "saudação", "função"}
     função = next(item for item in gerais if item.trigger == "função")
-    assert "início" in função.kwargs["completion"] and "\nfim" in função.kwargs["completion"]
+    assert "início" not in função.kwargs["completion"] and "\nfim" in função.kwargs["completion"]
     para = next(item for item in gerais if item.trigger == "para")
     assert "para ${1:índice}" in para.kwargs["completion"] and "\nfim" in para.kwargs["completion"]
     assert módulo.CABEÇALHO_DE_BLOCO.fullmatch("para índice = 1, 10 início")

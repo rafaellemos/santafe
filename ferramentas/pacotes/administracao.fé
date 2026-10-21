@@ -1,0 +1,52 @@
+-- Administração local do catálogo curado. Nunca envia nada à produção.
+retorne função(N,F)
+    local A={}
+    função A.empacote(diretório)
+        local raiz=garanta(N.raiz(diretório))
+        local ok,bruto=proteja(função()
+            local manifesto=F.manifesto(F.json(garanta(raiz:leia("santafe.json",1024*1024))),verdadeiro)
+            local arquivos={}
+            local caminhos={}; para _,p em ipares(manifesto.arquivos) início caminhos[#caminhos+1]=p fim
+            tabela.ordene(caminhos); manifesto.arquivos=caminhos
+            para _,caminho em ipares(caminhos) início
+                local conteúdo=garanta(raiz:leia(caminho,8*1024*1024))
+                arquivos[#arquivos+1]={caminho=caminho,sha256=N.sha256(conteúdo),base64=N.base64(conteúdo)}
+            fim
+            local pacote=F.canônico({formato=1,manifesto=manifesto,arquivos=arquivos}).."\n"
+            F.pacote(pacote)
+            retorne pacote
+        fim)
+        raiz:feche()
+        se não ok então retorne nulo,paraColar(bruto) fim
+        retorne bruto,N.sha256(bruto)
+    fim
+    função A.adicione(diretório,bruto)
+        local raiz=garanta(N.raiz(diretório))
+        local ok,resultado=proteja(função()
+            local manifesto=F.pacote(bruto)
+            garanta(raiz:trave())
+            local existe,falha=raiz:existe("indice.json"); F.exija(existe~=nulo,falha)
+            local índice=existe e F.índice(F.json(garanta(raiz:leia("indice.json",4*1024*1024)))) ou {formato=1,pacotes={}}
+            local hash=N.sha256(bruto)
+            local versões=índice.pacotes[manifesto.nome] ou {}
+            local anterior=versões[manifesto.versao]
+            F.exija(não anterior ou anterior.sha256==hash,"versão imutável já existe com outro conteúdo")
+            local pasta="pacotes/"..manifesto.nome.."/"..manifesto.versao
+            local arquivo=pasta.."/"..hash..".sfp"
+            garanta(raiz:diretorio(pasta))
+            existe,falha=raiz:existe(arquivo); F.exija(existe~=nulo,falha)
+            se existe então F.exija(garanta(raiz:leia(arquivo,48*1024*1024))==bruto,"arquivo imutável corrompido")
+            senão garanta(raiz:grave(arquivo,bruto,falso)) fim
+            versões[manifesto.versao]={arquivo=arquivo,sha256=hash,dependencias=manifesto.dependencias ou {}}
+            índice.pacotes[manifesto.nome]=versões
+            F.índice(índice)
+            local catálogo=F.canônico(índice).."\n"; F.exija(#catálogo<=4*1024*1024,"índice excessivo")
+            garanta(raiz:grave("indice.json",catálogo,verdadeiro))
+            retorne {nome=manifesto.nome,versao=manifesto.versao,sha256=hash,arquivo=arquivo}
+        fim)
+        raiz:feche()
+        se não ok então retorne nulo,paraColar(resultado) fim
+        retorne resultado
+    fim
+    retorne A
+fim

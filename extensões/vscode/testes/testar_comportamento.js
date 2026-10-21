@@ -29,12 +29,19 @@ class Location { constructor(uri, range) { this.uri = uri; this.range = range; }
 class Hover { constructor(contents) { this.contents = contents; } }
 const descarte = { dispose() {} };
 module.exports = {
+  EventEmitter: class {fire(){} dispose(){} event(){return descarte;}},
+  CodeActionKind: {QuickFix:"quickfix"},
   Position, Range, CompletionItem, SnippetString, MarkdownString, Diagnostic, DocumentSymbol, Location, Hover,
   CompletionItemKind: { Keyword: 1, Module: 2, Variable: 3, Method: 4, Function: 5 },
   SemanticTokensLegend: class { constructor(types, modifiers) { this.tokenTypes = types; this.tokenModifiers = modifiers; } },
   SymbolKind: { Function: 12 }, DiagnosticSeverity: { Error: 1, Warning: 2, Information: 3, Hint: 4 },
   window: { createOutputChannel() { return { appendLine() {}, append() {}, show() {}, dispose() {} }; }, showWarningMessage() {} },
   languages: {
+    registerReferenceProvider(){return descarte;}, registerDocumentHighlightProvider(){return descarte;},
+    registerRenameProvider(){return descarte;}, registerSignatureHelpProvider(){return descarte;},
+    registerDocumentFormattingEditProvider(){return descarte;}, registerFoldingRangeProvider(){return descarte;},
+    registerSelectionRangeProvider(){return descarte;}, registerCodeActionsProvider(){return descarte;},
+    registerWorkspaceSymbolProvider(){return descarte;},
     registerDocumentSemanticTokensProvider(_, provider) { registrados.realce = provider; return descarte; },
     createDiagnosticCollection() { return { delete() {}, set() {}, dispose() {} }; },
     registerCompletionItemProvider(_, provider) { registrados.conclusões = provider; return descarte; },
@@ -43,6 +50,8 @@ module.exports = {
     registerDefinitionProvider(_, provider) { registrados.definições = provider; return descarte; }
   },
   workspace: {
+    createFileSystemWatcher(){return {dispose(){},onDidCreate(){return descarte;},onDidChange(){return descarte;},onDidDelete(){return descarte;}};},
+    onDidChangeWorkspaceFolders(){return descarte;},
     textDocuments: [], workspaceFolders: undefined,
     getConfiguration() { return { get(chave, padrão) { return chave === "enable" ? false : padrão; }, inspect() { return {}; } }; },
     onDidOpenTextDocument() { return descarte; }, onDidChangeTextDocument() { return descarte; },
@@ -64,13 +73,14 @@ function documento(texto) {
       return linhas[intervalo.start.line].slice(intervalo.start.character, intervalo.end.character);
     },
     lineAt(linha) { return { text: linhas[linha], range: { end: { line: linha, character: linhas[linha].length } } }; },
-    getWordRangeAtPosition(posição) {
+    getWordRangeAtPosition(posição, padrão = /[\p{L}\p{M}\p{N}_]+/u) {
       const linha = linhas[posição.line];
-      const antes = linha.slice(0, posição.character).match(/[\p{L}\p{N}_]+$/u);
-      const começo = antes ? posição.character - antes[0].length : posição.character;
-      const depois = linha.slice(posição.character).match(/^[\p{L}\p{N}_]+/u);
-      const fim = posição.character + (depois ? depois[0].length : 0);
-      return começo === fim ? undefined : { start: { line: posição.line, character: começo }, end: { line: posição.line, character: fim } };
+      for (const match of linha.matchAll(new RegExp(padrão.source, "gu"))) {
+        const começo = match.index, fim = começo + match[0].length;
+        if (começo <= posição.character && posição.character <= fim)
+          return {start: {line: posição.line, character: começo}, end: {line: posição.line, character: fim}};
+      }
+      return undefined;
     },
     positionAt(offset) {
       let linha = 0;
@@ -85,7 +95,7 @@ try {
   fs.copyFileSync(path.join(raiz, "extension.js"), path.join(temporário, "extension.js"));
   fs.copyFileSync(path.join(raiz, "package.json"), path.join(temporário, "package.json"));
   fs.copyFileSync(path.join(raiz, "api-publica.json"), path.join(temporário, "api-publica.json"));
-  for (const nome of ["realce-vscode.js", "realce-embutido.js", "aparencia.js", "paletas.json"])
+  for (const nome of ["realce-vscode.js", "realce-embutido.js", "aparencia.js", "paletas.json", "provedores-sls.js"])
     fs.copyFileSync(path.join(raiz, nome), path.join(temporário, nome));
   fs.writeFileSync(path.join(temporário, "node_modules", "vscode", "index.js"), apiFalsa);
 
@@ -115,6 +125,12 @@ try {
     }
   }
   assert(vscode.__registrados.definições.provideDefinition(fonte, { line: 0, character: 16 }));
+  for (const nome of ["saudação", "saudac\u0327a\u0303o", "i\u0301ndice"]) {
+    const doc = documento(`local função ${nome}()\nfim\n${nome}()`);
+    const destino = vscode.__registrados.definições.provideDefinition(doc, {line: 2, character: nome.length - 1});
+    assert(destino, `navegação local deve preservar ${nome}`);
+    assert.strictEqual(doc.getText(destino.range), nome);
+  }
   extensão.deactivate();
   console.log("Extensão VS Code: conclusões, ajuda e símbolos locais: ok");
 } finally {

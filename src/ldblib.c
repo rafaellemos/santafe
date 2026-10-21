@@ -18,6 +18,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "llex.h"
 
 
 /*
@@ -428,7 +429,58 @@ static int db_traceback (lua_State *L) {
 }
 
 
+/* Compile text only, discard the closure, and retain the compiler's interval.
+** Never call a user-supplied reader or execute the compiled program/imports.
+*/
+typedef struct AnalysisInput {
+  const char *text;
+  size_t length;
+} AnalysisInput;
+
+static const char *analysis_reader (lua_State *L, void *data, size_t *size) {
+  AnalysisInput *input = (AnalysisInput *)data;
+  (void)L;
+  *size = input->length;
+  input->length = 0;
+  return *size ? input->text : NULL;
+}
+
+static int db_analyze (lua_State *L) {
+  AnalysisInput input;
+  lua_Diagnostic diagnostic;
+  int status;
+  const char *name;
+  luaL_checktype(L, 1, LUA_TSTRING);
+  input.text = lua_tolstring(L, 1, &input.length);
+  name = luaL_optstring(L, 2, "=(an\xC3\xA1lise)");
+  status = lua_loaddiagnostic(L, analysis_reader, &input, name, "t", &diagnostic);
+  if (status == LUA_OK) {
+    lua_pop(L, 1);  /* discard, do not return an executable function */
+    lua_pushboolean(L, 1);
+    return 1;
+  }
+  if (status != LUA_ERRSYNTAX)
+    return lua_error(L);  /* allocation/runtime errors are not syntax diagnostics */
+  lua_newtable(L);
+  lua_pushvalue(L, -2);  /* original compiler message */
+  lua_setfield(L, -2, "mensagem");
+  lua_pushliteral(L, "sintaxe");
+  lua_setfield(L, -2, "c\xC3\xB3" "digo");
+  if (diagnostic.hasrange) {
+    lua_pushinteger(L, (lua_Integer)diagnostic.start);
+    lua_setfield(L, -2, "in\xC3\xAD" "cio");
+    lua_pushinteger(L, (lua_Integer)diagnostic.end);
+    lua_setfield(L, -2, "fim");
+  }
+  lua_pushboolean(L, 0);
+  lua_insert(L, -2);
+  return 2;  /* false, diagnostic (the original stack message is discarded) */
+}
+
+
 static const luaL_Reg dblib[] = {
+  {"analise", db_analyze},
+  {"lexemas", luaX_lexemes},
   {"depure", db_debug},                                    /* debug */
   {"obterValorDeUsu\xC3\xA1rio", db_getuservalue},          /* getuservalue */
   {"obterGancho", db_gethook},                              /* gethook */

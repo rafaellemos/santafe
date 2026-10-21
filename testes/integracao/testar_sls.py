@@ -58,7 +58,7 @@ def principal() -> None:
         inicialização = leia(processo)
         assert inicialização["id"] == 1
         capacidades = inicialização["result"]["capabilities"]
-        assert capacidades["textDocumentSync"]["change"] == 1
+        assert capacidades["textDocumentSync"]["change"] == 2
         assert capacidades["positionEncoding"] == "utf-16"
 
         envie(processo, {

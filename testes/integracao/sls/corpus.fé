@@ -1,0 +1,14 @@
+-- Harness próprio, nunca executar o conteúdo analisado.
+local A=executeArquivo(arg[1])
+local fontes=json.decod(es.entradaPadrão:leia("*tudo"))
+local falhas={}
+para _,caminho em ipares(fontes) início
+    local f=garanta(es.abra(caminho,"rb")); local fonte=f:leia("*tudo"); f:feche()
+    se depure.analise(fonte,caminho) então
+        local a=A.analise(fonte,caminho)
+        se a.incompleto ou #a.erros>0 ou a.falhaLéxica então
+            falhas[#falhas+1]={arquivo=caminho,erros=a.erros,incompleto=a.incompleto}
+        fim
+    fim
+fim
+mostre(json.cod(#falhas==0 e json.matrizVazia ou falhas))

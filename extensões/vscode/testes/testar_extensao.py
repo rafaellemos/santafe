@@ -7,6 +7,7 @@ import json
 import hashlib
 import pathlib
 import struct
+import stat
 import subprocess
 import sys
 import zipfile
@@ -48,6 +49,7 @@ def principal() -> None:
     with zipfile.ZipFile(vsix) as arquivo:
         nomes = set(arquivo.namelist())
         assert arquivo.testzip() is None
+        assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         assert all(info.date_time == (2026, 10, 18, 0, 0, 0) for info in arquivo.infolist())
     primeira = vsix.read_bytes()
     subprocess.run([sys.executable, str(RAIZ / "empacotar.py")], check=True)

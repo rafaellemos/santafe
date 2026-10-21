@@ -1,6 +1,6 @@
 # Santafé para Visual Studio Code
 
-Extensão Santafé 1.0.7 para arquivos (`.fé` e `.fe`). Ela oferece:
+Extensão Santafé 1.1.0, disponível no portal oficial, para arquivos (`.fé` e `.fe`). Ela oferece:
 
 - reconhecimento de arquivos, comentários, pares e indentação;
 - realce de sintaxe, trechos e ícone próprio;
@@ -8,7 +8,13 @@ Extensão Santafé 1.0.7 para arquivos (`.fé` e `.fe`). Ela oferece:
   símbolos declarados no arquivo atual;
 - ajuda ao passar o mouse, estrutura de funções no explorador e navegação para
   funções declaradas no arquivo atual;
-- diagnósticos sintáticos em tempo real através do SLS.
+- diagnósticos e provedores semânticos através do SLS 1.0.0: referências,
+  renomeação, ajuda de parâmetros, símbolos, recuo e navegação entre módulos.
+
+Os recursos são negociados com o servidor, com fallback local quando ausentes.
+O SLS não executa o fonte nem suas dependências; a inicialização automática usa
+`-E -P`. Atualize núcleo 2.1.0 e SLS juntos. Não requer um servidor SLS diferente
+do usado pelo Sublime. As notas 1.0.x abaixo descrevem recursos preservados.
 
 Salve o arquivo com a extensão `.fé` ou `.fe` — ou escolha **Santafé** no
 seletor de linguagem do canto inferior direito — para ativar esses recursos.
@@ -65,7 +71,7 @@ Gere o pacote sem depender de Node.js:
 
 ```sh
 python3 empacotar.py
-code --install-extension dist/santafe-1.0.7.vsix
+code --install-extension dist/santafe-1.1.0.vsix
 ```
 
 Também é possível escolher **Instalar do VSIX...** na visualização Extensions do
@@ -91,8 +97,13 @@ acentos graves. Chaves aninhadas são balanceadas; `\®` permanece literal.
 O curinga integra o realce de `®nome`; `®{` e `}` recebem o estilo de operador,
 enquanto o conteúdo da expressão mantém seu próprio realce.
 Colares com aspas ou colchetes não passam a interpolar por serem realçados.
-Para nomes Unicode na forma curta, use a expressão `®{índice}`: o núcleo atual
-reconhece nomes ASCII na forma `®var`.
+Na revisão em desenvolvimento, a forma curta também reconhece `®variável`,
+`Ⓡíndice` e acentos combinados (NFD), sem cortar o nome no acento. O nome começa
+com letra Unicode ou `_`; em seguida aceita letras, marcas combinantes, números
+e `_`. O curinga inteiro mantém a cor laranja e o estilo normal, inclusive em
+HTML/JS. Não há normalização: declaração e referência precisam usar a mesma
+sequência Unicode. A correção deve ser distribuída junto com o núcleo corrigido;
+nas versões já publicadas, use `®{índice}`/`Ⓡ{índice}` como alternativa.
 
 HTML é reconhecido por uma tag, comentário HTML ou `<!DOCTYPE`/`<!doctype>`
 na linha de abertura, inclusive depois de texto como `[[ | Site</title>]]`.

@@ -1,0 +1,41 @@
+-- Intervalos reais do léxico; não deduzir colunas pelo texto do erro.
+local função confira(texto, trecho, último)
+    local ok, diagnóstico = depure.analise(texto, "@uri:12: com espaços.fé")
+    garanta(ok == falso e diagnóstico["código"] == "sintaxe")
+    local começo = diagnóstico["início"]
+    local final = diagnóstico["fim"]
+    garanta(tipo(começo) == "número" e começo >= 0 e começo <= final e final <= #texto)
+    garanta(texto:corte(começo + 1, final) == trecho, json.cod(diagnóstico))
+    se último então garanta(final == #texto, json.cod(diagnóstico)) fim
+fim
+
+garanta(depure.analise("mostre(42)"))
+garanta(depure.analise("erro('NUNCA EXECUTAR')"))
+garanta(depure.analise('local m = importe "modulo_que_nao_existe"'))
+confira('local emoji = "🟢 é"; local índice = )', ")", verdadeiro)
+confira("local fim = 1", "fim")
+confira("local x = 12e+", "12e+", verdadeiro)
+confira("local x = 1 == == 2", "==")
+confira("local t = { nome + ) }", ")")
+confira("-- linha\r\nlocal nome = )", ")", verdadeiro)
+confira("-- linha\rlocal nome = )", ")", verdadeiro)
+confira("local x = 'não terminou", "'não terminou", verdadeiro)
+confira("local x = [=[não terminou", "[=[não terminou", verdadeiro)
+confira("--[=[comentário incompleto", "--[=[comentário incompleto", verdadeiro)
+confira("local x = 'escape\\q'", "'escape\\q")
+confira("se verdadeiro então\n", "", verdadeiro)
+confira("--[[html]] local x = [[<div>]] .. )", ")", verdadeiro)
+confira("local x = `®nome Ⓡ{1+2}` + )", ")", verdadeiro)
+confira("local x = `®nome\n", "`®nome\n", verdadeiro)
+confira("pare\nlocal x = 1", "pare")
+confira("vápara ausente\nlocal x = 1", "vápara ausente")
+confira("vápara destino\nlocal x = 1\n::destino:: mostre(x)", "vápara destino")
+garanta(depure.analise("local x = 1")) -- não conservar falha anterior
+
+local okBinário, erroBinário = depure.analise("\27Lua")
+garanta(okBinário == falso e erroBinário["início"] == nulo e erroBinário["fim"] == nulo)
+local aceitouNúmero = proteja(depure.analise, 42)
+garanta(não aceitouNúmero)
+local funçãoCompilada, falha, terceiro = carregue("local x = )")
+garanta(funçãoCompilada == nulo e tipo(falha) == "colar" e terceiro == nulo)
+mostre("Análise sintática: intervalos em octetos, lookahead e ausência de execução: ok")

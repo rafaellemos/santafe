@@ -1,0 +1,430 @@
+-- Análise estática sobre depure.lexemas (o lexer do compilador).
+-- Nenhum carregamento de fonte do usuário, avaliação ou importação executável.
+local A = {}
+local precedência = {
+    ["ou"]=1, ["e"]=2, ["<"]=3, [">"]=3, ["<="]=3, [">="]=3, ["~="]=3, ["=="]=3,
+    ["|"]=4, ["~"]=5, ["&"]=6, ["<<"]=7, [">>"]=7, [".."]=8,
+    ["+"]=9, ["-"]=9, ["*"]=10, ["/"]=10, ["//"]=10, ["%"]=10, ["^"]=12
+}
+local fechadores = { ["fim"]=verdadeiro, ["senão"]=verdadeiro,
+    ["senãose"]=verdadeiro, ["até"]=verdadeiro }
+
+local função acrescente(lista, valor) lista[#lista + 1] = valor; retorne valor fim
+local função nó(tipoNó, começo, final)
+    retorne { classe=tipoNó, começo=começo, final=final, filhos={} }
+fim
+
+função A.analise(texto, uri)
+    local tokens, falhaLéxica = depure.lexemas(texto, "@" .. (uri ou "documento"))
+    local raiz = { começo=0, final=#texto, nomes={}, filhos={}, classe="raiz" }
+    local resultado = { texto=texto, uri=uri, tokens=tokens, raiz=raiz,
+        escopos={raiz}, símbolos={}, referências={}, nós={}, erros={}, globais={},
+        importações={}, exportações={}, falhaLéxica=falhaLéxica }
+    local atual, lista, posição, profundidade, trabalho = raiz, tokens, 1, 0, 0
+    local expressão, bloco, comando, corpoFunção, interpolação
+    local eof = { texto="", tipo="fim", ["início"]=#texto, ["fim"]=#texto }
+
+    local função veja(n) retorne lista[posição + (n ou 0)] ou eof fim
+    local função tire()
+        local t = veja(); posição = posição + 1; trabalho = trabalho + 1
+        se trabalho > 400000 então erro("limite de trabalho estrutural excedido") fim
+        retorne t
+    fim
+    local função aceite(s)
+        se veja().texto == s então retorne tire() fim
+    fim
+    local função falhe(mensagem, token)
+        token = token ou veja()
+        se #resultado.erros < 32 então
+            acrescente(resultado.erros, { mensagem=mensagem, começo=token["início"], final=token["fim"] })
+        fim
+    fim
+    local função exija(s)
+        local t = aceite(s)
+        se não t então falhe("esperado '" .. s .. "'") fim
+        retorne t ou veja()
+    fim
+    local função abra(classe, começo)
+        local novo = { classe=classe, começo=começo, final=#texto, pai=atual, nomes={}, filhos={} }
+        acrescente(atual.filhos, novo); acrescente(resultado.escopos, novo); atual = novo
+        retorne novo
+    fim
+    local função feche(final)
+        atual.final = final
+        local fechado = atual; atual = atual.pai ou raiz
+        retorne fechado
+    fim
+    local função busque(nome, escopo)
+        enquanto escopo início
+            local candidatos = escopo.nomes[nome]
+            se candidatos e #candidatos > 0 então retorne candidatos[#candidatos] fim
+            escopo = escopo.pai
+        fim
+        retorne resultado.globais[nome]
+    fim
+    local função declare(t, classe, escopo, visível, propriedade)
+        local s = { nome=t.texto, token=t, classe=classe ou "variável", escopo=escopo,
+            visível=visível ou t["fim"], referências={}, parâmetros={}, campos={}, id=#resultado.símbolos + 1 }
+        acrescente(resultado.símbolos, s)
+        se escopo então
+            escopo.nomes[s.nome] = escopo.nomes[s.nome] ou {}
+            acrescente(escopo.nomes[s.nome], s)
+        senãose não propriedade então resultado.globais[s.nome] = s fim
+        s.propriedade=propriedade
+        local r = { token=t, símbolo=s, declaração=verdadeiro, escopo=escopo ou raiz }
+        acrescente(s.referências, r); acrescente(resultado.referências, r)
+        retorne s
+    fim
+    local função ref(t, dono)
+        local r = { token=t, escopo=atual, dono=dono }
+        se não dono então r.símbolo = busque(t.texto, atual) fim
+        acrescente(resultado.referências, r)
+        se r.símbolo então acrescente(r.símbolo.referências, r) fim
+        retorne r
+    fim
+    local função nome()
+        se veja().tipo == "nome" então retorne tire() fim
+        falhe("esperado nome"); retorne nulo
+    fim
+    local função registre(n)
+        acrescente(resultado.nós, n); retorne n
+    fim
+    local função atribua(s, valor)
+        se não s ou não valor então retorne fim
+        se valor.símbolo então resultado.propriedadesDinâmicas=verdadeiro fim
+        se s.valor então s.ambíguo = verdadeiro fim
+        s.valor = valor
+        se valor.classe == "função" então
+            s.classe, s.parâmetros, s.corpo = "função", valor.parâmetros, valor
+        senãose valor.classe == "tabela" então
+            s.campos = valor.campos
+            se valor.dinâmica então resultado.propriedadesDinâmicas=verdadeiro fim
+            para _,campo em pares(s.campos) início campo.dono=s fim
+        senãose valor.importação então
+            s.importação = valor.importação
+            acrescente(resultado.importações, s)
+        fim
+    fim
+
+    corpoFunção = função(inícioFunção, símbolo, método)
+        local n = nó("função", inícioFunção, #texto)
+        n.parâmetros = {}
+        local escopo = abra("função", inícioFunção); n.escopo = escopo
+        exija("(")
+        se método então
+            -- O parâmetro implícito não tem intervalo editável.
+            local falsoToken = { texto="este", ["início"]=inícioFunção, ["fim"]=inícioFunção }
+            local implícito = declare(falsoToken, "parâmetro", atual); implícito.implícito = verdadeiro
+        fim
+        enquanto veja().texto ~= ")" e veja().tipo ~= "fim" início
+            se aceite("...") então acrescente(n.parâmetros, "..."); pare fim
+            local t = nome(); se não t então pare fim
+            declare(t, "parâmetro", atual); acrescente(n.parâmetros, t.texto)
+            se não aceite(",") então pare fim
+        fim
+        exija(")")
+        bloco()
+        local final = exija("fim")["fim"]
+        n.final = final; feche(final)
+        se símbolo então atribua(símbolo, n) fim
+        retorne registre(n)
+    fim
+
+    local função argumentos(n)
+        local args = {}
+        se aceite("(") então
+            se veja().texto ~= ")" então
+                acrescente(args, expressão())
+                enquanto aceite(",") início acrescente(args, expressão()) fim
+            fim
+            n.final = exija(")")["fim"]
+        senãose veja().tipo == "colar" ou veja().tipo == "gabarito" ou veja().texto == "{" então
+            local v = expressão(13); acrescente(args, v); n.final = v.final
+        senão retorne nulo fim
+        local chamada = nó("chamada", n.começo, n.final); chamada.alvo, chamada.argumentos = n, args
+        para _,v em ipares(args) início
+            se v.símbolo então resultado.propriedadesDinâmicas=verdadeiro fim
+        fim
+        se n.nome == "importe" e não n.símbolo e args[1] e args[1].classe == "colar" então
+            chamada.importação = args[1].valor
+        fim
+        retorne registre(chamada)
+    fim
+
+    expressão = função(mínima)
+        mínima = mínima ou 0; profundidade = profundidade + 1
+        se profundidade > 128 então erro("limite de profundidade estrutural excedido") fim
+        local t, n = veja(), nulo
+        se t.texto == "-" ou t.texto == "#" ou t.texto == "~" ou t.texto == "não" então
+            tire(); local valor = expressão(11)
+            n = nó("unária", t["início"], valor.final); n.filhos={valor}
+        senãose aceite("função") então n = corpoFunção(t["início"])
+        senãose aceite("(") então
+            local valor = expressão(); local final = exija(")")["fim"]
+            n = nó("parênteses", t["início"], final); n.filhos={valor}; n.símbolo=valor.símbolo
+        senãose aceite("{") então
+            n = nó("tabela", t["início"], #texto); n.campos={}
+            enquanto veja().texto ~= "}" e veja().tipo ~= "fim" início
+                local antes = posição
+                se veja().tipo == "nome" e veja(1).texto == "=" então
+                    local chave = tire(); tire()
+                    local valor = expressão()
+                    local s = declare(chave, "campo", nulo, nulo, verdadeiro)
+                    s.propriedade=verdadeiro; atribua(s, valor); n.campos[chave.texto]=s
+                senãose aceite("[") então
+                    local chave = expressão(); exija("]"); exija("="); local valor = expressão()
+                    -- Chaves calculadas não são renomeadas como identificadores.
+                    n.dinâmica = verdadeiro; acrescente(n.filhos, chave); acrescente(n.filhos, valor)
+                senão acrescente(n.filhos, expressão()) fim
+                se posição == antes então tire() fim
+                se não aceite(",") e não aceite(";") então pare fim
+            fim
+            n.final=exija("}")["fim"]
+        senãose t.tipo == "nome" então
+            tire(); local r = ref(t)
+            n = nó("nome", t["início"], t["fim"]); n.nome=t.texto; n.símbolo=r.símbolo; n.referência=r
+        senãose t.tipo == "colar" ou t.tipo == "gabarito" ou t.tipo == "número" ou
+                t.texto == "nulo" ou t.texto == "verdadeiro" ou t.texto == "falso" ou t.texto == "..." então
+            tire(); n = nó(t.tipo, t["início"], t["fim"]); n.valor=t.valor
+            se t.tipo == "gabarito" então interpolação(t) fim
+        senão
+            falhe("esperada expressão", t); n = nó("erro", t["início"], t["fim"])
+            -- Não consumir terminadores: o comando/bloco recupera o contexto.
+            se t.tipo ~= "fim" e não fechadores[t.texto] e t.texto ~= ")" e
+               t.texto ~= "}" e t.texto ~= "]" e t.texto ~= "," então tire() fim
+        fim
+        enquanto verdadeiro início
+            se aceite(".") ou aceite(":") então
+                local tCampo = nome(); se não tCampo então pare fim
+                local campo = nó("campo", n.começo, tCampo["fim"])
+                campo.dono=n; campo.nome=tCampo.texto; campo.referência=ref(tCampo, n)
+                n = registre(campo)
+            senãose aceite("[") então
+                resultado.propriedadesDinâmicas=verdadeiro
+                local chave = expressão(); local final = exija("]")["fim"]
+                local indexado = nó("índice", n.começo, final); indexado.filhos={n,chave}; n=registre(indexado)
+            senãose veja().texto == "(" ou veja().texto == "{" ou veja().tipo == "colar" ou veja().tipo == "gabarito" então
+                n = argumentos(n)
+            senão pare fim
+        fim
+        enquanto precedência[veja().texto] e precedência[veja().texto] > mínima início
+            local op = tire(); local p = precedência[op.texto]
+            local direita = expressão((op.texto == "^" ou op.texto == "..") e p - 1 ou p)
+            local binária = nó("binária", n.começo, direita.final); binária.filhos={n,direita}; n=registre(binária)
+        fim
+        profundidade = profundidade - 1
+        retorne registre(n)
+    fim
+
+    interpolação = função(t)
+        local bruto = t.texto
+        -- Escapes podem sintetizar marcadores/nome após decodificação. Até ter
+        -- mapa origem→decodificado, bloquear rename em vez de editar só parte.
+        se bruto:procure("\\",1,verdadeiro) então resultado.interpolaçãoAmbígua=verdadeiro fim
+        se t.gabaritoIncompleto então resultado.interpolaçãoAmbígua=verdadeiro; falhe("gabarito sem fechamento de expressão",t) fim
+        para _,parte em ipares(t.interpolações ou {}) início
+            local trecho=texto:corte(parte["início"]+1,parte["fim"])
+            se não parte.expressão então
+                ref({tipo="nome",texto=trecho,["início"]=parte["início"],["fim"]=parte["fim"]})
+            senãose não trecho:procure("\\",1,verdadeiro) então
+                local peças,erroLéxico=depure.lexemas(trecho,"=(interpolação)",10000)
+                se erroLéxico então resultado.interpolaçãoAmbígua=verdadeiro fim
+                local anterior,índice,fimAnterior=lista,posição,eof
+                lista=peças
+                para _,peça em ipares(lista) início
+                    peça["início"]=peça["início"]+parte["início"]
+                    peça["fim"]=peça["fim"]+parte["início"]
+                fim
+                eof={tipo="fim",texto="",["início"]=parte["fim"],["fim"]=parte["fim"]}
+                posição=1; expressão(); lista,posição,eof=anterior,índice,fimAnterior
+            fim
+        fim
+    fim
+
+    local função listaExpressões()
+        local valores={expressão()}
+        enquanto aceite(",") início acrescente(valores,expressão()) fim
+        retorne valores
+    fim
+    comando = função()
+        local t = veja(); local começo=t["início"]
+        se aceite(";") então retorne fim
+        se aceite("local") então
+            se aceite("função") então
+                local nomeFunção=nome()
+                se nomeFunção então corpoFunção(começo,declare(nomeFunção,"função",atual)) fim
+            senão
+                local nomes={}; local primeiro=nome(); se não primeiro então retorne fim
+                acrescente(nomes,primeiro)
+                enquanto aceite(",") início local nt=nome(); se não nt então pare fim; acrescente(nomes,nt) fim
+                local valores = aceite("=") e listaExpressões() ou {}
+                local limite = (lista[posição-1] ou primeiro)["fim"]
+                para k,nt em ipares(nomes) início atribua(declare(nt,"variável",atual,limite),valores[k]) fim
+            fim
+        senãose aceite("função") então
+            local nt=nome(); se não nt então retorne fim
+            local s=busque(nt.texto,atual); local base
+            se veja().texto == "." ou veja().texto == ":" então
+                base={símbolo=s,nome=nt.texto}; ref(nt)
+                enquanto veja().texto == "." ou veja().texto == ":" início
+                    local método=tire().texto == ":"; local campo=nome(); se não campo então pare fim
+                    se veja().texto == "(" então
+                        local c=declare(campo,"função",nulo,nulo,verdadeiro)
+                        se base.símbolo então
+                            local anterior=base.símbolo.campos[campo.texto]
+                            se anterior então anterior.ambíguo=verdadeiro; c.ambíguo=verdadeiro fim
+                            base.símbolo.campos[campo.texto]=c; c.dono=base.símbolo
+                        fim
+                        corpoFunção(começo,c,método); pare
+                    fim
+                    ref(campo,base); base={nome=campo.texto}
+                fim
+            senão
+                se s então ref(nt).escrita=verdadeiro senão s=declare(nt,"função",nulo) fim
+                corpoFunção(começo,s)
+            fim
+        senãose aceite("início") então
+            abra("bloco",começo); bloco(); feche(exija("fim")["fim"])
+        senãose aceite("se") então
+            expressão(); exija("então"); abra("se",começo); bloco(); feche(veja()["início"])
+            enquanto aceite("senãose") início
+                local inícioRamo=(lista[posição-1])["início"]; expressão(); exija("então")
+                abra("ramo",inícioRamo); bloco(); feche(veja()["início"])
+            fim
+            se aceite("senão") então abra("senão",lista[posição-1]["início"]); bloco(); feche(veja()["início"]) fim
+            exija("fim")
+        senãose aceite("enquanto") então
+            expressão(); exija("início"); abra("enquanto",começo); bloco(); feche(exija("fim")["fim"])
+        senãose aceite("para") então
+            local nomes={}; local nt=nome(); se nt então acrescente(nomes,nt) fim
+            enquanto aceite(",") início nt=nome(); se não nt então pare fim; acrescente(nomes,nt) fim
+            se aceite("=") então listaExpressões() senão exija("em"); listaExpressões() fim
+            exija("início"); abra("para",começo)
+            para _,nomeLaço em ipares(nomes) início declare(nomeLaço,"variável",atual) fim
+            bloco(); feche(exija("fim")["fim"])
+        senãose aceite("repita") então
+            abra("repita",começo); bloco(); exija("até"); expressão(); feche(lista[posição-1]["fim"])
+        senãose aceite("retorne") então
+            se veja().tipo ~= "fim" e não fechadores[veja().texto] e veja().texto ~= ";" então
+                local valores=listaExpressões()
+                se atual == raiz e valores[1] então resultado.retorno=valores[1] fim
+            fim
+            aceite(";")
+        senãose aceite("pare") então retorne
+        senãose aceite("vápara") então nome()
+        senãose aceite("::") então nome(); exija("::")
+        senão
+            local alvos=listaExpressões()
+            se aceite("=") então
+                local valores=listaExpressões()
+                para k,alvo em ipares(alvos) início
+                    se alvo.classe == "nome" então
+                        local s=alvo.símbolo
+                        se não s então s=declare(alvo.referência.token,"global",nulo); alvo.referência.símbolo=s fim
+                        alvo.referência.escrita=verdadeiro; atribua(s,valores[k])
+                    senãose alvo.classe == "campo" e alvo.dono.símbolo então
+                        local s=alvo.dono.símbolo
+                        local c=s.campos[alvo.nome]
+                        se não c então
+                            c=declare(alvo.referência.token,"campo",nulo,nulo,verdadeiro)
+                            c.propriedade=verdadeiro; c.dono=s; s.campos[c.nome]=c
+                        fim
+                        atribua(c,valores[k])
+                    fim
+                fim
+            fim
+        fim
+    fim
+    bloco = função()
+        profundidade=profundidade+1
+        se profundidade>128 então erro("limite de profundidade estrutural excedido") fim
+        enquanto veja().tipo ~= "fim" e não fechadores[veja().texto] início
+            local antes=posição; comando()
+            se posição == antes então falhe("comando não reconhecido"); tire() fim
+        fim
+        profundidade=profundidade-1
+    fim
+    local ok, falha=proteja(função()
+        bloco()
+        enquanto veja().tipo ~= "fim" início falhe("fechamento sem bloco"); tire(); bloco() fim
+    fim)
+    se não ok então resultado.incompleto=paraColar(falha) fim
+    resultado.comErros=falhaLéxica~=nulo ou #resultado.erros>0
+    se resultado.retorno então
+        local s=resultado.retorno.símbolo
+        resultado.exportações = s e s.campos ou resultado.retorno.campos ou {}
+    fim
+    -- Resolver campos depois de conhecer as declarações estáticas do documento.
+    para _,r em ipares(resultado.referências) início
+        se r.dono e r.dono.símbolo então
+            local s=r.dono.símbolo
+            r.símbolo = não s.ambíguo e s.campos[r.token.texto] ou nulo
+            se r.símbolo então acrescente(r.símbolo.referências,r) fim
+        senãose não r.dono e não r.símbolo e resultado.globais[r.token.texto] então
+            r.símbolo=resultado.globais[r.token.texto]
+            acrescente(r.símbolo.referências,r)
+        fim
+    fim
+    retorne resultado
+fim
+
+função A.escopoEm(análise, offset)
+    local melhor=análise.raiz
+    para _,s em ipares(análise.escopos) início
+        se s.começo <= offset e offset < s.final e s.começo >= melhor.começo então melhor=s fim
+    fim
+    retorne melhor
+fim
+
+função A.visíveis(análise, offset)
+    local nomes, escopo={},A.escopoEm(análise,offset)
+    enquanto escopo início
+        para nome, lista em pares(escopo.nomes) início
+            para i=#lista,1,-1 início
+                se lista[i].visível <= offset e não nomes[nome] então nomes[nome]=lista[i] fim
+            fim
+        fim
+        escopo=escopo.pai
+    fim
+    retorne nomes
+fim
+
+função A.referênciaEm(análise, offset)
+    para _,r em ipares(análise.referências) início
+        se r.token["início"] <= offset e offset < r.token["fim"] então retorne r fim
+    fim
+fim
+
+função A.emTexto(análise, offset)
+    local anterior=0
+    para _,t em ipares(análise.tokens) início
+        se t["início"] < offset e offset < t["fim"] e (t.tipo=="colar" ou t.tipo=="gabarito") então
+            se t.tipo=="gabarito" então
+                local r=A.referênciaEm(análise,offset) ou A.referênciaEm(análise,offset-1)
+                se r então retorne falso fim
+            fim
+            retorne verdadeiro
+        fim
+        se t["início"]>=offset então pare fim
+        anterior=t["fim"]
+    fim
+    local lacuna=análise.texto:corte(anterior+1,offset)
+    local cursor=1
+    enquanto cursor<=#lacuna início
+        local começo,final= lacuna:procure("--",cursor,verdadeiro)
+        se não começo então pare fim
+        local iguais=lacuna:corte(final+1):separe("^%[(=*)%[")
+        se iguais então
+            local primeiro,último=lacuna:procure("]"..iguais.."]",final+#iguais+3,verdadeiro)
+            se não primeiro então retorne verdadeiro fim
+            cursor=último+1
+        senão
+            local quebra=lacuna:procure("[\r\n]",final+1)
+            se não quebra então retorne verdadeiro fim
+            cursor=quebra+1
+        fim
+    fim
+    retorne falso
+fim
+
+retorne A

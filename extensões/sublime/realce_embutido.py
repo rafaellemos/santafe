@@ -16,6 +16,18 @@ PRECEDENCIA = {"ou": 1, "e": 2, "<": 3, ">": 3, "<=": 3, ">=": 3, "~=": 3, "==":
 ESCAPES = dict(a="\a", b="\b", f="\f", n="\n", r="\r", t="\t", v="\v")
 
 
+def fim_identificador(fonte, inicio):
+    """[L_][LMN_]*, em pontos de código; preserva a forma NFC/NFD do nome."""
+    if inicio >= len(fonte) or not (fonte[inicio] == "_" or
+                                    unicodedata.category(fonte[inicio]).startswith("L")):
+        return inicio
+    fim = inicio + 1
+    while fim < len(fonte) and (fonte[fim] == "_" or
+                               unicodedata.category(fonte[fim])[0] in "LMN"):
+        fim += 1
+    return fim
+
+
 def recorte(fonte):
     literais, fluxos = [], []
     i, total = 0, len(fonte)
@@ -53,7 +65,7 @@ def recorte(fonte):
                 else:
                     i = min(total, i + 1)
             elif marca == "`" and fonte[i] in "®Ⓡ":
-                variavel = re.match(r"[®Ⓡ][A-Za-z_][A-Za-z_0-9]*", fonte[i:])
+                fim_variavel = fim_identificador(fonte, i + 1)
                 if fonte[i+1:i+2] == "{" and profundidade < 64:
                     if i > trecho:
                         partes.append(dict(inicio=trecho, fim=i))
@@ -62,11 +74,11 @@ def recorte(fonte):
                     codigo(True, profundidade + 1)
                     partes.append(dict(inicio=buraco, fim=i, buraco=True))
                     trecho = i
-                elif variavel:
+                elif fim_variavel > i + 1:
                     if i > trecho:
                         partes.append(dict(inicio=trecho, fim=i))
                     buraco = i
-                    i += len(variavel[0])
+                    i = fim_variavel
                     partes.append(dict(inicio=buraco, fim=i, buraco=True))
                     trecho = i
                 else:
@@ -104,10 +116,9 @@ def recorte(fonte):
                 anotacao = None
                 continue
             anotacao, inicio = None, i
-            if fonte[i].isalpha() or fonte[i] == "_":
-                i += 1
-                while i < total and (fonte[i].isalnum() or fonte[i] == "_" or unicodedata.category(fonte[i]).startswith("M")):
-                    i += 1
+            fim_nome = fim_identificador(fonte, i)
+            if fim_nome > i:
+                i = fim_nome
                 tipo = "nome"
             else:
                 numero = NUMERO.match(fonte, i)

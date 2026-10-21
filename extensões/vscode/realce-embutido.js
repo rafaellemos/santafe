@@ -3,6 +3,7 @@
 // Recorte léxico antes do TextMate: a linguagem embutida nunca consome os
 // delimitadores Santafé. Não há eval, execução de código ou leitura de imports.
 const ID = /[\p{L}_][\p{L}\p{M}\p{N}_]*/uy;
+const INTERPOLAÇÃO = /[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*/uy;
 const NUM = /(?:0[xX][\da-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/y;
 const LONGO = /\[(=*)\[/y;
 const PRECEDÊNCIA = {ou: 1, e: 2, "<": 3, ">": 3, "<=": 3, ">=": 3, "~=": 3, "==": 3,
@@ -44,7 +45,8 @@ function recorte(fonte) {
         else if (fonte[i] === "\r" && fonte[i + 1] === "\n") i += 2;
         else i = Math.min(fonte.length, i + 1);
       } else if (marca === "`" && /[®Ⓡ]/u.test(fonte[i])) {
-        const variável = /^[®Ⓡ][A-Za-z_][A-Za-z_0-9]*/.exec(fonte.slice(i));
+        INTERPOLAÇÃO.lastIndex = i;
+        const variável = INTERPOLAÇÃO.exec(fonte);
         if (fonte[i + 1] === "{" && profundidade < 128) {
           texto(i); const inícioBuraco = i; i += 2;
           código(true, profundidade + 1);
