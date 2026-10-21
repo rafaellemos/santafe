@@ -28,13 +28,13 @@ testes, fontes do núcleo nem artefatos de trabalho.
 Para sincronizar uma versão:
 
 1. Execute `python3 extensões/sublime/testes/testar_pacote.py` na raiz.
-2. Compare os arquivos exportados com o pacote publicado no portal. Na 1.1.0,
-   o código permanece idêntico; o README recebe os esclarecimentos finais de
-   disponibilidade e requisitos. LICENSE, CHANGELOG e atalhos de preferências
+2. Compare os arquivos exportados com a etiqueta anterior. Na 1.1.1,
+   o código permanece idêntico à 1.1.0; o README corrige a descrição do SLS.
+   LICENSE, CHANGELOG e atalhos de preferências
    são os arquivos adicionais da distribuição GitHub. Não reenvie esses bytes
    como substituição do pacote imutável do portal.
 3. Sincronize a exportação com o repositório independente, preservando `.git`.
-4. Confira o diff, registre um commit e crie a etiqueta `v1.1.0`, somente se
+4. Confira o diff, registre um commit e crie a etiqueta `v1.1.1`, somente se
    ela ainda não existir. Nunca mova uma etiqueta de versão publicada.
 5. Atualize a entrada existente em `repository/s.json` no ramo da submissão
    com `dist/package-control-entrada.json`. Não abra uma submissão duplicada.
@@ -65,5 +65,25 @@ de formatação do catálogo passaram.
 Errata documental identificada após registrar a etiqueta: a seção final de
 diagnósticos ainda descrevia o SLS 0.1.1/0.2 em vez do SLS 1.0.0. O README no
 fonte e no ramo `main` independente foi corrigido separadamente; a etiqueta e
-os pacotes 1.1.0 foram preservados. Inclua a correção na próxima revisão, sem
-mover `v1.1.0` nem substituir o pacote histórico do portal.
+os pacotes 1.1.0 foram preservados. A correção foi incorporada à revisão
+1.1.1, sem mover `v1.1.0` nem substituir o pacote histórico do portal.
+
+## Registro do envio 1.1.1 — 21/10/2026
+
+A etiqueta `v1.1.1` do repositório independente aponta para
+`100a0500f86bd2211b938889272570bf8c75042a`. Somente README e CHANGELOG
+diferem da etiqueta 1.1.0; o código, as configurações e o realce são idênticos.
+Os testes locais de comportamento, recorte Unicode/HTML/JS, empacotamento,
+exportação e conteúdo dos READMEs passaram.
+
+A submissão #9622 agora informa `v1.1.1`. Sua entrada já usa `tags: true`,
+portanto não necessita alterar o JSON nem abrir uma nova submissão para cada
+revisão. A formatação do catálogo foi conferida localmente. Os workflows da
+submissão continuam em `action_required`, aguardando autorização de um
+mantenedor; o pedido segue aberto, não integrado ao catálogo oficial.
+
+SHA-256 do pacote versionado local gerado para a distribuição HTTPS:
+`faefbb1bdba0966155fe31097f68ec84aa865df3266313226109505e16baa54c`.
+O portal não foi alterado nesta publicação dos catálogos externos: seus
+downloads 1.1.0 continuam preservados. A distribuição GitHub inclui licença,
+histórico e atalhos de preferências, conforme a exportação descrita acima.

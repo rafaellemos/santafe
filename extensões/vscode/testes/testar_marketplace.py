@@ -29,6 +29,10 @@ def confira_vsix(caminho):
             assert pacote.read("extension/" + relativo) == (RAIZ / relativo).read_bytes(), relativo
         assert pacote.read("extension/LICENSE.txt") == (RAIZ.parents[1] / "LICENSE").read_bytes()
         manifesto = json.loads(pacote.read("extension/package.json"))
+        leia_me = pacote.read("extension/readme.md").decode("utf-8")
+        assert f"Extensão Santafé {manifesto['version']}" in leia_me
+        assert "O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0" in leia_me
+        assert "análise semântica futura do SLS" not in leia_me
         for chave, valor in original.items():
             assert manifesto[chave] == valor, chave
         ns = {"v": "http://schemas.microsoft.com/developer/vsx-schema/2011"}

@@ -1,5 +1,12 @@
 # Registro de mudanças — Santafé para Sublime Text
 
+## 1.1.1 — 21 de outubro de 2026
+
+- Corrige a seção final do README para descrever o SLS 1.0.0 publicado com
+  o núcleo 2.1.0, removendo a descrição obsoleta do perfil 0.1.1/0.2.
+- Revisão documental: código, realce, configurações e integração LSP
+  permanecem idênticos à versão 1.1.0. A etiqueta anterior é preservada.
+
 ## 1.1.0 — 21 de outubro de 2026
 
 - Integração semântica com SLS 1.0.0: navegação, referências, renomeação,

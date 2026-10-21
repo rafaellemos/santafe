@@ -18,7 +18,12 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 def principal() -> None:
     metadados = json.loads((RAIZ / "package-metadata.json").read_text(encoding="utf-8"))
     assert metadados["name"] == "Santafe"
-    assert metadados["version"] == "1.1.0"
+    assert metadados["version"] == "1.1.1"
+    leia_me = (RAIZ / "README.md").read_text(encoding="utf-8")
+    assert f"Pacote {metadados['version']} para Sublime Text 4" in leia_me
+    assert "O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0" in leia_me
+    assert "O SLS 0.1.1 publicado" not in leia_me
+    assert "perfil 0.2.0-dev.1" not in leia_me
     assert (RAIZ / ".python-version").read_text(encoding="ascii").strip() == "3.8"
     sintaxe = (RAIZ / "Santafe.sublime-syntax").read_text(encoding="utf-8")
     assert "scope: source.santafe" in sintaxe
@@ -40,6 +45,7 @@ def principal() -> None:
     pacote = RAIZ / "dist" / "Santafe.sublime-package"
     with zipfile.ZipFile(pacote) as arquivo:
         assert arquivo.testzip() is None
+        assert arquivo.read("README.md").decode("utf-8") == leia_me
         assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         nomes = set(arquivo.namelist())
     esperados = {
@@ -59,6 +65,7 @@ def principal() -> None:
     controle = RAIZ / "dist" / f"Santafe-{metadados['version']}.sublime-package"
     with zipfile.ZipFile(controle) as arquivo:
         assert arquivo.testzip() is None
+        assert arquivo.read("README.md").decode("utf-8") == leia_me
         assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         nomes = set(arquivo.namelist())
     assert "package-metadata.json" not in nomes

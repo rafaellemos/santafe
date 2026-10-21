@@ -1,6 +1,6 @@
 # Santafé para Visual Studio Code
 
-Extensão Santafé 1.1.0, disponível no portal oficial, para arquivos (`.fé` e `.fe`). Ela oferece:
+Extensão Santafé 1.1.1 para arquivos (`.fé` e `.fe`). Ela oferece:
 
 - reconhecimento de arquivos, comentários, pares e indentação;
 - realce de sintaxe, trechos e ícone próprio;
@@ -20,6 +20,12 @@ Salve o arquivo com a extensão `.fé` ou `.fe` — ou escolha **Santafé** no
 seletor de linguagem do canto inferior direito — para ativar esses recursos.
 
 ## Instalação
+
+### Revisão documental — 1.1.1
+
+Corrige a descrição final do SLS para refletir os recursos publicados na
+versão 1.0.0 com o núcleo 2.1.0. Não altera código, realce, configurações,
+ícone nem integração com o servidor em relação à extensão 1.1.0.
 
 ### Marca oficial — 1.0.7
 
@@ -71,7 +77,7 @@ Gere o pacote sem depender de Node.js:
 
 ```sh
 python3 empacotar.py
-code --install-extension dist/santafe-1.1.0.vsix
+code --install-extension dist/santafe-1.1.1.vsix
 ```
 
 Também é possível escolher **Instalar do VSIX...** na visualização Extensions do

@@ -19,6 +19,10 @@ PACOTE = RAIZ / "package.json"
 
 def principal() -> None:
     manifesto = json.loads(PACOTE.read_text(encoding="utf-8"))
+    leia_me = (RAIZ / "README.md").read_text(encoding="utf-8")
+    assert f"Extensão Santafé {manifesto['version']}" in leia_me
+    assert "O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0" in leia_me
+    assert "análise semântica futura do SLS" not in leia_me
     assert manifesto["main"] == "./extension.js"
     assert manifesto["icon"] == "./icon.png"
     assert manifesto["engines"]["vscode"].startswith("^")
@@ -51,6 +55,7 @@ def principal() -> None:
         assert arquivo.testzip() is None
         assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         assert all(info.date_time == (2026, 10, 18, 0, 0, 0) for info in arquivo.infolist())
+        assert arquivo.read("extension/README.md").decode("utf-8") == leia_me
     primeira = vsix.read_bytes()
     subprocess.run([sys.executable, str(RAIZ / "empacotar.py")], check=True)
     assert vsix.read_bytes() == primeira, "VSIX precisa ser reproduzível byte a byte"

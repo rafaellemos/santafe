@@ -1,13 +1,17 @@
 # Santafé para Sublime Text
 
-Pacote 1.1.0 para Sublime Text 4, disponível no portal oficial.
+Pacote 1.1.1 para Sublime Text 4.
 O catálogo oficial do Package Control exige build 4171 ou superior.
 
 Integra o SLS 1.0.0 pelo cliente LSP do Sublime: recursos semânticos são
 negociados por sessão e substituem os provedores locais equivalentes sem
 duplicação. O iniciador do SLS usa `-E -P`, sem executar fontes/dependências
 do projeto. Atualize núcleo 2.1.0 e SLS juntos. As notas 1.0.13 abaixo são
-históricas; esta revisão foi homologada no Sublime Text 4215 em macOS Intel.
+históricas; a base funcional 1.1.0 foi homologada no Sublime Text 4215 em macOS Intel.
+
+A revisão 1.1.1 corrige a descrição final do SLS para refletir os recursos
+publicados na versão 1.0.0. Não altera código, realce, configurações nem
+integração com o servidor em relação ao pacote 1.1.0.
 
 Ele reconhece `.fé` e `.fe`, aplica realce de sintaxe, oferece snippets,
 conclusões da linguagem e da API pública, exibe ajuda curta ao repousar o mouse

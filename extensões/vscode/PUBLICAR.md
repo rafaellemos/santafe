@@ -1,7 +1,8 @@
 # Publicação no Visual Studio Marketplace
 
 Identidade da extensão: `santafe.santafe`. A versão do editor é independente da
-versão do núcleo. A versão **1.1.0** integra SLS 1.0.0 e gabaritos Unicode,
+versão do núcleo. A versão **1.1.1** corrige o README da 1.1.0, que integra
+SLS 1.0.0 e gabaritos Unicode,
 preservando o cordeiro oficial introduzido em 1.0.7. A marca e sua origem estão
 registradas em [MARCA.md](MARCA.md).
 
@@ -25,10 +26,10 @@ python3 extensões/vscode/preparar_marketplace.py "$area_marketplace/extensao"
 (
     cd "$area_marketplace/extensao"
     vsce package --no-dependencies --githubBranch desenvolvimento \
-        --out "$area_marketplace/santafe-marketplace-1.1.0.vsix"
+        --out "$area_marketplace/santafe-marketplace-1.1.1.vsix"
 )
 python3 extensões/vscode/testes/testar_marketplace.py \
-    --vsix "$area_marketplace/santafe-marketplace-1.1.0.vsix"
+    --vsix "$area_marketplace/santafe-marketplace-1.1.1.vsix"
 ```
 
 `--no-dependencies` é intencional: os runtimes TextMate/Oniguruma e suas licenças
@@ -75,5 +76,22 @@ A instalação diretamente da galeria, em outro perfil temporário, também pass
 
 Errata documental identificada após o envio: o último parágrafo de SLS ainda
 descrevia limitações de uma versão anterior, em contradição com a introdução.
-O README no fonte já foi corrigido. O VSIX enviado não foi substituído; leve
-esta correção à próxima revisão da extensão, sem reutilizar a versão 1.1.0.
+O README no fonte foi corrigido. O VSIX 1.1.0 não foi substituído; a correção
+foi incorporada à revisão 1.1.1 descrita abaixo.
+
+## Registro do envio 1.1.1 — 21/10/2026
+
+Revisão documental, sem alteração de runtime, ícone ou configurações. O VSIX
+oficial contém o README corrigido; os testes conferem explicitamente essa
+descrição dentro do arquivo enviado. A comparação com a 1.1.0 permite somente
+README, versão no manifesto e manifesto VSIX diferentes.
+
+SHA-256 enviado:
+`352943c6b00d15cd201639db70da1763fd62a8598761a5d9ae3e79b07d709b06`.
+Testes de estrutura, metadados, conclusões, integração do cliente SLS,
+gabaritos e concatenações passaram. A instalação do VSIX em perfil temporário
+isolado retornou `santafe.santafe@1.1.1`, sem alterar as extensões pessoais.
+O upload foi aceito e entrou em `Verifying`; aguarde a confirmação pública
+antes de anunciar que essa revisão já pode ser instalada pela galeria.
+
+Os downloads 1.1.0 do portal e as etiquetas do núcleo permanecem inalterados.
