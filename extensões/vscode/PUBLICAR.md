@@ -91,8 +91,12 @@ SHA-256 enviado:
 Testes de estrutura, metadados, conclusões, integração do cliente SLS,
 gabaritos e concatenações passaram. A instalação do VSIX em perfil temporário
 isolado retornou `santafe.santafe@1.1.1`, sem alterar as extensões pessoais.
-O upload foi aceito e entrou em `Verifying`; aguarde a confirmação pública
-antes de anunciar que essa revisão já pode ser instalada pela galeria.
+Após a verificação da Microsoft, a gerência passou a mostrar 1.1.1 pública
+e o histórico da página pública confirmou a versão. O README público contém
+a descrição atual do SLS 1.0.0. A instalação diretamente da galeria, em outro
+perfil temporário isolado, também passou:
+`code --install-extension santafe.santafe@1.1.1`. A listagem confirmou
+`santafe.santafe@1.1.1`, e o README instalado contém a correção documental.
 
 Os downloads 1.1.0 do portal e as etiquetas do núcleo permanecem inalterados.
 
@@ -109,3 +113,10 @@ pendentes. O pré-voo verifica coerência, mas a validação final do conjunto
 continua recusando o fonte até haver identidade e homologação próprias para
 outra entrega conjunta. A publicação independente dos editores não exige
 reinstalar o núcleo nem alterar o servidor.
+
+No commit `65db9180d90b077792772f3c353635cef0822e33`, as quatro tarefas
+automáticas passaram em Ubuntu 24.04 e macOS 14:
+[núcleo, manual e editores](https://github.com/rafaellemos/santafe/actions/runs/39598962372)
+e [SLS e bibliotecas](https://github.com/rafaellemos/santafe/actions/runs/39598962271).
+Isso não equivale à aprovação da submissão do Sublime no Package Control,
+que continua dependendo dos mantenedores daquele catálogo.
