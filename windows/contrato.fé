@@ -1,0 +1,26 @@
+-- Somente dados artificiais; nenhum envio, servidor ou instalação.
+local variável = "José"
+local variável = "Ana"
+garanta(`®variável / Ⓡvariável / Ⓡ{1+1}` == "José / Ana / 2")
+garanta(tamanho("á🟢") == 2)
+local t = {presente=nulo, [1]="número", ["1"]="texto"}
+garanta(tabela.temChave(t,"presente") e não tabela.temChave(t,"ausente"))
+garanta(não t.presente e t[1]~=t["1"])
+local l = [[1,nulo],[],[3]]
+garanta(#l==3 e #l[1]==2 e tabela.temChave(l[1],2))
+local ok=proteja(função() l[9]=1 fim)
+garanta(não ok e #l==3)
+ok=proteja(definaMetatabela,l,{})
+garanta(não ok)
+garanta(json.cod(json.decod('[null,[],{},false]'))=='[null,[],{},false]')
+garanta(json.decod(json.cod(9223372036854775807))==9223372036854775807)
+ok=proteja(json.cod,t); garanta(não ok)
+local bruto=[==[®variável \n ]=] permanece literal
+segunda linha]==]
+garanta(bruto:procure("\\n",1,verdadeiro))
+para i=1,3000 início
+    t[i]=nulo
+    se i%71==0 então coleteLixo("colete") fim
+fim
+garanta(tabela.temChave(t,3000))
+mostre("CONTRATO_WINDOWS_OK")
