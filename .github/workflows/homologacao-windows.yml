@@ -51,6 +51,10 @@ jobs:
         run: |
           & '${{ steps.msi_python.outputs.python-path }}' dados17/testar-instalador.py resultados/instalador resultados/ferramentas resultados/candidato resultados/ferramentas/instalador-guarda.dll dados17/baseline-dados16.zip
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Instalar e remover com usuario padrao real
+        shell: pwsh
+        run: |
+          ./dados17/usuario-padrao.ps1 -Python '${{ steps.msi_python.outputs.python-path }}' -OutputDir resultados/instalador
       - name: Guardar evidências mesmo em caso de falha
         if: always()
         uses: actions/upload-artifact@v4

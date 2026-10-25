@@ -28,7 +28,17 @@ def build(archive,version,out,guard,fault=False):
   product=guid('product-'+version+('-fault' if fault else ''))
   db=m.init_database(str(out),schema,'Santafe dados - candidato Windows',product,version,'Projeto Santafe')
   # Windows Installer database strings are Windows-1252; payload remains UTF-8.
-  cp=tmp/'codepage.idt';cp.write_bytes(b'\r\n\r\n1252\t_ForceCodepage\r\n');db.Import(str(tmp),cp.name)
+  cp=tmp/'codepage.idt';cp.write_bytes(b'\r\n\r\n1252\t_ForceCodepage\r\n')
+  db.Commit();db=None
+  api=ctypes.WinDLL('msi');handle=ctypes.c_uint()
+  api.MsiOpenDatabaseW.argtypes=[ctypes.c_wchar_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint)]
+  api.MsiDatabaseImportW.argtypes=[ctypes.c_uint,ctypes.c_wchar_p,ctypes.c_wchar_p]
+  assert api.MsiOpenDatabaseW(str(out),ctypes.c_void_p(1),ctypes.byref(handle))==0
+  try:
+   assert api.MsiDatabaseImportW(handle,str(tmp),cp.name)==0
+   assert api.MsiDatabaseCommit(handle)==0
+  finally:api.MsiCloseHandle(handle)
+  db=m.OpenDatabase(str(out),m.MSIDBOPEN_TRANSACT)
   si=db.GetSummaryInformation(20);si.SetProperty(m.PID_CODEPAGE,1252);si.SetProperty(m.PID_WORDCOUNT,10);si.SetProperty(m.PID_PAGECOUNT,500);si.SetProperty(m.PID_TEMPLATE,'x64;1033');si.Persist()
   add=lambda table,rows:m.add_data(db,table,rows)
   add('Property',[(k,v) for k,v in {

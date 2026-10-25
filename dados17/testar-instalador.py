@@ -65,10 +65,18 @@ try:
  assert (junction/'documento.txt').read_text()=='arquivo do usuario'
  install('recusa-juncao',['/i',newmsi,'INSTALLDIR='+str(junction)],1603,'DADOS17_TARGET_REPARSE_OR_FILE')
  os.rmdir(junction);ok('controle-positivo-juncao')
+ install('falha-primeira-instalacao',['/i',badmsi,'INSTALLDIR='+str(target)],1603,'DADOS17_FALHA_APOS_COPIA_CONFIRMADA')
+ assert state(bad['product_code'])==-1 and not (target/'bin/santafe.exe').exists();ok('reversao-primeira-instalacao-sem-registro')
  install('instalar-baseline16',['/i',oldmsi,'INSTALLDIR='+str(target)])
  assert state(old['product_code'])==5;checkfiles(old,target,'baseline16-integridade')
  entry=str(target/'bin');assert entry.lower() in regpath()[0].lower() and prefix in regpath()[0];ok('path-do-usuario-preservado')
  extra=target/'documento-pessoal.txt';extra.write_text('nao excluir',encoding='utf-8')
+ hard=workspace/'hardlink.txt';os.link(target/'LEIA-ME.txt',hard)
+ install('recusa-hardlink-em-atualizacao',['/i',newmsi],1603,'DADOS17_TARGET_UNSAFE_ENTRY');hard.unlink()
+ binpath=target/'bin';savedbin=target/'bin-original';binpath.rename(savedbin)
+ subprocess.run([os.environ['COMSPEC'],'/d','/c','mklink','/J',str(binpath),str(foreign)],check=True,capture_output=True)
+ install('recusa-juncao-interna-em-atualizacao',['/i',newmsi],1603,'DADOS17_TARGET_UNSAFE_ENTRY');os.rmdir(binpath);savedbin.rename(binpath)
+ checkfiles(old,target,'recusas-preservaram-baseline16')
  install('falha-real-depois-da-copia',['/i',badmsi],1603,'DADOS17_FALHA_APOS_COPIA_CONFIRMADA')
  assert state(old['product_code'])==5 and state(bad['product_code'])==-1
  checkfiles(old,target,'reversao-restaurou-baseline16');assert extra.read_text()=='nao excluir';ok('reversao-preservou-extras')
@@ -83,13 +91,14 @@ try:
  p=subprocess.run([str(target/'bin/santafe.exe'),'instale','exemplo','1.0.0','--repositorio-local',str(TOOLS/'casos/repo')],cwd=workspace,capture_output=True,env=env,timeout=60)
  assert p.returncode==0,p.stderr;ok('gerenciador-instalado-projeto-separado')
  p=subprocess.run([str(target/'bin/santafe.exe'),'-e','garanta((importe "exemplo").valor==42)'],cwd=workspace,capture_output=True,env=env,timeout=60);assert p.returncode==0,p.stderr;ok('biblioteca-importada-apos-instalar')
+ project_hashes={p.relative_to(workspace).as_posix():digest(p) for p in workspace.rglob('*') if p.is_file()}
  (target/'share/santafé/1.0/ferramentas/sls/nativo.dll').unlink();(target/'LEIA-ME.txt').write_text('dano sintetico',encoding='utf-8')
  install('reparar-arquivos-ausentes-e-corrompidos',['/fa',newmsi]);checkfiles(new,target,'reparacao-integridade')
  setpath((regpath()[0]+';'+suffix,winreg.REG_EXPAND_SZ))
  install('desinstalar17',['/x',new['product_code']])
  assert state(new['product_code'])==-1 and not (target/'bin/santafe.exe').exists()
  assert extra.read_text()=='nao excluir' and (workspace/'meu-arquivo.fé').read_bytes()==userbytes
- assert (workspace/'.santafe').exists() or (workspace/'santafe.json').exists() or any(workspace.iterdir())
+ assert {p.relative_to(workspace).as_posix():digest(p) for p in workspace.rglob('*') if p.is_file()}==project_hashes
  current=regpath()[0];assert entry.lower() not in current.lower() and prefix in current and suffix in current;ok('desinstalacao-preservou-projetos-extras-e-path')
  # Deliberate rollback after successful update: explicit uninstall then baseline reinstall.
  extra.unlink();shutil.rmtree(target) # Only this harness-owned empty residual tree.
