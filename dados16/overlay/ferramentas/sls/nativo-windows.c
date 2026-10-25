@@ -6,9 +6,6 @@
 #ifdef SANTAFE_DADOS_EXPERIMENTAL
 SANTAFE_MODULE_ABI;
 #endif
-#define SEARCH_MT "SLS.Win32.busca"
-typedef struct { HANDLE h; } Search;
-static int close_search(lua_State *L){Search *s=lua_touserdata(L,1);if(s->h!=INVALID_HANDLE_VALUE)FindClose(s->h);s->h=INVALID_HANDLE_VALUE;return 0;}
 static int root(lua_State *L) {
     size_t n;const char *p=luaL_checklstring(L,1,&n);WF *w=wf_new(L);
     if(!wf_root(w,p,n)){wf_close(w);return wf_fail(L,"raiz inacessivel ou insegura");}return 1;
@@ -20,16 +17,11 @@ static int read_source(lua_State *L) {
 }
 typedef struct{int files,entries,dirs;const char *problem;} Scan;
 static void scan(lua_State *L,WF *root,const char *prefix,int output,Scan *s,int depth) {
-    WIN32_FIND_DATAW item;wchar_t pattern[WF_MAX];Search *search;int top=lua_gettop(L);
+    WIN32_FIND_DATAW item;WF_ENUM *search;int more=0,top=lua_gettop(L);
     if(depth>32||++s->dirs>1024){s->problem="limite de diretorios";return;}
     luaL_checkstack(L,12,"profundidade de indexacao");
-    if(wcslen(root->path)+3>=WF_MAX){s->problem="caminho excessivo";return;}
-    wcscpy(pattern,root->path);wcscat(pattern,L"\\*");
-    search=lua_newuserdata(L,sizeof(*search));search->h=INVALID_HANDLE_VALUE;
-    luaL_getmetatable(L,SEARCH_MT);lua_setmetatable(L,-2);
-    search->h=FindFirstFileW(pattern,&item);
-    if(search->h==INVALID_HANDLE_VALUE){s->problem="diretorio ilegivel";lua_settop(L,top);return;}
-    do {
+    search=lua_newuserdata(L,sizeof(*search));memset(search,0,sizeof(*search));
+    while((more=wf_next(root->h[root->n-1],search,&item))>0) {
         char name[1024],path[4096];size_t len;WF *child;
         if(++s->entries>20000){s->problem="limite de entradas";break;}
         if(item.cFileName[0]==L'.'||(item.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT))continue;
@@ -40,7 +32,7 @@ static void scan(lua_State *L,WF *root,const char *prefix,int output,Scan *s,int
             if(!strcmp(name,"node_modules")||!strcmp(name,"dist")||!strcmp(name,"build")||!strcmp(name,"construcao"))continue;
             child=wf_new(L);
             if(!wf_copy(child,root)||!wf_append(child,item.cFileName,wcslen(item.cFileName))||
-               !wf_add(child,wf_open(child->path,FILE_LIST_DIRECTORY,FILE_SHARE_READ,OPEN_EXISTING,1,0))) {
+               !wf_add(child,wf_at(root->h[root->n-1],item.cFileName,FILE_LIST_DIRECTORY|FILE_TRAVERSE,FILE_SHARE_READ,OPEN_EXISTING,1,0))) {
                 wf_close(child);lua_pop(L,1);s->problem="diretorio alterado ou inseguro";break;
             }
             strcat(path,"/");scan(L,child,path,output,s,depth+1);wf_close(child);lua_pop(L,1);
@@ -49,9 +41,9 @@ static void scan(lua_State *L,WF *root,const char *prefix,int output,Scan *s,int
             lua_pushstring(L,path);lua_rawseti(L,output,++s->files);
         }
         if(s->problem)break;
-    }while(FindNextFileW(search->h,&item));
-    if(!s->problem && GetLastError()!=ERROR_NO_MORE_FILES)s->problem="leitura de diretorio falhou";
-    FindClose(search->h);search->h=INVALID_HANDLE_VALUE;lua_settop(L,top);
+    }
+    if(!s->problem && more<0)s->problem="leitura de diretorio falhou";
+    lua_settop(L,top);
 }
 static int sources(lua_State *L){WF *w=luaL_checkudata(L,1,WF_MT);Scan s={0,0,0,NULL};lua_newtable(L);scan(L,w,"",lua_gettop(L),&s,0);if(s.problem)lua_pushstring(L,s.problem);else lua_pushnil(L);return 2;}
 static int ready(lua_State *L) {
@@ -76,7 +68,7 @@ static int hash_source(lua_State *L){size_t n,i;const char *p=luaL_checklstring(
  for(i=0;i<32;i++)sprintf(hex+2*i,"%02x",digest[i]);lua_pushlstring(L,hex,64);return 1;}
 __declspec(dllexport) int luaopen_sls_nativo(lua_State *L){
  const luaL_Reg api[]={{"abraRaiz",root},{"leiaFonte",read_source},{"listeFontes",sources},{"entradaPronta",ready},{"leiaEntrada",input},{"executeProtegido",protected_request},{"sha256",hash_source},{NULL,NULL}};
- wf_register(L);if(luaL_newmetatable(L,SEARCH_MT)){lua_pushcfunction(L,close_search);lua_setfield(L,-2,LUA_MM_FINALIZE);}lua_pop(L,1);
+ wf_register(L);
  /* LSP Content-Length counts octets. CRT must not rewrite LF to CRLF. */
  _setmode(_fileno(stdin),_O_BINARY);_setmode(_fileno(stdout),_O_BINARY);
  luaL_newlib(L,api);return 1;

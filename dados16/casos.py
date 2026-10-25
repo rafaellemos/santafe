@@ -86,3 +86,46 @@ def test(root,out,run,sf,exe,init,lit):
  execute('arvore-prazo',['treehold'],limit=1,assertion='c==124')
  time.sleep(2.5);assert not (a/'descendente-vazou').exists()
  sf('descendentes-conferidos','mostre("árvore encerrada e marcador externo ausente")')
+ # HTTPS loopback: no trust-store change; explicit CA scoped to this operation.
+ from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
+ import shutil
+ tls=work/'tls';tls.mkdir();conf=tls/'openssl.cnf';cert=tls/'cert.pem';key=tls/'key.pem'
+ conf.write_text('[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=localhost\n[ext]\nsubjectAltName=DNS:localhost,IP:127.0.0.1\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,digitalSignature,keyEncipherment\n',encoding='ascii')
+ run('certificado-teste-local',[shutil.which('openssl'),'req','-x509','-newkey','rsa:2048','-nodes','-days','1','-keyout',key,'-out',cert,'-config',conf])
+ class Handler(SimpleHTTPRequestHandler):
+  def __init__(self,*args,**kw):super().__init__(*args,directory=str(work),**kw)
+  def log_message(self,*args):pass
+  def do_GET(self):
+   if self.path.startswith('/downgrade/'):
+    self.send_response(302);self.send_header('Location','http://127.0.0.1:1/forbidden');self.end_headers()
+   else:super().do_GET()
+ server=ThreadingHTTPServer(('127.0.0.1',0),Handler);context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(cert,key)
+ server.socket=context.wrap_socket(server.socket,server_side=True);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+ try:
+  https=work/'https';https.mkdir();url=f'https://127.0.0.1:{server.server_port}/repo'
+  sf('tls-sem-ca-recusa',setup+f'garanta(C.instale({lit(https)},"exemplo","1.0.0",{{repositório={lit(url)}}}))',expected=None)
+  assert not (https/'.santafe/estado.json').exists()
+  sf('tls-ca-explicita',setup+f'garanta(C.instale({lit(https)},"exemplo","1.0.0",{{repositório={lit(url)},autoridadeCertificadora={lit(cert)}}}))')
+  cli('tls-pacote-real',https,'-e','garanta((importe "exemplo").valor==42)')
+  downgrade=work/'downgrade';downgrade.mkdir();url=f'https://127.0.0.1:{server.server_port}/downgrade'
+  sf('tls-recusa-downgrade',setup+f'garanta(C.instale({lit(downgrade)},"exemplo","1.0.0",{{repositório={lit(url)},autoridadeCertificadora={lit(cert)}}}))',expected=None)
+  assert not (downgrade/'.santafe/estado.json').exists()
+ finally:server.shutdown();server.server_close();thread.join(3)
+ # Independent process lock and refusal to rename an ancestor while held.
+ held=work/'pinned';held.mkdir();marker=held/'ready'
+ code=init+f'local r=garanta(N.raiz({lit(held)}));garanta(r:trave());garanta(r:grave("ready","ok",falso));local c,s=r:execute({{{lit(probe)},"sleep"}},2,4096);garanta(c==124,s)'
+ process=subprocess.Popen([str(exe),'-E','-P','-'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ process.stdin.write(code.encode('utf-8'));process.stdin.close()
+ try:
+  deadline=time.monotonic()+8
+  while not marker.exists() and process.poll() is None and time.monotonic()<deadline:time.sleep(.02)
+  assert marker.exists(),'holder did not acquire lock'
+  sf('trava-entre-processos',init+f'local r=garanta(N.raiz({lit(held)}));garanta(r:trave())',expected=None)
+  try:held.rename(work/'moved')
+  except PermissionError:pass
+  else:raise AssertionError('raiz fixada foi renomeada')
+ finally:
+  process.wait(timeout=8);assert process.returncode==0,process.stderr.read().decode('utf-8',errors='replace')
+ sf('trava-liberada',init+f'local r=garanta(N.raiz({lit(held)}));garanta(r:trave());r:feche()')
+ # Repeated opening/closing must not retain handles indefinitely.
+ sf('descritores-repetidos',init+f'para i=1,3000 início local r=garanta(N.raiz({lit(a)}));garanta(r:leia("santafe.lock"));r:feche() fim;coleteLixo("colete")')

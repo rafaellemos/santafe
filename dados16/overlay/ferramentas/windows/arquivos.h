@@ -7,6 +7,7 @@
 #define _WIN32_WINNT 0x0A00
 #endif
 #include <windows.h>
+#include <winternl.h>
 #include <sddl.h>
 #include <aclapi.h>
 #include <wchar.h>
@@ -73,8 +74,8 @@ static int wf_info(HANDLE h,int directory,int single) {
     BY_HANDLE_FILE_INFORMATION st;
     if(GetFileType(h)!=FILE_TYPE_DISK || !GetFileInformationByHandle(h,&st))return 0;
     if((st.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)||
-        (!!(st.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)!=directory)||
-        (single && st.nNumberOfLinks!=1)) {SetLastError(ERROR_ACCESS_DENIED);return 0;}
+        ((directory>=0 && !!(st.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)!=directory))||
+        (single && !(st.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) && st.nNumberOfLinks!=1)) {SetLastError(ERROR_ACCESS_DENIED);return 0;}
     return 1;
 }
 /* Private new objects: protected DACL grants only the current token user. */
@@ -92,11 +93,6 @@ static PSECURITY_DESCRIPTOR wf_security(void) {
     }
     if(sid)LocalFree(sid);free(user);CloseHandle(token);return sd;
 }
-static int wf_mkdir(const wchar_t *path) {
-    PSECURITY_DESCRIPTOR sd=wf_security();SECURITY_ATTRIBUTES sa={sizeof(sa),sd,FALSE};BOOL ok;DWORD e;
-    if(!sd){SetLastError(ERROR_ACCESS_DENIED);return 0;}
-    ok=CreateDirectoryW(path,&sa);e=GetLastError();LocalFree(sd);SetLastError(e);return ok||e==ERROR_ALREADY_EXISTS;
-}
 static int wf_owner(HANDLE h) {
     HANDLE token;DWORD size=0;TOKEN_USER *u=NULL;PSID owner;PSECURITY_DESCRIPTOR sd=NULL;int same=0;
     if(GetSecurityInfo(h,SE_FILE_OBJECT,OWNER_SECURITY_INFORMATION,&owner,NULL,NULL,NULL,&sd)!=ERROR_SUCCESS)return 0;
@@ -113,6 +109,46 @@ static HANDLE wf_open(const wchar_t *p,DWORD access,DWORD share,DWORD dispositio
     error=GetLastError();if(sd)LocalFree(sd);SetLastError(error);
     if(h!=INVALID_HANDLE_VALUE && !wf_info(h,dir,single)) {DWORD e=GetLastError();CloseHandle(h);SetLastError(e);return INVALID_HANDLE_VALUE;}
     return h;
+}
+/* Resolve exactly one component relative to an already verified directory.
+ * Neither a mutable drive mapping nor an ancestor reparse point is traversed. */
+static HANDLE wf_at(HANDLE parent,const wchar_t *name,DWORD access,DWORD share,DWORD disposition,int dir,int single) {
+    typedef NTSTATUS (NTAPI *Create)(PHANDLE,ACCESS_MASK,POBJECT_ATTRIBUTES,PIO_STATUS_BLOCK,PLARGE_INTEGER,ULONG,ULONG,ULONG,ULONG,PVOID,ULONG);
+    typedef ULONG (WINAPI *Error)(NTSTATUS);
+    HMODULE nt=GetModuleHandleW(L"ntdll.dll");Create create=(Create)GetProcAddress(nt,"NtCreateFile");Error error=(Error)GetProcAddress(nt,"RtlNtStatusToDosError");
+    OBJECT_ATTRIBUTES oa;UNICODE_STRING us;IO_STATUS_BLOCK io;HANDLE h=INVALID_HANDLE_VALUE;NTSTATUS st;PSECURITY_DESCRIPTOR sd=NULL;
+    ULONG options=0x00200000|0x00000020; /* FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT */
+    ULONG disp=disposition==CREATE_NEW?2:disposition==OPEN_ALWAYS?3:1;
+    if(!create||!error||!wf_component(name,wcslen(name))){SetLastError(ERROR_INVALID_NAME);return INVALID_HANDLE_VALUE;}
+    if(disp!=1){sd=wf_security();if(!sd){SetLastError(ERROR_ACCESS_DENIED);return INVALID_HANDLE_VALUE;}}
+    /* DIRECTORY_FILE only needed to create. Existing directories are checked
+     * on their returned handle, without combining incompatible open options. */
+    if(dir==1 && disp!=1)options|=1;
+    if(dir==0)options|=0x40;
+    memset(&oa,0,sizeof(oa));memset(&io,0,sizeof(io));us.Buffer=(PWSTR)name;us.Length=(USHORT)(wcslen(name)*2);us.MaximumLength=us.Length;
+    oa.Length=sizeof(oa);oa.RootDirectory=parent;oa.ObjectName=&us;oa.Attributes=0x40;oa.SecurityDescriptor=sd;
+    st=create(&h,access|SYNCHRONIZE|FILE_READ_ATTRIBUTES,&oa,&io,NULL,FILE_ATTRIBUTE_NORMAL,share,disp,options,NULL,0);
+    if(sd)LocalFree(sd);
+    if(st<0){SetLastError(error(st));return INVALID_HANDLE_VALUE;}
+    if(!wf_info(h,dir,single)){DWORD e=GetLastError();CloseHandle(h);SetLastError(e);return INVALID_HANDLE_VALUE;}
+    return h;
+}
+/* Handle-relative directory enumeration. Buffer is Lua-owned, including on OOM. */
+typedef struct { unsigned char data[65536]; DWORD offset; int started,more; } WF_ENUM;
+static int wf_next(HANDLE dir,WF_ENUM *e,WIN32_FIND_DATAW *out) {
+    FILE_ID_BOTH_DIR_INFO *info;DWORD n;
+    if(!e->started || !e->more){
+        FILE_INFO_BY_HANDLE_CLASS cls=e->started?FileIdBothDirectoryInfo:FileIdBothDirectoryRestartInfo;
+        if(!GetFileInformationByHandleEx(dir,cls,e->data,sizeof(e->data)))return GetLastError()==ERROR_NO_MORE_FILES?0:-1;
+        e->started=1;e->offset=0;
+    }
+    if(e->offset+offsetof(FILE_ID_BOTH_DIR_INFO,FileName)>sizeof(e->data)){SetLastError(ERROR_INVALID_DATA);return -1;}
+    info=(FILE_ID_BOTH_DIR_INFO*)(e->data+e->offset);n=info->FileNameLength/2;
+    if(info->FileNameLength%2||n>=MAX_PATH||e->offset+offsetof(FILE_ID_BOTH_DIR_INFO,FileName)+info->FileNameLength>sizeof(e->data)){SetLastError(ERROR_INVALID_DATA);return -1;}
+    memset(out,0,sizeof(*out));out->dwFileAttributes=info->FileAttributes;memcpy(out->cFileName,info->FileName,info->FileNameLength);
+    e->more=info->NextEntryOffset!=0;
+    if(e->more){if(info->NextEntryOffset<offsetof(FILE_ID_BOTH_DIR_INFO,FileName)||e->offset+info->NextEntryOffset>=sizeof(e->data)){SetLastError(ERROR_INVALID_DATA);return -1;}e->offset+=info->NextEntryOffset;}
+    return 1;
 }
 static int wf_add(WF *w,HANDLE h) {
     if(h==INVALID_HANDLE_VALUE)return 0;
@@ -134,12 +170,13 @@ static int wf_append(WF *w,const wchar_t *s,size_t len) {
     memcpy(w->path+n,s,len*sizeof(wchar_t));w->path[n+len]=0;return 1;
 }
 static int wf_walk(WF *w,const wchar_t *p,int create) {
-    const wchar_t *end;
+    const wchar_t *end; wchar_t component[256];HANDLE h;
     while(*p) {
         end=wcschr(p,L'/');if(!end)end=p+wcslen(p);
         if(!wf_component(p,(size_t)(end-p))||!wf_append(w,p,(size_t)(end-p))){SetLastError(ERROR_INVALID_NAME);return 0;}
-        if(create && !wf_mkdir(w->path))return 0;
-        if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,OPEN_EXISTING,1,0)))return 0;
+        memcpy(component,p,(end-p)*sizeof(wchar_t));component[end-p]=0;
+        h=wf_at(w->h[w->n-1],component,FILE_LIST_DIRECTORY|FILE_TRAVERSE,FILE_SHARE_READ,create?OPEN_ALWAYS:OPEN_EXISTING,1,0);
+        if(!wf_add(w,h))return 0;
         p=*end?end+1:end;
     }return 1;
 }
@@ -165,7 +202,7 @@ static int wf_parent(WF *w,WF *root,const char *s,size_t n,wchar_t leaf[256],int
 static int wf_file(lua_State *L,WF *root,const char *s,size_t n,DWORD access,DWORD share,WF **owned) {
     wchar_t leaf[256];WF *w=wf_new(L);*owned=w;
     if(!wf_parent(w,root,s,n,leaf,0)||!wf_append(w,leaf,wcslen(leaf)))return 0;
-    return wf_add(w,wf_open(w->path,access,share,OPEN_EXISTING,0,1));
+    return wf_add(w,wf_at(w->h[w->n-1],leaf,access,share,OPEN_EXISTING,0,1));
 }
 static int wf_read(lua_State *L,WF *root,const char *s,size_t n,size_t limit) {
     WF *w; LARGE_INTEGER size;DWORD k;size_t used=0;char *buffer;

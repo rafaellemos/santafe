@@ -20,7 +20,7 @@ static int mkdirs(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=p
 static int read_file(lua_State *L){WF *root=root_arg(L);size_t n;const char *p=path_arg(L,2,&n);lua_Integer max=luaL_optinteger(L,3,MAX_BYTES);luaL_argcheck(L,max>0&&max<=MAX_BYTES,3,"limite invalido");return wf_read(L,root,p,n,max);}
 static int exists(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=path_arg(L,2,&n);wchar_t leaf[256];HANDLE h;BY_HANDLE_FILE_INFORMATION st;
  w=wf_new(L);if(!wf_parent(w,root,p,n,leaf,0)||!wf_append(w,leaf,wcslen(leaf)))goto fail;
- h=CreateFileW(w->path,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_BACKUP_SEMANTICS,NULL);
+ h=wf_at(w->h[w->n-1],leaf,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,-1,1);
  if(h==INVALID_HANDLE_VALUE)goto fail;
  if(!GetFileInformationByHandle(h,&st)||GetFileType(h)!=FILE_TYPE_DISK||(st.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)||(!(st.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)&&st.nNumberOfLinks!=1)) {CloseHandle(h);wf_close(w);SetLastError(ERROR_ACCESS_DENIED);return wf_fail(L,"caminho especial");}
  CloseHandle(h);wf_close(w);lua_pushstring(L,(st.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)?"diretorio":"arquivo");return 1;
@@ -32,51 +32,46 @@ static int write_file(lua_State *L){WF *root=root_arg(L),*w;size_t n,len,used=0;
  wcscpy(dest,w->path);if(wcslen(dest)+wcslen(leaf)+2>=WF_MAX){SetLastError(ERROR_BUFFER_OVERFLOW);goto fail;}wcscat(dest,L"\\");wcscat(dest,leaf);
  /* Existing targets may be replaced atomically, never followed. Refuse special
   * targets explicitly; a racing replacement cannot redirect the rename. */
- {DWORD a=GetFileAttributesW(dest);if(a!=INVALID_FILE_ATTRIBUTES && (a&(FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_DIRECTORY))){SetLastError(ERROR_ACCESS_DENIED);goto fail;}}
+ {HANDLE target=wf_at(w->h[w->n-1],leaf,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,0,1);
+  if(target!=INVALID_HANDLE_VALUE)CloseHandle(target);else if(GetLastError()!=ERROR_FILE_NOT_FOUND)goto fail;}
  if(!random_bytes(rnd,16))goto fail;wcscpy(tmp,L".escrita-");for(i=0;i<16;i++)swprintf(tmp+8+2*i,3,L"%02x",rnd[i]);
  if(!wf_append(w,tmp,wcslen(tmp)))goto fail;
- h=wf_open(w->path,GENERIC_WRITE|DELETE,0,CREATE_NEW,0,1);if(h==INVALID_HANDLE_VALUE)goto fail;
+ h=wf_at(w->h[w->n-1],tmp,GENERIC_WRITE|DELETE,0,CREATE_NEW,0,1);if(h==INVALID_HANDLE_VALUE)goto fail;
  while(used<n){if(!WriteFile(h,bytes+used,(DWORD)(n-used),&wrote,NULL)||!wrote)goto fail;used+=wrote;}
  if(!FlushFileBuffers(h))goto fail;
- rename_size=offsetof(FILE_RENAME_INFO,FileName)+wcslen(dest)*sizeof(wchar_t);
+ rename_size=offsetof(FILE_RENAME_INFO,FileName)+(wcslen(leaf)+1)*sizeof(wchar_t);
  rename=calloc(1,rename_size);if(!rename){SetLastError(ERROR_NOT_ENOUGH_MEMORY);goto fail;}
- rename->ReplaceIfExists=replace;rename->RootDirectory=NULL;rename->FileNameLength=(DWORD)(wcslen(dest)*sizeof(wchar_t));memcpy(rename->FileName,dest,rename->FileNameLength);
+ rename->ReplaceIfExists=replace;rename->RootDirectory=w->h[w->n-1];rename->FileNameLength=(DWORD)(wcslen(leaf)*sizeof(wchar_t));memcpy(rename->FileName,leaf,rename->FileNameLength);
  if(!SetFileInformationByHandle(h,FileRenameInfo,rename,(DWORD)rename_size)){error=GetLastError();free(rename);SetLastError(error);goto fail;}free(rename);
  CloseHandle(h);wf_close(w);lua_pushboolean(L,1);return 1;
 fail:error=GetLastError();if(h!=INVALID_HANDLE_VALUE){SetFileInformationByHandle(h,FileDispositionInfo,&remove,sizeof(remove));CloseHandle(h);}wf_close(w);SetLastError(error);return wf_fail(L,"gravar arquivo atomico");}
 static int lock_root(lua_State *L){WF *root=root_arg(L),*w;wchar_t leaf[256];HANDLE h;OVERLAPPED o={0};
  luaL_argcheck(L,!root->lock,1,"raiz ja travada");w=wf_new(L);
  if(!wf_parent(w,root,".santafe/trava",14,leaf,1)||!wf_append(w,leaf,wcslen(leaf))){wf_close(w);return wf_fail(L,"diretorio da trava");}
- h=wf_open(w->path,GENERIC_READ|GENERIC_WRITE|READ_CONTROL,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_ALWAYS,0,1);
+ h=wf_at(w->h[w->n-1],leaf,GENERIC_READ|GENERIC_WRITE|READ_CONTROL,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_ALWAYS,0,1);
  if(h==INVALID_HANDLE_VALUE){wf_close(w);return wf_fail(L,"abrir trava");}
  if(!wf_owner(h)||!LockFileEx(h,LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY,0,1,0,&o)){DWORD e=GetLastError();CloseHandle(h);wf_close(w);SetLastError(e);return wf_fail(L,"trava insegura ou instalacao em andamento");}
  root->lock=h;wf_close(w);lua_pushboolean(L,1);return 1;}
 static int remove_file(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=path_arg(L,2,&n);FILE_DISPOSITION_INFO remove={TRUE};
  if(!wf_file(L,root,p,n,DELETE,0,&w)){DWORD e=GetLastError();wf_close(w);if(e==ERROR_FILE_NOT_FOUND||e==ERROR_PATH_NOT_FOUND){lua_pushboolean(L,1);return 1;}SetLastError(e);return wf_fail(L,"remover arquivo");}
  if(!SetFileInformationByHandle(w->h[w->n-1],FileDispositionInfo,&remove,sizeof(remove))){wf_close(w);return wf_fail(L,"remover arquivo");}wf_close(w);lua_pushboolean(L,1);return 1;}
-#define SEARCH_MT "Pacotes.Win32.busca"
-typedef struct{HANDLE h;} Search;
-static int close_search(lua_State *L){Search *s=lua_touserdata(L,1);if(s->h!=INVALID_HANDLE_VALUE)FindClose(s->h);s->h=INVALID_HANDLE_VALUE;return 0;}
-static int list_directory(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=luaL_optlstring(L,2,"",&n);wchar_t rel[WF_MAX],pattern[WF_MAX];WIN32_FIND_DATAW item;Search *search;int count=0,out;
+static int list_directory(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=luaL_optlstring(L,2,"",&n);wchar_t rel[WF_MAX];WIN32_FIND_DATAW item;WF_ENUM *search;int more=0,count=0,out;
  w=wf_new(L);if(!wf_copy(w,root))goto fail;
  if(n && (!wf_relative(p,n,rel)||!wf_walk(w,rel,0)))goto fail;
- if(wcslen(w->path)+3>=WF_MAX){SetLastError(ERROR_BUFFER_OVERFLOW);goto fail;}
- wcscpy(pattern,w->path);wcscat(pattern,L"\\*");
- search=lua_newuserdata(L,sizeof(*search));search->h=INVALID_HANDLE_VALUE;luaL_getmetatable(L,SEARCH_MT);lua_setmetatable(L,-2);
- search->h=FindFirstFileW(pattern,&item);if(search->h==INVALID_HANDLE_VALUE)goto fail;
+ search=lua_newuserdata(L,sizeof(*search));memset(search,0,sizeof(*search));
 #ifdef SANTAFE_DADOS_EXPERIMENTAL
  lua_createlist(L,0);
 #else
  lua_newtable(L);
 #endif
  out=lua_gettop(L);
- do{char name[1024];const char *type;
+ while((more=wf_next(w->h[w->n-1],search,&item))>0){char name[1024];const char *type;
   if(!wcscmp(item.cFileName,L".")||!wcscmp(item.cFileName,L".."))continue;
-  if(++count>8192 || !wf_utf8(item.cFileName,name,sizeof(name))){FindClose(search->h);search->h=INVALID_HANDLE_VALUE;SetLastError(ERROR_BUFFER_OVERFLOW);goto fail;}
+  if(++count>8192 || !wf_utf8(item.cFileName,name,sizeof(name))){SetLastError(ERROR_BUFFER_OVERFLOW);goto fail;}
   type=(item.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)?"especial":(item.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)?"diretorio":"arquivo";
   lua_newtable(L);lua_pushstring(L,name);lua_setfield(L,-2,"nome");lua_pushstring(L,type);lua_setfield(L,-2,"tipo");lua_rawseti(L,out,count);
- }while(FindNextFileW(search->h,&item));
- {DWORD e=GetLastError();FindClose(search->h);search->h=INVALID_HANDLE_VALUE;wf_close(w);if(e!=ERROR_NO_MORE_FILES){SetLastError(e);return wf_fail(L,"listar diretorio");}}
+ }
+ wf_close(w);if(more<0)return wf_fail(L,"listar diretorio");
  return 1;
 fail:wf_close(w);return wf_fail(L,"listar diretorio");}
 static int digest(lua_State *L) {
@@ -181,5 +176,5 @@ __declspec(dllexport) int luaopen_pacotes_nativo(lua_State *L){
  const luaL_Reg api[]={{"raiz",open_root},{"sha256",digest},{"base64",base64},{"decodBase64",unbase64},{"chaveCaminho",path_key},{"diretorioAtual",cwd},{"plataforma",platform},{"nonce",nonce},{"ferramenta",tool},{NULL,NULL}};
  luaL_checkversion(L);wf_register(L);luaL_getmetatable(L,WF_MT);lua_newtable(L);luaL_setfuncs(L,methods,0);lua_setfield(L,-2,LUA_MM_INDICE);lua_pop(L,1);
  if(luaL_newmetatable(L,MEMORY)){lua_pushcfunction(L,gc_memory);lua_setfield(L,-2,LUA_MM_FINALIZE);}lua_pop(L,1);
- if(luaL_newmetatable(L,SEARCH_MT)){lua_pushcfunction(L,close_search);lua_setfield(L,-2,LUA_MM_FINALIZE);}lua_pop(L,1);luaL_newlib(L,api);return 1;
+ luaL_newlib(L,api);return 1;
 }

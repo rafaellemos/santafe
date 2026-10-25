@@ -25,7 +25,7 @@ local função caminho(uri)
     retorne resultado
 fim
 local função uri(p)
-    retorne (Windows e "file:///" ou "file://") .. p:troque("[^A-Za-z0-9/_.~-]",função(c) retorne ("%%%02X"):formate(c:byte()) fim)
+    retorne (Windows e "file:///" ou "file://") .. p:troque(Windows e "[^A-Za-z0-9:/_.~-]" ou "[^A-Za-z0-9/_.~-]",função(c) retorne ("%%%02X"):formate(c:byte()) fim)
 fim
 P.caminho, P.uri = caminho, uri
 

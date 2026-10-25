@@ -30,6 +30,7 @@ jobs:
             mingw-w64-ucrt-x86_64-binutils
             mingw-w64-ucrt-x86_64-glib2
             mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-openssl
       - name: Preparar fonte selada e correção isolada
         run: python windows/preparar.py fonte.tar.gz fonte
       - name: Aplicar adaptação dados16
