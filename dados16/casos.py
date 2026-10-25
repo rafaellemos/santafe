@@ -1,6 +1,23 @@
 """Adversarial Windows integration. Real packages, handles, job objects and LSP."""
 from pathlib import Path
-import json,os,subprocess,sys,time,threading,ssl,functools,ctypes
+import json,os,subprocess,sys,time,threading,ssl,functools,ctypes,struct
+
+def crie_juncao(path,dest):
+ # Native fixture: no command shell or argument rewriting by the toolchain.
+ path.mkdir();k=ctypes.WinDLL('kernel32',use_last_error=True)
+ k.CreateFileW.argtypes=[ctypes.c_wchar_p,ctypes.c_ulong,ctypes.c_ulong,ctypes.c_void_p,ctypes.c_ulong,ctypes.c_ulong,ctypes.c_void_p];k.CreateFileW.restype=ctypes.c_void_p
+ k.DeviceIoControl.argtypes=[ctypes.c_void_p,ctypes.c_ulong,ctypes.c_void_p,ctypes.c_ulong,ctypes.c_void_p,ctypes.c_ulong,ctypes.POINTER(ctypes.c_ulong),ctypes.c_void_p];k.DeviceIoControl.restype=ctypes.c_int
+ k.CloseHandle.argtypes=[ctypes.c_void_p]
+ target=('\\??\\'+str(dest.resolve()).replace('/',chr(92))).encode('utf-16le')
+ display=str(dest.resolve()).replace('/',chr(92)).encode('utf-16le')
+ body=struct.pack('<HHHH',0,len(target),len(target)+2,len(display))+target+b'\0\0'+display+b'\0\0'
+ data=struct.pack('<IHH',0xA0000003,len(body),0)+body
+ handle=k.CreateFileW(str(path),0x40000000,3,None,3,0x02200000,None)
+ if handle==ctypes.c_void_p(-1).value:raise ctypes.WinError(ctypes.get_last_error())
+ try:
+  raw=ctypes.create_string_buffer(data);got=ctypes.c_ulong()
+  if not k.DeviceIoControl(handle,0x000900A4,raw,len(data),None,0,ctypes.byref(got),None):raise ctypes.WinError(ctypes.get_last_error())
+ finally:k.CloseHandle(handle)
 
 def test(root,out,run,sf,exe,init,lit):
  sys.path.insert(0,str(root/'testes/integracao'))
@@ -57,7 +74,8 @@ def test(root,out,run,sf,exe,init,lit):
   sf('caminho-recusa-'+str(i),init+'N.chaveCaminho('+lit(path)+')',expected=None)
  sf('colisao-unicode',init+'garanta(N.chaveCaminho("José")==N.chaveCaminho("JOSÉ"))')
  outside=work/'outside';outside.mkdir();secret=outside/'secret';secret.write_text('INTACTO',encoding='utf-8')
- junction=a/'junction';run('criar-juncao-fixture',[Path(os.environ['SystemRoot'])/'System32/cmd.exe','/d','/c','mklink','/J',str(junction).replace('/',chr(92)),str(outside).replace('/',chr(92))],work)
+ junction=a/'junction';crie_juncao(junction,outside)
+ assert (junction/'secret').read_text()=='INTACTO','a fixture deve realmente apontar para fora'
  sf('recusar-juncao-leitura',init+f'local r=garanta(N.raiz({lit(a)}));garanta(r:leia("junction/secret"))',expected=None)
  sf('recusar-juncao-escrita',init+f'local r=garanta(N.raiz({lit(a)}));garanta(r:grave("junction/secret","ERRO",verdadeiro))',expected=None)
  sf('recusar-raiz-juncao',init+f'garanta(N.raiz({lit(junction)}))',expected=None)

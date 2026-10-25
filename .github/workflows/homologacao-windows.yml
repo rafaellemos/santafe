@@ -58,4 +58,4 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          'Esta bateria cobre somente núcleo, ONFÉ em memória e IBA estática/dinâmica com DLLs sintéticas. A adaptação SLS/gerenciador está em ensaio adicional; consulte resultados/ferramentas. Não aprova instalação nem editores Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'Candidato dados.16: núcleo/ONFÉ/IBA em resultado.json; SLS, gerenciador, proteção de caminhos/processos, HTTPS e pacote portátil em ferramentas/resultado.json. Cada relatório distingue testes aprovados de falha/interrupção; a presença do artefato não significa aprovação. Não homologa serviços, instalador global ou testes visuais dos editores Windows.' >> $env:GITHUB_STEP_SUMMARY
