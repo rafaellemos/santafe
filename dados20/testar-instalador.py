@@ -58,8 +58,13 @@ try:
  db=msi.m.OpenDatabase(str(newmsi),msi.m.MSIDBOPEN_READONLY)
  view=db.OpenView('SELECT `Action`, `Type` FROM `CustomAction`');view.Execute(None);actions=[]
  while (row:=view.Fetch()):actions.append((row.GetString(1),row.GetInteger(2)))
- assert actions==[('RestoreDir',51),('ValidateTarget',1)] or set(actions)=={('RestoreDir',51),('ValidateTarget',1)}
+ assert set(actions)=={('RestoreDir',51),('ValidateTarget',1),('RejectUnsupportedMode',19)}
  db=None;ok('msi-publicavel-sem-injecao-de-falha')
+ adminimage=OUT/'imagem-administrativa-recusada'
+ install('recusa-imagem-administrativa',['/a',newmsi,'TARGETDIR='+str(adminimage)],1603)
+ install('recusa-anuncio',['/ju',newmsi],1603)
+ assert not adminimage.exists() and state(new['product_code'])==-1
+ ok('modos-nao-suportados-nao-gravaram-produto')
  foreign.mkdir();(foreign/'documento.txt').write_text('arquivo do usuario',encoding='utf-8')
  install('recusa-diretorio-nao-pertencente',['/i',newmsi,'INSTALLDIR='+str(foreign)],1603,'DADOS20_TARGET_NOT_EMPTY')
  assert (foreign/'documento.txt').read_text()=='arquivo do usuario'

@@ -52,15 +52,15 @@ def build(archive,version,out,guard,fault=False):
   db.OpenView("UPDATE `Property` SET `Value` = '1046' WHERE `Property` = 'ProductLanguage'").Execute(None)
   add('Property',[(k,v) for k,v in {
    'UpgradeCode':UPGRADE,'INSTALLLEVEL':'1','ARPCOMMENTS':'Candidato isolado; não instala serviços.','ARPHELPLINK':'https://santafé.dev.br/',
-   'SecureCustomProperties':'OLDERPRODUCTS;NEWERPRODUCTS;INSTALLDIR;OLDINSTALLDIR','MSIFASTINSTALL':'0','REBOOT':'ReallySuppress','DefaultUIFont':'Normal','ARPINSTALLLOCATION':'[INSTALLDIR]'
+   'SecureCustomProperties':'OLDERPRODUCTS;NEWERPRODUCTS;INSTALLDIR;OLDINSTALLDIR','MSIFASTINSTALL':'0','REBOOT':'ReallySuppress','DefaultUIFont':'Normal','ErrorDialog':'ErrorDlg','ARPINSTALLLOCATION':'[INSTALLDIR]'
   }.items()])
   add('Directory',[('TARGETDIR',None,'SourceDir'),('LocalAppDataFolder','TARGETDIR','.'),('ProgramsDir','LocalAppDataFolder','Programs'),('INSTALLDIR','ProgramsDir','SANTAF~1|Santafe-Dados-Candidato'),('ProgramMenuFolder','TARGETDIR','.'),('MenuDir','ProgramMenuFolder','SANTAF~1|Santafe Candidato')])
   dirs={Path('.'): 'INSTALLDIR'}
-  for p in sorted({p.parent for p in files}|{a for p in files for a in p.parents if a!=root and root in a.parents},key=lambda p:len(p.parts)):
+  for number,p in enumerate(sorted({p.parent for p in files}|{a for p in files for a in p.parents if a!=root and root in a.parents},key=lambda p:(len(p.parts),p.as_posix())),1):
    rel=p.relative_to(root)
    if rel==Path('.'):continue
    did=ident('dir/'+rel.as_posix());dirs[rel]=did
-   add('Directory',[(did,dirs[rel.parent],p.name)])
+   add('Directory',[(did,dirs[rel.parent],f'D{number:07d}|'+p.name)])
   add('Feature',[('Runtime',None,'Santafe','Nucleo, SLS e gerenciador de bibliotecas',1,1,'INSTALLDIR',0)])
   cabinet=[]
   for seq,p in enumerate(files,1):
@@ -81,13 +81,14 @@ def build(archive,version,out,guard,fault=False):
   add('Registry',[('InstallDirKey',1,REG,'InstallDir','[INSTALLDIR]',cid)])
   add('Environment',[('UserPath','=-Path','[~];[INSTALLDIR]bin',cid)])
   add('Shortcut',[('Console','MenuDir','SANTAF~1|Santafe candidato',cid,'[INSTALLDIR]bin\\santafe.exe',None,'Santafe candidato - console',None,None,None,1,'INSTALLDIR')])
-  add('RemoveFile',[('RemoveEmptyMenu',cid,None,'MenuDir',2)])
+  # Remove only empty managed directories; never wildcard/delete user files.
+  add('RemoveFile',[(ident('empty/'+d),cid,None,d,2) for d in ['MenuDir','ProgramsDir',*dirs.values()]])
   cab=tmp/'payload.cab';m.FCICreate(str(cab),cabinet);m.add_stream(db,'payload.cab',str(cab));add('Media',[(1,len(files),None,'#payload.cab',None,None)])
   add('Upgrade',[(UPGRADE,None,version,None,0,None,'OLDERPRODUCTS'),(UPGRADE,version,None,None,2,None,'NEWERPRODUCTS')])
   add('AppSearch',[('OLDINSTALLDIR','PreviousDir')]);add('RegLocator',[('PreviousDir',1,REG,'InstallDir',2|16)])
   add('LaunchCondition',[('VersionNT64 >= 603','Requer Windows x64 10 ou posterior (homologado em Server 2022).'),('NOT ALLUSERS','Instale apenas para o usuario atual.'),('NOT NEWERPRODUCTS','Uma versao mais recente ja esta instalada. A reversao deliberada exige desinstalacao primeiro.'),('NOT DISABLEROLLBACK AND NOT RollbackDisabled','A reversao transacional do Windows Installer deve estar habilitada.')])
   add('Binary',[('Guard',m.Binary(str(guard)))])
-  ca=[('RestoreDir',51,'INSTALLDIR','[OLDINSTALLDIR]'),('ValidateTarget',1,'Guard','ValidateTarget')]
+  ca=[('RestoreDir',51,'INSTALLDIR','[OLDINSTALLDIR]'),('ValidateTarget',1,'Guard','ValidateTarget'),('RejectUnsupportedMode',19,None,'Este candidato aceita instalação por usuário. Imagem administrativa e anúncio não são suportados.')]
   if fault:ca += [('SetFaultData',51,'AbortAfterFiles','[INSTALLDIR]|'+version),('AbortAfterFiles',1025,'Guard','AbortAfterFiles')]
   add('CustomAction',ca)
   prefix=[('FindRelatedProducts',None,200),('AppSearch',None,400),('LaunchConditions',None,500),('RestoreDir','OLDINSTALLDIR AND NOT INSTALLDIR',600),('CostInitialize',None,800),('FileCost',None,900),('CostFinalize',None,1000),('ValidateTarget',None,1100)]
@@ -105,7 +106,25 @@ def build(archive,version,out,guard,fault=False):
   dialog('Welcome','Santafé — candidato','Instala núcleo, SLS e gerenciador para este usuário. Adiciona o diretório bin ao PATH do usuário. Abra um terminal novo após instalar.\n\nCandidato de homologação, sem assinatura Authenticode; não instala serviços.', [('Install','Instalar',[('EndDialog','Return')]),('Cancel','Cancelar',[('EndDialog','Exit')])])
   dialog('Maintenance','Santafé — manutenção','Reparar restaura os arquivos do pacote. Remover preserva arquivos extras e projetos do usuário.', [('Repair','Reparar',[('[REINSTALL]','ALL'),('[REINSTALLMODE]','amus'),('EndDialog','Return')]),('Remove','Remover',[('[REMOVE]','ALL'),('EndDialog','Return')]),('Cancel','Cancelar',[('EndDialog','Exit')])])
   for name,text,result in [('Finished','Operação concluída.','Return'),('FatalError','A operação falhou. Consulte o registro do Windows Installer.','Exit'),('Cancelled','Operação cancelada.','Exit')]:dialog(name,'Santafé',text,[('Close','Fechar',[('EndDialog',result)])])
+  # Required Windows Installer dialogs: file conflicts and dynamic errors.
+  dialogs.append(('FilesInUse',50,50,420,220,3,'Santafé — arquivos em uso','Retry','Retry','Cancel'))
+  controls.extend([('FilesInUse','Text','Text',20,15,380,45,3,None,'Feche os aplicativos abaixo e tente novamente. Cancelar preserva a instalação anterior.',None,None),('FilesInUse','Processes','ListBox',20,65,380,95,3,'FileInUseProcess',None,None,None)])
+  for i,(bid,label,arg,nextid) in enumerate([('Retry','Tentar novamente','Retry','Ignore'),('Ignore','Ignorar','Ignore','Cancel'),('Cancel','Cancelar','Exit','Retry')]):
+   controls.append(('FilesInUse',bid,'PushButton',20+i*130,180,120,24,3,None,label,nextid,None))
+   events.append(('FilesInUse',bid,'EndDialog',arg,'1',1))
+  dialogs.append(('ErrorDlg',50,50,420,190,65539,'Santafé','ErrorText','O','C'))
+  controls.append(('ErrorDlg','ErrorText','Text',20,20,380,105,3,None,'[ErrorText]','A',None))
+  errorbuttons=[('A','Interromper','ErrorAbort'),('C','Cancelar','ErrorCancel'),('I','Ignorar','ErrorIgnore'),('N','Não','ErrorNo'),('O','OK','ErrorOk'),('R','Tentar novamente','ErrorRetry'),('Y','Sim','ErrorYes')]
+  for i,(bid,label,arg) in enumerate(errorbuttons):
+   controls.append(('ErrorDlg',bid,'PushButton',20,145,120,24,3,None,label,errorbuttons[(i+1)%len(errorbuttons)][0],None))
+   events.append(('ErrorDlg',bid,'EndDialog',arg,'1',1))
   add('Dialog',dialogs);add('Control',controls);add('ControlEvent',events)
+  # Schema-valid standard sequences, refused before any action that writes.
+  cost=[('CostInitialize',None,800),('FileCost',None,900),('CostFinalize',None,1000)]
+  endings=[('Finished',None,-1),('Cancelled',None,-2),('FatalError',None,-3)]
+  add('AdminUISequence',[('RejectUnsupportedMode',None,100),*cost,('ExecuteAction',None,1300),*endings])
+  add('AdminExecuteSequence',[('RejectUnsupportedMode',None,100),*cost,('InstallValidate',None,1400),('InstallInitialize',None,1500),('InstallAdminPackage',None,3900),('InstallFiles',None,4000),('InstallFinalize',None,6600)])
+  add('AdvtExecuteSequence',[('RejectUnsupportedMode',None,100),('CostInitialize',None,800),('CostFinalize',None,1000),('InstallValidate',None,1400),('PublishFeatures',None,6300),('PublishProduct',None,6400)])
   add('InstallUISequence',prefix+[('Welcome','NOT Installed',1200),('Maintenance','Installed',1201),('ExecuteAction',None,1300),('Finished',None,-1),('Cancelled',None,-2),('FatalError',None,-3)])
   db.Commit();db=None
  meta={'versao_msi':version,'candidato':'dados.20' if version=='3.0.20' else 'fixture','product_code':product,'upgrade_code':UPGRADE,'sha256':hashlib.sha256(out.read_bytes()).hexdigest(),'arquivos':hashes,'falha_injetada':fault,'assinatura_authenticode':False,'per_usuario':True,'bytes':out.stat().st_size}

@@ -1,6 +1,6 @@
 """Execute the complete installed WiX ICE suite, preserving delivered MSI bytes."""
 from pathlib import Path
-import hashlib,json,os,shutil,subprocess,sys,traceback
+import collections,hashlib,json,os,re,shutil,subprocess,sys,traceback
 import msilib as m
 out=Path(sys.argv[2]);msi=Path(sys.argv[1]).resolve();out.mkdir(exist_ok=True)
 result={'candidato':'dados.20','resultado':'em_execucao','validacao_visual':False,'testes':[]}
@@ -13,7 +13,11 @@ try:
  before=hashlib.sha256(msi.read_bytes()).hexdigest()
  check=subprocess.run([str(smoke),str(msi),'-nologo'],capture_output=True,timeout=180)
  (out/'ice-completo.log').write_bytes(check.stdout+check.stderr)
- result.update(ferramenta=str(smoke),codigo=check.returncode)
+ warnings=collections.Counter(re.findall(rb'warning SMOK[0-9]+ : (ICE[0-9]+):',check.stdout+check.stderr))
+ result.update(ferramenta=str(smoke),codigo=check.returncode,avisos={k.decode():v for k,v in warnings.items()},avisos_suprimidos=False)
+ # ICE91 is expected for an exclusively per-user MSI. ALLUSERS is explicitly
+ # refused and tested. Keep these warnings in the full log; do not suppress ICE.
+ if set(warnings)-{b'ICE91'}:raise RuntimeError('Avisos ICE exigem revisão: '+str(warnings))
  if check.returncode:raise RuntimeError('ICE recusou o MSI: '+(check.stdout+check.stderr).decode('utf-8','replace')[-12000:])
  result['testes'].append({'nome':'suite-completa-ice','passou':True})
  # A malformed foreign key must be refused by the same validator.
