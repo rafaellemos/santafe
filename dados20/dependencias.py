@@ -63,6 +63,23 @@ def verify_runtime(read,metadata,lock):
   if sha(read(e['arquivo']))!=expected['sha256']:raise ValueError('DLL alterada: '+e['arquivo'])
  return len(byname)
 
+def verify_signature(signature,source):
+ # Native Windows Python cannot execute pacman-key (a shell script) itself.
+ # Use bash/cygpath from the same MSYS2 installation as the verified package DB.
+ pacman=shutil.which('pacman')
+ if not pacman:raise ValueError('pacman ausente')
+ bindir=Path(pacman).resolve().parent
+ suffix='.exe' if os.name=='nt' else ''
+ bash=bindir/('bash'+suffix);key=bindir/'pacman-key'
+ if not bash.is_file() or not key.is_file():raise ValueError('Verificador MSYS2 incompleto')
+ paths=[key,signature.resolve(),source.resolve()]
+ if os.name=='nt':
+  cygpath=bindir/'cygpath.exe'
+  if not cygpath.is_file():raise ValueError('Conversor de caminhos MSYS2 ausente')
+  args=[subprocess.check_output([str(cygpath),'-u',str(p)],text=True,timeout=10).strip() for p in paths]
+ else:args=[str(p) for p in paths]
+ return subprocess.run([str(bash),'--noprofile','--norc',args[0],'--verify',args[1],args[2]],capture_output=True,timeout=45)
+
 def prepare(destination):
  lock=load_lock();metadata=json.loads((destination/'DEPENDENCIAS-MSYS2.json').read_text(encoding='utf-8'))
  verify_runtime(lambda n:(destination/n).read_bytes(),metadata,lock)
@@ -71,7 +88,7 @@ def prepare(destination):
  evidence=[]
  for e in lock['binarios']:
   source=fetch(e['fonte'],cache);sig=fetch(e['assinatura'],cache)
-  p=subprocess.run(['pacman-key','--verify',str(sig),str(source)],capture_output=True,timeout=45)
+  p=verify_signature(sig,source)
   if p.returncode:raise ValueError('Assinatura MSYS2 recusada: '+e['fonte']['arquivo']+' '+p.stderr.decode('utf-8','replace')[-1000:])
   count=verify_source(source,e)
   for path in (source,sig):shutil.copyfile(path,target/path.name)
