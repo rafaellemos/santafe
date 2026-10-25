@@ -26,17 +26,19 @@ int main(int argc,char **argv){
   FILE_DISPOSITION_INFO del={TRUE};SetFileInformationByHandle(h,FileDispositionInfo,&del,sizeof(del));CloseHandle(h);
   wcscpy(victim,path);wcscat(victim,L"-movido");check(!MoveFileW(path,victim),"ancestral nao renomeado");
   if(mode){
-   WF original={0},strict={0};original.n=1;original.h[0]=dir;wcscpy(original.path,path);
+   WF original={0},strict={0};char utf8[WF_MAX*3];check(wf_utf8(path,utf8,sizeof(utf8)),"caminho da sonda");check(wf_root(&original,utf8,strlen(utf8)),"fixar cadeia original");
    check(wf_strict(&strict,&original),"reabrir diretório por handle com proteção estrita");
    mutator=CreateFileW(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
-   check(mutator==INVALID_HANDLE_VALUE,"pin de processo impede mutador");wf_close(&strict);
+   check(mutator==INVALID_HANDLE_VALUE,"pin de processo impede mutador");wf_close(&strict);wf_close(&original);
   }
+  WF beforeMutation={0};char utf8[WF_MAX*3];
+  if(mode){check(wf_utf8(path,utf8,sizeof(utf8)),"UTF8 original");check(wf_root(&beforeMutation,utf8,strlen(utf8)),"cadeia antes da mutação");}
   mutator=CreateFileW(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
   int mutated=mutator!=INVALID_HANDLE_VALUE&&junction(mutator,outside);printf("MUTACAO modo=%d feita=%d erro=%lu\n",mode,mutated,GetLastError());if(mutator!=INVALID_HANDLE_VALUE)CloseHandle(mutator);
   if(mode){
    check(mutated,"ataque de juncao realmente exercitado");
-   WF original={0},strict={0};original.n=1;original.h[0]=dir;wcscpy(original.path,path);
-   check(!wf_strict(&strict,&original),"processo recusa diretório já transformado em junção");wf_close(&strict);
+   WF strict={0};
+   check(!wf_strict(&strict,&beforeMutation),"processo recusa diretório já transformado em junção");wf_close(&strict);wf_close(&beforeMutation);
   }
   h=wf_at(dir,L"segredo",GENERIC_READ,FILE_SHARE_READ,OPEN_EXISTING,0,1);check(h==INVALID_HANDLE_VALUE,"leitura nao alcança fora");
   h=wf_at(dir,L"victim",GENERIC_WRITE|DELETE,0,CREATE_NEW,0,1);

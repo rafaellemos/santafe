@@ -181,26 +181,36 @@ static int wf_copy(WF *to,WF *from) {
         if(!DuplicateHandle(GetCurrentProcess(),from->h[i],GetCurrentProcess(),&h,0,FALSE,DUPLICATE_SAME_ACCESS)||!wf_add(to,h))return 0;
     }return 1;
 }
-/* A subprocess resolves its cwd by name. Reopen every ancestor with strict
- * sharing, then validate the actual pinned object before allowing that use.
- * A preexisting mutator or reparse point makes the operation fail closed. */
-static int wf_strict(WF *to,WF *from) {
-    unsigned i; HANDLE h;
-    if(!from->n){SetLastError(ERROR_INVALID_HANDLE);return 0;}
-    wcscpy(to->path,from->path);
-    for(i=0;i<from->n;i++) {
-        h=ReOpenFile(from->h[i],FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,
-            FILE_SHARE_READ,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT);
-        if(h==INVALID_HANDLE_VALUE)return 0;
-        if(!wf_info(h,1,0)){DWORD e=GetLastError();CloseHandle(h);SetLastError(e);return 0;}
-        if(!wf_add(to,h))return 0;
-    }return 1;
-}
 static int wf_append(WF *w,const wchar_t *s,size_t len) {
     size_t n=wcslen(w->path);
     if(n+len+2>=WF_MAX){SetLastError(ERROR_FILENAME_EXCED_RANGE);return 0;}
     if(n && w->path[n-1]!=L'\\')w->path[n++]=L'\\';
     memcpy(w->path+n,s,len*sizeof(wchar_t));w->path[n+len]=0;return 1;
+}
+/* Subprocesses resolve cwd by name. Acquire strict directory pins using the
+ * same one-component NT opens, and require the identities of ALL original
+ * ancestors. Already-mutated roots and competing writer handles fail closed. */
+static int wf_strict(WF *to,WF *from) {
+    const wchar_t *end,*p; wchar_t component[256]; unsigned i; HANDLE h;
+    if(!from->n || wcsncmp(from->path,L"\\\\?\\Volume{",11)) {SetLastError(ERROR_INVALID_NAME);return 0;}
+    end=wcschr(from->path+4,L'\\');if(!end){SetLastError(ERROR_INVALID_NAME);return 0;}
+    memcpy(to->path,from->path,(end-from->path+1)*sizeof(wchar_t));to->path[end-from->path+1]=0;
+    if(!wf_add(to,wf_open(to->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,OPEN_EXISTING,1,0)))return 0;
+    p=end+1;
+    while(*p) {
+        end=wcschr(p,L'\\');if(!end)end=p+wcslen(p);
+        if(!wf_component(p,end-p) || !wf_append(to,p,end-p)){SetLastError(ERROR_INVALID_NAME);return 0;}
+        memcpy(component,p,(end-p)*sizeof(wchar_t));component[end-p]=0;
+        h=wf_at(to->h[to->n-1],component,FILE_LIST_DIRECTORY|FILE_TRAVERSE,FILE_SHARE_READ,OPEN_EXISTING,1,0);
+        if(!wf_add(to,h))return 0;
+        p=*end?end+1:end;
+    }
+    if(to->n!=from->n){SetLastError(ERROR_ACCESS_DENIED);return 0;}
+    for(i=0;i<to->n;i++) {
+        BY_HANDLE_FILE_INFORMATION a,b;
+        if(!GetFileInformationByHandle(to->h[i],&a)||!GetFileInformationByHandle(from->h[i],&b))return 0;
+        if(a.dwVolumeSerialNumber!=b.dwVolumeSerialNumber||a.nFileIndexHigh!=b.nFileIndexHigh||a.nFileIndexLow!=b.nFileIndexLow){SetLastError(ERROR_ACCESS_DENIED);return 0;}
+    }return 1;
 }
 static int wf_walk(WF *w,const wchar_t *p,int create) {
     const wchar_t *end; wchar_t component[256];HANDLE h;
