@@ -1,4 +1,4 @@
-name: Windows nativo — dados.15 (bateria parcial)
+name: Windows nativo — dados.16 — SLS e gerenciador
 on:
   push:
     branches: ['homologacao/windows-dados15']
@@ -28,18 +28,24 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-python
             mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-pkgconf
       - name: Preparar fonte selada e correção isolada
         run: python windows/preparar.py fonte.tar.gz fonte
+      - name: Aplicar adaptação dados16
+        run: python dados16/aplicar.py fonte
       - name: Compilar e executar a bateria nativa
         run: python windows/testar.py fonte resultados
+      - name: SLS e gerenciador nativos
+        run: python dados16/testar.py resultados/candidato resultados/ferramentas
       - name: Guardar evidências mesmo em caso de falha
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-dados15-evidencias
           path: |
-            resultados/*.json
-            resultados/*.log
+            resultados/**/*.json
+            resultados/**/*.log
             fonte/PREPARACAO-WINDOWS.json
           if-no-files-found: error
           retention-days: 14
@@ -47,4 +53,4 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          'Esta bateria cobre somente núcleo, ONFÉ em memória e IBA estática/dinâmica com DLLs sintéticas. Não aprova SLS, gerenciador, conjunto de bibliotecas C, instalação, persistência ou editores no Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'Esta bateria cobre somente núcleo, ONFÉ em memória e IBA estática/dinâmica com DLLs sintéticas. A adaptação SLS/gerenciador está em ensaio adicional; consulte resultados/ferramentas. Não aprova instalação nem editores Windows.' >> $env:GITHUB_STEP_SUMMARY
