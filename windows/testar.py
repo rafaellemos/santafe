@@ -77,6 +77,8 @@ def main():
             run('compilar-iba',['gcc','-DSANTAFE_DADOS_EXPERIMENTAL','-DLUA_USE_WINDOWS',
                 '-I'+str(cand/'src'),HERE/'iba.c',cand/'src/libsantafe.a','-lm','-lws2_32','-o',work/'iba.exe'],cand),
             run('executar-iba',[work/'iba.exe'],cand))))
+        from dll import test as test_dll
+        cases.append(('iba-dinamica',lambda:test_dll(cand,work,run,sf)))
         def bytecode():
             file=work/'simples.fe';file.write_text('mostre(42)\n',encoding='utf-8')
             for name,tree in [('estavel',stable),('candidato',cand)]:

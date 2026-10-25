@@ -47,4 +47,4 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          'Esta bateria cobre somente núcleo, ONFÉ em memória e IBA estática. Não aprova SLS, gerenciador, DLLs, instalação, persistência ou editores no Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'Esta bateria cobre somente núcleo, ONFÉ em memória e IBA estática/dinâmica com DLLs sintéticas. Não aprova SLS, gerenciador, conjunto de bibliotecas C, instalação, persistência ou editores no Windows.' >> $env:GITHUB_STEP_SUMMARY
