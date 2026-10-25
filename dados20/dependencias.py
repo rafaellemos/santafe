@@ -64,21 +64,26 @@ def verify_runtime(read,metadata,lock):
  return len(byname)
 
 def verify_signature(signature,source):
- # Native Windows Python cannot execute pacman-key (a shell script) itself.
- # Use bash/cygpath from the same MSYS2 installation as the verified package DB.
+ # Read the MSYS2 pacman keyring without changing its permissions or trust.
+ # pacman-key assumes Unix uid 0 or a lock-never config; Windows runners have
+ # neither. Use its GPG verification rule directly, including full trust.
  pacman=shutil.which('pacman')
  if not pacman:raise ValueError('pacman ausente')
  bindir=Path(pacman).resolve().parent
  suffix='.exe' if os.name=='nt' else ''
- bash=bindir/('bash'+suffix);key=bindir/'pacman-key'
- if not bash.is_file() or not key.is_file():raise ValueError('Verificador MSYS2 incompleto')
- paths=[key,signature.resolve(),source.resolve()]
+ gpg=bindir/('gpg'+suffix)
+ keyring=bindir.parent.parent/'etc/pacman.d/gnupg'
+ if not gpg.is_file() or not (keyring/'pubring.gpg').is_file() or not (keyring/'trustdb.gpg').is_file():raise ValueError('Chaveiro MSYS2 incompleto')
+ paths=[keyring,signature.resolve(),source.resolve()]
  if os.name=='nt':
   cygpath=bindir/'cygpath.exe'
   if not cygpath.is_file():raise ValueError('Conversor de caminhos MSYS2 ausente')
   args=[subprocess.check_output([str(cygpath),'-u',str(p)],text=True,timeout=10).strip() for p in paths]
  else:args=[str(p) for p in paths]
- return subprocess.run([str(bash),'--noprofile','--norc',args[0],'--verify',args[1],args[2]],capture_output=True,timeout=45)
+ return subprocess.run([str(gpg),'--no-options','--homedir',args[0],'--batch','--no-auto-key-retrieve','--no-auto-check-trustdb','--lock-never','--trust-model','pgp','--status-fd','1','--verify',args[1],args[2]],capture_output=True,timeout=45)
+
+def signature_valid(result):
+ return result.returncode==0 and re.search(rb'^\[GNUPG:\] VALIDSIG ',result.stdout,re.M) is not None and re.search(rb'^\[GNUPG:\] TRUST_(FULLY|ULTIMATE)(?: |$)',result.stdout,re.M) is not None
 
 def prepare(destination):
  lock=load_lock();metadata=json.loads((destination/'DEPENDENCIAS-MSYS2.json').read_text(encoding='utf-8'))
@@ -89,10 +94,17 @@ def prepare(destination):
  for e in lock['binarios']:
   source=fetch(e['fonte'],cache);sig=fetch(e['assinatura'],cache)
   p=verify_signature(sig,source)
-  if p.returncode:raise ValueError('Assinatura MSYS2 recusada: '+e['fonte']['arquivo']+' '+p.stderr.decode('utf-8','replace')[-1000:])
+  if not signature_valid(p):raise ValueError('Assinatura MSYS2 recusada: '+e['fonte']['arquivo']+' '+p.stderr.decode('utf-8','replace')[-1000:])
+  corrupted=cache/('controle-corrompido-'+source.name)
+  data=bytearray(source.read_bytes());data[len(data)//2]^=1
+  try:
+   corrupted.write_bytes(data)
+   negative=verify_signature(sig,corrupted)
+   if negative.returncode==0 or signature_valid(negative):raise ValueError('Verificador aceitou fonte adulterado')
+  finally:corrupted.unlink(missing_ok=True)
   count=verify_source(source,e)
   for path in (source,sig):shutil.copyfile(path,target/path.name)
-  evidence.append({'arquivo':source.name,'sha256':sha(source.read_bytes()),'membros_conferidos':count,'assinatura_msys2_verificada':True,'verificador':'pacman-key --verify','resultado_publico':(p.stdout+p.stderr).decode('utf-8','replace')})
+  evidence.append({'arquivo':source.name,'sha256':sha(source.read_bytes()),'membros_conferidos':count,'assinatura_msys2_verificada':True,'controle_corrompido_recusado':True,'verificador':'GPG: VALIDSIG + TRUST_FULLY/ULTIMATE no chaveiro pacman (somente leitura)','resultado_publico':(p.stdout+p.stderr).decode('utf-8','replace')})
  shutil.copyfile(HERE/'DEPENDENCIAS.lock.json',target/'DEPENDENCIAS.lock.json')
  shutil.copyfile(HERE/'FONTES-TERCEIROS.md',target/'LEIA-ME.md')
  (target/'VERIFICACAO.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
@@ -111,6 +123,6 @@ def verify_package(read):
  for e in lock['binarios']:
   for k in ('fonte','assinatura'):verify_data(read(DIRECTORY+'/'+e[k]['arquivo']),e[k])
  proof=json.loads(read(DIRECTORY+'/VERIFICACAO.json'))
- if {x['arquivo'] for x in proof}!={e['fonte']['arquivo'] for e in lock['binarios']} or len(proof)!=4 or not all(x['assinatura_msys2_verificada'] for x in proof):raise ValueError('Verificação de fontes incompleta')
+ if {x['arquivo'] for x in proof}!={e['fonte']['arquivo'] for e in lock['binarios']} or len(proof)!=4 or not all(x['assinatura_msys2_verificada'] and x.get('controle_corrompido_recusado') for x in proof):raise ValueError('Verificação de fontes incompleta')
  if not metadata.get('fontes_correspondentes_incluidas') or not metadata.get('resolucao_runtime_fixada'):raise ValueError('Metadados incompletos')
  return 4
