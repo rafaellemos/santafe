@@ -1,0 +1,190 @@
+-- Resolução estática confinada às raízes escolhidas pelo cliente.
+local P = {}
+local Windows = módulo.configuração:corte(1,1)=="\\"
+local função caminho(uri)
+    se tipo(uri) ~= "colar" ou uri:procure("[?#]") então retorne nulo fim
+    local p=uri:separe("^file://(/.*)$") ou uri:separe("^file://localhost(/.*)$")
+    se não p então retorne nulo fim
+    local inválido=p:troque("%%[0-9A-Fa-f][0-9A-Fa-f]",""):procure("%%")~=nulo
+    p=p:troque("%%(..)",função(h)
+        local n=paraNúmero(h,16)
+        se não n ou n==0 então inválido=verdadeiro; retorne "" fim
+        retorne colar.caractere(n)
+    fim)
+    se inválido ou p:procure("%z") ou p:procure("\\",1,verdadeiro) então retorne nulo fim
+    local partes={}
+    para parte em p:capture("[^/]+") início
+        se parte == ".." então retorne nulo fim
+        se parte ~= "." então partes[#partes+1]=parte fim
+    fim
+    local resultado="/" .. tabela.concatene(partes,"/")
+    se Windows então
+        se não resultado:separe("^/[A-Za-z]:/") então retorne nulo fim
+        resultado=resultado:corte(2,2):maiúscula()..resultado:corte(3)
+    fim
+    retorne resultado
+fim
+local função uri(p)
+    retorne (Windows e "file:///" ou "file://") .. p:troque(Windows e "[^A-Za-z0-9:/_.~-]" ou "[^A-Za-z0-9/_.~-]",função(c) retorne ("%%%02X"):formate(c:byte()) fim)
+fim
+P.caminho, P.uri = caminho, uri
+
+função P.novo(nativo, documentos, indexe, hash, dados)
+    local self={raízes={}, descritores={}, cache={}, total=0, quantidade=0}
+    função self.configure(params)
+        self.raízes={}; self.descritores={}
+        local fontes={}
+        se dados.éLista(params.workspaceFolders) então
+            para _,r em ipares(params.workspaceFolders) início
+                se tipo(r)=="tabela" então fontes[#fontes+1]=r.uri fim
+            fim
+        senãose tipo(params.rootUri)=="colar" então fontes[1]=params.rootUri fim
+        para _,u em ipares(fontes) início
+            local p=caminho(u)
+            se p e p~="/" e não p:separe("^[A-Za-z]:/?$") e #self.raízes<16 e não self.descritores[p] então
+                local descritor=nativo e nativo.abraRaiz(p)
+                se descritor então
+                    self.raízes[#self.raízes+1]=p; self.descritores[p]=descritor
+                fim
+            fim
+        fim
+        self.invalide()
+    fim
+    função self.invalide()
+        self.cache={}; self.total=0; self.quantidade=0; self.tentativas=0; self.índices={}; self.pacotes={}
+        -- Vínculos entre módulos pertencem à mesma geração do índice.
+        para _,d em pares(documentos) início dados.apague(d,"análise") fim
+        -- Uma geração grande já não é alcançável. Liberá-la antes de construir
+        -- a próxima impede que sucessivas edições inflem o pico do alocador.
+        se coleteLixo("conte")>32*1024 então coleteLixo("colete") fim
+    fim
+    função self.atualize(evento)
+        se tipo(evento)~="tabela" então retorne fim
+        se dados.éLista(evento.removed) então
+            para _,item em ipares(evento.removed) início
+                local p=tipo(item)=="tabela" e caminho(item.uri)
+                se p então dados.apague(self.descritores,p) fim
+            fim
+        fim
+        local mantidas={}
+        para _,p em ipares(self.raízes) início
+            se self.descritores[p] então mantidas[#mantidas+1]=p fim
+        fim
+        self.raízes=mantidas
+        se dados.éLista(evento.added) então
+            para _,item em ipares(evento.added) início
+                local p=tipo(item)=="tabela" e caminho(item.uri)
+                se p e p~="/" e não p:separe("^[A-Za-z]:/?$") e #self.raízes<16 e não self.descritores[p] então
+                    local descritor=nativo.abraRaiz(p)
+                    se descritor então
+                        self.raízes[#self.raízes+1]=p; self.descritores[p]=descritor
+                    fim
+                fim
+            fim
+        fim
+        self.invalide()
+    fim
+    função self.raiz(u)
+        local p=caminho(u); se não p então retorne nulo fim
+        local melhor=nulo
+        para _,r em ipares(self.raízes) início
+            se p:corte(1,#r+1)==r.."/" e (não melhor ou #r>#melhor) então melhor=r fim
+        fim
+        retorne melhor,p
+    fim
+    função self.leia(u)
+        se documentos[u] então retorne documentos[u] fim
+        se self.cache[u] ~= nulo então retorne self.cache[u] ou nulo fim
+        local r,p=self.raiz(u)
+        se não r ou não nativo ou self.quantidade>=512 ou self.total>=16*1024*1024 ou self.tentativas>=4096 então retorne nulo fim
+        self.tentativas=self.tentativas+1
+        local texto=nativo.leiaFonte(self.descritores[r],p:corte(#r+2),4*1024*1024)
+        se não texto então self.cache[u]=falso; retorne nulo fim
+        se self.total+#texto>16*1024*1024 então retorne nulo fim
+        local linhas=indexe(texto); se não linhas então self.cache[u]=falso; retorne nulo fim
+        local d={texto=texto,linhas=linhas,uri=u}
+        self.cache[u]=d; self.quantidade=self.quantidade+1; self.total=self.total+#texto
+        retorne d
+    fim
+    função self.biblioteca(u)
+        local r,p=self.raiz(u)
+        retorne r e p:corte(#r+2):separe("^%.santafe/geracoes/")~=nulo ou falso
+    fim
+    local função instalados(raiz)
+        se self.pacotes[raiz]~=nulo então retorne self.pacotes[raiz] fim
+        self.pacotes[raiz]=falso
+        se não hash então retorne falso fim
+        local bruto=nativo.leiaFonte(self.descritores[raiz],".santafe/estado.json",16384)
+        se não bruto então retorne falso fim
+        local ok,estado=proteja(json.decod,bruto)
+        se não ok ou tipo(estado)~="tabela" ou estado.formato~=1 ou tipo(estado.geracao)~="colar" ou
+           #estado.geracao~=32 ou não estado.geracao:separe("^[0-9a-f]+$") então retorne falso fim
+        local base=".santafe/geracoes/"..estado.geracao
+        bruto=nativo.leiaFonte(self.descritores[raiz],base.."/modulos.json",1024*1024)
+        se não bruto ou hash(bruto)~=estado.modulos então retorne falso fim
+        local mapa; ok,mapa=proteja(json.decod,bruto)
+        se não ok ou tipo(mapa)~="tabela" ou mapa.formato~=1 ou tipo(mapa.modulos)~="tabela" então retorne falso fim
+        self.pacotes[raiz]={base=base,módulos=mapa.modulos}
+        retorne self.pacotes[raiz]
+    fim
+    função self.indexe(raizDesejada)
+        local arquivos,problema={},nulo
+        para _,raiz em ipares(self.raízes) início
+            se não raizDesejada ou raizDesejada==raiz então
+                local índice=self.índices[raiz]
+                se não índice então
+                    local caminhos,falha=nativo.listeFontes(self.descritores[raiz])
+                    índice={arquivos={},falha=falha}
+                    tabela.ordene(caminhos)
+                    para _,p em ipares(caminhos) início
+                        local u=uri(raiz.."/"..p)
+                        -- Uma raiz aninhada pertence somente à sua própria geração.
+                        se self.raiz(u)==raiz então
+                            local d=self.leia(u)
+                            se d então índice.arquivos[u]=d
+                            senão índice.falha="fonte inacessível ou limite de indexação" fim
+                        fim
+                    fim
+                    self.índices[raiz]=índice
+                fim
+                problema=problema ou índice.falha
+                para u,d em pares(índice.arquivos) início arquivos[u]=d fim
+            fim
+        fim
+        para u,d em pares(documentos) início
+            se não raizDesejada ou self.raiz(u)==raizDesejada então arquivos[u]=d fim
+        fim
+        retorne arquivos,problema
+    fim
+    função self.módulo(origem,nome)
+        se tipo(nome)~="colar" ou #nome>256 ou nome:procure("[/\\:%z]") ou
+           nome:corte(1,1)=="." ou nome:corte(-1)=="." ou nome:procure("..",1,verdadeiro) então retorne nulo fim
+        para parte em nome:capture("[^.]+") início
+            local ts,erroLéxico=depure.lexemas(parte)
+            se erroLéxico ou #ts~=1 ou ts[1].tipo~="nome" ou ts[1].octetosIdentificador~=#parte então retorne nulo fim
+        fim
+        local r,p=self.raiz(origem); se não r então retorne nulo fim
+        local pacotes=instalados(r)
+        local instalado=pacotes e pacotes.módulos[nome]
+        se instalado~=nulo e instalado~=falso então
+            se tipo(instalado)~="tabela" ou instalado.tipo~="fé" ou tipo(instalado.caminho)~="colar" ou
+                #instalado.caminho>2048 ou não instalado.caminho:separe("^pacotes/[a-z0-9-]+/") ou
+                tipo(instalado.sha256)~="colar" ou #instalado.sha256~=64 então retorne nulo fim
+            local u=uri(r.."/"..pacotes.base.."/"..instalado.caminho)
+            local d=self.leia(u)
+            se d e hash(d.texto)==instalado.sha256 então retorne d,u fim
+            retorne nulo
+        fim
+        local relativo=nome:troque("%.","/")
+        local diretório=p:separe("^(.*)/[^/]*$")
+        local bases={diretório.."/"..relativo,r.."/"..relativo,r.."/bibs/bibf/"..relativo}
+        para _,base em ipares(bases) início
+            para _,sufixo em ipares({".fé",".fe","/ini.fé","/ini.fe"}) início
+                local u=uri(base..sufixo); local d=self.leia(u)
+                se d então retorne d,u fim
+            fim
+        fim
+    fim
+    retorne self
+fim
+retorne P

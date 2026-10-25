@@ -1,0 +1,632 @@
+local Windows = módulo.configuração:corte(1,1)=="\\"
+local extensãoNativa=Windows e ".dll" ou ".so"
+-- SLS — Servidor de Linguagem Santafé.
+--
+-- Usa o analisador do núcleo sem executar o fonte. Intervalos são obtidos do
+-- léxico em octetos e convertidos para UTF-16; alterações são transacionais.
+
+local LIMITE_DO_QUADRO = 16 * 1024 * 1024
+local LIMITE_DOCUMENTO = 4 * 1024 * 1024
+local LIMITE_TOTAL = 16 * 1024 * 1024
+local LIMITE_DOCUMENTOS = 64
+local LIMITE_LINHAS = 100000
+local LIMITE_MUDANÇAS = 256
+local LIMITE_TRABALHO = 64 * 1024 * 1024
+local documentos = {}
+local totalOctetos = 0
+local totalDocumentos = 0
+local entrada = es.entradaPadrão
+local saída = es.saídaPadrão
+local inicializado = falso
+local encerrado = falso
+local diretórioSLS = (arg[0] ou ""):troque("\\","/"):separe("^(.*)/[^/]+$") ou "."
+local sondagem = es.abra(diretórioSLS .. "/analisador.fé", "rb")
+se sondagem então sondagem:feche() senão diretórioSLS=diretórioSLS.."/sls" fim
+local Analisador = executeArquivo(diretórioSLS.."/analisador.fé")
+local Projetos = executeArquivo(diretórioSLS.."/projetos.fé")
+local Semântica = executeArquivo(diretórioSLS.."/semantica.fé")
+local Dados = executeArquivo(diretórioSLS.."/estrutura.fé")
+local ONFE = Dados.experimental e executeArquivo(diretórioSLS.."/onfé.fé")
+local avisosEscopo = falso
+local carregadorNativo = módulo.pré["sls.nativo"] ou módulo.carregarBib(diretórioSLS.."/nativo"..extensãoNativa, "luaopen_sls_nativo")
+local nativo = carregadorNativo e carregadorNativo() ou nulo
+se Windows então garanta(nativo,"SLS Windows exige a camada nativa de proteção e transporte") fim
+local semântica
+local Transporte=executeArquivo(diretórioSLS.."/transporte.fé")
+local transporte=nativo e Transporte.novo(nativo, Dados) ou nulo
+
+local função escrevaQuadro(mensagem)
+    local conteúdo = garanta(json.cod(mensagem))
+    se #conteúdo>LIMITE_DO_QUADRO então
+        conteúdo=garanta(json.cod({jsonrpc="2.0",id=mensagem.id ou json.valorNulo,
+            error={code=-32803,message="resultado excede o limite de 16 MiB"}}))
+    fim
+    saída:escreva("Content-Length: ", octetos(conteúdo), "\r\n\r\n", conteúdo)
+    saída:esvazie()
+fim
+
+local função leiaQuadro()
+    local tamanhoDoConteúdo = nulo
+    local cabeçalhoLido = 0
+
+    enquanto verdadeiro início
+        local caracteres = {}
+        enquanto verdadeiro início
+            local caractere = entrada:leia(1)
+            se caractere == nulo então
+                se cabeçalhoLido == 0 então retorne nulo fim
+                retorne nulo, "cabeçalho LSP incompleto"
+            fim
+            cabeçalhoLido = cabeçalhoLido + 1
+            se cabeçalhoLido > 8192 então retorne nulo, "cabeçalho LSP excede 8192 bytes" fim
+            se caractere == "\n" então pare fim
+            caracteres[#caracteres + 1] = caractere
+        fim
+        local linha = tabela.concatene(caracteres)
+        -- es.leia("*linha") remove \n, mas preserva o \r de quadros LSP
+        -- escritos conforme HTTP/1.1 (CRLF).
+        se #linha > 0 e linha:corte(#linha, #linha) == "\r" então
+            linha = linha:corte(1, #linha - 1)
+        fim
+        se linha == "" então pare fim
+
+        local tamanho = linha:minúscula():separe(
+            "^content%-length:[ \t]*([0-9]+)[ \t]*$"
+        )
+        se tamanho então
+            se tamanhoDoConteúdo ~= nulo então retorne nulo, "Content-Length duplicado" fim
+            tamanhoDoConteúdo = paraNúmero(tamanho)
+        fim
+    fim
+
+    se tamanhoDoConteúdo == nulo ou tamanhoDoConteúdo < 0 ou
+       tamanhoDoConteúdo > LIMITE_DO_QUADRO então
+        retorne nulo, "Content-Length ausente ou fora do limite"
+    fim
+
+    local conteúdo = entrada:leia(tamanhoDoConteúdo)
+    se conteúdo == nulo ou octetos(conteúdo) ~= tamanhoDoConteúdo então
+        retorne nulo, "quadro LSP incompleto"
+    fim
+
+    retorne conteúdo
+fim
+
+local função responda(id, resultado)
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        id = id,
+        result = resultado
+    })
+fim
+
+local função respondaFalha(id, código, mensagem)
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        id = id ou json.valorNulo,
+        error = {
+            code = código,
+            message = mensagem
+        }
+    })
+fim
+
+local função inteiro(valor, mínimo)
+    retorne tipo(valor) == "número" e valor >= mínimo e valor <= 2147483647 e valor % 1 == 0
+fim
+
+-- UTF-8 estrito. Não dividir pares substitutos nem contar grafemas como colunas.
+local função passoUTF8(texto, índice)
+    local a, b, c, d = texto:byte(índice, índice + 3)
+    se a < 128 então retorne 1, 1 fim
+    se b == nulo ou b < 128 ou b > 191 então retorne nulo fim
+    se a >= 194 e a <= 223 então retorne 2, 1 fim
+    se c == nulo ou c < 128 ou c > 191 então retorne nulo fim
+    se a >= 224 e a <= 239 então
+        se (a == 224 e b < 160) ou (a == 237 e b >= 160) então retorne nulo fim
+        retorne 3, 1
+    fim
+    se d == nulo ou d < 128 ou d > 191 então retorne nulo fim
+    se a >= 240 e a <= 244 então
+        se (a == 240 e b < 144) ou (a == 244 e b > 143) então retorne nulo fim
+        retorne 4, 2
+    fim
+    retorne nulo
+fim
+
+local função indexe(texto)
+    se #texto > LIMITE_DOCUMENTO então retorne nulo, "documento excede 4 MiB" fim
+    local linhas = { 0 }
+    local i = 1
+    enquanto i <= #texto início
+        local b = texto:byte(i)
+        se b == 10 ou b == 13 então
+            se b == 13 e texto:byte(i + 1) == 10 então i = i + 1 fim
+            linhas[#linhas + 1] = i
+            se #linhas > LIMITE_LINHAS então retorne nulo, "documento excede o limite de linhas" fim
+            i = i + 1
+        senão
+            local passo = passoUTF8(texto, i)
+            se passo == nulo então retorne nulo, "texto UTF-8 inválido" fim
+            i = i + passo
+        fim
+    fim
+    retorne linhas
+fim
+
+local função fimDaLinha(texto, linhas, linha)
+    local limite = linhas[linha + 1]
+    se limite == nulo então retorne #texto fim
+    se texto:byte(limite) == 10 então
+        limite = limite - 1
+        se texto:byte(limite) == 13 então limite = limite - 1 fim
+    senão
+        limite = limite - 1
+    fim
+    retorne limite
+fim
+
+local função octetoDaPosição(texto, linhas, posição)
+    se tipo(posição) ~= "tabela" ou não inteiro(posição.line, 0) ou
+       não inteiro(posição.character, 0) ou posição.line >= #linhas então retorne nulo fim
+    local linha = posição.line + 1
+    local i, coluna = linhas[linha], 0
+    local limite = fimDaLinha(texto, linhas, linha)
+    enquanto i < limite e coluna < posição.character início
+        local passo, unidades = passoUTF8(texto, i + 1)
+        i, coluna = i + passo, coluna + unidades
+    fim
+    -- LSP 3.17 manda limitar colunas além da linha ao seu fim. Uma posição no
+    -- meio de um par substituto não pode ser aplicada sem corromper UTF-8.
+    se coluna > posição.character então retorne nulo fim
+    retorne i
+fim
+
+local função posiçãoDoOcteto(texto, linhas, offset)
+    local esquerda, direita = 1, #linhas
+    enquanto esquerda < direita início
+        local meio = (esquerda + direita + 1) // 2
+        se linhas[meio] <= offset então esquerda = meio senão direita = meio - 1 fim
+    fim
+    local i, coluna = linhas[esquerda], 0
+    linhas.cachePosição=linhas.cachePosição ou {}
+    local cache=linhas.cachePosição[esquerda]
+    se cache e cache.offset<=offset então i,coluna=cache.offset,cache.coluna fim
+    local limite = mat.mínimo(offset, fimDaLinha(texto, linhas, esquerda))
+    enquanto i < limite início
+        local passo, unidades = passoUTF8(texto, i + 1)
+        i, coluna = i + passo, coluna + unidades
+    fim
+    linhas.cachePosição[esquerda]={offset=i,coluna=coluna}
+    retorne { line = esquerda - 1, character = coluna }
+fim
+
+local função unidadesUTF16(texto, começo, final)
+    local unidades = 0
+    enquanto começo < final início
+        local passo, quantidade = passoUTF8(texto, começo + 1)
+        começo, unidades = começo + passo, unidades + quantidade
+    fim
+    retorne unidades
+fim
+
+local função avise(mensagem)
+    escrevaQuadro({ jsonrpc = "2.0", method = "window/logMessage", params = {
+        type = 2, message = "SLS: " .. mensagem
+    } })
+fim
+
+semântica = Semântica.novo(Analisador, Projetos, {
+    documentos=documentos, posição=posiçãoDoOcteto, offset=octetoDaPosição,
+    indexe=indexe, diretório=diretórioSLS, nativo=nativo, dados=Dados
+})
+
+local função publiqueDiagnósticos(uri, documento)
+    local ok, falha
+    se documento.onfe então ok,falha=ONFE.analise(documento.texto)
+    senão ok,falha=depure.analise(documento.texto, "@" .. uri) fim
+    local diagnósticos = json.matrizVazia
+
+    se não ok então
+        local começo, final = falha["início"], falha["fim"]
+        local intervalo = começo ~= nulo e final ~= nulo
+        -- Erros sem token (por exemplo bytecode recusado) não ganham uma
+        -- posição inventada. A mensagem original é preservada integralmente.
+        diagnósticos = {{
+            range = {
+                start = posiçãoDoOcteto(documento.texto, documento.linhas, começo ou 0),
+                ["end"] = posiçãoDoOcteto(documento.texto, documento.linhas, final ou 0)
+            },
+            code = intervalo e "sintaxe" ou "sintaxe-sem-intervalo",
+            severity = 1,
+            source = "SLS",
+            message = falha.mensagem
+        }}
+        -- O compilador continua sendo a autoridade. A recuperação estrutural
+        -- só acrescenta erros em fonte já rejeitado, nunca em programa válido.
+        local recuperada=documento.onfe e {erros={}} ou semântica.analise(documento,uri)
+        local vistos={[paraColar(começo ou 0)..":"..paraColar(final ou 0)]=verdadeiro}
+        para _,outro em ipares(recuperada.erros) início
+            local chave=paraColar(outro.começo)..":"..paraColar(outro.final)
+            se não vistos[chave] e #diagnósticos<16 então
+                vistos[chave]=verdadeiro
+                diagnósticos[#diagnósticos+1]={
+                    range={start=posiçãoDoOcteto(documento.texto,documento.linhas,outro.começo),
+                           ["end"]=posiçãoDoOcteto(documento.texto,documento.linhas,outro.final)},
+                    code="sintaxe-recuperada",severity=1,source="SLS",message=outro.mensagem
+                }
+            fim
+        fim
+    fim
+
+    se ok e avisosEscopo e não documento.onfe então
+        diagnósticos=semântica.avisos(documento,uri)
+    fim
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        method = "textDocument/publishDiagnostics",
+        params = {
+            uri = uri,
+            version = documento.versão,
+            diagnostics = diagnósticos == json.matrizVazia e diagnósticos ou Dados.lista(diagnósticos)
+        }
+    })
+fim
+
+local função textoDoDocumento(parâmetros)
+    local documento = tipo(parâmetros) == "tabela" e parâmetros.textDocument ou nulo
+    se tipo(documento) ~= "tabela" ou tipo(documento.uri) ~= "colar" então
+        retorne nulo
+    fim
+    retorne documento
+fim
+
+local função aoAbrir(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo ou tipo(documento.text) ~= "colar" ou
+       não inteiro(documento.version, -2147483648) então retorne fim
+    se documentos[documento.uri] ~= nulo então
+        avise("didOpen duplicado ignorado; feche o documento antes de reabri-lo")
+        retorne
+    fim
+    se totalDocumentos >= LIMITE_DOCUMENTOS ou totalOctetos + #documento.text > LIMITE_TOTAL então
+        avise("limite de documentos abertos excedido; feche documentos e reabra este")
+        retorne
+    fim
+    local linhas, falha = indexe(documento.text)
+    se linhas == nulo então avise(falha); retorne fim
+
+    documentos[documento.uri] = {
+        texto = documento.text,
+        versão = documento.version,
+        linhas = linhas,
+        onfe = ONFE e (documento.languageId=="onfe-experimental" ou documento.languageId=="onfe" ou
+            documento.uri:separe("%.onfé$")~=nulo ou documento.uri:minúscula():separe("%.onf%%c3%%a9$")~=nulo) ou falso
+    }
+    totalOctetos, totalDocumentos = totalOctetos + #documento.text, totalDocumentos + 1
+    semântica.projetos.invalide()
+    publiqueDiagnósticos(documento.uri, documentos[documento.uri])
+fim
+
+local função apliqueMudanças(guardado, mudanças)
+    se não Dados.éLista(mudanças) ou #mudanças == 0 ou #mudanças > LIMITE_MUDANÇAS então
+        retorne nulo, "lista de mudanças inválida ou excessiva"
+    fim
+    para chave em pares(mudanças) início
+        se não inteiro(chave, 1) ou chave > #mudanças então retorne nulo, "lista de mudanças inválida" fim
+    fim
+    local texto, linhas = guardado.texto, guardado.linhas
+    local sincronizado = não guardado.dessincronizado
+    local trabalho = 0
+    para i = 1, #mudanças início
+        local mudança = mudanças[i]
+        se tipo(mudança) ~= "tabela" ou tipo(mudança.text) ~= "colar" então
+            retorne nulo, "mudança sem texto"
+        fim
+        se mudança.range == nulo então
+            texto = mudança.text
+            sincronizado = verdadeiro
+        senão
+            se não sincronizado então retorne nulo, "aguardando substituição integral" fim
+            se tipo(mudança.range) ~= "tabela" então retorne nulo, "intervalo inválido" fim
+            local começo = octetoDaPosição(texto, linhas, mudança.range.start)
+            local final = octetoDaPosição(texto, linhas, mudança.range["end"])
+            se começo == nulo ou final == nulo ou começo > final então
+                retorne nulo, "intervalo inválido ou corta um par UTF-16"
+            fim
+            se mudança.rangeLength ~= nulo e
+               (não inteiro(mudança.rangeLength, 0) ou
+                mudança.rangeLength ~= unidadesUTF16(texto, começo, final)) então
+                retorne nulo, "rangeLength não corresponde ao intervalo UTF-16"
+            fim
+            se #texto - (final - começo) + #mudança.text > LIMITE_DOCUMENTO então
+                retorne nulo, "documento excede 4 MiB"
+            fim
+            texto = texto:corte(1, começo) .. mudança.text .. texto:corte(final + 1)
+        fim
+        trabalho = trabalho + #texto
+        se trabalho > LIMITE_TRABALHO então retorne nulo, "lote de mudanças excede o limite de trabalho" fim
+        local falha
+        linhas, falha = indexe(texto)
+        se linhas == nulo então retorne nulo, falha fim
+    fim
+    se totalOctetos - #guardado.texto + #texto > LIMITE_TOTAL então
+        retorne nulo, "limite total de documentos excedido"
+    fim
+    retorne { texto = texto, linhas = linhas }
+fim
+
+local função aoMudar(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo então retorne fim
+    local guardado = documentos[documento.uri]
+    se guardado == nulo então retorne fim
+    se não inteiro(documento.version, -2147483648) ou documento.version <= guardado.versão então retorne fim
+
+    local novo, falha = apliqueMudanças(guardado, parâmetros.contentChanges)
+    se novo == nulo então
+        guardado.dessincronizado = verdadeiro
+        guardado.versão = documento.version
+        avise(falha .. "; envie o texto integral ou reabra o documento")
+        escrevaQuadro({ jsonrpc = "2.0", method = "textDocument/publishDiagnostics", params = {
+            uri = documento.uri, version = documento.version, diagnostics = json.matrizVazia
+        } })
+        retorne
+    fim
+    totalOctetos = totalOctetos - #guardado.texto + #novo.texto
+    novo.versão = documento.version
+    novo.onfe = guardado.onfe
+    documentos[documento.uri] = novo
+    semântica.projetos.invalide()
+    publiqueDiagnósticos(documento.uri, novo)
+fim
+
+local função aoSalvar(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo então retorne fim
+
+    local guardado = documentos[documento.uri]
+    -- O editor é dono do texto aberto. didSave não substitui versões nem
+    -- ressuscita documentos fechados; diferenças exigem didChange integral.
+    se guardado == nulo ou guardado.dessincronizado então retorne fim
+    se parâmetros.text ~= nulo e parâmetros.text ~= guardado.texto então
+        avise("didSave diverge do texto sincronizado; envie didChange integral")
+        retorne
+    fim
+    publiqueDiagnósticos(documento.uri, guardado)
+fim
+
+local função aoFechar(parâmetros)
+    local documento = textoDoDocumento(parâmetros)
+    se documento == nulo então retorne fim
+
+    local guardado = documentos[documento.uri]
+    se guardado então
+        totalOctetos = totalOctetos - #guardado.texto
+        totalDocumentos = totalDocumentos - 1
+        Dados.apague(documentos, documento.uri)
+        semântica.projetos.invalide()
+    fim
+    escrevaQuadro({
+        jsonrpc = "2.0",
+        method = "textDocument/publishDiagnostics",
+        params = { uri = documento.uri, diagnostics = json.matrizVazia }
+    })
+fim
+
+local métodos = {
+    ["textDocument/completion"]=semântica.complete,
+    ["textDocument/hover"]=semântica.hover,
+    ["textDocument/definition"]=semântica.definição,
+    ["textDocument/references"]=semântica.referências,
+    ["textDocument/documentHighlight"]=função(p) retorne semântica.referências(p,verdadeiro) fim,
+    ["textDocument/prepareRename"]=semântica.prepareRename,
+    ["textDocument/rename"]=semântica.rename,
+    ["textDocument/signatureHelp"]=semântica.assinatura,
+    ["textDocument/documentSymbol"]=semântica.símbolos,
+    ["workspace/symbol"]=função(p) retorne semântica.símbolos(p,verdadeiro) fim,
+    ["textDocument/semanticTokens/full"]=semântica.tokens,
+    ["textDocument/foldingRange"]=semântica.dobre,
+    ["textDocument/selectionRange"]=semântica.selecione,
+    ["textDocument/formatting"]=semântica.formate,
+    ["textDocument/codeAction"]=semântica.corrija
+}
+
+local função parâmetrosVálidos(m,p)
+    se m=="workspace/symbol" então retorne tipo(p.query)=="colar" e #p.query<=1024 fim
+    se tipo(p.textDocument)~="tabela" ou tipo(p.textDocument.uri)~="colar" ou
+       #p.textDocument.uri>8192 então retorne falso fim
+    local função posição(v)
+        retorne tipo(v)=="tabela" e inteiro(v.line,0) e inteiro(v.character,0) e
+            v.line<=2147483647 e v.character<=2147483647
+    fim
+    local função intervalo(v)
+        retorne tipo(v)=="tabela" e posição(v.start) e posição(v["end"]) e
+            (v.start.line<v["end"].line ou (v.start.line==v["end"].line e v.start.character<=v["end"].character))
+    fim
+    local comPosição=m=="textDocument/completion" ou m=="textDocument/hover" ou m=="textDocument/definition" ou
+        m=="textDocument/references" ou m=="textDocument/documentHighlight" ou m=="textDocument/prepareRename" ou
+        m=="textDocument/rename" ou m=="textDocument/signatureHelp"
+    se comPosição e não posição(p.position) então retorne falso fim
+    se m=="textDocument/rename" e tipo(p.newName)~="colar" então retorne falso fim
+    se m=="textDocument/references" e (tipo(p.context)~="tabela" ou tipo(p.context.includeDeclaration)~="lógico") então retorne falso fim
+    se m=="textDocument/formatting" e (tipo(p.options)~="tabela" ou não inteiro(p.options.tabSize,1) ou
+        p.options.tabSize>32 ou tipo(p.options.insertSpaces)~="lógico") então retorne falso fim
+    se m=="textDocument/selectionRange" então
+        se não Dados.éLista(p.positions) ou #p.positions>128 então retorne falso fim
+        para k,v em pares(p.positions) início
+            se não inteiro(k,1) ou k>#p.positions ou não posição(v) então retorne falso fim
+        fim
+    fim
+    se m=="textDocument/codeAction" e (não intervalo(p.range) ou tipo(p.context)~="tabela" ou
+        não Dados.éLista(p.context.diagnostics)) então retorne falso fim
+    retorne verdadeiro
+fim
+
+local função processe(pedido)
+    se tipo(pedido) ~= "tabela" ou pedido.jsonrpc ~= "2.0" ou
+       tipo(pedido.method) ~= "colar" ou
+       (pedido.id~=nulo e tipo(pedido.id)~="número" e tipo(pedido.id)~="colar") então
+        respondaFalha(nulo, -32600, "pedido JSON-RPC inválido")
+        retorne verdadeiro
+    fim
+
+    local método = pedido.method
+    local parâmetros = pedido.params
+    se parâmetros == nulo então parâmetros = {} fim
+    local éPedido = pedido.id ~= nulo
+
+    se método == "exit" então
+        so.saia(encerrado e 0 ou 1)
+    fim
+    se tipo(parâmetros) ~= "tabela" então
+        se éPedido então respondaFalha(pedido.id, -32602, "parâmetros inválidos") fim
+        retorne verdadeiro
+    fim
+    se encerrado ou (inicializado e método == "initialize") então
+        se éPedido então respondaFalha(pedido.id, -32600, "estado LSP inválido") fim
+        retorne verdadeiro
+    fim
+    se não inicializado e método ~= "initialize" então
+        se éPedido então respondaFalha(pedido.id, -32002, "servidor não inicializado") fim
+        retorne verdadeiro
+    fim
+
+    se método == "initialize" então
+        se éPedido então
+            se tipo(depure.analise) ~= "função" ou tipo(depure.lexemas) ~= "função" ou não nativo então
+                respondaFalha(pedido.id, -32603, "SLS requer núcleo com depure.analise/lexemas e suporte nativo POSIX; recompile e instale núcleo e SLS juntos")
+                retorne verdadeiro
+            fim
+            inicializado = verdadeiro
+            avisosEscopo=tipo(parâmetros.initializationOptions)=="tabela" e parâmetros.initializationOptions.avisosEscopo==verdadeiro
+            semântica.projetos.configure(parâmetros)
+            responda(pedido.id, {
+                capabilities = {
+                    positionEncoding = "utf-16",
+                    completionProvider={triggerCharacters=Dados.lista({".",":"})},
+                    hoverProvider=verdadeiro,
+                    definitionProvider=verdadeiro,
+                    referencesProvider=verdadeiro,
+                    documentHighlightProvider=verdadeiro,
+                    documentSymbolProvider=verdadeiro,
+                    workspaceSymbolProvider=verdadeiro,
+                    workspace={workspaceFolders={supported=verdadeiro,changeNotifications=verdadeiro}},
+                    renameProvider={prepareProvider=verdadeiro},
+                    signatureHelpProvider={triggerCharacters=Dados.lista({"(",","})},
+                    foldingRangeProvider=verdadeiro,
+                    selectionRangeProvider=verdadeiro,
+                    documentFormattingProvider=verdadeiro,
+                    codeActionProvider={codeActionKinds=Dados.lista({"quickfix"})},
+                    semanticTokensProvider={full=verdadeiro,legend={tokenTypes=Dados.lista({"variable","function","parameter"}),tokenModifiers=Dados.lista({"declaration"})}},
+                    textDocumentSync = {
+                        openClose = verdadeiro,
+                        change = 2,
+                        save = { includeText = verdadeiro }
+                    }
+                },
+                serverInfo = { name = "SLS", version = Dados.experimental e "1.0.0-dados.18" ou "1.0.0" }
+            })
+        fim
+    senão se método == "shutdown" então
+        se éPedido então
+            encerrado = verdadeiro
+            responda(pedido.id, json.valorNulo)
+        fim
+    senão se método == "exit" então
+        retorne falso
+    senão se método == "textDocument/didOpen" então
+        aoAbrir(parâmetros)
+    senão se método == "textDocument/didChange" então
+        aoMudar(parâmetros)
+    senão se método == "textDocument/didSave" então
+        aoSalvar(parâmetros)
+    senão se método == "textDocument/didClose" então
+        aoFechar(parâmetros)
+    senão se método == "workspace/didChangeWatchedFiles" então
+        semântica.projetos.invalide()
+    senão se método == "workspace/didChangeWorkspaceFolders" então
+        semântica.projetos.atualize(parâmetros.event)
+    senão se métodos[método] e éPedido então
+        se não parâmetrosVálidos(método,parâmetros) então
+            respondaFalha(pedido.id,-32602,"parâmetros inválidos para "..método)
+            retorne verdadeiro
+        fim
+        local doc=parâmetros.textDocument e documentos[parâmetros.textDocument.uri]
+        se doc e doc.onfe então
+            se método=="textDocument/rename" então respondaFalha(pedido.id,-32602,"ONFÉ contém dados, não símbolos renomeáveis")
+            senão responda(pedido.id,método=="textDocument/semanticTokens/full" e {data=json.matrizVazia} ou
+                ((método=="textDocument/hover" ou método=="textDocument/definition" ou método=="textDocument/prepareRename" ou método=="textDocument/signatureHelp") e json.valorNulo ou json.matrizVazia)) fim
+            retorne verdadeiro
+        fim
+        transporte.ativo=pedido.id
+        transporte.puxe(0)
+        local cancelamento,limite,memória={},{},{}
+        local começou=so.relógio()
+        local função confiraCancelamento()
+            transporte.puxe(0)
+            se transporte.cancelados[pedido.id] então erro(cancelamento) fim
+            se so.relógio()-começou>2 então erro(limite) fim
+            se coleteLixo("conte")>256*1024 então
+                -- Gerações invalidadas podem ainda aguardar a coleta. O limite
+                -- deve medir objetos vivos, não recusar um pedido por lixo.
+                coleteLixo("colete")
+                se coleteLixo("conte")>256*1024 então erro(memória) fim
+            fim
+        fim
+        local ok,resultado,falha
+        se transporte.cancelados[pedido.id] então ok,resultado=falso,cancelamento
+        senão
+            ok,resultado,falha=nativo.executeProtegido(função()
+                depure.definaGancho(confiraCancelamento,"",5000)
+                retorne métodos[método](parâmetros)
+            fim)
+            transporte.puxe(0)
+        fim
+        transporte.ativo=nulo
+        se transporte.cancelados[pedido.id] ou resultado==cancelamento então
+            Dados.apague(transporte.cancelados, pedido.id)
+            semântica.projetos.invalide()
+            respondaFalha(pedido.id,-32800,"pedido cancelado")
+        senãose resultado==limite ou so.relógio()-começou>2 então
+            semântica.projetos.invalide()
+            respondaFalha(pedido.id,-32803,"análise excedeu o limite de processamento")
+        senãose resultado==memória então
+            semântica.projetos.invalide()
+            coleteLixo("colete")
+            respondaFalha(pedido.id,-32803,"análise excedeu o orçamento de memória")
+        senãose não ok então respondaFalha(pedido.id,-32603,"falha controlada da análise: "..paraColar(resultado))
+        senãose falha então respondaFalha(pedido.id,-32602,falha)
+        senão responda(pedido.id,resultado ou json.valorNulo) fim
+    senão se éPedido então
+        respondaFalha(pedido.id, -32601, "método LSP ainda não implementado: " .. método)
+    fim fim fim fim fim fim fim fim fim fim fim
+
+    retorne verdadeiro
+fim
+
+enquanto verdadeiro início
+    local recebido, falhaDoQuadro
+    se transporte então recebido,falhaDoQuadro=transporte.próximo()
+    senão
+        -- Permite responder initialize com erro claro em instalação incompleta.
+        local quadro; quadro,falhaDoQuadro=leiaQuadro()
+        se quadro então
+            local ok,pedido=proteja(json.decod,quadro)
+            recebido={pedido=pedido,inválido=não ok}
+        fim
+    fim
+    se recebido == nulo então
+        se falhaDoQuadro então
+            es.saídaDeErroPadrão:escreva(falhaDoQuadro, "\n")
+            so.saia(1)
+        fim
+        pare
+    fim
+
+    se não recebido.inválido então
+        se não processe(recebido.pedido) então pare fim
+    senão
+        respondaFalha(nulo, -32700, "JSON inválido")
+    fim
+fim

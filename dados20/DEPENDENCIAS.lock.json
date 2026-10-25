@@ -1,0 +1,118 @@
+{
+  "versao": 1,
+  "escopo": "DLLs externas redistribuídas; não é fixação completa do toolchain",
+  "binarios": [
+    {
+      "arquivo": "bin/libglib-2.0-0.dll",
+      "sha256": "3a1abec0184b238db54399cb9243393d9436d96b8fdb9bd9f2875da207c5b458",
+      "pacote": "mingw-w64-ucrt-x86_64-glib2",
+      "identidade": "mingw-w64-ucrt-x86_64-glib2 2.90.1-1",
+      "fonte": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-glib2-2.90.1-1.src.tar.zst",
+        "arquivo": "mingw-w64-glib2-2.90.1-1.src.tar.zst",
+        "bytes": 5875958,
+        "sha256": "ac3bc00e4079e6b51dd0a1fb9ccc420fff033b4e9095e4487dbf6cf01312cee6"
+      },
+      "assinatura": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-glib2-2.90.1-1.src.tar.zst.sig",
+        "arquivo": "mingw-w64-glib2-2.90.1-1.src.tar.zst.sig",
+        "bytes": 566,
+        "sha256": "8a4a15f9134d813d9e525a0ecf67a587cf5a414138b5019e6a37b1a8a7d59e4d"
+      },
+      "conteudos": {
+        "mingw-w64-glib2/.SRCINFO": "7425ca1205eb6cf33fa43ce2fa2996a00cb5e7c67ff2c00eb7f229250d0d4d21",
+        "mingw-w64-glib2/0002-disable_glib_compile_schemas_warning.patch": "396c25cfd740ffbb72209133c7b9453173167577265a4bb14502678de8d5a8f9",
+        "mingw-w64-glib2/0004-disable-explicit-ms-bitfields.patch": "48e94a9e61f8db9a2dc66556f12c725efe5e247a9ddc5b491f8cb8310a387293",
+        "mingw-w64-glib2/7e69f88480a4bf8d9653efd0310c4c25390a0c8b.patch": "4902e5748c6954ed38f690f27954db96709e705ff83bbdb4ebf7392a21f65824",
+        "mingw-w64-glib2/gio-querymodules.hook.in": "f18d27d98709dba8c5f9756672baaf0158fb4353c9edbdc2e80021f88ff34ced",
+        "mingw-w64-glib2/glib-2.90.1.tar.xz": "93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396",
+        "mingw-w64-glib2/glib-compile-schemas.hook.in": "0c3d54636407e0e13429b73959cace626253cd772e1d4870de0fb92b0b99545a",
+        "mingw-w64-glib2/PKGBUILD": "ca768ab894a3a5b9c07cbcf56411fbca55e1c60b8243c6e6409f3496ae46e6d8",
+        "mingw-w64-glib2/pyscript2exe.py": "3c65bc3dd7337877e14b19bc7c42918bde664a11a860cfc0b9db891f8a1052db"
+      }
+    },
+    {
+      "arquivo": "bin/libiconv-2.dll",
+      "sha256": "94ec68fb8d342b6c91b6b48a8d95092819cdcd006a7166e0b68062f946afd08a",
+      "pacote": "mingw-w64-ucrt-x86_64-libiconv",
+      "identidade": "mingw-w64-ucrt-x86_64-libiconv 1.19-1",
+      "fonte": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst",
+        "arquivo": "mingw-w64-libiconv-1.19-1.src.tar.zst",
+        "bytes": 5131029,
+        "sha256": "74428280c17094da5b702c29b2e1a0abae59556ea5dfdd65705cc8ccc1e000fb"
+      },
+      "assinatura": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst.sig",
+        "arquivo": "mingw-w64-libiconv-1.19-1.src.tar.zst.sig",
+        "bytes": 566,
+        "sha256": "d99f265bd4e51d7e86267258d3d0101a72d901d8c2b8c4f2f59cf845656dbe62"
+      },
+      "conteudos": {
+        "mingw-w64-libiconv/.SRCINFO": "0a6eaca4b054fbc935d8f66e0432a5e29abed083d25707d47938ca009947015f",
+        "mingw-w64-libiconv/0002-fix-cr-for-awk-in-configure.all.patch": "89d5c0f666e50a0186cfb142ba7b77e8fe1ac4d65bdfd9ae14ae8d2f0045a87c",
+        "mingw-w64-libiconv/0003-add-cp65001-as-utf8-alias.patch": "cb2b1cca44c9b9bd11c3bd33997c10d22dff263542275324c88f34b59910ef87",
+        "mingw-w64-libiconv/fix-pointer-buf.patch": "6b6e2393840f4dc6067587165777b1a07978f4c05247d7c1010a45ad251bbeeb",
+        "mingw-w64-libiconv/iconv.pc": "56e7ec406bf42eb66b1d972f20d229f7a76ba00c38c7b4403bf348875704baae",
+        "mingw-w64-libiconv/libiconv-1.19.tar.gz": "88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6",
+        "mingw-w64-libiconv/libiconv-1.19.tar.gz.sig": "30374a9cf2846418fc34977eb2b92094c3edb76021d57de541699e2b5e32dc9b",
+        "mingw-w64-libiconv/PKGBUILD": "9b3212d06910560fb59e017e0b73a29d392a5082d3a47a613e61509bd7dcd475"
+      }
+    },
+    {
+      "arquivo": "bin/libintl-8.dll",
+      "sha256": "0e5a178731e6be6d115442a6ade3df7f03265cd1fc4338f8b6f86a8001cbf582",
+      "pacote": "mingw-w64-ucrt-x86_64-gettext-runtime",
+      "identidade": "mingw-w64-ucrt-x86_64-gettext-runtime 1.0-1",
+      "fonte": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-gettext-1.0-1.src.tar.zst",
+        "arquivo": "mingw-w64-gettext-1.0-1.src.tar.zst",
+        "bytes": 10267655,
+        "sha256": "cca0d0c8f60353faccc5ad40405240014e4a7ccc8b1c6ca9f4626aef3097d26e"
+      },
+      "assinatura": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-gettext-1.0-1.src.tar.zst.sig",
+        "arquivo": "mingw-w64-gettext-1.0-1.src.tar.zst.sig",
+        "bytes": 566,
+        "sha256": "daaa76ab77b852c1d62de5ab2338b026a5281e6d208a5f83e963f19c504baf95"
+      },
+      "conteudos": {
+        "mingw-w64-gettext/.SRCINFO": "98322e06dc8d20c5ca2c433ced0eb0d6e80adc838976f488de1b8878781f3972",
+        "mingw-w64-gettext/0005-Fix-compilation-of-pthread_sigmask.c.patch": "cbc2f533012d646521afa20f8b256917fce040741ff42cf53fb6dd7123a6670a",
+        "mingw-w64-gettext/0021-replace-fsync.patch": "380dbddee2f9e2feee4c1435e8a942b5d11d0125e60c3350ebb10c19b19011aa",
+        "mingw-w64-gettext/0022-libasprintf.patch": "c354f6a7021069c99b90f1c6d6f6a4ccf40a01e9f6742b866df2b5a7286cb868",
+        "mingw-w64-gettext/0024-disable-gnu-format.patch": "ce7ccf6dd3a492cab322253cd67310899b546eccc25821c25cbc047a1a984633",
+        "mingw-w64-gettext/0030-fix-build-with-mingw-w64-clang.patch": "9b1b4f0c65b3bc1a3103c921a02c203cecf533d145f0bd90023406e760f81749",
+        "mingw-w64-gettext/122-Use-LF-as-newline-in-envsubst.patch": "ec39103d851262c02c27b7038f3c538e03afaefc6aa050311d62519d192ff38c",
+        "mingw-w64-gettext/gettext-1.0.tar.lz": "d6342cbe1411a2fe7d139bfed80c2d63b1babc92acfedc72501cc105184f61ee",
+        "mingw-w64-gettext/gettext-1.0.tar.lz.sig": "39fae6a06678f1d34f0ad8ccb670435b48af3b062cf8f0b50d39159ac3d1c0b1",
+        "mingw-w64-gettext/PKGBUILD": "853ef80a50588f29355722a4513f24cf1a5f8de06e0b5ee326580464db539741"
+      }
+    },
+    {
+      "arquivo": "bin/libpcre2-8-0.dll",
+      "sha256": "1f609cde2ce432efb7d2b0c7b84a14a6dbfc9622d1ac1a3cbadf51c5b0b4dada",
+      "pacote": "mingw-w64-ucrt-x86_64-pcre2",
+      "identidade": "mingw-w64-ucrt-x86_64-pcre2 10.49-1",
+      "fonte": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-pcre2-10.49-1.src.tar.zst",
+        "arquivo": "mingw-w64-pcre2-10.49-1.src.tar.zst",
+        "bytes": 2183818,
+        "sha256": "b02f0d5070b7d7f6db5c8ba9b009f28c1a07b9b52aaf7964dc0c8b098e4088d1"
+      },
+      "assinatura": {
+        "url": "https://repo.msys2.org/mingw/sources/mingw-w64-pcre2-10.49-1.src.tar.zst.sig",
+        "arquivo": "mingw-w64-pcre2-10.49-1.src.tar.zst.sig",
+        "bytes": 566,
+        "sha256": "953a7bad67b4f175fb30719aab3c0c1b645b9ce5346ac4efd84846f94444c4ec"
+      },
+      "conteudos": {
+        "mingw-w64-pcre2/.SRCINFO": "5038c50f87b109f4641775c20db6cee6122d996662faaa7aa64290b4b2d126c3",
+        "mingw-w64-pcre2/0001-pcre2test-wineditline.patch": "73400390211bfaf1ad7e5b900335bc48b50d9bd1aa5b864fa54a3e8f666d5eb9",
+        "mingw-w64-pcre2/pcre2-10.49.tar.bz2": "53c156e1ba416a20da8e65395daa132da0d80e76910424caca3fcdae7831d384",
+        "mingw-w64-pcre2/pcre2-10.49.tar.bz2.sig": "195ed167511ccb6b34f9676d5e37f7cc71490ca6ec00fc65851bacb3fb43bdcb",
+        "mingw-w64-pcre2/PKGBUILD": "19e2827b5ffd57b7981ec9678258107e5737f520229d36b4d15d71c24267eb19"
+      }
+    }
+  ]
+}
