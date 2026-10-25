@@ -34,7 +34,8 @@ static int write_file(lua_State *L){WF *root=root_arg(L),*w;size_t n,len,used=0;
   * targets explicitly; a racing replacement cannot redirect the rename. */
  {HANDLE target=wf_at(w->h[w->n-1],leaf,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,0,1);
   if(target!=INVALID_HANDLE_VALUE)CloseHandle(target);else if(GetLastError()!=ERROR_FILE_NOT_FOUND)goto fail;}
- if(!random_bytes(rnd,16))goto fail;wcscpy(tmp,L".escrita-");for(i=0;i<16;i++)swprintf(tmp+8+2*i,3,L"%02x",rnd[i]);
+ if(!random_bytes(rnd,16))goto fail;
+ wcscpy(tmp,L".escrita-");for(i=0;i<16;i++)swprintf(tmp+8+2*i,3,L"%02x",rnd[i]);
  if(!wf_append(w,tmp,wcslen(tmp)))goto fail;
  stage="criar temporario";h=wf_at(w->h[w->n-1],tmp,GENERIC_WRITE|DELETE,0,CREATE_NEW,0,1);if(h==INVALID_HANDLE_VALUE)goto fail;
  stage="escrever temporario";while(used<n){if(!WriteFile(h,bytes+used,(DWORD)(n-used),&wrote,NULL)||!wrote)goto fail;used+=wrote;}
@@ -109,25 +110,29 @@ static int append_arg(wchar_t *out,size_t *used,const wchar_t *arg) {
         if(arg[i]==L'\\'){slashes++;i++;continue;}
         if(*used+2*slashes+4>=32760)return 0;
         while(slashes){out[(*used)++]=L'\\';if(arg[i]==L'"')out[(*used)++]=L'\\';slashes--;}
-        if(arg[i]==L'"')out[(*used)++]=L'\\';out[(*used)++]=arg[i++];
+        if(arg[i]==L'"')out[(*used)++]=L'\\';
+        out[(*used)++]=arg[i++];
     }
     if(*used+2*slashes+2>=32760)return 0;
     while(slashes--){out[(*used)++]=L'\\';out[(*used)++]=L'\\';}out[(*used)++]=L'"';out[*used]=0;return 1;
 }
 static int absolute(const wchar_t *p){return ((p[0]>=L'A'&&p[0]<=L'Z')||(p[0]>=L'a'&&p[0]<=L'z'))&&p[1]==L':'&&(p[2]==L'/'||p[2]==L'\\');}
 static int run(lua_State *L){
- WF *root=root_arg(L);lua_Integer seconds=luaL_optinteger(L,3,120),max=luaL_optinteger(L,4,1024*1024);size_t count,used=0,bytes=0;int i,code=0,started=0;DWORD error=ERROR_SUCCESS,available,n,exitcode=0;
+ WF *root=root_arg(L),*pins=NULL;lua_Integer seconds=luaL_optinteger(L,3,120),max=luaL_optinteger(L,4,1024*1024);size_t count,used=0,bytes=0;int i,code=0,started=0;DWORD error=ERROR_SUCCESS,available,n,exitcode=0;
  wchar_t command[32768],exe[WF_MAX],arg[WF_MAX],system[WF_MAX],compiler[WF_MAX],environment[32768];char *output;
  HANDLE rd=NULL,wr=NULL,in=NULL,job=NULL,inherit[2];STARTUPINFOEXW startup;PROCESS_INFORMATION process;SECURITY_ATTRIBUTES sa={sizeof(sa),NULL,TRUE};JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;SIZE_T attrs=0;ULONGLONG end;
  luaL_argcheck(L,lua_istable(L,2),2,"argumentos invalidos");count=lua_rawlen(L,2);
  luaL_argcheck(L,count>0&&count<=256,2,"limite de argumentos");luaL_argcheck(L,seconds>=1&&seconds<=180,3,"prazo invalido");luaL_argcheck(L,max>0&&max<=MAX_BYTES,4,"limite de saida invalido");
  for(i=1;i<=(int)count;i++){size_t size;const char *s;lua_rawgeti(L,2,i);s=luaL_checklstring(L,-1,&size);if(!size)arg[0]=0;else if(!wf_wide(s,size,arg,WF_MAX))return luaL_argerror(L,2,"argumento UTF8 invalido ou excessivo");
-  if(!append_arg(command,&used,arg))return luaL_argerror(L,2,"comando excessivo");if(i==1)wcscpy(exe,arg);lua_pop(L,1);}
+  if(!append_arg(command,&used,arg))return luaL_argerror(L,2,"comando excessivo");
+  if(i==1)wcscpy(exe,arg);
+  lua_pop(L,1);}
  luaL_argcheck(L,absolute(exe)&&wcslen(exe)>4&&!_wcsicmp(exe+wcslen(exe)-4,L".exe"),2,"executavel absoluto .exe exigido");
  wcscpy(compiler,exe);{wchar_t *slash=wcsrchr(compiler,L'\\'),*other=wcsrchr(compiler,L'/');if(other&&(!slash||other>slash))slash=other;*slash=0;}
  if(!GetWindowsDirectoryW(system,WF_MAX))return wf_fail(L,"diretorio Windows");
  {int len=swprintf(environment,32768,L"PATH=%ls;%ls\\System32%cSystemRoot=%ls%cTEMP=%ls%cTMP=%ls%c",compiler,system,0,system,0,root->path,0,root->path,0);if(len<=0||len>=32767)return luaL_error(L,"ambiente excessivo");environment[len]=0;}
  output=lua_newuserdata(L,(size_t)max+1);memset(&startup,0,sizeof(startup));memset(&process,0,sizeof(process));memset(&limits,0,sizeof(limits));startup.StartupInfo.cb=sizeof(startup);
+ pins=wf_new(L);if(!wf_strict(pins,root))goto fail;
  if(!CreatePipe(&rd,&wr,&sa,0)||!SetHandleInformation(rd,HANDLE_FLAG_INHERIT,0))goto fail;
  in=CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&sa,OPEN_EXISTING,0,NULL);if(in==INVALID_HANDLE_VALUE){in=NULL;goto fail;}
  job=CreateJobObjectW(NULL,NULL);if(!job)goto fail;limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
@@ -155,7 +160,9 @@ stop:
  goto cleanup;
 fail:error=GetLastError();if(!error)error=ERROR_GEN_FAILURE;
 cleanup:
- if(job)CloseHandle(job);if(started){CloseHandle(process.hThread);CloseHandle(process.hProcess);}if(rd)CloseHandle(rd);if(wr)CloseHandle(wr);if(in)CloseHandle(in);
+ if(pins)wf_close(pins);
+ if(job)CloseHandle(job);
+ if(started){CloseHandle(process.hThread);CloseHandle(process.hProcess);}if(rd)CloseHandle(rd);if(wr)CloseHandle(wr);if(in)CloseHandle(in);
  if(startup.lpAttributeList){DeleteProcThreadAttributeList(startup.lpAttributeList);free(startup.lpAttributeList);}
  if(error){SetLastError(error);return wf_fail(L,"executar processo confinado");}lua_pushinteger(L,code);lua_pushlstring(L,output,bytes);return 2;
 }
@@ -170,7 +177,8 @@ static int tool(lua_State *L){const char *name=luaL_checkstring(L,1);wchar_t p[W
  if(!strcmp(name,"curl")){n=GetSystemDirectoryW(p,WF_MAX);if(!n||n+10>=WF_MAX)return wf_fail(L,"curl do sistema");wcscat(p,L"\\curl.exe");}
  else if(!strcmp(name,"cc")){n=GetEnvironmentVariableW(L"SANTAFE_CC",p,WF_MAX);if(!n||n>=WF_MAX){SetLastError(ERROR_NOT_SUPPORTED);return wf_fail(L,"configure SANTAFE_CC com compilador absoluto confiavel");}}
  else return luaL_error(L,"ferramenta desconhecida");
- if(!absolute(p)||!wf_utf8(p,out,sizeof(out)))return wf_fail(L,"ferramenta absoluta exigida");lua_pushstring(L,out);return 1;
+ if(!absolute(p)||!wf_utf8(p,out,sizeof(out)))return wf_fail(L,"ferramenta absoluta exigida");
+ lua_pushstring(L,out);return 1;
 }
 __declspec(dllexport) int luaopen_pacotes_nativo(lua_State *L){
  const luaL_Reg methods[]={{"leia",read_file},{"grave",write_file},{"diretorio",mkdirs},{"subraiz",subroot},{"existe",exists},{"liste",list_directory},{"trave",lock_root},{"execute",run},{"removaArquivo",remove_file},{"feche",wf_gc},{NULL,NULL}};

@@ -31,6 +31,9 @@ def prepare(root,out,run):
  run('portatil-instalar-fe',[exe,'instale','exemplo','1.0.0','--repositorio-local',out/'casos/repo'],work,env=env)
  run('portatil-importar-fe',[exe,'-e','garanta((importe "exemplo").valor==42)'],work,env=env)
  run('portatil-sls',[Path(os.sys.executable),Path(__file__).parent/'portatil_sls.py',root,bindir/'santafe-sls.exe',out/'portatil-sls.json'],timeout=240,env=env)
+ native=share/'sls/nativo.dll';hidden=native.with_suffix('.ausente');native.rename(hidden)
+ try:run('sls-recusa-sem-protecao',[bindir/'santafe-sls.exe'],work,expected=None,env=env)
+ finally:hidden.rename(native)
  # Relocate once more; tools must find their own installation, not PATH or CWD.
  renamed=out/'portatil-renomeado';dest.rename(renamed);dest=renamed
  run('portatil-realocado',[dest/'bin/santafe.exe','instale','--ajuda'],work,env=env)

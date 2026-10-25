@@ -10,7 +10,7 @@ def save(): (OUT/'resultado.json').write_text(json.dumps(RESULT,ensure_ascii=Fal
 def run(name,cmd,cwd=ROOT,expected=0,stdin=None,timeout=90,env=None):
  t=time.monotonic();p=subprocess.run([str(x) for x in cmd],cwd=cwd,input=stdin,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,env=env)
  (OUT/(name+'.log')).write_bytes(p.stdout)
- ok=p.returncode==expected if expected is not None else p.returncode!=0
+ ok=p.returncode==expected if expected is not None else p.returncode==1
  RESULT['testes'].append({'nome':name,'passou':ok,'codigo':p.returncode,'segundos':round(time.monotonic()-t,3)});save();print(('PASSOU ' if ok else 'FALHOU ')+name,flush=True)
  if not ok: print(p.stdout[-16000:].decode('utf-8',errors='replace'),flush=True);raise AssertionError(name)
  return p.stdout

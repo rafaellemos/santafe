@@ -1,4 +1,4 @@
-/* Isolated adversarial experiment. Does NOT change the candidate protection.
+/* Isolated adversarial experiment for handle-relative operations and strict process pins.
  * Every path created here is beneath the disposable CI fixture. */
 #include "ferramentas/windows/arquivos.h"
 #include <winioctl.h>
@@ -25,9 +25,19 @@ int main(int argc,char **argv){
   printf("RENOMEACAO modo=%d ok=%d erro=%lu\n",mode,ok,GetLastError());if(mode)check(ok,"substituicao relativa funcional");
   FILE_DISPOSITION_INFO del={TRUE};SetFileInformationByHandle(h,FileDispositionInfo,&del,sizeof(del));CloseHandle(h);
   wcscpy(victim,path);wcscat(victim,L"-movido");check(!MoveFileW(path,victim),"ancestral nao renomeado");
+  if(mode){
+   WF original={0},strict={0};original.n=1;original.h[0]=dir;wcscpy(original.path,path);
+   check(wf_strict(&strict,&original),"reabrir diretório por handle com proteção estrita");
+   mutator=CreateFileW(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
+   check(mutator==INVALID_HANDLE_VALUE,"pin de processo impede mutador");wf_close(&strict);
+  }
   mutator=CreateFileW(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
   int mutated=mutator!=INVALID_HANDLE_VALUE&&junction(mutator,outside);printf("MUTACAO modo=%d feita=%d erro=%lu\n",mode,mutated,GetLastError());if(mutator!=INVALID_HANDLE_VALUE)CloseHandle(mutator);
-  if(mode)check(mutated,"ataque de juncao realmente exercitado");
+  if(mode){
+   check(mutated,"ataque de juncao realmente exercitado");
+   WF original={0},strict={0};original.n=1;original.h[0]=dir;wcscpy(original.path,path);
+   check(!wf_strict(&strict,&original),"processo recusa diretório já transformado em junção");wf_close(&strict);
+  }
   h=wf_at(dir,L"segredo",GENERIC_READ,FILE_SHARE_READ,OPEN_EXISTING,0,1);check(h==INVALID_HANDLE_VALUE,"leitura nao alcança fora");
   h=wf_at(dir,L"victim",GENERIC_WRITE|DELETE,0,CREATE_NEW,0,1);
   if(h!=INVALID_HANDLE_VALUE){WriteFile(h,"NAO_VAZAR",9,&n,NULL);rename_child(h,dir,L"renomeado",&ok);CloseHandle(h);}

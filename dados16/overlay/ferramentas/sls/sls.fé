@@ -30,6 +30,7 @@ local ONFE = Dados.experimental e executeArquivo(diretórioSLS.."/onfé.fé")
 local avisosEscopo = falso
 local carregadorNativo = módulo.pré["sls.nativo"] ou módulo.carregarBib(diretórioSLS.."/nativo"..extensãoNativa, "luaopen_sls_nativo")
 local nativo = carregadorNativo e carregadorNativo() ou nulo
+se Windows então garanta(nativo,"SLS Windows exige a camada nativa de proteção e transporte") fim
 local semântica
 local Transporte=executeArquivo(diretórioSLS.."/transporte.fé")
 local transporte=nativo e Transporte.novo(nativo, Dados) ou nulo

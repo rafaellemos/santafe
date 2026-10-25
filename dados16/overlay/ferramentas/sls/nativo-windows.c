@@ -32,7 +32,7 @@ static void scan(lua_State *L,WF *root,const char *prefix,int output,Scan *s,int
             if(!strcmp(name,"node_modules")||!strcmp(name,"dist")||!strcmp(name,"build")||!strcmp(name,"construcao"))continue;
             child=wf_new(L);
             if(!wf_copy(child,root)||!wf_append(child,item.cFileName,wcslen(item.cFileName))||
-               !wf_add(child,wf_at(root->h[root->n-1],item.cFileName,FILE_LIST_DIRECTORY|FILE_TRAVERSE,FILE_SHARE_READ,OPEN_EXISTING,1,0))) {
+               !wf_add(child,wf_at(root->h[root->n-1],item.cFileName,FILE_LIST_DIRECTORY|FILE_TRAVERSE,WF_DIR_SHARE,OPEN_EXISTING,1,0))) {
                 wf_close(child);lua_pop(L,1);s->problem="diretorio alterado ou inseguro";break;
             }
             strcat(path,"/");scan(L,child,path,output,s,depth+1);wf_close(child);lua_pop(L,1);
@@ -56,7 +56,8 @@ static int ready(lua_State *L) {
             if(GetLastError()==ERROR_BROKEN_PIPE){lua_pushboolean(L,1);return 1;}
             return luaL_error(L,"consulta do canal falhou");
         }
-        if(n||GetTickCount64()>=end)break;Sleep(1);
+        if(n||GetTickCount64()>=end)break;
+        Sleep(1);
     }while(1);
     lua_pushboolean(L,n>0);return 1;
 }
@@ -65,7 +66,8 @@ static int protected_request(lua_State *L){int status,n=lua_gettop(L);luaL_check
 static int hash_source(lua_State *L){size_t n,i;const char *p=luaL_checklstring(L,1,&n);unsigned char digest[32];char hex[65];BCRYPT_ALG_HANDLE a;NTSTATUS s;
  luaL_argcheck(L,n<=16*1024*1024,1,"fonte excessiva");s=BCryptOpenAlgorithmProvider(&a,BCRYPT_SHA256_ALGORITHM,NULL,0);if(s<0)return luaL_error(L,"SHA256 indisponivel");
  s=BCryptHash(a,NULL,0,(PUCHAR)p,(ULONG)n,digest,32);BCryptCloseAlgorithmProvider(a,0);if(s<0)return luaL_error(L,"SHA256 falhou");
- for(i=0;i<32;i++)sprintf(hex+2*i,"%02x",digest[i]);lua_pushlstring(L,hex,64);return 1;}
+ for(i=0;i<32;i++)sprintf(hex+2*i,"%02x",digest[i]);
+ lua_pushlstring(L,hex,64);return 1;}
 __declspec(dllexport) int luaopen_sls_nativo(lua_State *L){
  const luaL_Reg api[]={{"abraRaiz",root},{"leiaFonte",read_source},{"listeFontes",sources},{"entradaPronta",ready},{"leiaEntrada",input},{"executeProtegido",protected_request},{"sha256",hash_source},{NULL,NULL}};
  wf_register(L);

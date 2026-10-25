@@ -20,6 +20,10 @@
 #define WF_MT "Santafe.Win32.capacidade"
 #define WF_MAX 8192
 #define WF_DEPTH 96
+/* Directory write sharing permits atomic child replacement. Safety relies on
+ * one-component handle-relative operations, never on re-resolving path.
+ * Processes additionally acquire strict pins for their entire lifetime. */
+#define WF_DIR_SHARE (FILE_SHARE_READ|FILE_SHARE_WRITE)
 typedef struct { HANDLE h[WF_DEPTH]; unsigned n; wchar_t path[WF_MAX]; HANDLE lock, lock_parent; } WF;
 static void wf_close(WF *w) {
     DWORD e=GetLastError();
@@ -177,6 +181,21 @@ static int wf_copy(WF *to,WF *from) {
         if(!DuplicateHandle(GetCurrentProcess(),from->h[i],GetCurrentProcess(),&h,0,FALSE,DUPLICATE_SAME_ACCESS)||!wf_add(to,h))return 0;
     }return 1;
 }
+/* A subprocess resolves its cwd by name. Reopen every ancestor with strict
+ * sharing, then validate the actual pinned object before allowing that use.
+ * A preexisting mutator or reparse point makes the operation fail closed. */
+static int wf_strict(WF *to,WF *from) {
+    unsigned i; HANDLE h;
+    if(!from->n){SetLastError(ERROR_INVALID_HANDLE);return 0;}
+    wcscpy(to->path,from->path);
+    for(i=0;i<from->n;i++) {
+        h=ReOpenFile(from->h[i],FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT);
+        if(h==INVALID_HANDLE_VALUE)return 0;
+        if(!wf_info(h,1,0)){DWORD e=GetLastError();CloseHandle(h);SetLastError(e);return 0;}
+        if(!wf_add(to,h))return 0;
+    }return 1;
+}
 static int wf_append(WF *w,const wchar_t *s,size_t len) {
     size_t n=wcslen(w->path);
     if(n+len+2>=WF_MAX){SetLastError(ERROR_FILENAME_EXCED_RANGE);return 0;}
@@ -189,7 +208,7 @@ static int wf_walk(WF *w,const wchar_t *p,int create) {
         end=wcschr(p,L'/');if(!end)end=p+wcslen(p);
         if(!wf_component(p,(size_t)(end-p))||!wf_append(w,p,(size_t)(end-p))){SetLastError(ERROR_INVALID_NAME);return 0;}
         memcpy(component,p,(end-p)*sizeof(wchar_t));component[end-p]=0;
-        h=wf_at(w->h[w->n-1],component,FILE_LIST_DIRECTORY|FILE_TRAVERSE,FILE_SHARE_READ,create?OPEN_ALWAYS:OPEN_EXISTING,1,0);
+        h=wf_at(w->h[w->n-1],component,FILE_LIST_DIRECTORY|FILE_TRAVERSE,WF_DIR_SHARE,create?OPEN_ALWAYS:OPEN_EXISTING,1,0);
         if(!wf_add(w,h))return 0;
         p=*end?end+1:end;
     }return 1;
@@ -204,7 +223,7 @@ static int wf_root(WF *w,const char *s,size_t n) {
     if(GetDriveTypeW(drive)!=DRIVE_FIXED || !GetVolumeInformationW(drive,NULL,0,NULL,NULL,NULL,fs,64)||_wcsicmp(fs,L"NTFS")||
        !GetVolumeNameForVolumeMountPointW(drive,volume,128)){SetLastError(ERROR_NOT_SUPPORTED);return 0;}
     wcscpy(w->path,volume);
-    if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,OPEN_EXISTING,1,0)))return 0;
+    if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,WF_DIR_SHARE,OPEN_EXISTING,1,0)))return 0;
     return wf_walk(w,p+3,0);
 }
 static int wf_parent(WF *w,WF *root,const char *s,size_t n,wchar_t leaf[256],int create) {
