@@ -32,7 +32,9 @@ static int tree_safe(const wchar_t *path,unsigned depth,unsigned *count){
 __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
  wchar_t path[1024],base[1024],full[1024],old[1024],installed[32],related[512],remove[32];
  if(!prop(h,L"REMOVE",remove,32))return ERROR_INSTALL_FAILURE;
- if(!wcscmp(remove,L"ALL"))return ERROR_SUCCESS;
+ /* Uninstall also inspects the tree: a substituted junction must not
+  * redirect removal of managed files into another directory. */
+ int removing=!wcscmp(remove,L"ALL");
  /* MSI applies a version lie even to RtlGetVersion (6.3 on Server2022).
   * Probe the required Win10+ process attribute instead, without starting code. */
  SIZE_T bytes=0;InitializeProcThreadAttributeList(NULL,1,0,&bytes);
@@ -42,10 +44,10 @@ __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
  if(initialized)DeleteProcThreadAttributeList(attrs);
  if(attrs)HeapFree(GetProcessHeap(),0,attrs);
  if(job)CloseHandle(job);
- if(!supported)return refuse(h,L"DADOS17_JOB_LIST_ATTRIBUTE_REQUIRED");
+ if(!supported&&!removing)return refuse(h,L"DADOS17_JOB_LIST_ATTRIBUTE_REQUIRED");
  if(!prop(h,L"INSTALLDIR",path,1024)||!prop(h,L"LocalAppDataFolder",base,1024))return ERROR_INSTALL_FAILURE;
  if(wcslen(path)>230||wcslen(base)>900)return refuse(h,L"DADOS17_TARGET_PATH_TOO_LONG");
- if(path[1]!=L':'||path[2]!=L'\\')return refuse(h,L"DADOS17_TARGET_NOT_LOCAL");
+ if(wcslen(path)<3||path[1]!=L':'||path[2]!=L'\\')return refuse(h,L"DADOS17_TARGET_NOT_LOCAL");
  wchar_t drive[4]={path[0],L':',L'\\',0},fs[32];
  if(GetDriveTypeW(drive)!=DRIVE_FIXED||!GetVolumeInformationW(drive,NULL,0,NULL,NULL,NULL,fs,32)||_wcsicmp(fs,L"NTFS"))return refuse(h,L"DADOS17_TARGET_REQUIRES_FIXED_NTFS");
  wcscat(base,L"Programs\\Santafe-");

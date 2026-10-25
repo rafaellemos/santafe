@@ -112,6 +112,16 @@ try:
  project_hashes={p.relative_to(workspace).as_posix():digest(p) for p in workspace.rglob('*') if p.is_file()}
  (target/'share/santafé/1.0/ferramentas/sls/nativo.dll').unlink();(target/'LEIA-ME.txt').write_text('dano sintetico',encoding='utf-8')
  install('reparar-arquivos-ausentes-e-corrompidos',['/fa',newmsi]);checkfiles(new,target,'reparacao-integridade')
+ # Uninstall cannot follow a replaced managed directory into unrelated files.
+ (foreign/'santafe.exe').write_bytes(b'arquivo alheio nao remover')
+ binpath.rename(savedbin)
+ subprocess.run([os.environ['COMSPEC'],'/d','/c','mklink','/J',str(binpath),str(foreign)],check=True,capture_output=True)
+ try:
+  install('recusa-juncao-na-desinstalacao',['/x',new['product_code']],1603,'DADOS17_TARGET_UNSAFE_ENTRY')
+  assert (foreign/'santafe.exe').read_bytes()==b'arquivo alheio nao remover' and state(new['product_code'])==5
+ finally:
+  os.rmdir(binpath);savedbin.rename(binpath)
+ checkfiles(new,target,'remocao-recusada-preservou-instalacao')
  setpath((regpath()[0]+';'+suffix,winreg.REG_EXPAND_SZ))
  install('desinstalar17',['/x',new['product_code']])
  assert state(new['product_code'])==-1 and not (target/'bin/santafe.exe').exists()
