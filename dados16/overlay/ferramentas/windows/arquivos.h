@@ -139,7 +139,7 @@ static int wf_walk(WF *w,const wchar_t *p,int create) {
         end=wcschr(p,L'/');if(!end)end=p+wcslen(p);
         if(!wf_component(p,(size_t)(end-p))||!wf_append(w,p,(size_t)(end-p))){SetLastError(ERROR_INVALID_NAME);return 0;}
         if(create && !wf_mkdir(w->path))return 0;
-        if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,1,0)))return 0;
+        if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,OPEN_EXISTING,1,0)))return 0;
         p=*end?end+1:end;
     }return 1;
 }
@@ -153,7 +153,7 @@ static int wf_root(WF *w,const char *s,size_t n) {
     if(GetDriveTypeW(drive)!=DRIVE_FIXED || !GetVolumeInformationW(drive,NULL,0,NULL,NULL,NULL,fs,64)||_wcsicmp(fs,L"NTFS")||
        !GetVolumeNameForVolumeMountPointW(drive,volume,128)){SetLastError(ERROR_NOT_SUPPORTED);return 0;}
     wcscpy(w->path,volume);
-    if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,1,0)))return 0;
+    if(!wf_add(w,wf_open(w->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,OPEN_EXISTING,1,0)))return 0;
     return wf_walk(w,p+3,0);
 }
 static int wf_parent(WF *w,WF *root,const char *s,size_t n,wchar_t leaf[256],int create) {

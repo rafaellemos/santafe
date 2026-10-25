@@ -20,7 +20,7 @@ local função caminho(uri)
     local resultado="/" .. tabela.concatene(partes,"/")
     se Windows então
         se não resultado:separe("^/[A-Za-z]:/") então retorne nulo fim
-        resultado=resultado:corte(2,2):maiúsculas()..resultado:corte(3)
+        resultado=resultado:corte(2,2):maiúscula()..resultado:corte(3)
     fim
     retorne resultado
 fim

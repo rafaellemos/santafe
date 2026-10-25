@@ -44,9 +44,12 @@ jobs:
         with:
           name: windows-dados15-evidencias
           path: |
-            resultados/**/*.json
-            resultados/**/*.log
+            resultados/*.json
+            resultados/*.log
+            resultados/ferramentas/*.json
+            resultados/ferramentas/*.log
             fonte/PREPARACAO-WINDOWS.json
+            fonte/DADOS16-WINDOWS.json
           if-no-files-found: error
           retention-days: 14
       - name: Declarar o limite da homologação

@@ -44,7 +44,9 @@ try:
  sf('arquivos-atomicos',INIT+'local r=garanta(N.raiz('+lit(work)+'));garanta(r:diretorio("sub/pasta"));garanta(r:grave("sub/pasta/a.fé","José",falso));garanta(r:leia("sub/pasta/a.fé")=="José");garanta(não r:grave("sub/pasta/a.fé","erro",falso));garanta(r:grave("sub/pasta/a.fé","novo",verdadeiro));garanta(r:leia("sub/pasta/a.fé")=="novo");garanta(r:trave());r:feche()')
  run('ajuda-cli',[EXE,'instale','--ajuda'],work)
  run('sls-contrato',[sys.executable,ROOT/'testes/integracao/testar_sls_aceitacao.py','--perfil','1.0','--prazo','15','--relatorio',OUT/'sls-contrato.json','--comando',src/'santafe-sls.exe'],timeout=240)
- RESULT['resultado']='passou_primeira_integracao'
+ from casos import test
+ test(ROOT,OUT,run,sf,EXE,INIT,lit)
+ RESULT['resultado']='passou_integracao_adversarial'
 except Exception as e:
  RESULT['resultado']='falhou';RESULT['falha']=str(e);traceback.print_exc()
 finally:save()

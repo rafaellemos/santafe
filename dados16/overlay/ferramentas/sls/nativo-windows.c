@@ -40,7 +40,7 @@ static void scan(lua_State *L,WF *root,const char *prefix,int output,Scan *s,int
             if(!strcmp(name,"node_modules")||!strcmp(name,"dist")||!strcmp(name,"build")||!strcmp(name,"construcao"))continue;
             child=wf_new(L);
             if(!wf_copy(child,root)||!wf_append(child,item.cFileName,wcslen(item.cFileName))||
-               !wf_add(child,wf_open(child->path,FILE_LIST_DIRECTORY,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,1,0))) {
+               !wf_add(child,wf_open(child->path,FILE_LIST_DIRECTORY,FILE_SHARE_READ,OPEN_EXISTING,1,0))) {
                 wf_close(child);lua_pop(L,1);s->problem="diretorio alterado ou inseguro";break;
             }
             strcat(path,"/");scan(L,child,path,output,s,depth+1);wf_close(child);lua_pop(L,1);
