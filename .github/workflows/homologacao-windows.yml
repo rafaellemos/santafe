@@ -1,4 +1,4 @@
-name: Windows nativo — dados.18 — SLS e gerenciador
+name: Windows nativo — dados.19 — SLS e gerenciador
 on:
   push:
     branches: ['homologacao/windows-dados15']
@@ -33,14 +33,14 @@ jobs:
             mingw-w64-ucrt-x86_64-openssl
       - name: Preparar fonte selada e correção isolada
         run: python windows/preparar.py fonte.tar.gz fonte
-      - name: Aplicar adaptação dados18
-        run: python dados18/aplicar.py fonte
+      - name: Aplicar adaptação dados19
+        run: python dados19/aplicar.py fonte
       - name: Compilar e executar a bateria nativa
         run: python windows/testar.py fonte resultados
       - name: SLS e gerenciador nativos
-        run: python dados18/testar.py resultados/candidato resultados/ferramentas
+        run: python dados19/testar.py resultados/candidato resultados/ferramentas
       - name: Compilar verificacoes nativas do instalador
-        run: python dados18/compilar-guarda.py resultados/ferramentas
+        run: python dados19/compilar-guarda.py resultados/ferramentas
       - uses: actions/setup-python@v5
         id: msi_python
         with:
@@ -49,21 +49,21 @@ jobs:
       - name: Instalacao atualizacao e reversao MSI
         shell: pwsh
         run: |
-          & '${{ steps.msi_python.outputs.python-path }}' dados18/testar-instalador.py resultados/instalador resultados/ferramentas resultados/candidato resultados/ferramentas/instalador-guarda.dll dados18/baseline-dados16.zip
+          & '${{ steps.msi_python.outputs.python-path }}' dados19/testar-instalador.py resultados/instalador resultados/ferramentas resultados/candidato resultados/ferramentas/instalador-guarda.dll dados19/baseline-dados16.zip
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Instalar e remover com usuario padrao real
         shell: pwsh
         run: |
-          ./dados18/usuario-padrao.ps1 -Python '${{ steps.msi_python.outputs.python-path }}' -OutputDir resultados/instalador
+          ./dados19/usuario-padrao.ps1 -Python '${{ steps.msi_python.outputs.python-path }}' -OutputDir resultados/instalador
       - name: Verificar metadados e recusa de assinatura indevida
         shell: pwsh
-        run: ./dados18/testar-assinatura.ps1 -OutputDir resultados/instalador -ToolsDir resultados/ferramentas
+        run: ./dados19/testar-assinatura.ps1 -OutputDir resultados/instalador -ToolsDir resultados/ferramentas
       - name: Preparar entrada verificada para Windows11
-        run: python dados18/preparar-windows11.py resultados/candidato resultados
+        run: python dados19/preparar-windows11.py resultados/candidato resultados
       - name: Transportar pacote entre os ambientes de homologacao
         uses: actions/upload-artifact@v4
         with:
-          name: dados18-windows11-input
+          name: dados19-windows11-input
           path: resultados/windows11-input.zip
           retention-days: 7
       - name: Guardar evidências mesmo em caso de falha
@@ -79,16 +79,16 @@ jobs:
             resultados/ferramentas/*.zip
             resultados/instalador/*.json
             resultados/instalador/*.log
-            resultados/instalador/santafe-dados18-windows-x64.msi
+            resultados/instalador/santafe-dados19-windows-x64.msi
             fonte/PREPARACAO-WINDOWS.json
-            fonte/DADOS18-WINDOWS.json
+            fonte/DADOS19-WINDOWS.json
           if-no-files-found: error
           retention-days: 14
       - name: Declarar o limite da homologação
         if: always()
         shell: pwsh
         run: |
-          'Candidato dados.18: núcleo/ONFÉ/IBA em resultado.json; SLS, gerenciador, proteção de caminhos/processos, HTTPS e pacote portátil em ferramentas/resultado.json. Cada relatório distingue testes aprovados de falha/interrupção; a presença do artefato não significa aprovação. Instalador MSI por usuario em instalador/resultado.json. Nao homologa servicos, assinatura Authenticode ou GUI dos editores Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'Candidato dados.19: núcleo/ONFÉ/IBA em resultado.json; SLS, gerenciador, proteção de caminhos/processos, HTTPS e pacote portátil em ferramentas/resultado.json. Cada relatório distingue testes aprovados de falha/interrupção; a presença do artefato não significa aprovação. Instalador MSI por usuario em instalador/resultado.json. Nao homologa servicos, assinatura Authenticode ou GUI dos editores Windows.' >> $env:GITHUB_STEP_SUMMARY
 
   cliente-windows11:
     needs: nucleo
@@ -105,18 +105,18 @@ jobs:
           architecture: 'arm64'
       - uses: actions/download-artifact@v4
         with:
-          name: dados18-windows11-input
+          name: dados19-windows11-input
           path: entrada-ci
       - name: Instalar atualizar e reverter x64 no Windows11 ARM
         shell: pwsh
         run: |
-          & '${{ steps.python.outputs.python-path }}' dados18/testar-windows11.py entrada-ci/windows11-input.zip resultados-windows11
+          & '${{ steps.python.outputs.python-path }}' dados19/testar-windows11.py entrada-ci/windows11-input.zip resultados-windows11
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Guardar evidencia sem declarar validacao visual
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows11-dados18-evidencias
+          name: windows11-dados19-evidencias
           path: |
             resultados-windows11/*.json
             resultados-windows11/*.log
