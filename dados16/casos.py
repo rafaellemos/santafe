@@ -57,7 +57,7 @@ def test(root,out,run,sf,exe,init,lit):
   sf('caminho-recusa-'+str(i),init+'N.chaveCaminho('+lit(path)+')',expected=None)
  sf('colisao-unicode',init+'garanta(N.chaveCaminho("José")==N.chaveCaminho("JOSÉ"))')
  outside=work/'outside';outside.mkdir();secret=outside/'secret';secret.write_text('INTACTO',encoding='utf-8')
- junction=a/'junction';subprocess.run(['cmd.exe','/d','/c','mklink','/J',str(junction),str(outside)],check=True,capture_output=True)
+ junction=a/'junction';run('criar-juncao-fixture',[Path(os.environ['SystemRoot'])/'System32/cmd.exe','/d','/c','mklink','/J',str(junction).replace('/',chr(92)),str(outside).replace('/',chr(92))],work)
  sf('recusar-juncao-leitura',init+f'local r=garanta(N.raiz({lit(a)}));garanta(r:leia("junction/secret"))',expected=None)
  sf('recusar-juncao-escrita',init+f'local r=garanta(N.raiz({lit(a)}));garanta(r:grave("junction/secret","ERRO",verdadeiro))',expected=None)
  sf('recusar-raiz-juncao',init+f'garanta(N.raiz({lit(junction)}))',expected=None)
