@@ -88,7 +88,7 @@ def build(archive,version,out,guard,fault=False):
   add('AppSearch',[('OLDINSTALLDIR','PreviousDir')]);add('RegLocator',[('PreviousDir',1,REG,'InstallDir',2|16)])
   add('LaunchCondition',[('VersionNT64 >= 603','Requer Windows x64 10 ou posterior (homologado em Server 2022).'),('NOT ALLUSERS','Instale apenas para o usuario atual.'),('NOT NEWERPRODUCTS','Uma versao mais recente ja esta instalada. A reversao deliberada exige desinstalacao primeiro.'),('NOT DISABLEROLLBACK AND NOT RollbackDisabled','A reversao transacional do Windows Installer deve estar habilitada.')])
   add('Binary',[('Guard',m.Binary(str(guard)))])
-  ca=[('RestoreDir',51,'INSTALLDIR','[OLDINSTALLDIR]'),('ValidateTarget',1,'Guard','ValidateTarget'),('RejectUnsupportedMode',19,None,'Este candidato aceita instalação por usuário. Imagem administrativa e anúncio não são suportados.')]
+  ca=[('RestoreDir',51,'INSTALLDIR','[OLDINSTALLDIR]'),('ValidateTarget',1,'Guard','ValidateTarget'),('RejectUnsupportedMode',19,None,'Este candidato aceita instalação por usuário. Imagem administrativa não é suportada.')]
   if fault:ca += [('SetFaultData',51,'AbortAfterFiles','[INSTALLDIR]|'+version),('AbortAfterFiles',1025,'Guard','AbortAfterFiles')]
   add('CustomAction',ca)
   prefix=[('FindRelatedProducts',None,200),('AppSearch',None,400),('LaunchConditions',None,500),('RestoreDir','OLDINSTALLDIR AND NOT INSTALLDIR',600),('CostInitialize',None,800),('FileCost',None,900),('CostFinalize',None,1000),('ValidateTarget',None,1100)]
@@ -116,15 +116,16 @@ def build(archive,version,out,guard,fault=False):
   controls.append(('ErrorDlg','ErrorText','Text',20,20,380,105,3,None,'[ErrorText]','A',None))
   errorbuttons=[('A','Interromper','ErrorAbort'),('C','Cancelar','ErrorCancel'),('I','Ignorar','ErrorIgnore'),('N','Não','ErrorNo'),('O','OK','ErrorOk'),('R','Tentar novamente','ErrorRetry'),('Y','Sim','ErrorYes')]
   for i,(bid,label,arg) in enumerate(errorbuttons):
-   controls.append(('ErrorDlg',bid,'PushButton',20,145,120,24,3,None,label,errorbuttons[(i+1)%len(errorbuttons)][0],None))
+   controls.append(('ErrorDlg',bid,'PushButton',20,145,120,24,3,None,label,errorbuttons[i+1][0] if i+1<len(errorbuttons) else 'ErrorText',None))
    events.append(('ErrorDlg',bid,'EndDialog',arg,'1',1))
   add('Dialog',dialogs);add('Control',controls);add('ControlEvent',events)
-  # Schema-valid standard sequences, refused before any action that writes.
+  # Administrative images are refused before writes. Advertisement uses only
+  # standard MSI actions (custom actions are forbidden here); no payload executes.
   cost=[('CostInitialize',None,800),('FileCost',None,900),('CostFinalize',None,1000)]
   endings=[('Finished',None,-1),('Cancelled',None,-2),('FatalError',None,-3)]
   add('AdminUISequence',[('RejectUnsupportedMode',None,100),*cost,('ExecuteAction',None,1300),*endings])
   add('AdminExecuteSequence',[('RejectUnsupportedMode',None,100),*cost,('InstallValidate',None,1400),('InstallInitialize',None,1500),('InstallAdminPackage',None,3900),('InstallFiles',None,4000),('InstallFinalize',None,6600)])
-  add('AdvtExecuteSequence',[('RejectUnsupportedMode',None,100),('CostInitialize',None,800),('CostFinalize',None,1000),('InstallValidate',None,1400),('PublishFeatures',None,6300),('PublishProduct',None,6400)])
+  add('AdvtExecuteSequence',[('CostInitialize',None,800),('CostFinalize',None,1000),('InstallValidate',None,1400),('InstallInitialize',None,1500),('PublishFeatures',None,6300),('PublishProduct',None,6400),('InstallFinalize',None,6600)])
   add('InstallUISequence',prefix+[('Welcome','NOT Installed',1200),('Maintenance','Installed',1201),('ExecuteAction',None,1300),('Finished',None,-1),('Cancelled',None,-2),('FatalError',None,-3)])
   db.Commit();db=None
  meta={'versao_msi':version,'candidato':'dados.20' if version=='3.0.20' else 'fixture','product_code':product,'upgrade_code':UPGRADE,'sha256':hashlib.sha256(out.read_bytes()).hexdigest(),'arquivos':hashes,'falha_injetada':fault,'assinatura_authenticode':False,'per_usuario':True,'bytes':out.stat().st_size}

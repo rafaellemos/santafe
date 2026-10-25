@@ -18,7 +18,10 @@ try:
  # ICE91 is expected for an exclusively per-user MSI. ALLUSERS is explicitly
  # refused and tested. Keep these warnings in the full log; do not suppress ICE.
  if set(warnings)-{b'ICE91'}:raise RuntimeError('Avisos ICE exigem revisão: '+str(warnings))
- if check.returncode:raise RuntimeError('ICE recusou o MSI: '+(check.stdout+check.stderr).decode('utf-8','replace')[-12000:])
+ if check.returncode:
+  lines=(check.stdout+check.stderr).decode('utf-8','replace').splitlines()
+  errors=[line.split(' : error ',1)[-1] for line in lines if ' : error ' in line]
+  raise RuntimeError('ICE recusou o MSI (log completo preservado): '+repr(errors)[-1200:])
  result['testes'].append({'nome':'suite-completa-ice','passou':True})
  # A malformed foreign key must be refused by the same validator.
  bad=out/'fixture-ice-invalido.msi';shutil.copyfile(msi,bad)

@@ -62,9 +62,19 @@ try:
  db=None;ok('msi-publicavel-sem-injecao-de-falha')
  adminimage=OUT/'imagem-administrativa-recusada'
  install('recusa-imagem-administrativa',['/a',newmsi,'TARGETDIR='+str(adminimage)],1603)
- install('recusa-anuncio',['/ju',newmsi],1603)
  assert not adminimage.exists() and state(new['product_code'])==-1
- ok('modos-nao-suportados-nao-gravaram-produto')
+ ok('imagem-administrativa-nao-gravou-produto')
+ # Windows Installer advertisement only registers availability, not installation.
+ # Custom actions are forbidden in AdvtExecuteSequence; preserve standard behavior.
+ default_target=programs/'Santafe-Dados-Candidato'
+ assert not default_target.exists()
+ before_advertise=regpath()
+ install('anunciar-sem-instalar',['/ju',newmsi])
+ assert state(new['product_code'])==1 and not default_target.exists() and regpath()==before_advertise
+ ok('anuncio-sem-payload-sem-path')
+ install('remover-anuncio',['/x',newmsi])
+ assert state(new['product_code'])==-1 and not default_target.exists() and regpath()==before_advertise
+ ok('anuncio-removido-sem-residuos')
  foreign.mkdir();(foreign/'documento.txt').write_text('arquivo do usuario',encoding='utf-8')
  install('recusa-diretorio-nao-pertencente',['/i',newmsi,'INSTALLDIR='+str(foreign)],1603,'DADOS20_TARGET_NOT_EMPTY')
  assert (foreign/'documento.txt').read_text()=='arquivo do usuario'
