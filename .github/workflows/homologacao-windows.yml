@@ -49,6 +49,7 @@ jobs:
             resultados/*.log
             resultados/ferramentas/*.json
             resultados/ferramentas/*.log
+            resultados/ferramentas/*.zip
             fonte/PREPARACAO-WINDOWS.json
             fonte/DADOS16-WINDOWS.json
           if-no-files-found: error

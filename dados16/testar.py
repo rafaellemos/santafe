@@ -39,6 +39,8 @@ try:
    if origin.is_file() and not target.exists():shutil.copyfile(origin,target);todo.append(target)
  os.environ['SANTAFE_CC']=str(compiler)
  INIT='local N=garanta(módulo.carregarBib('+lit(ROOT/'ferramentas/pacotes/nativo.dll')+',"luaopen_pacotes_nativo"))(); '
+ run('compilar-sonda-confinamento',['gcc','-std=gnu99','-O2','-DSANTAFE_DADOS_EXPERIMENTAL','-I'+str(ROOT),'-I'+str(src),HERE/'sonda-confinamento.c',lib,'-ladvapi32','-o',src/'sonda-confinamento.exe'])
+ run('sonda-confinamento-isolada',[src/'sonda-confinamento.exe',OUT/'fixture-confinamento'])
  sf('api-basica',INIT+'garanta(N.sha256("abc")=="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");garanta(N.decodBase64(N.base64("ação"))=="ação");garanta(#N.nonce()==32)')
  work=OUT/'projeto-ação-漢字';work.mkdir()
  sf('arquivos-atomicos',INIT+'local r=garanta(N.raiz('+lit(work)+'));garanta(r:diretorio("sub/pasta"));garanta(r:grave("sub/pasta/a.fé","José",falso));garanta(r:leia("sub/pasta/a.fé")=="José");garanta(não r:grave("sub/pasta/a.fé","erro",falso));garanta(r:grave("sub/pasta/a.fé","novo",verdadeiro));garanta(r:leia("sub/pasta/a.fé")=="novo");garanta(r:trave());r:feche()')
@@ -46,6 +48,8 @@ try:
  run('sls-contrato',[sys.executable,ROOT/'testes/integracao/testar_sls_aceitacao.py','--perfil','1.0','--prazo','15','--relatorio',OUT/'sls-contrato.json','--comando',src/'santafe-sls.exe'],timeout=240)
  from casos import test
  test(ROOT,OUT,run,sf,EXE,INIT,lit)
+ from portatil import prepare
+ prepare(ROOT,OUT,run)
  RESULT['resultado']='passou_integracao_adversarial'
 except Exception as e:
  RESULT['resultado']='falhou';RESULT['falha']=str(e);traceback.print_exc()
