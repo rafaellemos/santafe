@@ -9,6 +9,8 @@ RESULT={'candidato':'dados.17','resultado':'em_execucao','sistema':'Windows Serv
 def save(): (OUT/'resultado.json').write_text(json.dumps(RESULT,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 def ok(name,**more):RESULT['testes'].append({'nome':name,'resultado':'passou',**more});save();print('OK',name,flush=True)
 def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def machinepath():
+ with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,r'SYSTEM\CurrentControlSet\Control\Session Manager\Environment') as k:return winreg.QueryValueEx(k,'Path')
 def regpath():
  with winreg.OpenKey(winreg.HKEY_CURRENT_USER,'Environment') as k:
   try:return winreg.QueryValueEx(k,'Path')
@@ -39,7 +41,7 @@ def run(name,args,env=None,timeout=240):
 uid=uuid.uuid4().hex[:10]; programs=Path(os.environ['LOCALAPPDATA'])/'Programs';programs.mkdir(exist_ok=True)
 target=programs/('Santafe-Homologação-'+uid);foreign=programs/('Santafe-Externa-'+uid);junction=programs/('Santafe-Junção-'+uid)
 workspace=OUT/'projeto-ação';workspace.mkdir();(workspace/'meu-arquivo.fé').write_text('mostre("preservar")',encoding='utf-8')
-userbytes=(workspace/'meu-arquivo.fé').read_bytes();original=regpath();prefix=str(programs/('OutroPrograma-'+uid));suffix=str(programs/('ProgramaPosterior-'+uid))
+userbytes=(workspace/'meu-arquivo.fé').read_bytes();machine_before=machinepath();original=regpath();prefix=str(programs/('OutroPrograma-'+uid));suffix=str(programs/('ProgramaPosterior-'+uid))
 seed=(original[0]+';' if original else '')+prefix;setpath((seed,winreg.REG_EXPAND_SZ))
 oldmsi=OUT/'fixture-dados16.msi';newmsi=OUT/'santafe-dados17-windows-x64.msi';badmsi=OUT/'fixture-falha18.msi'
 metas=[]
@@ -105,6 +107,7 @@ try:
  install('reversao-deliberada-reinstalar16',['/i',oldmsi,'INSTALLDIR='+str(target)]);checkfiles(old,target,'reversao-deliberada-integridade16')
  install('remover-baseline16',['/x',old['product_code']])
  assert state(old['product_code'])==-1;ok('ciclo-encerrado-sem-produto-registrado')
+ assert machinepath()==machine_before;ok('path-da-maquina-inalterado')
  RESULT['resultado']='passou_instalacao_atualizacao_reversao';RESULT['msi']=new
 except BaseException as e:
  RESULT['resultado']='falhou';RESULT['falha']=str(e);RESULT['rastro']=traceback.format_exc();traceback.print_exc()

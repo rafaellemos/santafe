@@ -21,7 +21,7 @@ def prepare(root,out,run):
  shutil.copytree(licenses,dest/'LICENCAS-TERCEIROS')
  for name in ('LICENSE','COPYRIGHT'):
   if (root/name).is_file():shutil.copyfile(root/name,dest/name)
- (dest/'LEIA-ME.txt').write_text('Santafé dados.17 — candidato Windows x64, não versão estável.\nNúcleo, SLS e gerenciador local. Executar bin/santafe.exe ou bin/santafe-sls.exe.\nNão instala serviços nem modifica PATH, registro ou produção.\nNTFS local; UNC, junções e links recusados nas ferramentas protegidas.\nBibliotecas C requerem GCC UCRT64 confiável em SANTAFE_CC e --permitir-nativo.\nDemais bibliotecas C, instalador e editores Windows ainda não homologados.\nCompilador/terceiros: https://packages.msys2.org/ ; fontes: https://repo.msys2.org/mingw/sources/\n',encoding='utf-8')
+ (dest/'LEIA-ME.txt').write_text('Santafé dados.17 — candidato Windows x64, não versão estável.\nNúcleo, SLS e gerenciador local. Executar bin/santafe.exe ou bin/santafe-sls.exe.\nO ZIP portátil não modifica PATH ou registro. O MSI acrescenta bin ao PATH do usuário.\nNenhuma modalidade instala serviços. Usar somente em homologação.\nNTFS local; UNC, junções e links recusados nas ferramentas protegidas.\nBibliotecas C requerem GCC UCRT64 confiável em SANTAFE_CC e --permitir-nativo.\nDemais bibliotecas C e editores Windows ainda não homologados.\nInstalador MSI: veja o resultado da bateria separada na entrega.\nCompilador/terceiros: https://packages.msys2.org/ ; fontes: https://repo.msys2.org/mingw/sources/\n',encoding='utf-8')
  env={k:v for k,v in os.environ.items() if k.upper() in ('SYSTEMROOT','WINDIR','TEMP','TMP','USERPROFILE')}
  env['PATH']=str(Path(os.environ['SYSTEMROOT'])/'System32')
  work=out/'portatil-projeto';work.mkdir()

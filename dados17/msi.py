@@ -61,8 +61,11 @@ def build(archive,version,out,guard,fault=False):
    add('Registry',[(rid,1,REG+r'\Arquivos',fid,version,cid)])
    short=f'F{seq:07d}';long=p.name
    add('File',[(fid,cid,short+'|'+long,p.stat().st_size,None,None,512,seq)])
-   info=m.GetFileHash(str(p),0)
-   add('MsiFileHash',[(fid,0,*[ctypes.c_int32(n).value for n in info[1:]])])
+   class FileHash(ctypes.Structure):_fields_=[('size',ctypes.c_uint32),('parts',ctypes.c_uint32*4)]
+   info=FileHash();info.size=ctypes.sizeof(info)
+   api.MsiGetFileHashW.argtypes=[ctypes.c_wchar_p,ctypes.c_uint,ctypes.POINTER(FileHash)]
+   assert api.MsiGetFileHashW(str(p),0,ctypes.byref(info))==0
+   add('MsiFileHash',[(fid,0,*[ctypes.c_int32(n).value for n in info.parts])])
    cabinet.append((str(p),fid))
   # Dedicated registration component, no wildcard removals or machine-wide PATH.
   cid='Registration';add('Component',[(cid,guid('registration'),'INSTALLDIR',260,None,'InstallDirKey')]);add('FeatureComponents',[('Runtime',cid)])
@@ -73,7 +76,7 @@ def build(archive,version,out,guard,fault=False):
   cab=tmp/'payload.cab';m.FCICreate(str(cab),cabinet);m.add_stream(db,'payload.cab',str(cab));add('Media',[(1,len(files),None,'#payload.cab',None,None)])
   add('Upgrade',[(UPGRADE,None,version,None,0,None,'OLDERPRODUCTS'),(UPGRADE,version,None,None,2,None,'NEWERPRODUCTS')])
   add('AppSearch',[('OLDINSTALLDIR','PreviousDir')]);add('RegLocator',[('PreviousDir',1,REG,'InstallDir',2|16)])
-  add('LaunchCondition',[('VersionNT64 >= 603','Requer Windows x64 10 ou posterior (homologado em Server 2022).'),('NOT ALLUSERS','Instale apenas para o usuario atual.'),('NOT NEWERPRODUCTS','Uma versao mais recente ja esta instalada. A reversao deliberada exige desinstalacao primeiro.'),('NOT DISABLEROLLBACK','A reversao transacional do Windows Installer deve estar habilitada.')])
+  add('LaunchCondition',[('VersionNT64 >= 603','Requer Windows x64 10 ou posterior (homologado em Server 2022).'),('NOT ALLUSERS','Instale apenas para o usuario atual.'),('NOT NEWERPRODUCTS','Uma versao mais recente ja esta instalada. A reversao deliberada exige desinstalacao primeiro.'),('NOT DISABLEROLLBACK AND NOT RollbackDisabled','A reversao transacional do Windows Installer deve estar habilitada.')])
   add('Binary',[('Guard',m.Binary(str(guard)))])
   ca=[('RestoreDir',51,'INSTALLDIR','[OLDINSTALLDIR]'),('ValidateTarget',1,'Guard','ValidateTarget')]
   if fault:ca += [('SetFaultData',51,'AbortAfterFiles','[INSTALLDIR]|'+version),('AbortAfterFiles',1025,'Guard','AbortAfterFiles')]

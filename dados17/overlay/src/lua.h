@@ -37,7 +37,7 @@
 #ifndef SANTAFE_DADOS_VERSION
 #define SANTAFE_DADOS_VERSION "dados.17"
 #endif
-#define LUA_RELEASE "Santafé candidato-" SANTAFE_DADOS_VERSION " (experimental, não instalar)"
+#define LUA_RELEASE "Santafé candidato-" SANTAFE_DADOS_VERSION " (experimental, não usar em produção)"
 #endif
 #define LUA_COPYRIGHT	LUA_RELEASE "  (C) 2025-2026 Rafael Alves Lemos - Baseado em Lua 5.3.6"
 #define LUA_AUTHORS	"Rafael Alves Lemos"
