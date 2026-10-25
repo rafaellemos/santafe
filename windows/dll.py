@@ -1,6 +1,7 @@
 """Ensaio isolado da IBA dinâmica Windows; não é SDK instalado."""
 from pathlib import Path
 import json
+import shutil
 
 def test(cand, work, run, sf):
     src=cand/'src'; target=work/'dll';target.mkdir()
@@ -19,7 +20,9 @@ def test(cand, work, run, sf):
         ('legado','',False),
         ('epoca_errada','#undef SANTAFE_ABI_MAJOR\n#define SANTAFE_ABI_MAJOR 2\nSANTAFE_MODULE_ABI;',False),
         ('curto','SANTAFE_ABI_EXPORT const uint32_t santafe_module_abi[2]={0x53464942u,2};',False)]:
-        code=mods/(name+'.c');binary=mods/(name+'.dll')
+        # O linker MinGW deste executor não aceita saída em caminho Unicode.
+        # Compilar em ASCII e copiar preserva o teste real do carregador Santafé.
+        code=target/(name+'.c');built=target/(name+'.dll');binary=mods/(name+'.dll')
         code.write_text('#include "lua.h"\n#include "lauxlib.h"\n'+descriptor+'''
 __declspec(dllexport) int luaopen_ensaio(lua_State *L) {
   luaL_checkversion(L);
@@ -27,7 +30,8 @@ __declspec(dllexport) int luaopen_ensaio(lua_State *L) {
 }
 ''',encoding='utf-8')
         run('dll-compilar-'+name,['gcc','-shared','-DSANTAFE_DADOS_EXPERIMENTAL',
-            '-I'+str(src),code,imports,'-o',binary],cand)
+            '-I'+str(src),code,imports,'-o',built],cand)
+        shutil.copyfile(built,binary)
         path=json.dumps(binary.as_posix(),ensure_ascii=False)
         probe='local f,erro=módulo.carregarBib('+path+',"luaopen_ensaio"); '
         probe+=('garanta(f,erro);local l=f();garanta(tipo(l)=="lista" e #l==1 e tabela.temChave(l,1));'

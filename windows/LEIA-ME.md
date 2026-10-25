@@ -1,7 +1,8 @@
 # Bateria Windows nativa — dados.15
 
 Estado: **em homologação no Windows**. A primeira execução compilou o núcleo e
-identificou falhas Unicode; a revisão seguinte está em teste. O usuário informou que
+identificou falhas Unicode; a correção passou 21 verificações. O ensaio de DLLs
+está em andamento. O usuário informou que
 não dispõe de máquina Windows. A alternativa preparada é um executor
 `windows-2022` do GitHub Actions, com compilador UCRT64 e Python Windows nativos.
 MSYS2 fornece o ambiente de construção; o teste recusa executáveis dependentes
@@ -73,3 +74,8 @@ A primeira execução foi preservada com suas falhas. A compilação e a IBA est
 passaram; `onfé.fé` não era localizado pelo CRT e o caminho com Unicode chegava
 corrompido. O logger Python foi separado desse defeito e agora grava Unicode
 sem falhar ao apresentar os próprios diagnósticos. Bytes de saída são preservados.
+
+O linker MinGW/GCC usado pelo executor falhou ao gravar DLLs em diretório com
+ideogramas. As sondas são compiladas em caminho ASCII e copiadas para
+`módulos-漢字`, onde o interpretador candidato tenta carregá-las. Esta adaptação
+não remove o teste Unicode do carregador e não declara suporte Unicode do GCC.
