@@ -15,10 +15,15 @@ OLD = '''mingw:
 '''
 NEW = '''# Interpretador e compilador usam a mesma biblioteca, opções e IBA.
 # AR já contém suas opções; não acrescentar outro "rcu".
-mingw:
+WINDRES ?= windres
+santafe-windows.o: santafe.rc santafe.manifest
+	$(WINDRES) -i santafe.rc -o $@
+
+mingw: santafe-windows.o
 	$(MAKE) "LUA_A=libsantafe.a" "LUA_T=santafe.exe" "LUAC_T=santafec.exe" \\
 	"AR=$(AR)" "RANLIB=$(RANLIB)" \\
-	"SYSCFLAGS=-DLUA_USE_WINDOWS" "SYSLIBS=-lws2_32" "SYSLDFLAGS=-static" all
+	"SYSCFLAGS=-DLUA_USE_WINDOWS" "SYSLIBS=-lws2_32" "SYSLDFLAGS=-static" \\
+	"MYLDFLAGS=$(MYLDFLAGS) santafe-windows.o" all
 '''
 
 def prepare(archive, destination):
@@ -51,9 +56,15 @@ def prepare(archive, destination):
         raise ValueError('receita MinGW inesperada')
     after = text.replace(OLD, NEW).encode('utf-8')
     makefile.write_bytes(after)
+    additions={}
+    for name in ('santafe.rc','santafe.manifest'):
+        data=(Path(__file__).parent/name).read_bytes()
+        (destination/'src'/name).write_bytes(data)
+        additions['src/'+name]=hashlib.sha256(data).hexdigest()
     evidence = {'fonte_sha256': SOURCE_SHA, 'arquivos_conferidos':len(manifest),
                 'alterado':'src/Makefile', 'antes':hashlib.sha256(before).hexdigest(),
-                'depois':hashlib.sha256(after).hexdigest(), 'producao_alterada':False}
+                'depois':hashlib.sha256(after).hexdigest(), 'adicionados':additions,
+                'producao_alterada':False}
     (destination/'PREPARACAO-WINDOWS.json').write_text(json.dumps(evidence,indent=2)+'\n',encoding='utf-8')
     return evidence
 

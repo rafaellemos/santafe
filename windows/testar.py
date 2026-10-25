@@ -21,6 +21,7 @@ def main():
     args = parser.parse_args()
     if sys.platform != 'win32':
         raise SystemExit('Esta bateria exige Python Windows nativo; macOS, WSL e MSYS Python não contam.')
+    sys.stdout.reconfigure(encoding='utf-8',errors='backslashreplace')
     root=args.fonte.resolve(); work=args.trabalho.resolve()
     if not (root/'PREPARACAO-WINDOWS.json').is_file() or work.exists():
         raise SystemExit('Exige preparação validada e trabalho novo')
