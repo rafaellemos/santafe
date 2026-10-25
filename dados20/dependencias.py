@@ -1,6 +1,6 @@
 """Lock de DLLs e fontes correspondentes; nenhum fonte é executado."""
 from pathlib import Path, PurePosixPath
-import hashlib,json,os,re,shutil,subprocess,urllib.request,urllib.parse
+import hashlib,io,json,os,re,shutil,subprocess,sys,tarfile,urllib.request,urllib.parse
 HERE=Path(__file__).resolve().parent
 DIRECTORY='FONTES-TERCEIROS'
 def sha(data):return hashlib.sha256(data).hexdigest()
@@ -42,16 +42,30 @@ def fetch(entry,cache):
 
 def verify_source(path,entry):
  verify_data(path.read_bytes(),entry['fonte'])
- names=subprocess.check_output(['tar','-tf',str(path)],text=True,timeout=30).splitlines()
- files=[n for n in names if not n.endswith('/')]
- if len(names)!=len(set(names)) or set(files)!=set(entry['conteudos']):raise ValueError('Conteúdo do fonte divergente')
- for n in files:
-  data=subprocess.check_output(['tar','-xOf',str(path),n],timeout=30)
-  if sha(data)!=entry['conteudos'][n]:raise ValueError('Fonte interno divergente: '+n)
-  if n.endswith('/.SRCINFO'):
-   text=data.decode('utf-8')
-   v=entry['identidade'].split(' ',1)[1].rsplit('-',1)
-   if not all(re.search(r'^\s*'+k+r' = '+re.escape(val)+r'\s*$',text,re.M) for k,val in [('pkgver',v[0]),('pkgrel',v[1]),('pkgname',entry['pacote'])]):raise ValueError('Versão/família do fonte divergente')
+ # Read once, without GNU tar's remote-path handling or spawning decompressors
+ # for every member. Build Windows uses CPython 3.14 with native zstd support.
+ if sys.version_info >= (3,14):
+  archive=tarfile.open(path,'r:zst')
+ else:
+  decoded=subprocess.check_output(['zstd','--decompress','--stdout','--memory=256MB',str(path)],timeout=30)
+  if len(decoded)>40_000_000:raise ValueError('Fonte descompactado excede limite')
+  archive=tarfile.open(fileobj=io.BytesIO(decoded),mode='r:')
+ with archive:
+  seen=set();files={}
+  for member in archive:
+   n=member.name
+   if n in seen or len(seen)>=100:raise ValueError('Membro repetido ou limite de membros excedido')
+   seen.add(n)
+   if member.isdir():continue
+   if not member.isfile() or n not in entry['conteudos'] or not 0<=member.size<=40_000_000:raise ValueError('Membro de fonte recusado')
+   data=archive.extractfile(member).read()
+   if sha(data)!=entry['conteudos'][n]:raise ValueError('Fonte interno divergente: '+n)
+   files[n]=True
+   if n.endswith('/.SRCINFO'):
+    text=data.decode('utf-8')
+    v=entry['identidade'].split(' ',1)[1].rsplit('-',1)
+    if not all(re.search(r'^\s*'+k+r' = '+re.escape(val)+r'\s*$',text,re.M) for k,val in [('pkgver',v[0]),('pkgrel',v[1]),('pkgname',entry['pacote'])]):raise ValueError('Versão/família do fonte divergente')
+  if set(files)!=set(entry['conteudos']):raise ValueError('Conteúdo do fonte divergente')
  return len(files)
 
 def verify_runtime(read,metadata,lock):
