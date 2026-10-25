@@ -4,13 +4,34 @@ out=Path(sys.argv[1]);package=out/'santafe.msi';meta=json.loads((out/'manifesto.
 result={'resultado':'em_execucao','administrador':bool(ctypes.windll.shell32.IsUserAnAdmin()),'testes':[]}
 def known(s):
  b=(ctypes.c_byte*16).from_buffer_copy(uuid.UUID(s).bytes_le);p=ctypes.c_wchar_p()
- assert ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(b),0,None,ctypes.byref(p))==0
+ rc=ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(b),0x8000,None,ctypes.byref(p));assert rc==0,('SHGetKnownFolderPath',s,hex(rc & 0xffffffff))
  v=p.value;ctypes.windll.ole32.CoTaskMemFree(p);return v
 def call(name,args):
  p=subprocess.run([str(Path(os.environ['SystemRoot'])/'System32/msiexec.exe'),*args,'/qn','/norestart','/l*v',str(out/(name+'.log'))],timeout=180)
  assert p.returncode==0,(name,p.returncode);result['testes'].append(name)
 try:
  assert not result['administrador'],'The account must not be an administrator'
+ # Start-Process -Credential does not supply a fresh per-user environment.
+ # Obtain it from Windows for this token, instead of inheriting runneradmin's.
+ from ctypes import wintypes as w
+ kernel=ctypes.WinDLL('kernel32');adv=ctypes.WinDLL('advapi32');userenv=ctypes.WinDLL('userenv')
+ kernel.GetCurrentProcess.restype=w.HANDLE;kernel.CloseHandle.argtypes=[w.HANDLE]
+ adv.OpenProcessToken.argtypes=[w.HANDLE,w.DWORD,ctypes.POINTER(w.HANDLE)]
+ userenv.CreateEnvironmentBlock.argtypes=[ctypes.POINTER(ctypes.c_void_p),w.HANDLE,w.BOOL];userenv.DestroyEnvironmentBlock.argtypes=[ctypes.c_void_p]
+ token=w.HANDLE();block=ctypes.c_void_p();assert adv.OpenProcessToken(kernel.GetCurrentProcess(),10,ctypes.byref(token))
+ try:
+  assert userenv.CreateEnvironmentBlock(ctypes.byref(block),token,False)
+  try:
+   clean={};cursor=block.value
+   while True:
+    line=ctypes.wstring_at(cursor)
+    if not line:break
+    cursor+=(len(line)+1)*ctypes.sizeof(ctypes.c_wchar)
+    if not line.startswith('='):
+     key,value=line.split('=',1);clean[key]=value
+   os.environ.clear();os.environ.update(clean)
+  finally:userenv.DestroyEnvironmentBlock(block)
+ finally:kernel.CloseHandle(token)
  local=known('F1B32785-6FBA-4FCF-9D55-7B8E7F157091');target=Path(local)/'Programs/Santafe-Dados-Candidato'
  result['perfil_local']=str(target)
  call('instalar-sem-administrador',['/i',str(package)])
