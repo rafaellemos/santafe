@@ -26,11 +26,11 @@ def main():
     if not (root/'PREPARACAO-WINDOWS.json').is_file() or work.exists():
         raise SystemExit('Exige preparação validada e trabalho novo')
     work.mkdir(parents=True)
-    result={'plataforma':platform.platform(),'python':sys.version,'candidato':'dados.17',
+    result={'plataforma':platform.platform(),'python':sys.version,'candidato':'dados.18',
             'testes':[], 'resultado':'em_execucao', 'suporte_windows_completo':False,
             'pendencias':['SLS e gerenciador: consultar bateria complementar ferramentas/resultado.json',
                          'Bibliotecas C: DLL/IBA dinâmica e dependências',
-                         'Instalação, atualização e reversão nativas',
+                         'Instalação, atualização e reversão: consultar instalador/resultado.json',
                          'Persistência atômica ONFÉ em NTFS',
                          'Integração visual dos editores no Windows']}
     def save():
