@@ -1,3 +1,4 @@
+#define _WIN32_WINNT 0x0A00
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
@@ -32,9 +33,16 @@ __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
  wchar_t path[1024],base[1024],full[1024],old[1024],installed[32],related[512],remove[32];
  if(!prop(h,L"REMOVE",remove,32))return ERROR_INSTALL_FAILURE;
  if(!wcscmp(remove,L"ALL"))return ERROR_SUCCESS;
- typedef LONG (WINAPI *VersionFn)(OSVERSIONINFOW*);
- VersionFn version=(VersionFn)(void*)GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion");OSVERSIONINFOW os={0};os.dwOSVersionInfoSize=sizeof(os);
- if(!version||version(&os)!=0||os.dwMajorVersion<10)return refuse(h,L"DADOS17_WINDOWS10_OR_LATER_REQUIRED");
+ /* MSI applies a version lie even to RtlGetVersion (6.3 on Server2022).
+  * Probe the required Win10+ process attribute instead, without starting code. */
+ SIZE_T bytes=0;InitializeProcThreadAttributeList(NULL,1,0,&bytes);
+ LPPROC_THREAD_ATTRIBUTE_LIST attrs=HeapAlloc(GetProcessHeap(),0,bytes);HANDLE job=CreateJobObjectW(NULL,NULL);
+ int initialized=attrs&&InitializeProcThreadAttributeList(attrs,1,0,&bytes);
+ int supported=initialized&&job&&UpdateProcThreadAttribute(attrs,0,PROC_THREAD_ATTRIBUTE_JOB_LIST,&job,sizeof(job),NULL,NULL);
+ if(initialized)DeleteProcThreadAttributeList(attrs);
+ if(attrs)HeapFree(GetProcessHeap(),0,attrs);
+ if(job)CloseHandle(job);
+ if(!supported)return refuse(h,L"DADOS17_JOB_LIST_ATTRIBUTE_REQUIRED");
  if(!prop(h,L"INSTALLDIR",path,1024)||!prop(h,L"LocalAppDataFolder",base,1024))return ERROR_INSTALL_FAILURE;
  if(wcslen(path)>230||wcslen(base)>900)return refuse(h,L"DADOS17_TARGET_PATH_TOO_LONG");
  if(path[1]!=L':'||path[2]!=L'\\')return refuse(h,L"DADOS17_TARGET_NOT_LOCAL");
