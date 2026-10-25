@@ -7,6 +7,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 int main(void){wchar_t wide[8192];char path[24576],*slash,*name;DWORD n;lua_State *L;int rc;
+ if(!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS))return 126;
  n=GetModuleFileNameW(NULL,wide,8192);if(!n||n>=8192||!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,wide,-1,path,sizeof(path),NULL,NULL))return 126;
  for(name=path;*name;name++)if(*name=='\\')*name='/';slash=strrchr(path,'/');if(!slash)return 126;*slash=0;
  slash=strrchr(path,'/');if(!slash)return 126;int checkout=!strcmp(slash+1,"src");*slash=0;

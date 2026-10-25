@@ -121,6 +121,9 @@ def test(root,out,run,sf,exe,init,lit):
   while not marker.exists() and process.poll() is None and time.monotonic()<deadline:time.sleep(.02)
   assert marker.exists(),'holder did not acquire lock'
   sf('trava-entre-processos',init+f'local r=garanta(N.raiz({lit(held)}));garanta(r:trave())',expected=None)
+  try:(held/'.santafe').rename(held/'trava-movida')
+  except PermissionError:pass
+  else:raise AssertionError('diretorio da trava foi renomeado')
   try:held.rename(work/'moved')
   except PermissionError:pass
   else:raise AssertionError('raiz fixada foi renomeada')

@@ -691,6 +691,12 @@ static int pmain (lua_State *L) {
 
 
 int main (int argc, char **argv) {
+#if defined(_WIN32)
+  /* Do not search the current project directory for implicit DLL dependencies. */
+  if (!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)) {
+    fputs("Santafe: pesquisa segura de DLL indisponivel\n", stderr); return EXIT_FAILURE;
+  }
+#endif
   int status, result;
   lua_State *L = luaL_newstate();  /* create state */
   if (L == NULL) {

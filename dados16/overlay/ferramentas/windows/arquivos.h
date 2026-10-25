@@ -20,11 +20,13 @@
 #define WF_MT "Santafe.Win32.capacidade"
 #define WF_MAX 8192
 #define WF_DEPTH 96
-typedef struct { HANDLE h[WF_DEPTH]; unsigned n; wchar_t path[WF_MAX]; HANDLE lock; } WF;
+typedef struct { HANDLE h[WF_DEPTH]; unsigned n; wchar_t path[WF_MAX]; HANDLE lock, lock_parent; } WF;
 static void wf_close(WF *w) {
     DWORD e=GetLastError();
     if(w->lock && w->lock!=INVALID_HANDLE_VALUE) CloseHandle(w->lock);
     w->lock=NULL;
+    if(w->lock_parent)CloseHandle(w->lock_parent);
+    w->lock_parent=NULL;
     while(w->n) CloseHandle(w->h[--w->n]);
     SetLastError(e);
 }
@@ -43,7 +45,8 @@ static int wf_fail(lua_State *L,const char *s) {
 static int wf_wide(const char *s,size_t n,wchar_t *out,int cap) {
     int k;if(!n || n>32760 || strlen(s)!=n){SetLastError(ERROR_INVALID_NAME);return 0;}
     k=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s,(int)n,out,cap-1);
-    if(!k)return 0;out[k]=0;return k;
+    if(!k)return 0;
+    out[k]=0;return k;
 }
 static int wf_utf8(const wchar_t *s,char *out,int cap) {
     return WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s,-1,out,cap,NULL,NULL);
@@ -91,7 +94,8 @@ static PSECURITY_DESCRIPTOR wf_security(void) {
             ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl,SDDL_REVISION_1,&sd,NULL);
         }
     }
-    if(sid)LocalFree(sid);free(user);CloseHandle(token);return sd;
+    if(sid)LocalFree(sid);
+    free(user);CloseHandle(token);return sd;
 }
 static int wf_owner(HANDLE h) {
     HANDLE token;DWORD size=0;TOKEN_USER *u=NULL;PSID owner;PSECURITY_DESCRIPTOR sd=NULL;int same=0;
@@ -115,7 +119,7 @@ static HANDLE wf_open(const wchar_t *p,DWORD access,DWORD share,DWORD dispositio
 static HANDLE wf_at(HANDLE parent,const wchar_t *name,DWORD access,DWORD share,DWORD disposition,int dir,int single) {
     typedef NTSTATUS (NTAPI *Create)(PHANDLE,ACCESS_MASK,POBJECT_ATTRIBUTES,PIO_STATUS_BLOCK,PLARGE_INTEGER,ULONG,ULONG,ULONG,ULONG,PVOID,ULONG);
     typedef ULONG (WINAPI *Error)(NTSTATUS);
-    HMODULE nt=GetModuleHandleW(L"ntdll.dll");Create create=(Create)GetProcAddress(nt,"NtCreateFile");Error error=(Error)GetProcAddress(nt,"RtlNtStatusToDosError");
+    HMODULE nt=GetModuleHandleW(L"ntdll.dll");Create create=(Create)(void*)GetProcAddress(nt,"NtCreateFile");Error error=(Error)(void*)GetProcAddress(nt,"RtlNtStatusToDosError");
     OBJECT_ATTRIBUTES oa;UNICODE_STRING us;IO_STATUS_BLOCK io;HANDLE h=INVALID_HANDLE_VALUE;NTSTATUS st;PSECURITY_DESCRIPTOR sd=NULL;
     ULONG options=0x00200000|0x00000020; /* FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT */
     ULONG disp=disposition==CREATE_NEW?2:disposition==OPEN_ALWAYS?3:1;
@@ -132,6 +136,16 @@ static HANDLE wf_at(HANDLE parent,const wchar_t *name,DWORD access,DWORD share,D
     if(st<0){SetLastError(error(st));return INVALID_HANDLE_VALUE;}
     if(!wf_info(h,dir,single)){DWORD e=GetLastError();CloseHandle(h);SetLastError(e);return INVALID_HANDLE_VALUE;}
     return h;
+}
+static int wf_rename(HANDLE file,FILE_RENAME_INFO *rename,DWORD size) {
+    typedef NTSTATUS (NTAPI *Set)(HANDLE,PIO_STATUS_BLOCK,PVOID,ULONG,FILE_INFORMATION_CLASS);
+    typedef ULONG (WINAPI *Error)(NTSTATUS);
+    HMODULE nt=GetModuleHandleW(L"ntdll.dll");IO_STATUS_BLOCK io;NTSTATUS st;
+    Set set=(Set)(void*)GetProcAddress(nt,"NtSetInformationFile");
+    Error error=(Error)(void*)GetProcAddress(nt,"RtlNtStatusToDosError");
+    if(!set||!error){SetLastError(ERROR_NOT_SUPPORTED);return 0;}
+    memset(&io,0,sizeof(io));st=set(file,&io,rename,size,(FILE_INFORMATION_CLASS)10);
+    if(st<0){SetLastError(error(st));return 0;}return 1;
 }
 /* Handle-relative directory enumeration. Buffer is Lua-owned, including on OOM. */
 typedef struct { unsigned char data[65536]; DWORD offset; int started,more; } WF_ENUM;
@@ -211,7 +225,8 @@ static int wf_read(lua_State *L,WF *root,const char *s,size_t n,size_t limit) {
     buffer=lua_newuserdata(L,(size_t)size.QuadPart+1);
     while(used<(size_t)size.QuadPart+1) {
         if(!ReadFile(w->h[w->n-1],buffer+used,(DWORD)((size_t)size.QuadPart+1-used),&k,NULL)){wf_close(w);return wf_fail(L,"leitura falhou");}
-        if(!k)break;used+=k;
+        if(!k)break;
+        used+=k;
     }
     wf_close(w);
     if(used!=(size_t)size.QuadPart){SetLastError(ERROR_RETRY);return wf_fail(L,"arquivo alterado");}

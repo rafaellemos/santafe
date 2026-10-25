@@ -1,8 +1,11 @@
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 int main(int argc,char **argv){
+ _setmode(_fileno(stdout),_O_BINARY);
  if(argc<2)return 2;
  if(!strcmp(argv[1],"args")){int i;for(i=2;i<argc;i++)printf("%s\n",argv[i]);return 0;}
  if(!strcmp(argv[1],"env")){printf("%s",getenv("SANTAFE_TEST_SECRET")?"VAZOU":"LIMPO");return 0;}
