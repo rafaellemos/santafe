@@ -7,7 +7,7 @@
   "ferramentas/sls/nativo-windows.c": "d47705fa184018884832d808c7207a7f59cbda572e8720ea46fbac32eb90ec1b",
   "ferramentas/sls/projetos.fé": "32091bad40c2a53570bf53b47fad6bd7eca2867d01db539f7ef5f632f97380e8",
   "ferramentas/sls/sls.fé": "ca848a08779d48091ee2031ec5e431f787b1fec8947c1810439b9279cd8b5522",
-  "ferramentas/windows/arquivos.h": "fb02f3b0bff4f3faae86bf152a9ad4aae3e25e0ab12dfe12c83765f64d730282",
+  "ferramentas/windows/arquivos.h": "ed88d3142c30701c91170f7a591fab9d626fbf6f12ea1aaeab13e757e1f55c43",
   "src/lua.h": "fd940c85dc06e6f0986c0fa0cdf959b2d5afa1b1890443229ec5fb89a844e41f",
   "src/santafe.c": "f44b4b4e35e7e752d8e4d79c0c8b435e5d149a5eb3aff6c0078724008227d47a",
   "testes/integracao/sls/casos.py": "7fb1019e0e7604d342cae40e005c08a82e491a3da012e008e935884817178880",

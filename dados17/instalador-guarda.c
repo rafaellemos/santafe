@@ -32,6 +32,9 @@ __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
  wchar_t path[1024],base[1024],full[1024],old[1024],installed[32],related[512],remove[32];
  if(!prop(h,L"REMOVE",remove,32))return ERROR_INSTALL_FAILURE;
  if(!wcscmp(remove,L"ALL"))return ERROR_SUCCESS;
+ typedef LONG (WINAPI *VersionFn)(OSVERSIONINFOW*);
+ VersionFn version=(VersionFn)(void*)GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion");OSVERSIONINFOW os={0};os.dwOSVersionInfoSize=sizeof(os);
+ if(!version||version(&os)!=0||os.dwMajorVersion<10)return refuse(h,L"DADOS17_WINDOWS10_OR_LATER_REQUIRED");
  if(!prop(h,L"INSTALLDIR",path,1024)||!prop(h,L"LocalAppDataFolder",base,1024))return ERROR_INSTALL_FAILURE;
  if(wcslen(path)>230||wcslen(base)>900)return refuse(h,L"DADOS17_TARGET_PATH_TOO_LONG");
  if(path[1]!=L':'||path[2]!=L'\\')return refuse(h,L"DADOS17_TARGET_NOT_LOCAL");

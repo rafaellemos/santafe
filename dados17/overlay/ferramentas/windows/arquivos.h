@@ -100,8 +100,8 @@ static PSECURITY_DESCRIPTOR wf_security(void) {
     GetTokenInformation(token,TokenUser,NULL,0,&size);
     if(size && (user=malloc(size)) && GetTokenInformation(token,TokenUser,user,size,&size) &&
        ConvertSidToStringSidW(user->User.Sid,&sid)) {
-        if(wcslen(sid)<400) {
-            swprintf(sddl,512,L"D:P(A;OICI;FA;;;%ls)",sid);
+        if(wcslen(sid)<200) {
+            swprintf(sddl,512,L"O:%lsD:P(A;OICI;FA;;;%ls)",sid,sid);
             ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl,SDDL_REVISION_1,&sd,NULL);
         }
     }

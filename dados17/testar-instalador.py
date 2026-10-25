@@ -2,6 +2,8 @@
 from pathlib import Path
 import ctypes,hashlib,json,os,shutil,subprocess,sys,time,traceback,uuid,winreg
 import msi
+import proprietario
+import zipfile
 HERE=Path(__file__).resolve().parent
 OUT=Path(sys.argv[1]).resolve();OUT.mkdir(parents=True,exist_ok=True)
 TOOLS=Path(sys.argv[2]).resolve();SOURCE=Path(sys.argv[3]).resolve();GUARD=Path(sys.argv[4]).resolve();BASE=Path(sys.argv[5]).resolve()
@@ -90,8 +92,22 @@ try:
  run('instalado-versao',[target/'bin/santafe.exe','-v'],env)
  run('instalado-sls39',[sys.executable,HERE/'portatil_sls.py',SOURCE,target/'bin/santafe-sls.exe',OUT/'sls-instalado.json'],env)
  # Installation is not the project: project state remains outside the installation.
+ # Reproduce data16's owner bug under the same native elevated token.
+ token_user=proprietario.token_sid(1);token_default=proprietario.token_sid(4)
+ assert token_user!=token_default,'This regression requires an administrative token with a group default owner'
+ oldruntime=OUT/'runtime16';oldwork=OUT/'projeto-proprietario16';oldwork.mkdir()
+ with zipfile.ZipFile(BASE) as z:z.extractall(oldruntime)
+ oldtest=subprocess.run([str(oldruntime/'bin/santafe.exe'),'instale','exemplo','1.0.0','--repositorio-local',str(TOOLS/'casos/repo')],cwd=oldwork,capture_output=True,env=env,timeout=60)
+ assert oldtest.returncode==1 and b'Win32 5' in oldtest.stderr
+ assert proprietario.file_owner(oldwork/'.santafe/trava')==token_default
+ ok('controle-positivo-defeito-proprietario16')
  p=subprocess.run([str(target/'bin/santafe.exe'),'instale','exemplo','1.0.0','--repositorio-local',str(TOOLS/'casos/repo')],cwd=workspace,capture_output=True,env=env,timeout=60)
  assert p.returncode==0,p.stderr;ok('gerenciador-instalado-projeto-separado')
+ assert proprietario.file_owner(workspace/'.santafe/trava')==token_user;ok('trava-criada-com-proprietario-usuario')
+ foreignlock=OUT/'projeto-trava-alheia';(foreignlock/'.santafe').mkdir(parents=True);lock=foreignlock/'.santafe/trava';lock.write_bytes(b'')
+ proprietario.set_owner(lock,token_default);assert proprietario.file_owner(lock)!=token_user
+ refused=subprocess.run([str(target/'bin/santafe.exe'),'instale','exemplo','1.0.0','--repositorio-local',str(TOOLS/'casos/repo')],cwd=foreignlock,capture_output=True,env=env,timeout=60)
+ assert refused.returncode==1 and b'Win32 5' in refused.stderr;assert not (foreignlock/'santafe.json').exists();ok('trava-alheia-continua-recusada')
  p=subprocess.run([str(target/'bin/santafe.exe'),'-e','garanta((importe "exemplo").valor==42)'],cwd=workspace,capture_output=True,env=env,timeout=60);assert p.returncode==0,p.stderr;ok('biblioteca-importada-apos-instalar')
  project_hashes={p.relative_to(workspace).as_posix():digest(p) for p in workspace.rglob('*') if p.is_file()}
  (target/'share/santafé/1.0/ferramentas/sls/nativo.dll').unlink();(target/'LEIA-ME.txt').write_text('dano sintetico',encoding='utf-8')
