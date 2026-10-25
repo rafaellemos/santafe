@@ -52,6 +52,6 @@ try:
  prepare(ROOT,OUT,run)
  RESULT['resultado']='passou_integracao_adversarial'
 except Exception as e:
- RESULT['resultado']='falhou';RESULT['falha']=str(e);traceback.print_exc()
+ RESULT['resultado']='falhou';RESULT['falha']=str(e);RESULT['rastro']=traceback.format_exc();traceback.print_exc()
 finally:save()
 sys.exit(0 if RESULT['resultado'].startswith('passou') else 1)

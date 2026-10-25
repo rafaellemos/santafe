@@ -9,5 +9,7 @@
   "ferramentas/sls/sls.fé": "e70f3e6114a345d4b2888951dace2a21499272a0ad555de13f7781093ff0b3aa",
   "ferramentas/windows/arquivos.h": "def3e441e5e1067e878bfb424406c2e33bb36bd290227817dbc9890a0527f140",
   "src/lua.h": "d726773c643fff967c2a91a9caa4aa88193e1c5e9f8840f0c5218f8ca289f6eb",
-  "src/santafe.c": "f44b4b4e35e7e752d8e4d79c0c8b435e5d149a5eb3aff6c0078724008227d47a"
+  "src/santafe.c": "f44b4b4e35e7e752d8e4d79c0c8b435e5d149a5eb3aff6c0078724008227d47a",
+  "testes/integracao/sls/casos.py": "7fb1019e0e7604d342cae40e005c08a82e491a3da012e008e935884817178880",
+  "testes/integracao/testar_sls_aceitacao.py": "ad308d0223d8002f493fbbedc1f3e2c818e0815366640a2288d82189f303c09f"
 }

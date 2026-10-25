@@ -28,8 +28,15 @@ int main(int argc,char **argv){
   if(mode){
    WF original={0},strict={0};char utf8[WF_MAX*3];check(wf_utf8(path,utf8,sizeof(utf8)),"caminho da sonda");check(wf_root(&original,utf8,strlen(utf8)),"fixar cadeia original");
    check(wf_strict(&strict,&original),"reabrir diretório por handle com proteção estrita");
-   mutator=CreateFileW(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
-   check(mutator==INVALID_HANDLE_VALUE,"pin de processo impede mutador");wf_close(&strict);wf_close(&original);
+   DWORD accesses[]={0,FILE_WRITE_ATTRIBUTES,FILE_WRITE_EA,FILE_WRITE_DATA,GENERIC_WRITE};
+   for(unsigned a=0;a<sizeof(accesses)/sizeof(accesses[0]);a++){
+    mutator=CreateFileW(path,accesses[a],FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
+    int changed=mutator!=INVALID_HANDLE_VALUE&&junction(mutator,outside);
+    printf("PIN_ESTRITO acesso=%lu abriu=%d alterou=%d erro=%lu\n",accesses[a],mutator!=INVALID_HANDLE_VALUE,changed,GetLastError());
+    check(!changed,"pin de processo impede mutação com direitos mínimos");
+    if(mutator!=INVALID_HANDLE_VALUE)CloseHandle(mutator);
+   }
+   wf_close(&strict);wf_close(&original);
   }
   WF beforeMutation={0};char utf8[WF_MAX*3];
   if(mode){check(wf_utf8(path,utf8,sizeof(utf8)),"UTF8 original");check(wf_root(&beforeMutation,utf8,strlen(utf8)),"cadeia antes da mutação");}
