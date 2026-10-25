@@ -1,8 +1,8 @@
 {
   "ferramentas/pacotes/ambiente.fé": "930df500db38626a55588f4decabbb77e755a91cd378f93e16f3662ae2038231",
   "ferramentas/pacotes/cli.fé": "f16786d8d61224c783d567bd40689ab9328d85f152aa46b0d1265a67994c4cf2",
-  "ferramentas/pacotes/cliente.fé": "5940aec23cc9ec8f2cb74996a82cc948c1550d7f6fb0dc6c6ef7ca90628de3cf",
-  "ferramentas/pacotes/nativo-windows.c": "8b9872268f7292a8a82c10b0a744e9d14bea799f5f5d9ab96a792e16ac1a24b4",
+  "ferramentas/pacotes/cliente.fé": "0f159c14de481aa1d271027459afee0ccc42801783c78ab7bb42d4d469206da4",
+  "ferramentas/pacotes/nativo-windows.c": "bf0112f0e62d4680b4b5ebf4bac0b46ce469d8546970c422477f1deab1b92231",
   "ferramentas/sls/iniciador-windows.c": "9b146f03f6b0ce23e385a241fb279841d66d9dadaaf97523c6d2fe2c9b7fa497",
   "ferramentas/sls/nativo-windows.c": "d47705fa184018884832d808c7207a7f59cbda572e8720ea46fbac32eb90ec1b",
   "ferramentas/sls/projetos.fé": "32091bad40c2a53570bf53b47fad6bd7eca2867d01db539f7ef5f632f97380e8",

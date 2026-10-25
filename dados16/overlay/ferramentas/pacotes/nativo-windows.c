@@ -18,6 +18,18 @@ static int open_root(lua_State *L){size_t n;const char *p=luaL_checklstring(L,1,
 static int subroot(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=path_arg(L,2,&n);wchar_t rel[WF_MAX];wf_relative(p,n,rel);w=wf_new(L);if(!wf_copy(w,root)||!wf_walk(w,rel,0)){wf_close(w);return wf_fail(L,"subraiz insegura");}return 1;}
 static int mkdirs(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=path_arg(L,2,&n);wchar_t rel[WF_MAX];wf_relative(p,n,rel);w=wf_new(L);if(!wf_copy(w,root)||!wf_walk(w,rel,1)){wf_close(w);return wf_fail(L,"criar diretorios");}wf_close(w);lua_pushboolean(L,1);return 1;}
 static int read_file(lua_State *L){WF *root=root_arg(L);size_t n;const char *p=path_arg(L,2,&n);lua_Integer max=luaL_optinteger(L,3,MAX_BYTES);luaL_argcheck(L,max>0&&max<=MAX_BYTES,3,"limite invalido");return wf_read(L,root,p,n,max);}
+/* Trusted native tools sometimes cannot resolve relative output names from a
+ * VolumeGUID cwd. Keep the same stable volume identity and pinned ancestors;
+ * never substitute a mutable DOS drive mapping. The caller retains the root. */
+static int native_path(lua_State *L){
+ WF *root=root_arg(L);size_t n,i;const char *p=path_arg(L,2,&n);wchar_t rel[WF_MAX],path[WF_MAX];char utf8[WF_MAX*3];
+ if(!wf_relative(p,n,rel))return wf_fail(L,"caminho nativo relativo");
+ if(wcslen(root->path)+wcslen(rel)+2>=WF_MAX)return luaL_error(L,"caminho nativo excessivo");
+ wcscpy(path,root->path);wcscat(path,L"\\");
+ for(i=0;rel[i];i++)if(rel[i]==L'/')rel[i]=L'\\';
+ wcscat(path,rel);if(!wf_utf8(path,utf8,sizeof(utf8)))return wf_fail(L,"caminho nativo UTF8");
+ lua_pushstring(L,utf8);return 1;
+}
 static int exists(lua_State *L){WF *root=root_arg(L),*w;size_t n;const char *p=path_arg(L,2,&n);wchar_t leaf[256];HANDLE h;BY_HANDLE_FILE_INFORMATION st;
  w=wf_new(L);if(!wf_parent(w,root,p,n,leaf,0)||!wf_append(w,leaf,wcslen(leaf)))goto fail;
  h=wf_at(w->h[w->n-1],leaf,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,OPEN_EXISTING,-1,1);
@@ -162,7 +174,10 @@ fail:error=GetLastError();if(!error)error=ERROR_GEN_FAILURE;
 cleanup:
  if(job)CloseHandle(job);
  if(started){WaitForSingleObject(process.hProcess,5000);CloseHandle(process.hThread);CloseHandle(process.hProcess);}
- if(pins)wf_close(pins);if(rd)CloseHandle(rd);if(wr)CloseHandle(wr);if(in)CloseHandle(in);
+ if(pins)wf_close(pins);
+ if(rd)CloseHandle(rd);
+ if(wr)CloseHandle(wr);
+ if(in)CloseHandle(in);
  if(startup.lpAttributeList){DeleteProcThreadAttributeList(startup.lpAttributeList);free(startup.lpAttributeList);}
  if(error){SetLastError(error);return wf_fail(L,"executar processo confinado");}lua_pushinteger(L,code);lua_pushlstring(L,output,bytes);return 2;
 }
@@ -181,7 +196,7 @@ static int tool(lua_State *L){const char *name=luaL_checkstring(L,1);wchar_t p[W
  lua_pushstring(L,out);return 1;
 }
 __declspec(dllexport) int luaopen_pacotes_nativo(lua_State *L){
- const luaL_Reg methods[]={{"leia",read_file},{"grave",write_file},{"diretorio",mkdirs},{"subraiz",subroot},{"existe",exists},{"liste",list_directory},{"trave",lock_root},{"execute",run},{"removaArquivo",remove_file},{"feche",wf_gc},{NULL,NULL}};
+ const luaL_Reg methods[]={{"leia",read_file},{"grave",write_file},{"diretorio",mkdirs},{"subraiz",subroot},{"caminhoNativo",native_path},{"existe",exists},{"liste",list_directory},{"trave",lock_root},{"execute",run},{"removaArquivo",remove_file},{"feche",wf_gc},{NULL,NULL}};
  const luaL_Reg api[]={{"raiz",open_root},{"sha256",digest},{"base64",base64},{"decodBase64",unbase64},{"chaveCaminho",path_key},{"diretorioAtual",cwd},{"plataforma",platform},{"nonce",nonce},{"ferramenta",tool},{NULL,NULL}};
  luaL_checkversion(L);wf_register(L);luaL_getmetatable(L,WF_MT);lua_newtable(L);luaL_setfuncs(L,methods,0);lua_setfield(L,-2,LUA_MM_INDICE);lua_pop(L,1);
  if(luaL_newmetatable(L,MEMORY)){lua_pushcfunction(L,gc_memory);lua_setfield(L,-2,LUA_MM_FINALIZE);}lua_pop(L,1);

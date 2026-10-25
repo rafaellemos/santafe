@@ -172,7 +172,9 @@ retorne função(N,F)
                     colisões[chave]=verdadeiro
                     exija(opções.cabeçalhos e absoluto(opções.cabeçalhos),"diretório de cabeçalhos Santafé ausente")
                     local saída="nativo-"..módulo..(Windows e ".dll" ou ".so")
-                    local argumentos={Windows e garanta(N.ferramenta("cc")) ou "/usr/bin/cc","-O2","-fPIC","-I"..opções.cabeçalhos,"-I.","-o",saída}
+                    local subraiz=garanta(raiz:subraiz(destino))
+                    local saídaCompilador=Windows e garanta(subraiz:caminhoNativo(saída)) ou saída
+                    local argumentos={Windows e garanta(N.ferramenta("cc")) ou "/usr/bin/cc","-O2","-fPIC","-I"..opções.cabeçalhos,"-I.","-o",saídaCompilador}
                     se plataforma.abiDados então argumentos[#argumentos+1]="-DSANTAFE_DADOS_EXPERIMENTAL" fim
                     se plataforma.sistema=="Darwin" então
                         argumentos[#argumentos+1]="-bundle"; argumentos[#argumentos+1]="-undefined"; argumentos[#argumentos+1]="dynamic_lookup"
@@ -184,7 +186,6 @@ retorne função(N,F)
                     para _,f em ipares(receita.fontes) início argumentos[#argumentos+1]="./"..f fim
                     para _,b em ipares(receita.bibliotecas ou {}) início argumentos[#argumentos+1]="-l"..b fim
                     se Windows então argumentos[#argumentos+1]=opções.importação fim
-                    local subraiz=garanta(raiz:subraiz(destino))
                     local código,diagnóstico=subraiz:execute(argumentos,120); subraiz:feche()
                     exija(código==0,"compilação falhou: "..nome.."\n"..(diagnóstico ou ""))
                     local binário=garanta(raiz:leia(destino.."/"..saída,16*1024*1024))
