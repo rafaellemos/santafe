@@ -92,6 +92,13 @@ def test(root,out,run,sf,exe,init,lit):
  native=fixture('nativo','1.0.0',7,True);np=work/'native';np.mkdir();nativepkg=work/'native.sfp'
  cli('empacotar-c',work,'empacote',native,nativepkg);cli('catalogar-c',work,'catalogo',repo,nativepkg)
  cli('recusar-c-sem-permissao',np,'instale','nativo','*','--repositorio-local',repo,ok=False)
+ # Diagnostic fixture for GCC/ld volume-path handling; no candidate guarantees
+ # are inferred from the probe's own successful exit.
+ cp=work/'compiler-probe';cp.mkdir()
+ probe_code=init+f'local r=garanta(N.raiz({lit(cp)}));garanta(r:grave("probe.c","int probe(void){{return 42;}}",falso));'
+ for suffix,path in [('relativo','relative.dll'),('dos',str(cp/'dos.dll')),('dos-barra',str(cp/'dos-barra.dll').replace('/',chr(92)))]:
+  probe_code+=f'local c,s=r:execute({{garanta(N.ferramenta("cc")),"-shared","probe.c","-o",{lit(path)}}},30,4096);mostre({lit(suffix)},c,s);'
+ sf('sonda-caminhos-compilador',probe_code)
  cli('instalar-c-autorizado',np,'instale','nativo','*','--repositorio-local',repo,'--permitir-nativo')
  cli('importar-c',np,'-e','garanta((importe "soma")(20,22)==42)')
  probe=out/'sonda.exe';run('compilar-sonda-processos',['gcc',Path(__file__).parent/'sonda-processo.c','-o',probe])

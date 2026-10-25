@@ -28,7 +28,7 @@ def main():
     work.mkdir(parents=True)
     result={'plataforma':platform.platform(),'python':sys.version,'candidato':'dados.16',
             'testes':[], 'resultado':'em_execucao', 'suporte_windows_completo':False,
-            'pendencias':['SLS e gerenciador: portar recursos POSIX e lançadores',
+            'pendencias':['SLS e gerenciador: consultar bateria complementar ferramentas/resultado.json',
                          'Bibliotecas C: DLL/IBA dinâmica e dependências',
                          'Instalação, atualização e reversão nativas',
                          'Persistência atômica ONFÉ em NTFS',
@@ -42,7 +42,7 @@ def main():
         log=proc.stdout[:8*1024*1024]
         (work/(name+'.log')).write_bytes(log)
         if len(proc.stdout)>len(log):raise RuntimeError('saída excedeu limite: '+name)
-        passed=proc.returncode==expected if expected is not None else proc.returncode!=0
+        passed=proc.returncode==expected if expected is not None else proc.returncode==1
         result['testes'].append({'nome':name,'codigo':proc.returncode,'passou':passed,
                                 'segundos':round(time.monotonic()-start,3)})
         print(('PASSOU ' if passed else 'FALHOU ')+name,flush=True)
