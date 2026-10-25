@@ -1,6 +1,7 @@
 """Ensaios automáticos em Windows11 ARM; pacote x64 em emulação, sem GUI."""
 from pathlib import Path,PurePosixPath
 import ctypes,hashlib,json,os,platform,subprocess,sys,tempfile,traceback,uuid,zipfile
+sys.stdout.reconfigure(encoding='utf-8',errors='backslashreplace')
 here=Path(__file__).resolve().parent
 out=Path(sys.argv[2]).resolve();out.mkdir(parents=True,exist_ok=True)
 result={'candidato':'dados.18','resultado':'em_execucao','testes':[],
@@ -28,8 +29,8 @@ try:
   for n in names:
    p=PurePosixPath(n);assert not p.is_absolute() and '..' not in p.parts and '\\' not in n and ':' not in n
   z.extractall(entry)
- for n,h in json.loads((entry/'MANIFESTO.json').read_text()).items():assert digest(entry/n)==h,n
- old=json.loads((here/'base/dados17.json').read_text());new=json.loads((entry/'dados18.json').read_text());metas=[old,new]
+ for n,h in json.loads((entry/'MANIFESTO.json').read_text(encoding='utf-8')).items():assert digest(entry/n)==h,n
+ old=json.loads((here/'base/dados17.json').read_text(encoding='utf-8'));new=json.loads((entry/'dados18.json').read_text(encoding='utf-8'));metas=[old,new]
  assert digest(here/'base/dados17.msi')=='73d02ea9dda40ce0ea9269cb2440616e5e2b9317f7bb15a301806c1de2023ef0'
  assert digest(entry/'dados18.msi')==new['sha256'];ok('entrada-e-msi-conferidos')
  target=Path(os.environ['LOCALAPPDATA'])/'Programs'/('Santafe-Windows11-'+uuid.uuid4().hex[:10])
