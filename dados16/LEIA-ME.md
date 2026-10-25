@@ -47,3 +47,10 @@ Não usar os arquivos anteriores com a mesma designação como prova desta revis
 Referências de implementação: documentação Microsoft de NtCreateFile,
 NtSetInformationFile/FILE_RENAME_INFORMATION, GetFileInformationByHandleEx,
 LockFileEx e Job Objects.
+
+Antes de subprocessos, a cadeia inteira é novamente fixada e comparada por
+identidade. O diretório final mantém um arquivo de guarda privado e não removível
+até o encerramento: NTFS recusa converter diretórios não vazios em reparse points.
+Só negar compartilhamento de escrita NÃO protege contra FILE_WRITE_ATTRIBUTES;
+a bateria inclui esse ataque e um controle positivo após liberar a guarda.
+Referência: https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-points

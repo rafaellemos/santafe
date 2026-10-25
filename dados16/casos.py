@@ -64,6 +64,8 @@ def test(root,out,run,sf,exe,init,lit):
  os.link(secret,a/'hardlink')
  sf('recusar-hardlink',init+f'local r=garanta(N.raiz({lit(a)}));garanta(r:leia("hardlink"))',expected=None)
  assert secret.read_text()=='INTACTO'
+ for api in ('listeFontes','leiaFonte'):
+  sf('sls-raiz-fechada-'+api,init+f'local S=garanta(módulo.carregarBib({lit(root/"ferramentas/sls/nativo.dll")},"luaopen_sls_nativo"))();local r=garanta(N.raiz({lit(a)}));r:feche();S.{api}(r,"exemplo.fé")',expected=None)
  sf('recusar-trava-dupla',init+f'local a=garanta(N.raiz({lit(a)}));local b=garanta(N.raiz({lit(a)}));garanta(a:trave());garanta(b:trave())',expected=None)
  # File size limit, invalid base64 and corrupt metadata.
  sf('limite-leitura',init+f'local r=garanta(N.raiz({lit(a)}));garanta(r:grave("grande","12345",falso));garanta(r:leia("grande",4))',expected=None)

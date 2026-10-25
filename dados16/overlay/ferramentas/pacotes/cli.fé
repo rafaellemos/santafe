@@ -35,6 +35,7 @@ Instalação por projeto; C exige --permitir-nativo. Sem sudo ou pós-instalaç�
 --repositorio-local DIRETORIO: somente para curadoria/ensaios locais.
 Catálogo oficial: https://xn--santaf-gva.dev.br/est%C3%A1tico/bibliotecas/v1/
 Disponível na distribuição Santafé 2.1.0; pacote inicial: semver 1.0.0.]=])
+        se Windows então mostre("Windows nativo: candidato dados.16 para homologação, sem instalação global.\nC requer GCC UCRT64 absoluto em SANTAFE_CC e --permitir-nativo.") fim
         retorne
     senão
         F.exija(a:corte(1,1)~="-","opção desconhecida: "..a)

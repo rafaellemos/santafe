@@ -10,6 +10,7 @@
 #include <winternl.h>
 #include <sddl.h>
 #include <aclapi.h>
+#include <bcrypt.h>
 #include <wchar.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -24,13 +25,19 @@
  * one-component handle-relative operations, never on re-resolving path.
  * Processes additionally acquire strict pins for their entire lifetime. */
 #define WF_DIR_SHARE (FILE_SHARE_READ|FILE_SHARE_WRITE)
-typedef struct { HANDLE h[WF_DEPTH]; unsigned n; wchar_t path[WF_MAX]; HANDLE lock, lock_parent; } WF;
+typedef struct { HANDLE h[WF_DEPTH]; unsigned n; wchar_t path[WF_MAX]; HANDLE lock, lock_parent, guard_file; } WF;
 static void wf_close(WF *w) {
     DWORD e=GetLastError();
     if(w->lock && w->lock!=INVALID_HANDLE_VALUE) CloseHandle(w->lock);
     w->lock=NULL;
     if(w->lock_parent)CloseHandle(w->lock_parent);
     w->lock_parent=NULL;
+    if(w->guard_file && w->guard_file!=INVALID_HANDLE_VALUE) {
+        FILE_DISPOSITION_INFO remove={TRUE};
+        SetFileInformationByHandle(w->guard_file,FileDispositionInfo,&remove,sizeof(remove));
+        CloseHandle(w->guard_file);
+    }
+    w->guard_file=NULL;
     while(w->n) CloseHandle(w->h[--w->n]);
     SetLastError(e);
 }
@@ -191,8 +198,16 @@ static int wf_append(WF *w,const wchar_t *s,size_t len) {
  * same one-component NT opens, and require the identities of ALL original
  * ancestors. Already-mutated roots and competing writer handles fail closed. */
 static int wf_strict(WF *to,WF *from) {
-    const wchar_t *end,*p; wchar_t component[256]; unsigned i; HANDLE h;
+    const wchar_t *end,*p; wchar_t component[256],guard[64]; unsigned i; HANDLE h; unsigned char nonce[16];
     if(!from->n || wcsncmp(from->path,L"\\\\?\\Volume{",11)) {SetLastError(ERROR_INVALID_NAME);return 0;}
+    /* Share flags do NOT prevent FILE_WRITE_ATTRIBUTES reparse mutation.
+     * NTFS refuses reparse conversion of a nonempty directory (MS-FSA).
+     * Each ancestor already contains the next pinned child. Keep a private
+     * undeletable child in the leaf as well, then revalidate the full chain. */
+    if(BCryptGenRandom(NULL,nonce,sizeof(nonce),BCRYPT_USE_SYSTEM_PREFERRED_RNG)<0){SetLastError(ERROR_GEN_FAILURE);return 0;}
+    wcscpy(guard,L".processo-");for(i=0;i<16;i++)swprintf(guard+9+2*i,3,L"%02x",nonce[i]);
+    to->guard_file=wf_at(from->h[from->n-1],guard,GENERIC_READ|DELETE,0,CREATE_NEW,0,1);
+    if(to->guard_file==INVALID_HANDLE_VALUE){to->guard_file=NULL;return 0;}
     end=wcschr(from->path+4,L'\\');if(!end){SetLastError(ERROR_INVALID_NAME);return 0;}
     memcpy(to->path,from->path,(end-from->path+1)*sizeof(wchar_t));to->path[end-from->path+1]=0;
     if(!wf_add(to,wf_open(to->path,FILE_LIST_DIRECTORY|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,OPEN_EXISTING,1,0)))return 0;

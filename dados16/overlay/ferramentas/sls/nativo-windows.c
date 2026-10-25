@@ -13,6 +13,7 @@ static int root(lua_State *L) {
 static int read_source(lua_State *L) {
     WF *w=luaL_checkudata(L,1,WF_MT);size_t n;const char *p=luaL_checklstring(L,2,&n);
     lua_Integer max=luaL_optinteger(L,3,4*1024*1024);
+    luaL_argcheck(L,w->n>0,1,"raiz fechada");
     luaL_argcheck(L,max>0&&max<=16*1024*1024,3,"limite invalido");return wf_read(L,w,p,n,(size_t)max);
 }
 typedef struct{int files,entries,dirs;const char *problem;} Scan;
@@ -45,7 +46,7 @@ static void scan(lua_State *L,WF *root,const char *prefix,int output,Scan *s,int
     if(!s->problem && more<0)s->problem="leitura de diretorio falhou";
     lua_settop(L,top);
 }
-static int sources(lua_State *L){WF *w=luaL_checkudata(L,1,WF_MT);Scan s={0,0,0,NULL};lua_newtable(L);scan(L,w,"",lua_gettop(L),&s,0);if(s.problem)lua_pushstring(L,s.problem);else lua_pushnil(L);return 2;}
+static int sources(lua_State *L){WF *w=luaL_checkudata(L,1,WF_MT);Scan s={0,0,0,NULL};luaL_argcheck(L,w->n>0,1,"raiz fechada");lua_newtable(L);scan(L,w,"",lua_gettop(L),&s,0);if(s.problem)lua_pushstring(L,s.problem);else lua_pushnil(L);return 2;}
 static int ready(lua_State *L) {
     int ms=(int)luaL_optinteger(L,1,0);HANDLE h=GetStdHandle(STD_INPUT_HANDLE);DWORD type=GetFileType(h),n=0;ULONGLONG end;
     luaL_argcheck(L,ms>=0&&ms<=1000,1,"prazo invalido");end=GetTickCount64()+ms;
@@ -70,7 +71,7 @@ static int hash_source(lua_State *L){size_t n,i;const char *p=luaL_checklstring(
  lua_pushlstring(L,hex,64);return 1;}
 __declspec(dllexport) int luaopen_sls_nativo(lua_State *L){
  const luaL_Reg api[]={{"abraRaiz",root},{"leiaFonte",read_source},{"listeFontes",sources},{"entradaPronta",ready},{"leiaEntrada",input},{"executeProtegido",protected_request},{"sha256",hash_source},{NULL,NULL}};
- wf_register(L);
+ luaL_checkversion(L);wf_register(L);
  /* LSP Content-Length counts octets. CRT must not rewrite LF to CRLF. */
  _setmode(_fileno(stdin),_O_BINARY);_setmode(_fileno(stdout),_O_BINARY);
  luaL_newlib(L,api);return 1;

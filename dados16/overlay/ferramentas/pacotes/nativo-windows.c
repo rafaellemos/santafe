@@ -160,9 +160,9 @@ stop:
  goto cleanup;
 fail:error=GetLastError();if(!error)error=ERROR_GEN_FAILURE;
 cleanup:
- if(pins)wf_close(pins);
  if(job)CloseHandle(job);
- if(started){CloseHandle(process.hThread);CloseHandle(process.hProcess);}if(rd)CloseHandle(rd);if(wr)CloseHandle(wr);if(in)CloseHandle(in);
+ if(started){WaitForSingleObject(process.hProcess,5000);CloseHandle(process.hThread);CloseHandle(process.hProcess);}
+ if(pins)wf_close(pins);if(rd)CloseHandle(rd);if(wr)CloseHandle(wr);if(in)CloseHandle(in);
  if(startup.lpAttributeList){DeleteProcThreadAttributeList(startup.lpAttributeList);free(startup.lpAttributeList);}
  if(error){SetLastError(error);return wf_fail(L,"executar processo confinado");}lua_pushinteger(L,code);lua_pushlstring(L,output,bytes);return 2;
 }

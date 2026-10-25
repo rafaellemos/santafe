@@ -39,7 +39,7 @@ try:
    if origin.is_file() and not target.exists():shutil.copyfile(origin,target);todo.append(target)
  os.environ['SANTAFE_CC']=str(compiler)
  INIT='local N=garanta(módulo.carregarBib('+lit(ROOT/'ferramentas/pacotes/nativo.dll')+',"luaopen_pacotes_nativo"))(); '
- run('compilar-sonda-confinamento',['gcc','-std=gnu99','-O2','-DSANTAFE_DADOS_EXPERIMENTAL','-I'+str(ROOT),'-I'+str(src),HERE/'sonda-confinamento.c',lib,'-ladvapi32','-o',src/'sonda-confinamento.exe'])
+ run('compilar-sonda-confinamento',['gcc','-std=gnu99','-O2','-DSANTAFE_DADOS_EXPERIMENTAL','-I'+str(ROOT),'-I'+str(src),HERE/'sonda-confinamento.c',lib,'-ladvapi32','-lbcrypt','-o',src/'sonda-confinamento.exe'])
  run('sonda-confinamento-isolada',[src/'sonda-confinamento.exe',OUT/'fixture-confinamento'])
  sf('api-basica',INIT+'garanta(N.sha256("abc")=="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");garanta(N.decodBase64(N.base64("ação"))=="ação");garanta(#N.nonce()==32)')
  work=OUT/'projeto-ação-漢字';work.mkdir()
