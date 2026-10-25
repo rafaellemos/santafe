@@ -1,0 +1,52 @@
+#define UNICODE
+#define _UNICODE
+#include <windows.h>
+#include <msi.h>
+#include <msiquery.h>
+#include <wchar.h>
+#include <stdio.h>
+static void logmsg(MSIHANDLE h,const wchar_t *s){MSIHANDLE r=MsiCreateRecord(1);MsiRecordSetStringW(r,0,s);MsiProcessMessage(h,INSTALLMESSAGE_INFO,r);MsiCloseHandle(r);}
+static int prop(MSIHANDLE h,const wchar_t*n,wchar_t*b,DWORD size){return MsiGetPropertyW(h,n,b,&size)==ERROR_SUCCESS;}
+static UINT refuse(MSIHANDLE h,const wchar_t*s){logmsg(h,s);return ERROR_INSTALL_FAILURE;}
+__declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
+ wchar_t path[1024],base[1024],full[1024],old[1024],installed[32],related[512],remove[32];
+ if(!prop(h,L"REMOVE",remove,32))return ERROR_INSTALL_FAILURE;
+ if(!wcscmp(remove,L"ALL"))return ERROR_SUCCESS;
+ if(!prop(h,L"INSTALLDIR",path,1024)||!prop(h,L"LocalAppDataFolder",base,1024))return ERROR_INSTALL_FAILURE;
+ if(wcslen(path)>230||wcslen(base)>900)return refuse(h,L"DADOS17_TARGET_PATH_TOO_LONG");
+ if(path[1]!=L':'||path[2]!=L'\\')return refuse(h,L"DADOS17_TARGET_NOT_LOCAL");
+ wchar_t drive[4]={path[0],L':',L'\\',0},fs[32];
+ if(GetDriveTypeW(drive)!=DRIVE_FIXED||!GetVolumeInformationW(drive,NULL,0,NULL,NULL,NULL,fs,32)||_wcsicmp(fs,L"NTFS"))return refuse(h,L"DADOS17_TARGET_REQUIRES_FIXED_NTFS");
+ wcscat(base,L"Programs\\Santafe-");
+ if(!GetFullPathNameW(path,1024,full,NULL)||_wcsnicmp(full,base,wcslen(base)))return refuse(h,L"DADOS17_TARGET_OUTSIDE_USER_CHANNEL");
+ if(_wcsicmp(path,full))return refuse(h,L"DADOS17_TARGET_NOT_CANONICAL");
+ for(wchar_t *p=path+3;*p;p++){
+  if(*p==L':'||*p<32)return refuse(h,L"DADOS17_TARGET_INVALID_COMPONENT");
+  if(*p==L'\\'&&(p[-1]==L'.'||p[-1]==L' '))return refuse(h,L"DADOS17_TARGET_INVALID_COMPONENT");
+ }
+ /* Point-in-time preflight, not a sandbox against another process of the same user. */
+ for(wchar_t *p=path+3;;p++)if(*p==L'\\'||!*p){
+  wchar_t save=*p;*p=0;
+  if(wcslen(path)>3){DWORD a=GetFileAttributesW(path);if(a!=INVALID_FILE_ATTRIBUTES){
+   if((a&FILE_ATTRIBUTE_REPARSE_POINT)||!(a&FILE_ATTRIBUTE_DIRECTORY)){*p=save;return refuse(h,L"DADOS17_TARGET_REPARSE_OR_FILE");}
+  }else if(GetLastError()!=ERROR_FILE_NOT_FOUND&&GetLastError()!=ERROR_PATH_NOT_FOUND){*p=save;return refuse(h,L"DADOS17_TARGET_INACCESSIBLE");}}
+  *p=save;if(!save)break;
+ }
+ if(!prop(h,L"Installed",installed,32)||!prop(h,L"OLDERPRODUCTS",related,512)||!prop(h,L"OLDINSTALLDIR",old,1024))return ERROR_INSTALL_FAILURE;
+ if(old[0]&&_wcsicmp(old,path))return refuse(h,L"DADOS17_TARGET_MOVE_REQUIRES_UNINSTALL");
+ if(!installed[0]&&!related[0]){
+  wchar_t pattern[1100];swprintf(pattern,1100,L"%s\\*",path);WIN32_FIND_DATAW data;HANDLE f=FindFirstFileW(pattern,&data);
+  if(f!=INVALID_HANDLE_VALUE){do{if(wcscmp(data.cFileName,L".")&&wcscmp(data.cFileName,L"..")){FindClose(f);return refuse(h,L"DADOS17_TARGET_NOT_EMPTY");}}while(FindNextFileW(f,&data));FindClose(f);}
+ }
+ logmsg(h,L"DADOS17_TARGET_PREFLIGHT_OK");return ERROR_SUCCESS;
+}
+__declspec(dllexport) UINT __stdcall AbortAfterFiles(MSIHANDLE h){
+ wchar_t data[1200];if(!prop(h,L"CustomActionData",data,1200))return ERROR_INSTALL_FAILURE;
+ wchar_t *sep=wcschr(data,L'|');if(!sep)return ERROR_INSTALL_FAILURE;*sep++=0;
+ wchar_t filename[1200];swprintf(filename,1200,L"%s\\VERSAO-INSTALADOR.txt",data);
+ HANDLE f=CreateFileW(filename,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+ if(f==INVALID_HANDLE_VALUE)return refuse(h,L"DADOS17_FAULT_WITHOUT_NEW_FILE");
+ char b[100]={0},expected[100]={0};DWORD n=0;ReadFile(f,b,99,&n,NULL);CloseHandle(f);WideCharToMultiByte(CP_UTF8,0,sep,-1,expected,100,NULL,NULL);
+ if(strcmp(b,expected))return refuse(h,L"DADOS17_FAULT_WRONG_VERSION");
+ logmsg(h,L"DADOS17_FALHA_APOS_COPIA_CONFIRMADA");return ERROR_INSTALL_FAILURE;
+}

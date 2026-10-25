@@ -1,0 +1,15 @@
+{
+  "ferramentas/pacotes/ambiente.fé": "930df500db38626a55588f4decabbb77e755a91cd378f93e16f3662ae2038231",
+  "ferramentas/pacotes/cli.fé": "8c5651f506b74e2f7e7b95080a3bb76b77f3ba548906bddda24185191d7ee19e",
+  "ferramentas/pacotes/cliente.fé": "0f159c14de481aa1d271027459afee0ccc42801783c78ab7bb42d4d469206da4",
+  "ferramentas/pacotes/nativo-windows.c": "bf0112f0e62d4680b4b5ebf4bac0b46ce469d8546970c422477f1deab1b92231",
+  "ferramentas/sls/iniciador-windows.c": "9b146f03f6b0ce23e385a241fb279841d66d9dadaaf97523c6d2fe2c9b7fa497",
+  "ferramentas/sls/nativo-windows.c": "d47705fa184018884832d808c7207a7f59cbda572e8720ea46fbac32eb90ec1b",
+  "ferramentas/sls/projetos.fé": "32091bad40c2a53570bf53b47fad6bd7eca2867d01db539f7ef5f632f97380e8",
+  "ferramentas/sls/sls.fé": "ca848a08779d48091ee2031ec5e431f787b1fec8947c1810439b9279cd8b5522",
+  "ferramentas/windows/arquivos.h": "fb02f3b0bff4f3faae86bf152a9ad4aae3e25e0ab12dfe12c83765f64d730282",
+  "src/lua.h": "3c9213f73df5b03630fed2473df602f30b26e61a89b4daaa9e039dcdec70ddf3",
+  "src/santafe.c": "f44b4b4e35e7e752d8e4d79c0c8b435e5d149a5eb3aff6c0078724008227d47a",
+  "testes/integracao/sls/casos.py": "7fb1019e0e7604d342cae40e005c08a82e491a3da012e008e935884817178880",
+  "testes/integracao/testar_sls_aceitacao.py": "ad308d0223d8002f493fbbedc1f3e2c818e0815366640a2288d82189f303c09f"
+}

@@ -1,4 +1,4 @@
-name: Windows nativo — dados.16 — SLS e gerenciador
+name: Windows nativo — dados.17 — SLS e gerenciador
 on:
   push:
     branches: ['homologacao/windows-dados15']
@@ -33,12 +33,24 @@ jobs:
             mingw-w64-ucrt-x86_64-openssl
       - name: Preparar fonte selada e correção isolada
         run: python windows/preparar.py fonte.tar.gz fonte
-      - name: Aplicar adaptação dados16
-        run: python dados16/aplicar.py fonte
+      - name: Aplicar adaptação dados17
+        run: python dados17/aplicar.py fonte
       - name: Compilar e executar a bateria nativa
         run: python windows/testar.py fonte resultados
       - name: SLS e gerenciador nativos
-        run: python dados16/testar.py resultados/candidato resultados/ferramentas
+        run: python dados17/testar.py resultados/candidato resultados/ferramentas
+      - name: Compilar verificacoes nativas do instalador
+        run: gcc -std=gnu99 -O2 -Wall -Wextra -shared dados17/instalador-guarda.c -lmsi -o resultados/ferramentas/instalador-guarda.dll
+      - uses: actions/setup-python@v5
+        id: msi_python
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Instalacao atualizacao e reversao MSI
+        shell: pwsh
+        run: |
+          & '${{ steps.msi_python.outputs.python-path }}' dados17/testar-instalador.py resultados/instalador resultados/ferramentas resultados/candidato resultados/ferramentas/instalador-guarda.dll dados17/baseline-dados16.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Guardar evidências mesmo em caso de falha
         if: always()
         uses: actions/upload-artifact@v4
@@ -50,12 +62,15 @@ jobs:
             resultados/ferramentas/*.json
             resultados/ferramentas/*.log
             resultados/ferramentas/*.zip
+            resultados/instalador/*.json
+            resultados/instalador/*.log
+            resultados/instalador/santafe-dados17-windows-x64.msi
             fonte/PREPARACAO-WINDOWS.json
-            fonte/DADOS16-WINDOWS.json
+            fonte/DADOS17-WINDOWS.json
           if-no-files-found: error
           retention-days: 14
       - name: Declarar o limite da homologação
         if: always()
         shell: pwsh
         run: |
-          'Candidato dados.16: núcleo/ONFÉ/IBA em resultado.json; SLS, gerenciador, proteção de caminhos/processos, HTTPS e pacote portátil em ferramentas/resultado.json. Cada relatório distingue testes aprovados de falha/interrupção; a presença do artefato não significa aprovação. Não homologa serviços, instalador global ou testes visuais dos editores Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'Candidato dados.17: núcleo/ONFÉ/IBA em resultado.json; SLS, gerenciador, proteção de caminhos/processos, HTTPS e pacote portátil em ferramentas/resultado.json. Cada relatório distingue testes aprovados de falha/interrupção; a presença do artefato não significa aprovação. Instalador MSI por usuario em instalador/resultado.json. Nao homologa servicos, assinatura Authenticode ou GUI dos editores Windows.' >> $env:GITHUB_STEP_SUMMARY
