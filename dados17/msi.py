@@ -39,7 +39,9 @@ def build(archive,version,out,guard,fault=False):
    assert api.MsiDatabaseCommit(handle)==0
   finally:api.MsiCloseHandle(handle)
   db=m.OpenDatabase(str(out),m.MSIDBOPEN_TRANSACT)
-  si=db.GetSummaryInformation(20);si.SetProperty(m.PID_CODEPAGE,1252);si.SetProperty(m.PID_WORDCOUNT,10);si.SetProperty(m.PID_PAGECOUNT,500);si.SetProperty(m.PID_TEMPLATE,'x64;1033');si.Persist()
+  si=db.GetSummaryInformation(20);si.SetProperty(m.PID_CODEPAGE,1252);si.SetProperty(m.PID_WORDCOUNT,10);si.SetProperty(m.PID_PAGECOUNT,500);si.SetProperty(m.PID_TEMPLATE,'x64;1033');si.Persist();si=None
+  # Release the summary handle before final database close and SHA-256.
+  # Otherwise native storage may finish its write after build() returns.
   add=lambda table,rows:m.add_data(db,table,rows)
   add('Property',[(k,v) for k,v in {
    'UpgradeCode':UPGRADE,'INSTALLLEVEL':'1','ARPCOMMENTS':'Candidato isolado; nao instala servicos.','ARPHELPLINK':'https://santafé.dev.br/',

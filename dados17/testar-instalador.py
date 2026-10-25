@@ -51,6 +51,7 @@ try:
  assert digest(BASE)=='84be8651b8e41787524f4be13ce27a6d3a9be185a3f12537891e2108773a26a4'
  portable=TOOLS/'santafe-dados17-windows-x64-portatil.zip'
  old=msi.build(BASE,'3.0.16',oldmsi,GUARD);new=msi.build(portable,'3.0.17',newmsi,GUARD);bad=msi.build(portable,'3.0.18',badmsi,GUARD,True);metas=[old,new,bad]
+ for meta,path in zip(metas,(oldmsi,newmsi,badmsi)):assert digest(path)==meta['sha256'],('hash-apos-fechar-msi',path.name)
  ok('msi-construido-api-nativa',baseline_sha256=digest(BASE),msi_sha256=new['sha256'])
  # Validate real database, not only generator metadata.
  db=msi.m.OpenDatabase(str(newmsi),msi.m.MSIDBOPEN_READONLY)
@@ -134,6 +135,7 @@ try:
  install('remover-baseline16',['/x',old['product_code']])
  assert state(old['product_code'])==-1;ok('ciclo-encerrado-sem-produto-registrado')
  assert machinepath()==machine_before;ok('path-da-maquina-inalterado')
+ assert digest(newmsi)==new['sha256'];ok('msi-entregue-inalterado-apos-todos-ensaios')
  RESULT['resultado']='passou_instalacao_atualizacao_reversao';RESULT['msi']=new
 except BaseException as e:
  RESULT['resultado']='falhou';RESULT['falha']=str(e);RESULT['rastro']=traceback.format_exc();traceback.print_exc()

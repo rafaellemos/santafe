@@ -12,6 +12,7 @@ def call(name,args,expected=0):
  assert p.returncode==expected,(name,p.returncode,expected);result['testes'].append(name)
 try:
  assert not result['administrador'],'The account must not be an administrator'
+ assert hashlib.sha256(package.read_bytes()).hexdigest()==meta['sha256'],'Hash of the MSI differs from the tested package'
  # Start-Process -Credential does not supply a fresh per-user environment.
  # Obtain it from Windows for this token, instead of inheriting runneradmin's.
  from ctypes import wintypes as w
