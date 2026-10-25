@@ -1,14 +1,15 @@
 from pathlib import Path
 import ctypes,json,hashlib,os,subprocess,sys,traceback,uuid,winreg
 out=Path(sys.argv[1]);package=out/'santafe.msi';meta=json.loads((out/'manifesto.json').read_text(encoding='utf-8'))
+policy_test=len(sys.argv)>2 and sys.argv[2]=='politica-bloqueia'
 result={'resultado':'em_execucao','administrador':bool(ctypes.windll.shell32.IsUserAnAdmin()),'testes':[]}
 def known(s):
  b=(ctypes.c_byte*16).from_buffer_copy(uuid.UUID(s).bytes_le);p=ctypes.c_wchar_p()
  rc=ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(b),0x8000,None,ctypes.byref(p));assert rc==0,('SHGetKnownFolderPath',s,hex(rc & 0xffffffff))
  v=p.value;ctypes.windll.ole32.CoTaskMemFree(p);return v
-def call(name,args):
+def call(name,args,expected=0):
  p=subprocess.run([str(Path(os.environ['SystemRoot'])/'System32/msiexec.exe'),*args,'/qn','/norestart','/l*v',str(out/(name+'.log'))],timeout=180)
- assert p.returncode==0,(name,p.returncode);result['testes'].append(name)
+ assert p.returncode==expected,(name,p.returncode,expected);result['testes'].append(name)
 try:
  assert not result['administrador'],'The account must not be an administrator'
  # Start-Process -Credential does not supply a fresh per-user environment.
@@ -34,6 +35,11 @@ try:
  finally:kernel.CloseHandle(token)
  local=known('F1B32785-6FBA-4FCF-9D55-7B8E7F157091');target=Path(local)/'Programs/Santafe-Dados-Candidato'
  result['perfil_local']=str(target)
+ if policy_test:
+  call('recusar-por-politica',['/i',str(package)],1625)
+  assert not (target/'bin/santafe.exe').exists()
+  result['resultado']='passou_recusa_por_politica'
+  raise SystemExit(0)
  call('instalar-sem-administrador',['/i',str(package)])
  for n,d in meta['arquivos'].items():assert hashlib.sha256((target/n).read_bytes()).hexdigest()==d,n
  result['testes'].append('integridade-payload-completo')
@@ -43,7 +49,9 @@ try:
  p=subprocess.run([str(target/'bin/santafe.exe'),'instale','--ajuda'],capture_output=True,env=env,timeout=30);assert p.returncode==0,p.stderr;result['testes'].append('gerenciador-sem-administrador')
  call('desinstalar-sem-administrador',['/x',meta['product_code']]);assert not (target/'bin/santafe.exe').exists()
  result['resultado']='passou_usuario_padrao'
+except SystemExit:
+ if not result['resultado'].startswith('passou'):raise
 except BaseException as e:result['resultado']='falhou';result['falha']=str(e);result['rastro']=traceback.format_exc()
 finally:
- (out/'usuario-padrao.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+ (out/('politica-usuario-padrao.json' if policy_test else 'usuario-padrao.json')).write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 sys.exit(0 if result['resultado'].startswith('passou') else 1)
