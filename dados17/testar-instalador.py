@@ -73,7 +73,7 @@ try:
  assert state(old['product_code'])==5;checkfiles(old,target,'baseline16-integridade')
  entry=str(target/'bin');assert entry.lower() in regpath()[0].lower() and prefix in regpath()[0];ok('path-do-usuario-preservado')
  extra=target/'documento-pessoal.txt';extra.write_text('nao excluir',encoding='utf-8')
- hard=workspace/'hardlink.txt';os.link(target/'LEIA-ME.txt',hard)
+ hard=foreign/'hardlink.txt';os.link(target/'LEIA-ME.txt',hard)
  install('recusa-hardlink-em-atualizacao',['/i',newmsi],1603,'DADOS17_TARGET_UNSAFE_ENTRY');hard.unlink()
  binpath=target/'bin';savedbin=target/'bin-original';binpath.rename(savedbin)
  subprocess.run([os.environ['COMSPEC'],'/d','/c','mklink','/J',str(binpath),str(foreign)],check=True,capture_output=True)
