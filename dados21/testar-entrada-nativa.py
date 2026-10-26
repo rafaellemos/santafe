@@ -150,7 +150,7 @@ def ensaiar(exe, destino):
         reader = threading.Thread(target=ler, daemon=True); reader.start()
         def esperar(marker, occurrences=1):
             with condition:
-                assert condition.wait_for(lambda: output.count(marker)>=occurrences, timeout=15), (marker, bytes(output[-300:]))
+                assert condition.wait_for(lambda: output.count(marker)>=occurrences, timeout=15), (marker, bytes(output[-300:]), p.poll(), p.stderr.read() if p.poll() is not None else b'processo vivo')
         def handles():
             n=w.DWORD(); assert k.GetProcessHandleCount(p._handle, c.byref(n)); return n.value
         try:
