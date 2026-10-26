@@ -144,6 +144,9 @@ static void lstop (lua_State *L, lua_Debug *ar) {
 ** interpreter.
 */
 static void laction (int i) {
+#if defined(_WIN32)
+  sf_console_evaluation(0); /* um segundo sinal pede encerramento normal CRT */
+#endif
   signal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
 }
@@ -225,7 +228,13 @@ static int docall (lua_State *L, int narg, int nres) {
   lua_insert(L, base);  /* put it under function and args */
   globalL = L;  /* to be available to 'laction' */
   signal(SIGINT, laction);  /* set C-signal handler */
+#if defined(_WIN32)
+  sf_console_evaluation(1);
+#endif
   status = lua_pcall(L, narg, nres, base);
+#if defined(_WIN32)
+  sf_console_evaluation(0);
+#endif
   signal(SIGINT, SIG_DFL); /* reset C-signal handler */
   lua_remove(L, base);  /* remove message handler from the stack */
   return status;

@@ -15,6 +15,26 @@ static UINT sf_console_input_before;
 static UINT sf_console_output_before;
 static int sf_console_input_changed;
 static int sf_console_output_changed;
+static volatile LONG sf_console_evaluating;
+
+static void sf_console_evaluation(int active) {
+  InterlockedExchange(&sf_console_evaluating, active);
+}
+
+/* Ctrl+C durante código mantém o tratamento SIGINT do interpretador. Na
+ * espera por entrada e em Ctrl+Break, a CRT pode terminar sem chamar atexit.
+ * A rotina de controle não usa stdio/travas: apenas devolve as páginas e
+ * deixa a propagação normal do sinal prosseguir. */
+static BOOL WINAPI sf_console_control(DWORD event) {
+  if (event == CTRL_BREAK_EVENT ||
+      (event == CTRL_C_EVENT && !sf_console_evaluating)) {
+    if (sf_console_output_changed && GetConsoleOutputCP() == CP_UTF8)
+      SetConsoleOutputCP(sf_console_output_before);
+    if (sf_console_input_changed && GetConsoleCP() == CP_UTF8)
+      SetConsoleCP(sf_console_input_before);
+  }
+  return FALSE;
+}
 
 static int sf_console_is_handle(DWORD which) {
   DWORD mode;
@@ -53,6 +73,7 @@ static int sf_console_prepare(void) {
   if (!change_input && !change_output) return 1;
   /* Registre a reversão antes de qualquer alteração; cobre também os.exit. */
   if (atexit(sf_console_restore) != 0) return 0;
+  if (!SetConsoleCtrlHandler(sf_console_control, TRUE)) return 0;
   if (change_input) {
     if (!SetConsoleCP(CP_UTF8)) return 0;
     sf_console_input_changed = 1;

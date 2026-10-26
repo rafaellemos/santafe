@@ -6,6 +6,7 @@ from pathlib import Path
 import platform
 import subprocess as sp
 import sys
+import threading
 
 
 def ensaiar(exe, destino):
@@ -27,6 +28,7 @@ def ensaiar(exe, destino):
         ('SetConsoleCP', [w.UINT], w.BOOL), ('SetConsoleOutputCP', [w.UINT], w.BOOL),
         ('FlushConsoleInputBuffer', [w.HANDLE], w.BOOL),
         ('WriteConsoleInputW', [w.HANDLE, c.POINTER(Record), w.DWORD, c.POINTER(w.DWORD)], w.BOOL),
+        ('GenerateConsoleCtrlEvent', [w.DWORD, w.DWORD], w.BOOL),
     ):
         fn = getattr(k, name); fn.argtypes = args; fn.restype = result
     inp = k.GetStdHandle(-10)
@@ -66,6 +68,37 @@ def ensaiar(exe, destino):
         assert esperado in received, (nome, 'esperado', esperado, 'recebido', received[:400], 'erro', err[:400])
         assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (cp, cp), nome+' alterou console'
         report['testes'].append({'nome': nome, 'passou': True}); salvar()
+    def interromper(evento):
+        # O console é exclusivo deste processo-filho e do interpretador; nunca
+        # envia sinal ao console do runner ou a aplicativos do operador.
+        Handler = c.WINFUNCTYPE(w.BOOL, w.DWORD)
+        handler = Handler(lambda event: True)
+        k.SetConsoleCtrlHandler.argtypes = [Handler, w.BOOL]
+        k.SetConsoleCtrlHandler.restype = w.BOOL
+        assert k.SetConsoleCtrlHandler(handler, True)
+        assert k.FlushConsoleInputBuffer(inp)
+        assert k.SetConsoleCP(850) and k.SetConsoleOutputCP(850)
+        p = sp.Popen([str(exe), '-E', '-P', '-i'], stdout=sp.PIPE)  # stderr console
+        ready = threading.Event(); output = bytearray()
+        def ler():
+            while True:
+                b = p.stdout.read(1)
+                if not b: break
+                output.extend(b)
+                if output.endswith('SantaFé> '.encode()): ready.set()
+        reader = threading.Thread(target=ler, daemon=True); reader.start()
+        try:
+            assert ready.wait(10), 'interpretador não chegou ao prompt'
+            assert k.GenerateConsoleCtrlEvent(evento, 0)
+            assert p.wait(timeout=10) != 0, 'interrupção não encerrou a leitura'
+            reader.join(timeout=5)
+            assert not reader.is_alive(), 'leitor órfão no ensaio'
+            assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (850,850), 'interrupção não restaurou console'
+            report['testes'].append({'nome': 'interrupcao-'+str(evento)+'-restaura', 'passou': True}); salvar()
+        finally:
+            if p.poll() is None: p.kill(); p.wait(timeout=5)
+            reader.join(timeout=5); p.stdout.close()
+            k.SetConsoleCtrlHandler(handler, False)
     try:
         for cp in (850, 1252, 65001):
             caso('repl-acento-'+str(cp), 'ã=3 mostre("RESULTADO",ã)\rso.saia(0)\r', ['-i'], 'RESULTADO\t3\n', cp)
@@ -79,6 +112,8 @@ def ensaiar(exe, destino):
         caso('leia-par-utf16', boundary+'\r', ['-e', 'local a=es.leia(); mostre("RESULTADO",#a,a)'], 'RESULTADO\t'+str(len(boundary.encode()))+'\t'+boundary+'\n')
         caso('leia-ctrlz', '\x1a\r', ['-e', 'mostre("RESULTADO",es.leia()==inexistente)'], 'RESULTADO\tverdadeiro\n')
         caso('programa-stdin-unicode', 'local ã=3; mostre("RESULTADO",ã,"ação 🟢")\r\x1a\r', ['-'], 'RESULTADO\t3\tação 🟢\n')
+        interromper(0)
+        interromper(1)
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
     except Exception as exc:
         report['resultado'] = 'falhou'; report['falha'] = repr(exc); salvar(); return 1
