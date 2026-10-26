@@ -1,4 +1,4 @@
-name: Console UTF8 Windows — preparação dados.21
+name: Candidato dados.21 — console e instalador Windows
 on:
   push:
     branches: ['homologacao/windows-dados15']
@@ -61,7 +61,36 @@ jobs:
         run: python dados21/testar-entrada-nativa.py regressao21/candidato/src/santafe.exe resultados21/entrada-dll.json
       - name: Repetir Ctrl+C por ConPTY no interpretador com DLL
         run: python dados21/testar-conpty.py regressao21/candidato/src/santafe.exe resultados21/conpty-dll.json
-      - name: Guardar evidência sem produzir instalador
+      - name: Preparar critérios MSI21 e baseline20 conferido
+        run: python dados21/preparar-instalador.py
+      - name: Compilar verificacoes nativas do instalador
+        run: python apoio21/compilar-guarda.py regressao21/ferramentas
+      - uses: actions/setup-python@v5
+        id: msi_python
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Instalacao atualizacao e reversao MSI
+        shell: pwsh
+        run: |
+          & '${{ steps.msi_python.outputs.python-path }}' apoio21/testar-instalador.py regressao21/instalador regressao21/ferramentas regressao21/candidato regressao21/ferramentas/instalador-guarda.dll dados20/baseline-dados16.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Instalar e remover com usuario padrao real
+        shell: pwsh
+        run: |
+          ./apoio21/usuario-padrao.ps1 -Python '${{ steps.msi_python.outputs.python-path }}' -OutputDir regressao21/instalador
+      - name: Verificar metadados e recusa de assinatura indevida
+        shell: pwsh
+        run: ./apoio21/testar-assinatura.ps1 -OutputDir regressao21/instalador -ToolsDir regressao21/ferramentas
+      - name: Preparar entrada verificada para Windows11
+        run: python apoio21/preparar-windows11.py regressao21/candidato regressao21
+      - name: Transportar pacote entre os ambientes de homologacao
+        uses: actions/upload-artifact@v4
+        with:
+          name: dados21-windows11-input
+          path: regressao21/windows11-input.zip
+          retention-days: 7
+      - name: Guardar evidências do candidato e limites de homologação
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -75,5 +104,48 @@ jobs:
             regressao21/ferramentas/*.json
             regressao21/ferramentas/*.log
             regressao21/ferramentas/santafe-dados21-windows-x64-portatil.zip
+            regressao21/instalador/*.json
+            regressao21/instalador/*.log
+            regressao21/instalador/santafe-dados21-windows-x64.msi
           if-no-files-found: error
           retention-days: 14
+
+  cliente-windows11:
+    needs: console
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: '3.12'
+          architecture: 'arm64'
+      - uses: actions/download-artifact@v4
+        with:
+          name: dados21-windows11-input
+          path: entrada-ci
+      - name: Preparar critérios de homologação21
+        shell: pwsh
+        run: |
+          python dados21/preparar-bateria.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python dados21/preparar-instalador.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Instalar atualizar e reverter x64 no Windows11 ARM
+        shell: pwsh
+        run: |
+          & '${{ steps.python.outputs.python-path }}' apoio21/testar-windows11.py entrada-ci/windows11-input.zip resultados-windows11
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Guardar evidencia sem declarar validacao visual
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows11-dados21-evidencias
+          path: |
+            resultados-windows11/*.json
+            resultados-windows11/*.log
+          retention-days: 14
+          if-no-files-found: error
