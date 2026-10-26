@@ -147,11 +147,14 @@ static void laction (int i) {
 #if defined(_WIN32)
   sf_console_evaluation(0); /* um segundo sinal pede encerramento normal CRT */
 #endif
-#if defined(LUA_USE_WINDOWS)
-  sf_input_interrupt();
-#endif
   signal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
+#if defined(LUA_USE_WINDOWS)
+  /* Publicar o gancho antes de acordar a leitura. No Windows o tratador
+   * roda em outra thread; acordar primeiro permite que o próximo comando
+   * receba, por engano, o sinal destinado ao comando anterior. */
+  sf_input_interrupt();
+#endif
 }
 
 
