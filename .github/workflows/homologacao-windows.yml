@@ -2,6 +2,7 @@ name: Windows nativo — dados.20 — SLS e gerenciador
 on:
   push:
     branches: ['homologacao/windows-dados15']
+    paths: ['fonte.tar.gz', 'windows/**', 'dados20/**', '.github/workflows/homologacao-windows.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -117,7 +117,7 @@ def ensaiar(exe, destino):
         caso('leia-ctrlz', '\x1a\r', ['-e', 'mostre("RESULTADO",es.leia()==inexistente)'], 'RESULTADO\tverdadeiro\n')
         caso('programa-stdin-unicode', 'local ã=3; mostre("RESULTADO",ã,"ação 🟢")\r\x1a\r', ['-'], 'RESULTADO\t3\tação 🟢\n')
         caso('repl-recusa-linha-truncada', 'mostre("NAO_EXECUTAR") --'+'a'*17000+'\r', ['-i'], 'SantaFé> ', status=1, ausente='NAO_EXECUTAR')
-        caso('leia-recusa-linha-truncada', 'a'*17000+'\r', ['-e', 'local v,e=es.leia(); mostre("RESULTADO",v==inexistente,e~=inexistente)'], 'RESULTADO\tverdadeiro\tverdadeiro\n')
+        caso('leia-recusa-linha-truncada', 'a'*17000+'\r', ['-e', 'local valor,motivo=es.leia(); mostre("RESULTADO",valor==inexistente,motivo~=inexistente)'], 'RESULTADO\tverdadeiro\tverdadeiro\n')
         interromper(0)
         interromper(1)
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
