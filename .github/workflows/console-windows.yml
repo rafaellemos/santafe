@@ -42,6 +42,8 @@ jobs:
           resultados21/simulado.exe > resultados21/simulado.log
           gcc -std=c99 -Wall -Wextra -Werror dados21/testar-entrada-simulada.c -o resultados21/entrada-simulada.exe
           resultados21/entrada-simulada.exe > resultados21/entrada-simulada.log
+      - name: Ctrl+C por protocolo ConPTY próprio, sem teclado global
+        run: python dados21/testar-conpty.py fonte/src/santafe.exe resultados21/conpty.json
       - name: Ensaio com console Windows próprio e pipes
         run: python dados21/testar-console-nativo.py fonte/src/santafe.exe resultados21/console.json
       - name: Entrada Unicode por eventos reais de teclado no console exclusivo
