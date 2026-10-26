@@ -10,6 +10,7 @@ typedef uint32_t DWORD;
 typedef uint16_t WCHAR;
 #define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
 #define ERROR_OPERATION_ABORTED 995
+#define ENABLE_LINE_INPUT 2
 #define LUA_USE_WINDOWS
 #define LUALIB_API
 #define SF_WININPUT_IMPLEMENTATION
@@ -18,16 +19,16 @@ typedef uint16_t WCHAR;
 #define _fileno mock_fileno
 #define _lock_file mock_lock
 #define _unlock_file mock_unlock
-static WCHAR input[5000];
+static WCHAR input[20000];
 static size_t input_size, input_pos, chunk;
-static int calls, fail_call, lock_depth, consoles, handle_id = 42;
+static int calls, fail_call, lock_depth, consoles, handle_id = 42, line_mode = 2;
 static DWORD api_error;
 static intptr_t _get_osfhandle(int fd) { (void)fd; return handle_id; }
 static int _fileno(FILE *f) { (void)f; return 0; }
 static void _lock_file(FILE *f) { (void)f; lock_depth++; }
 static void _unlock_file(FILE *f) { (void)f; assert(lock_depth>0); lock_depth--; }
 static int GetConsoleMode(HANDLE h, DWORD *mode) {
-  (void)h; *mode=0; return consoles;
+  (void)h; *mode=line_mode; return consoles;
 }
 static DWORD GetLastError(void) { return api_error; }
 static int ReadConsoleW(HANDLE h, void *b, DWORD max, DWORD *n, void *ctl) {
@@ -116,6 +117,14 @@ int main(void) {
     long_input[4097]='\r';long_input[4098]='\n';
     memcpy(long_expected+4095,"\xf0\x9f\x9f\xa2\n",5);
     bytes(long_input,4099,256,long_expected,4100);
+  }
+  {
+    WCHAR long_input[16384];
+    for(i=0;i<16384;i++)long_input[i]='x';
+    prepare(long_input,16384,16384);
+    assert(sf_input_getc(stdin)==EOF && sf_input_error(stdin)==EOVERFLOW);
+    prepare(long_input,16384,16384); line_mode=0;
+    assert(sf_input_getc(stdin)=='x' && !sf_input_error(stdin)); line_mode=2;
   }
   {
     FILE *f=tmpfile(); assert(f);

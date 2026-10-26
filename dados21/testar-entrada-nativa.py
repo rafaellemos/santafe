@@ -54,7 +54,7 @@ def ensaiar(exe, destino):
         written = w.DWORD()
         assert k.WriteConsoleInputW(inp, records, len(records), c.byref(written))
         assert written.value == len(records)
-    def caso(nome, texto, argumentos, esperado, cp=850):
+    def caso(nome, texto, argumentos, esperado, cp=850, status=0, ausente=None):
         assert k.FlushConsoleInputBuffer(inp)
         assert k.SetConsoleCP(cp) and k.SetConsoleOutputCP(cp)
         p = sp.Popen([str(exe), '-E', '-P', *argumentos], stdout=sp.PIPE, stderr=sp.PIPE)
@@ -64,8 +64,9 @@ def ensaiar(exe, destino):
         except BaseException:
             p.kill(); p.communicate(); raise
         received = out.decode('utf-8', 'strict').replace('\r\n', '\n')
-        assert p.returncode == 0, (nome, p.returncode, err.decode('utf-8', 'backslashreplace'))
+        assert p.returncode == status, (nome, p.returncode, err.decode('utf-8', 'backslashreplace'))
         assert esperado in received, (nome, 'esperado', esperado, 'recebido', received[:400], 'erro', err[:400])
+        if ausente is not None: assert ausente not in received, (nome,'executou entrada truncada')
         assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (cp, cp), nome+' alterou console'
         report['testes'].append({'nome': nome, 'passou': True}); salvar()
     def interromper(evento):
@@ -75,6 +76,9 @@ def ensaiar(exe, destino):
         handler = Handler(lambda event: True)
         k.SetConsoleCtrlHandler.argtypes = [Handler, w.BOOL]
         k.SetConsoleCtrlHandler.restype = w.BOOL
+        # MSYS2/runner pode ter herdado o atributo de ignorar Ctrl+C. Remover
+        # somente neste console novo antes de criar o processo sob teste.
+        assert k.SetConsoleCtrlHandler(Handler(), False)
         assert k.SetConsoleCtrlHandler(handler, True)
         assert k.FlushConsoleInputBuffer(inp)
         assert k.SetConsoleCP(850) and k.SetConsoleOutputCP(850)
@@ -112,6 +116,8 @@ def ensaiar(exe, destino):
         caso('leia-par-utf16', boundary+'\r', ['-e', 'local a=es.leia(); mostre("RESULTADO",#a,a)'], 'RESULTADO\t'+str(len(boundary.encode()))+'\t'+boundary+'\n')
         caso('leia-ctrlz', '\x1a\r', ['-e', 'mostre("RESULTADO",es.leia()==inexistente)'], 'RESULTADO\tverdadeiro\n')
         caso('programa-stdin-unicode', 'local ã=3; mostre("RESULTADO",ã,"ação 🟢")\r\x1a\r', ['-'], 'RESULTADO\t3\tação 🟢\n')
+        caso('repl-recusa-linha-truncada', 'mostre("NAO_EXECUTAR") --'+'a'*17000+'\r', ['-i'], 'SantaFé> ', status=1, ausente='NAO_EXECUTAR')
+        caso('leia-recusa-linha-truncada', 'a'*17000+'\r', ['-e', 'local v,e=es.leia(); mostre("RESULTADO",v==inexistente,e~=inexistente)'], 'RESULTADO\tverdadeiro\tverdadeiro\n')
         interromper(0)
         interromper(1)
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0

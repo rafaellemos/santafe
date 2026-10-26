@@ -75,7 +75,7 @@ static sf_InputConsole *sf_input_state(HANDLE handle) {
 static int sf_input_unit(sf_InputConsole *s) {
   if (s->error || s->eof) return EOF;
   if (s->next == s->length) {
-    DWORD n = 0;
+    DWORD n = 0, mode;
     if (!ReadConsoleW(s->handle, s->wide,
                       (DWORD)(sizeof(s->wide)/sizeof(s->wide[0])), &n, NULL)) {
       DWORD error = GetLastError();
@@ -84,6 +84,15 @@ static int sf_input_unit(sf_InputConsole *s) {
       return EOF;
     }
     if (!n) { s->eof = 1; return EOF; }
+    /* O editor nativo pode descartar o excesso de uma linha cheia. Recusar
+     * a fronteira conservadoramente, antes de executar um comando truncado.
+     * Arquivos/pipes não usam este limite; modo sem edição aceita blocos. */
+    if (!GetConsoleMode(s->handle, &mode)) {
+      errno = s->error = EIO; return EOF;
+    }
+    if ((mode & ENABLE_LINE_INPUT) && n >= 16383) {
+      errno = s->error = EOVERFLOW; return EOF;
+    }
     s->next = 0; s->length = n;
   }
   return (unsigned short)s->wide[s->next++];
