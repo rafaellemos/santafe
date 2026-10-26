@@ -48,9 +48,9 @@ def ensaiar(exe, destino):
             for j in range(2):
                 rec = records[i * 2 + j]; rec.kind = 1
                 rec.event.key.down = not j; rec.event.key.repeat = 1
-                rec.event.key.vk = 13 if unit == 13 else (90 if unit == 26 else 0)
+                rec.event.key.vk = 13 if unit == 13 else (90 if unit == 26 else (67 if unit == 3 else 0))
                 rec.event.key.char.UnicodeChar = chr(unit)
-                rec.event.key.state = 8 if unit == 26 else 0
+                rec.event.key.state = 8 if unit in (3,26) else 0
         written = w.DWORD()
         assert k.WriteConsoleInputW(inp, records, len(records), c.byref(written))
         assert written.value == len(records)
@@ -69,7 +69,7 @@ def ensaiar(exe, destino):
         if ausente is not None: assert ausente not in received, (nome,'executou entrada truncada')
         assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (cp, cp), nome+' alterou console'
         report['testes'].append({'nome': nome, 'passou': True}); salvar()
-    def interromper(evento, codigo=None):
+    def interromper(evento, codigo=None, tecla=False):
         # O console é exclusivo deste processo-filho e do interpretador; nunca
         # envia sinal ao console do runner ou a aplicativos do operador.
         Handler = c.WINFUNCTYPE(w.BOOL, w.DWORD)
@@ -96,7 +96,8 @@ def ensaiar(exe, destino):
         reader = threading.Thread(target=ler, daemon=True); reader.start()
         try:
             assert ready.wait(10), 'interpretador não chegou ao prompt'
-            assert k.GenerateConsoleCtrlEvent(evento, 0)
+            if tecla: escrever('\x03')
+            else: assert k.GenerateConsoleCtrlEvent(evento, 0)
             assert p.wait(timeout=10) != 0, 'interrupção não encerrou a leitura'
             reader.join(timeout=5)
             assert not reader.is_alive(), 'leitor órfão no ensaio'
@@ -104,6 +105,7 @@ def ensaiar(exe, destino):
                 assert b'interrompido' in p.stderr.read(), 'SIGINT não preservou o diagnóstico do interpretador'
             assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (850,850), 'interrupção não restaurou console'
             nome = 'interrupcao-'+str(evento)+'-restaura' if codigo is None else 'interrompe-programa-'+codigo
+            if tecla: nome += '-tecla'
             report['testes'].append({'nome': nome, 'passou': True}); salvar()
         finally:
             if p.poll() is None: p.kill(); p.wait(timeout=5)
@@ -128,6 +130,7 @@ def ensaiar(exe, destino):
         interromper(0)
         interromper(1)
         interromper(0, 'enquanto verdadeiro início fim')
+        interromper(0, 'es.leia()', tecla=True)
         interromper(0, 'es.leia()')
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
     except Exception as exc:

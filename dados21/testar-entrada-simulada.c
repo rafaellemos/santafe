@@ -22,7 +22,8 @@ typedef uint16_t WCHAR;
 static WCHAR input[20000];
 static size_t input_size, input_pos, chunk;
 static int calls, fail_call, lock_depth, consoles, handle_id = 42, line_mode = 2;
-static DWORD api_error;
+static DWORD api_error, last_error;
+static int true_cancelled, invalid_count;
 static intptr_t _get_osfhandle(int fd) { (void)fd; return handle_id; }
 static int _fileno(FILE *f) { (void)f; return 0; }
 static void _lock_file(FILE *f) { (void)f; lock_depth++; }
@@ -30,12 +31,15 @@ static void _unlock_file(FILE *f) { (void)f; assert(lock_depth>0); lock_depth--;
 static int GetConsoleMode(HANDLE h, DWORD *mode) {
   (void)h; *mode=line_mode; return consoles;
 }
-static DWORD GetLastError(void) { return api_error; }
+static DWORD GetLastError(void) { return last_error; }
+static void SetLastError(DWORD error) { last_error=error; }
 static int ReadConsoleW(HANDLE h, void *b, DWORD max, DWORD *n, void *ctl) {
   size_t count = input_size-input_pos;
   (void)h; (void)ctl; calls++;
   assert(lock_depth>0);
-  if(calls==fail_call) return 0;
+  if(calls==fail_call) { last_error=api_error; return 0; }
+  if(true_cancelled) { last_error=ERROR_OPERATION_ABORTED; *n=(DWORD)-1; return 1; }
+  if(invalid_count) { *n=20000; return 1; }
   if(count>chunk) count=chunk;
   if(count>max) count=max;
   memcpy(b,input+input_pos,count*sizeof(WCHAR)); input_pos+=count; *n=(DWORD)count;
@@ -47,7 +51,7 @@ static void prepare(const WCHAR *s,size_t n,size_t max) {
   assert(lock_depth==0);
   memset(&sf_input_console,0,sizeof(sf_input_console));
   memcpy(input,s,n*sizeof(WCHAR)); input_size=n; input_pos=0; chunk=max;
-  calls=fail_call=0; consoles=1; api_error=5; errno=0;
+  calls=fail_call=true_cancelled=invalid_count=0; consoles=1; api_error=5; errno=0;
 }
 static void bytes(const WCHAR *s,size_t n,size_t max,const char *expected,size_t len) {
   char b[15000]; size_t got;
@@ -102,6 +106,10 @@ int main(void) {
   assert(sf_input_getc(stdin)==0xc3 && sf_input_getc(stdin)==0xa3);
   prepare(accent,2,1); fail_call=1;
   assert(sf_input_read(b,sizeof(b),stdin)==0 && sf_input_error(stdin)==EIO);
+  prepare(accent,2,1); true_cancelled=1;
+  assert(sf_input_getc(stdin)==EOF && sf_input_error(stdin)==EINTR && !sf_input_eof(stdin));
+  prepare(accent,2,1); invalid_count=1;
+  assert(sf_input_getc(stdin)==EOF && sf_input_error(stdin)==EIO);
   prepare(sample,12,256); fail_call=2;
   n=sf_input_read(b,sizeof(b),stdin);
   assert(n==sizeof(expected)-1 && !memcmp(b,expected,n) && sf_input_error(stdin)==EIO);

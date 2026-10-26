@@ -76,12 +76,22 @@ static int sf_input_unit(sf_InputConsole *s) {
   if (s->error || s->eof) return EOF;
   if (s->next == s->length) {
     DWORD n = 0, mode;
-    if (!ReadConsoleW(s->handle, s->wide,
-                      (DWORD)(sizeof(s->wide)/sizeof(s->wide[0])), &n, NULL)) {
-      DWORD error = GetLastError();
+    DWORD error;
+    int ok;
+    SetLastError(0);
+    ok = ReadConsoleW(s->handle, s->wide,
+                      (DWORD)(sizeof(s->wide)/sizeof(s->wide[0])), &n, NULL);
+    error = GetLastError();
+    /* Algumas versões do conhost devolvem TRUE com operação cancelada e
+     * contagem zero ou DWORD(-1). Não tratar cancelamento como EOF nem usar
+     * uma contagem fora do buffer. */
+    if (!ok || error == ERROR_OPERATION_ABORTED) {
       s->error = error == ERROR_OPERATION_ABORTED ? EINTR : EIO;
       errno = s->error;
       return EOF;
+    }
+    if (n > sizeof(s->wide)/sizeof(s->wide[0])) {
+      errno = s->error = EIO; return EOF;
     }
     if (!n) { s->eof = 1; return EOF; }
     /* O editor nativo pode descartar o excesso de uma linha cheia. Recusar
