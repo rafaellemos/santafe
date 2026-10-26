@@ -44,11 +44,11 @@ jobs:
           gcc -std=c99 -Wall -Wextra -Werror dados21/testar-entrada-simulada.c -o resultados25/entrada-simulada.exe
           resultados25/entrada-simulada.exe > resultados25/entrada-simulada.log
       - name: Ctrl+C por protocolo ConPTY próprio, sem teclado global
-        run: python dados21/testar-conpty.py fonte/src/santafe.exe resultados25/conpty.json
+        run: python dados25/testar-conpty.py fonte/src/santafe.exe resultados25/conpty.json
       - name: Ensaio com console Windows próprio e pipes
-        run: python dados21/testar-console-nativo.py fonte/src/santafe.exe resultados25/console.json
+        run: python dados25/testar-console-nativo.py fonte/src/santafe.exe resultados25/console.json
       - name: Entrada Unicode por eventos reais de teclado no console exclusivo
-        run: python dados21/testar-entrada-nativa.py fonte/src/santafe.exe resultados25/entrada.json
+        run: python dados25/testar-entrada-nativa.py fonte/src/santafe.exe resultados25/entrada.json
       - name: Repetir núcleo ONFÉ e IBA na distribuição25
         run: |
           make -C fonte/src clean
@@ -57,11 +57,11 @@ jobs:
       - name: Repetir SLS gerenciador e proteções na distribuição25
         run: python apoio25/testar.py regressao25/candidato regressao25/ferramentas
       - name: Repetir console no interpretador com DLL
-        run: python dados21/testar-console-nativo.py regressao25/candidato/src/santafe.exe resultados25/console-dll.json
+        run: python dados25/testar-console-nativo.py regressao25/candidato/src/santafe.exe resultados25/console-dll.json
       - name: Repetir entrada Unicode no interpretador com DLL
-        run: python dados21/testar-entrada-nativa.py regressao25/candidato/src/santafe.exe resultados25/entrada-dll.json
+        run: python dados25/testar-entrada-nativa.py regressao25/candidato/src/santafe.exe resultados25/entrada-dll.json
       - name: Repetir Ctrl+C por ConPTY no interpretador com DLL
-        run: python dados21/testar-conpty.py regressao25/candidato/src/santafe.exe resultados25/conpty-dll.json
+        run: python dados25/testar-conpty.py regressao25/candidato/src/santafe.exe resultados25/conpty-dll.json
       - name: Preparar critérios MSI25 e baseline20 conferido
         run: python -c "print('Criterios MSI25 preparados e baselines preservados')"
       - name: Compilar verificacoes nativas do instalador
