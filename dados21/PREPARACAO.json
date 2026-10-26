@@ -1,0 +1,17 @@
+{
+  "estado": "preparacao; nao empacotado nem homologado",
+  "motivo": "CP850 no CMD corrompe saida UTF8 do candidato dados.20",
+  "origem": "ensaio real Windows10 Firmamento",
+  "alteracao": "CLI detecta handles de console, habilita UTF8 somente na sessao e registra restauracao na saida normal; pipes nao modificados; identificacao candidata dados.21",
+  "testes_simulados": 12,
+  "sanitizers": "ASan/UBSan; cc -std=c99 -Wall -Wextra -Werror",
+  "teste_sintaxe_mac": true,
+  "execucao_nativa_windows": false,
+  "pacotes_selados_modificados": false,
+  "producao_alterada": false,
+  "limites": [
+    "restauracao nao garantida apos encerramento abrupto do processo",
+    "fonte raster e entrada nao ASCII ainda precisam de ensaio real",
+    "nao declarar liberacao ou novo pacote antes de bateria Windows"
+  ]
+}

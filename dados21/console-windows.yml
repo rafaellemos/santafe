@@ -1,0 +1,52 @@
+name: Console UTF8 Windows — preparação dados.21
+on:
+  push:
+    branches: ['homologacao/windows-dados15']
+    paths: ['dados21/**', '.github/workflows/console-windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  console:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-binutils
+      - name: Preparar base e correção conferidas
+        run: |
+          python windows/preparar.py fonte.tar.gz fonte
+          python dados20/aplicar.py fonte
+          python dados21/aplicar.py fonte
+      - name: Compilar CLI nativo e testar decisões e erros
+        run: |
+          mkdir -p resultados21
+          make -C fonte/src mingw 'MYCFLAGS=-DSANTAFE_DADOS_EXPERIMENTAL -DLUA_USE_APICHECK' > resultados21/compilacao.log 2>&1
+          gcc -std=c99 -Wall -Wextra -Werror dados21/testar-console-simulado.c -o resultados21/simulado.exe
+          resultados21/simulado.exe > resultados21/simulado.log
+      - name: Ensaio com console Windows próprio e pipes
+        run: python dados21/testar-console-nativo.py fonte/src/santafe.exe resultados21/console.json
+      - name: Guardar evidência sem produzir instalador
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dados21-console-evidencias
+          path: |
+            resultados21/*.json
+            resultados21/*.log
+            fonte/DADOS21-CONSOLE.json
+          if-no-files-found: error
+          retention-days: 14
