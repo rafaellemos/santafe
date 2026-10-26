@@ -42,6 +42,8 @@ jobs:
           resultados21/simulado.exe > resultados21/simulado.log
       - name: Ensaio com console Windows próprio e pipes
         run: python dados21/testar-console-nativo.py fonte/src/santafe.exe resultados21/console.json
+      - name: Entrada Unicode por eventos reais de teclado no console exclusivo
+        run: python dados21/testar-entrada-nativa.py fonte/src/santafe.exe resultados21/entrada.json
       - name: Repetir núcleo ONFÉ e IBA na correção21
         run: |
           make -C fonte/src clean
@@ -51,6 +53,8 @@ jobs:
         run: python apoio21/testar.py regressao21/candidato regressao21/ferramentas
       - name: Repetir console no interpretador com DLL
         run: python dados21/testar-console-nativo.py regressao21/candidato/src/santafe.exe resultados21/console-dll.json
+      - name: Repetir entrada Unicode no interpretador com DLL
+        run: python dados21/testar-entrada-nativa.py regressao21/candidato/src/santafe.exe resultados21/entrada-dll.json
       - name: Guardar evidência sem produzir instalador
         if: always()
         uses: actions/upload-artifact@v4
