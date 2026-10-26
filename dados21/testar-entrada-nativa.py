@@ -73,7 +73,11 @@ def ensaiar(exe, destino):
         # O console é exclusivo deste processo-filho e do interpretador; nunca
         # envia sinal ao console do runner ou a aplicativos do operador.
         Handler = c.WINFUNCTYPE(w.BOOL, w.DWORD)
-        handler = Handler(lambda event: True)
+        events = []
+        def sinal(event):
+            events.append(event)
+            return True
+        handler = Handler(sinal)
         k.SetConsoleCtrlHandler.argtypes = [Handler, w.BOOL]
         k.SetConsoleCtrlHandler.restype = w.BOOL
         # MSYS2/runner pode ter herdado o atributo de ignorar Ctrl+C. Remover
@@ -98,7 +102,11 @@ def ensaiar(exe, destino):
             assert ready.wait(10), 'interpretador não chegou ao prompt'
             if tecla: escrever('\x03')
             else: assert k.GenerateConsoleCtrlEvent(evento, 0)
-            assert p.wait(timeout=10) != 0, 'interrupção não encerrou a leitura'
+            try:
+                assert p.wait(timeout=10) != 0, 'interrupção não encerrou a leitura'
+            except sp.TimeoutExpired:
+                raise AssertionError({'interrupcao': 'tecla' if tecla else 'evento',
+                                      'codigo': codigo, 'sinais_no_console': events})
             reader.join(timeout=5)
             assert not reader.is_alive(), 'leitor órfão no ensaio'
             if codigo is not None:
@@ -130,8 +138,8 @@ def ensaiar(exe, destino):
         interromper(0)
         interromper(1)
         interromper(0, 'enquanto verdadeiro início fim')
-        interromper(0, 'es.leia()', tecla=True)
         interromper(0, 'es.leia()')
+        interromper(0, 'es.leia()', tecla=True)
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
     except Exception as exc:
         report['resultado'] = 'falhou'; report['falha'] = repr(exc); salvar(); return 1

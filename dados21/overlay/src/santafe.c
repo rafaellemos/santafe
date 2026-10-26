@@ -147,6 +147,9 @@ static void laction (int i) {
 #if defined(_WIN32)
   sf_console_evaluation(0); /* um segundo sinal pede encerramento normal CRT */
 #endif
+#if defined(LUA_USE_WINDOWS)
+  sf_input_interrupt();
+#endif
   signal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
 }
@@ -227,6 +230,10 @@ static int docall (lua_State *L, int narg, int nres) {
   lua_pushcfunction(L, msghandler);  /* push message handler */
   lua_insert(L, base);  /* put it under function and args */
   globalL = L;  /* to be available to 'laction' */
+#if defined(LUA_USE_WINDOWS)
+  if (!sf_input_evaluation(1))
+    return luaL_error(L, "falha ao preparar leitura interrompivel do console");
+#endif
   signal(SIGINT, laction);  /* set C-signal handler */
 #if defined(_WIN32)
   sf_console_evaluation(1);
@@ -236,6 +243,9 @@ static int docall (lua_State *L, int narg, int nres) {
   sf_console_evaluation(0);
 #endif
   signal(SIGINT, SIG_DFL); /* reset C-signal handler */
+#if defined(LUA_USE_WINDOWS)
+  sf_input_evaluation(0);
+#endif
   lua_remove(L, base);  /* remove message handler from the stack */
   return status;
 }
@@ -734,7 +744,7 @@ int main (int argc, char **argv) {
   }
 #endif
 #if defined(_WIN32)
-  if (!sf_console_prepare()) {
+  if (atexit(sf_input_shutdown) != 0 || !sf_console_prepare()) {
     fputs("Santafe: nao foi possivel preparar o console UTF-8\n", stderr);
     return EXIT_FAILURE;
   }

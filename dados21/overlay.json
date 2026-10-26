@@ -3,6 +3,6 @@
   "src/liolib.c": "839b9d9dadff5042c0f95b2285adcd433b2bbc709f93c81c8e81ec6bc5e6c6ef",
   "src/lua.h": "39809509164b685d9c2c1f6f1ed847cfebdfbb722b755a586370fbb64d0192bd",
   "src/lwinconsole.h": "fe734de078e03e02432224335813a4329fd930593c24475d94585077eff5c5dd",
-  "src/lwininput.h": "997e1eab6b3ffec3b11451d0846856d33944731c55afd72bb55beecdff9be16a",
-  "src/santafe.c": "799b1ec9bd1cf693dd2f6e5e75fce597532f61dbc23539dd85b82ed352cd87a1"
+  "src/lwininput.h": "5c345177650cfad1ca70f36d28beacc7139ab7e84da6f72aeb6476df21381e8b",
+  "src/santafe.c": "c7001ae627cadf3eb3a46cb99a803dee035247a51fbf48d9b94fe8e7a6a64a1d"
 }

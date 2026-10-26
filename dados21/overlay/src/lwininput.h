@@ -14,6 +14,10 @@ LUALIB_API size_t sf_input_read(void *buffer, size_t count, FILE *f);
 LUALIB_API int sf_input_eof(FILE *f);
 LUALIB_API int sf_input_error(FILE *f);
 LUALIB_API void sf_input_clear(FILE *f);
+/* Ciclo exclusivo do CLI; a biblioteca não instala tratadores de sinais. */
+LUALIB_API int sf_input_evaluation(int active);
+LUALIB_API void sf_input_interrupt(void);
+LUALIB_API void sf_input_shutdown(void);
 #else
 #define sf_input_is_console(f) ((void)(f), 0)
 #define sf_input_getc(f) getc(f)
@@ -32,6 +36,83 @@ LUALIB_API void sf_input_clear(FILE *f);
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
+
+#ifndef SF_WININPUT_TEST
+/* Um evento por processo CLI, compartilhado também na versão DLL. Nenhum
+ * descritor de arquivo/pipe passa pela rotina de cancelamento do console. */
+static HANDLE sf_input_cancel_event;
+static int sf_input_active;
+LUALIB_API int sf_input_evaluation(int active) {
+  if (active && sf_input_is_console(stdin) && !sf_input_cancel_event) {
+    sf_input_cancel_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!sf_input_cancel_event) return 0;
+  }
+  if (sf_input_cancel_event && !ResetEvent(sf_input_cancel_event)) return 0;
+  sf_input_active = active;
+  return 1;
+}
+LUALIB_API void sf_input_interrupt(void) {
+  /* Chamada pelo tratador SIGINT: sem stdio, alocação ou trava do FILE. */
+  if (sf_input_cancel_event) SetEvent(sf_input_cancel_event);
+}
+LUALIB_API void sf_input_shutdown(void) {
+  if (sf_input_cancel_event) CloseHandle(sf_input_cancel_event);
+  sf_input_cancel_event = NULL;
+  sf_input_active = 0;
+}
+
+typedef struct {
+  HANDLE input;
+  WCHAR *buffer;
+  DWORD capacity, count, error;
+  BOOL ok;
+} sf_InputRead;
+static DWORD WINAPI sf_input_reader(LPVOID argument) {
+  sf_InputRead *r = (sf_InputRead *)argument;
+  if (WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
+    r->error = ERROR_OPERATION_ABORTED; return 0;
+  }
+  SetLastError(0);
+  r->ok = ReadConsoleW(r->input, r->buffer, r->capacity, &r->count, NULL);
+  r->error = GetLastError();
+  return 0;
+}
+static int sf_input_readwide(HANDLE input, WCHAR *buffer, DWORD capacity,
+                             DWORD *count) {
+  sf_InputRead r;
+  HANDLE waits[2], thread;
+  DWORD waited;
+  if (!sf_input_active || !sf_input_cancel_event)
+    return ReadConsoleW(input, buffer, capacity, count, NULL);
+  if (WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
+    SetLastError(ERROR_OPERATION_ABORTED); return 0;
+  }
+  memset(&r, 0, sizeof(r));
+  r.input = input; r.buffer = buffer; r.capacity = capacity;
+  /* O auxiliar executa somente esta ReadConsoleW. Ao contrário de cancelar
+   * a thread principal, nunca cancela outra operação iniciada em seguida. */
+  thread = CreateThread(NULL, 0, sf_input_reader, &r, 0, NULL);
+  if (!thread) return 0;
+  waits[0] = thread; waits[1] = sf_input_cancel_event;
+  waited = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+  if (waited != WAIT_OBJECT_0) {
+    /* O sinal pode anteceder a entrada efetiva na syscall. Repetir até a
+     * conclusão cobre essa janela; não liberar buffer nem encerrar thread
+     * à força enquanto o sistema ainda o utiliza. */
+    do { CancelSynchronousIo(thread); }
+    while (WaitForSingleObject(thread, 10) != WAIT_OBJECT_0);
+    r.ok = FALSE; r.error = ERROR_OPERATION_ABORTED;
+  }
+  CloseHandle(thread);
+  *count = r.count;
+  SetLastError(r.error);
+  return r.ok;
+}
+#else
+/* O simulador verifica conversão/fronteiras; cancelamento é ensaiado no
+ * Windows nativo com threads e sinais reais, nas duas distribuições. */
+#define sf_input_readwide(h,b,n,c) ReadConsoleW((h),(b),(n),(c),NULL)
+#endif
 
 typedef struct {
   HANDLE handle;
@@ -79,8 +160,8 @@ static int sf_input_unit(sf_InputConsole *s) {
     DWORD error;
     int ok;
     SetLastError(0);
-    ok = ReadConsoleW(s->handle, s->wide,
-                      (DWORD)(sizeof(s->wide)/sizeof(s->wide[0])), &n, NULL);
+    ok = sf_input_readwide(s->handle, s->wide,
+                      (DWORD)(sizeof(s->wide)/sizeof(s->wide[0])), &n);
     error = GetLastError();
     /* Algumas versões do conhost devolvem TRUE com operação cancelada e
      * contagem zero ou DWORD(-1). Não tratar cancelamento como EOF nem usar
