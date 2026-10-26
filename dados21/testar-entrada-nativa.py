@@ -7,6 +7,7 @@ import platform
 import subprocess as sp
 import sys
 import threading
+import time
 
 
 def ensaiar(exe, destino):
@@ -29,6 +30,7 @@ def ensaiar(exe, destino):
         ('FlushConsoleInputBuffer', [w.HANDLE], w.BOOL),
         ('WriteConsoleInputW', [w.HANDLE, c.POINTER(Record), w.DWORD, c.POINTER(w.DWORD)], w.BOOL),
         ('GenerateConsoleCtrlEvent', [w.DWORD, w.DWORD], w.BOOL),
+        ('GetProcessHandleCount', [w.HANDLE, c.POINTER(w.DWORD)], w.BOOL),
     ):
         fn = getattr(k, name); fn.argtypes = args; fn.restype = result
     inp = k.GetStdHandle(-10)
@@ -100,8 +102,17 @@ def ensaiar(exe, destino):
         reader = threading.Thread(target=ler, daemon=True); reader.start()
         try:
             assert ready.wait(10), 'interpretador não chegou ao prompt'
-            if tecla: escrever('\x03')
-            else: assert k.GenerateConsoleCtrlEvent(evento, 0)
+            if tecla:
+                escrever('\x03')
+                # WriteConsoleInputW escreve no buffer, não simula o caminho
+                # físico do teclado que gera CTRL_C_EVENT. O run40265674502
+                # comprovou zero sinais também no observador deste console.
+                time.sleep(.15)
+                assert not events and p.poll() is None, 'comportamento do buffer mudou'
+                report.setdefault('observacoes', []).append({
+                    'controle3_injetado': 'nenhum CTRL_C_EVENT observado; exige sinal separado',
+                    'teclado_fisico_aprovado': False})
+            assert k.GenerateConsoleCtrlEvent(evento, 0)
             try:
                 assert p.wait(timeout=10) != 0, 'interrupção não encerrou a leitura'
             except sp.TimeoutExpired:
@@ -113,13 +124,63 @@ def ensaiar(exe, destino):
                 assert b'interrompido' in p.stderr.read(), 'SIGINT não preservou o diagnóstico do interpretador'
             assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (850,850), 'interrupção não restaurou console'
             nome = 'interrupcao-'+str(evento)+'-restaura' if codigo is None else 'interrompe-programa-'+codigo
-            if tecla: nome += '-tecla'
+            if tecla: nome += '-controle3-no-buffer-mais-sinal'
             report['testes'].append({'nome': nome, 'passou': True}); salvar()
         finally:
             if p.poll() is None: p.kill(); p.wait(timeout=5)
             reader.join(timeout=5); p.stdout.close()
             if p.stderr is not None: p.stderr.close()
             k.SetConsoleCtrlHandler(handler, False)
+    def retomar_e_recursos():
+        Handler = c.WINFUNCTYPE(w.BOOL, w.DWORD)
+        handler = Handler(lambda event: True)
+        k.SetConsoleCtrlHandler.argtypes = [Handler, w.BOOL]
+        assert k.SetConsoleCtrlHandler(Handler(), False)
+        assert k.SetConsoleCtrlHandler(handler, True)
+        assert k.FlushConsoleInputBuffer(inp)
+        assert k.SetConsoleCP(850) and k.SetConsoleOutputCP(850)
+        p = sp.Popen([str(exe), '-E', '-P', '-i'], stdout=sp.PIPE, stderr=sp.PIPE)
+        output = bytearray(); condition = threading.Condition()
+        def ler():
+            while True:
+                b = p.stdout.read(1)
+                if not b: break
+                with condition:
+                    output.extend(b); condition.notify_all()
+        reader = threading.Thread(target=ler, daemon=True); reader.start()
+        def esperar(marker, occurrences=1):
+            with condition:
+                assert condition.wait_for(lambda: output.count(marker)>=occurrences, timeout=15), (marker, bytes(output[-300:]))
+        def handles():
+            n=w.DWORD(); assert k.GetProcessHandleCount(p._handle, c.byref(n)); return n.value
+        try:
+            esperar('SantaFé> '.encode())
+            escrever('mostre("LENDO"); es.esvazie(); es.leia()\r')
+            esperar(b'LENDO\r\n')
+            assert k.GenerateConsoleCtrlEvent(0,0)
+            esperar('SantaFé> '.encode(),2)
+            escrever('ã=3; mostre("RECUPEROU",ã)\r')
+            esperar(b'RECUPEROU\t3\r\n')
+            esperar('SantaFé> '.encode(),3)
+            escrever('mostre("RECURSOS"); es.esvazie(); para i=1,300 início garanta(es.leia()=="ação") fim; mostre("FINAL"); es.esvazie(); garanta(es.leia()=="fim")\r')
+            esperar(b'RECURSOS\r\n'); time.sleep(.05)
+            before=handles()
+            escrever('ação\r'*300)
+            esperar(b'FINAL\r\n'); time.sleep(.05)
+            after=handles()
+            assert after<=before+2, ('handles acumulados',before,after)
+            escrever('fim\rso.saia(0)\r')
+            assert p.wait(timeout=10)==0
+            reader.join(timeout=5); assert not reader.is_alive()
+            err=p.stderr.read(); assert b'interrompido' in err, err
+            assert (k.GetConsoleCP(), k.GetConsoleOutputCP())==(850,850)
+            report['testes'].append({'nome':'repl-retoma-unicode-apos-sigint', 'passou':True})
+            report['testes'].append({'nome':'300-leituras-sem-crescimento-de-handles', 'passou':True, 'antes':before, 'depois':after})
+            salvar()
+        finally:
+            if p.poll() is None: p.kill(); p.wait(timeout=5)
+            reader.join(timeout=5); p.stdout.close(); p.stderr.close()
+            k.SetConsoleCtrlHandler(handler,False)
     try:
         for cp in (850, 1252, 65001):
             caso('repl-acento-'+str(cp), 'ã=3 mostre("RESULTADO",ã)\rso.saia(0)\r', ['-i'], 'RESULTADO\t3\n', cp)
@@ -140,6 +201,7 @@ def ensaiar(exe, destino):
         interromper(0, 'enquanto verdadeiro início fim')
         interromper(0, 'es.leia()')
         interromper(0, 'es.leia()', tecla=True)
+        retomar_e_recursos()
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
     except Exception as exc:
         report['resultado'] = 'falhou'; report['falha'] = repr(exc); salvar(); return 1
