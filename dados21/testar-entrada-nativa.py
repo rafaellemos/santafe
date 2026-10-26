@@ -69,7 +69,7 @@ def ensaiar(exe, destino):
         if ausente is not None: assert ausente not in received, (nome,'executou entrada truncada')
         assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (cp, cp), nome+' alterou console'
         report['testes'].append({'nome': nome, 'passou': True}); salvar()
-    def interromper(evento):
+    def interromper(evento, codigo=None):
         # O console é exclusivo deste processo-filho e do interpretador; nunca
         # envia sinal ao console do runner ou a aplicativos do operador.
         Handler = c.WINFUNCTYPE(w.BOOL, w.DWORD)
@@ -82,14 +82,17 @@ def ensaiar(exe, destino):
         assert k.SetConsoleCtrlHandler(handler, True)
         assert k.FlushConsoleInputBuffer(inp)
         assert k.SetConsoleCP(850) and k.SetConsoleOutputCP(850)
-        p = sp.Popen([str(exe), '-E', '-P', '-i'], stdout=sp.PIPE)  # stderr console
+        args = ['-i'] if codigo is None else ['-e', 'mostre("PRONTO"); es.esvazie(); '+codigo]
+        p = sp.Popen([str(exe), '-E', '-P', *args], stdout=sp.PIPE,
+                     stderr=None if codigo is None else sp.PIPE)
         ready = threading.Event(); output = bytearray()
+        marker = 'SantaFé> '.encode() if codigo is None else b'PRONTO\r\n'
         def ler():
             while True:
                 b = p.stdout.read(1)
                 if not b: break
                 output.extend(b)
-                if output.endswith('SantaFé> '.encode()): ready.set()
+                if output.endswith(marker): ready.set()
         reader = threading.Thread(target=ler, daemon=True); reader.start()
         try:
             assert ready.wait(10), 'interpretador não chegou ao prompt'
@@ -97,11 +100,15 @@ def ensaiar(exe, destino):
             assert p.wait(timeout=10) != 0, 'interrupção não encerrou a leitura'
             reader.join(timeout=5)
             assert not reader.is_alive(), 'leitor órfão no ensaio'
+            if codigo is not None:
+                assert b'interrompido' in p.stderr.read(), 'SIGINT não preservou o diagnóstico do interpretador'
             assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (850,850), 'interrupção não restaurou console'
-            report['testes'].append({'nome': 'interrupcao-'+str(evento)+'-restaura', 'passou': True}); salvar()
+            nome = 'interrupcao-'+str(evento)+'-restaura' if codigo is None else 'interrompe-programa-'+codigo
+            report['testes'].append({'nome': nome, 'passou': True}); salvar()
         finally:
             if p.poll() is None: p.kill(); p.wait(timeout=5)
             reader.join(timeout=5); p.stdout.close()
+            if p.stderr is not None: p.stderr.close()
             k.SetConsoleCtrlHandler(handler, False)
     try:
         for cp in (850, 1252, 65001):
@@ -120,6 +127,8 @@ def ensaiar(exe, destino):
         caso('leia-recusa-linha-truncada', 'a'*17000+'\r', ['-e', 'local valor,motivo=es.leia(); mostre("RESULTADO",valor==inexistente,motivo~=inexistente)'], 'RESULTADO\tverdadeiro\tverdadeiro\n')
         interromper(0)
         interromper(1)
+        interromper(0, 'enquanto verdadeiro início fim')
+        interromper(0, 'es.leia()')
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
     except Exception as exc:
         report['resultado'] = 'falhou'; report['falha'] = repr(exc); salvar(); return 1
