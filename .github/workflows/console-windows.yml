@@ -9,7 +9,7 @@ permissions:
 jobs:
   console:
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         shell: msys2 {0}
@@ -26,6 +26,9 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-python
             mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-openssl
       - name: Preparar base e correção conferidas
         run: |
           python windows/preparar.py fonte.tar.gz fonte
@@ -39,6 +42,15 @@ jobs:
           resultados21/simulado.exe > resultados21/simulado.log
       - name: Ensaio com console Windows próprio e pipes
         run: python dados21/testar-console-nativo.py fonte/src/santafe.exe resultados21/console.json
+      - name: Repetir núcleo ONFÉ e IBA na correção21
+        run: |
+          make -C fonte/src clean
+          python dados21/preparar-bateria.py
+          python windows/testar21.py fonte regressao21
+      - name: Repetir SLS gerenciador e proteções na correção21
+        run: python apoio21/testar.py regressao21/candidato regressao21/ferramentas
+      - name: Repetir console no interpretador com DLL
+        run: python dados21/testar-console-nativo.py regressao21/candidato/src/santafe.exe resultados21/console-dll.json
       - name: Guardar evidência sem produzir instalador
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,5 +60,10 @@ jobs:
             resultados21/*.json
             resultados21/*.log
             fonte/DADOS21-CONSOLE.json
+            regressao21/*.json
+            regressao21/*.log
+            regressao21/ferramentas/*.json
+            regressao21/ferramentas/*.log
+            regressao21/ferramentas/santafe-dados21-windows-x64-portatil.zip
           if-no-files-found: error
           retention-days: 14
