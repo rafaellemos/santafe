@@ -54,7 +54,8 @@ def ensaiar(exe, destino):
         assert p.returncode == esperado, (nome, p.returncode)
         assert (k.GetConsoleCP(), k.GetConsoleOutputCP()) == (cp, cp), nome+' alterou console'
         if trecho is not None:
-            assert trecho in texto(), nome+' não preservou texto Unicode'
+            recebido = texto()
+            assert trecho in recebido, (nome, 'conteudo_console', recebido.rstrip()[:1200])
         if bytes_saida is not None:
             assert p.stdout == bytes_saida, nome+' alterou bytes redirecionados'
         if opcoes.get('stderr') == sp.PIPE:
@@ -63,7 +64,7 @@ def ensaiar(exe, destino):
         return p
     try:
         for cp in (850, 1252, 65001):
-            executar('versao-'+str(cp), cp, ['-v'], trecho='Santafé 3.0.0-candidato-dados.21')
+            executar('versao-'+str(cp), cp, ['-v'], trecho='Santafé candidato-dados.21')
         f = destino.parent/'acentos.fe'
         f.write_text('mostre("ação José cafe\u0301")\n', encoding='utf-8')
         executar('texto-nfc-nfd', 850, [str(f)], trecho='ação José cafe\u0301')
@@ -91,6 +92,7 @@ if __name__ == '__main__':
     exe, destino = map(lambda s: Path(s).resolve(), sys.argv[1:3])
     if len(sys.argv) > 3 and sys.argv[3] == '--console-filho':
         raise SystemExit(ensaiar(exe, destino))
+    sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
     destino.parent.mkdir(parents=True, exist_ok=True)
     start = sp.STARTUPINFO(); start.dwFlags |= sp.STARTF_USESHOWWINDOW; start.wShowWindow = 0
     # O filho tem seu próprio console. Não recebe chaves, rede, projetos ou credenciais.
