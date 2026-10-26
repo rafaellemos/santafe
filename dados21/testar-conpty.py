@@ -62,6 +62,9 @@ class Session:
             check(init(self.attributes,1,0,c.byref(n)))
             check(attribute(self.attributes,0,0x00020016,self.pty,c.sizeof(w.HANDLE),None,None))
             si=StartupEx(); si.startup.cb=c.sizeof(si); si.attributes=c.cast(self.attributes,c.c_void_p)
+            # ConPTY deve substituir os pipes redirecionados do runner.
+            # Microsoft Terminal discussão15814: STARTF_USESTDHANDLES+NULL.
+            si.startup.flags=0x100
             cmd=c.create_unicode_buffer(subprocess.list2cmdline([str(exe),'-E','-P','-i']))
             check(start(str(exe),cmd,None,None,False,0x00080000,None,None,c.byref(si),c.byref(self.process)))
             close(self.process.thread); self.process.thread=None
@@ -129,4 +132,5 @@ def main():
         report['resultado']='falhou'; report['falha']=repr(exc); return 1
     finally:
         destination.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+        print(json.dumps(report,ensure_ascii=True))
 if __name__=='__main__': sys.exit(main())
