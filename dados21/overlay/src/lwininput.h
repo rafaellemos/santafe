@@ -84,8 +84,9 @@ static int sf_input_readwide(HANDLE input, WCHAR *buffer, DWORD capacity,
   DWORD waited;
   if (!sf_input_active || !sf_input_cancel_event)
     return ReadConsoleW(input, buffer, capacity, count, NULL);
+retry_read:
   if (WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
-    SetLastError(ERROR_OPERATION_ABORTED); return 0;
+    *count = 0; SetLastError(ERROR_OPERATION_ABORTED); return 0;
   }
   memset(&r, 0, sizeof(r));
   r.input = input; r.buffer = buffer; r.capacity = capacity;
@@ -96,14 +97,29 @@ static int sf_input_readwide(HANDLE input, WCHAR *buffer, DWORD capacity,
   waits[0] = thread; waits[1] = sf_input_cancel_event;
   waited = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
   if (waited != WAIT_OBJECT_0) {
+    DWORD failure = waited == WAIT_OBJECT_0 + 1
+                  ? ERROR_OPERATION_ABORTED : GetLastError();
     /* O sinal pode anteceder a entrada efetiva na syscall. Repetir até a
      * conclusão cobre essa janela; não liberar buffer nem encerrar thread
      * à força enquanto o sistema ainda o utiliza. */
     do { CancelSynchronousIo(thread); }
     while (WaitForSingleObject(thread, 10) != WAIT_OBJECT_0);
-    r.ok = FALSE; r.error = ERROR_OPERATION_ABORTED;
+    r.ok = FALSE; r.error = failure ? failure : ERROR_INVALID_FUNCTION;
   }
   CloseHandle(thread);
+  if (r.error == ERROR_OPERATION_ABORTED) {
+    /* Ctrl+C pelo terminal cancela ReadConsoleW antes de a thread SIGINT
+     * publicar o gancho. Não devolver EINTR ainda: docall poderia restaurar
+     * SIG_DFL e o mesmo sinal terminaria o processo. Aguardar brevemente o
+     * evento do tratador; sem sinal, recomeçar a leitura, mantendo SIGINT
+     * instalado e a espera cancelável. O prazo não é uma condição de êxito.
+     * Também cobre o console que apenas cancela/limpa a linha sem sinal. */
+    waited = WaitForSingleObject(sf_input_cancel_event, 100);
+    if (waited == WAIT_TIMEOUT) goto retry_read;
+    if (waited != WAIT_OBJECT_0) {
+      r.ok = FALSE; r.error = ERROR_INVALID_FUNCTION;
+    }
+  }
   *count = r.count;
   SetLastError(r.error);
   return r.ok;

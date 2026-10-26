@@ -59,6 +59,8 @@ jobs:
         run: python dados21/testar-console-nativo.py regressao21/candidato/src/santafe.exe resultados21/console-dll.json
       - name: Repetir entrada Unicode no interpretador com DLL
         run: python dados21/testar-entrada-nativa.py regressao21/candidato/src/santafe.exe resultados21/entrada-dll.json
+      - name: Repetir Ctrl+C por ConPTY no interpretador com DLL
+        run: python dados21/testar-conpty.py regressao21/candidato/src/santafe.exe resultados21/conpty-dll.json
       - name: Guardar evidência sem produzir instalador
         if: always()
         uses: actions/upload-artifact@v4
