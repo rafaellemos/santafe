@@ -36,11 +36,6 @@ LUALIB_API void sf_input_shutdown(void);
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
-#ifdef SF_WININPUT_TRACE
-#define SF_INPUT_TRACE(...) fprintf(stderr, __VA_ARGS__)
-#else
-#define SF_INPUT_TRACE(...) ((void)0)
-#endif
 
 #ifndef SF_WININPUT_TEST
 /* Um evento por processo CLI, compartilhado também na versão DLL. Nenhum
@@ -53,7 +48,6 @@ LUALIB_API int sf_input_evaluation(int active) {
     if (!sf_input_cancel_event) return 0;
   }
   if (sf_input_cancel_event && !ResetEvent(sf_input_cancel_event)) return 0;
-  SF_INPUT_TRACE("INPUT evaluation=%d\n", active);
   sf_input_active = active;
   return 1;
 }
@@ -61,18 +55,36 @@ LUALIB_API void sf_input_interrupt(void) {
   /* Chamada pelo tratador SIGINT: sem stdio, alocação ou trava do FILE. */
   if (sf_input_cancel_event) SetEvent(sf_input_cancel_event);
 }
+/* A leitura pendente tem armazenamento próprio: SIGINT pode devolver o
+ * controle ao REPL sem cancelar o pedido no conhost. CancelSynchronousIo
+ * pode deixar uma leitura fantasma no servidor e descartar a próxima linha
+ * (microsoft/terminal#17791). Só o encerramento cancela essa leitura. */
+typedef struct {
+  HANDLE input;
+  WCHAR buffer[16384];
+  DWORD capacity, count, error;
+  BOOL ok;
+} sf_InputRead;
+static sf_InputRead sf_pending_read;
+static HANDLE sf_pending_thread;
+static int sf_pending_interrupted;
+
+static void sf_input_finish_reader(void) {
+  if (sf_pending_thread) {
+    /* Sem buffer na pilha, sem TerminateThread e sem cancelar E/S alheia. */
+    do { CancelSynchronousIo(sf_pending_thread); }
+    while (WaitForSingleObject(sf_pending_thread, 10) != WAIT_OBJECT_0);
+    CloseHandle(sf_pending_thread);
+    sf_pending_thread = NULL;
+  }
+  sf_pending_interrupted = 0;
+}
 LUALIB_API void sf_input_shutdown(void) {
+  sf_input_finish_reader();
   if (sf_input_cancel_event) CloseHandle(sf_input_cancel_event);
   sf_input_cancel_event = NULL;
   sf_input_active = 0;
 }
-
-typedef struct {
-  HANDLE input;
-  WCHAR *buffer;
-  DWORD capacity, count, error;
-  BOOL ok;
-} sf_InputRead;
 static DWORD WINAPI sf_input_reader(LPVOID argument) {
   sf_InputRead *r = (sf_InputRead *)argument;
   if (WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
@@ -85,57 +97,71 @@ static DWORD WINAPI sf_input_reader(LPVOID argument) {
 }
 static int sf_input_readwide(HANDLE input, WCHAR *buffer, DWORD capacity,
                              DWORD *count) {
-  sf_InputRead r;
-  HANDLE waits[2], thread;
+  sf_InputRead *r = &sf_pending_read;
+  HANDLE waits[2];
   DWORD waited;
-  SF_INPUT_TRACE("INPUT readwide active=%d\n", sf_input_active);
-  if (!sf_input_active || !sf_input_cancel_event) {
-    int direct = ReadConsoleW(input, buffer, capacity, count, NULL);
-    DWORD err = GetLastError();
-    SF_INPUT_TRACE("INPUT direct ok=%d count=%lu err=%lu\n",direct,(unsigned long)*count,(unsigned long)err);
-    SetLastError(err); return direct;
+  int was_interrupted;
+  if (sf_pending_thread && r->input != input) {
+    /* stdin foi explicitamente substituído; não usar dados do descritor velho. */
+    sf_input_finish_reader();
   }
 retry_read:
-  if (WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
+  if ((!sf_input_active || !sf_input_cancel_event) && !sf_pending_thread)
+    return ReadConsoleW(input, buffer, capacity, count, NULL);
+  if (sf_input_active &&
+      WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
     *count = 0; SetLastError(ERROR_OPERATION_ABORTED); return 0;
   }
-  memset(&r, 0, sizeof(r));
-  r.input = input; r.buffer = buffer; r.capacity = capacity;
-  /* O auxiliar executa somente esta ReadConsoleW. Ao contrário de cancelar
-   * a thread principal, nunca cancela outra operação iniciada em seguida. */
-  thread = CreateThread(NULL, 0, sf_input_reader, &r, 0, NULL);
-  if (!thread) return 0;
-  waits[0] = thread; waits[1] = sf_input_cancel_event;
-  waited = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+  if (!sf_pending_thread) {
+    memset(r, 0, sizeof(*r));
+    r->input = input;
+    r->capacity = capacity < sizeof(r->buffer)/sizeof(r->buffer[0])
+                ? capacity : (DWORD)(sizeof(r->buffer)/sizeof(r->buffer[0]));
+    sf_pending_interrupted = 0;
+    sf_pending_thread = CreateThread(NULL, 0, sf_input_reader, r, 0, NULL);
+    if (!sf_pending_thread) return 0;
+  }
+  if (sf_input_active) {
+    waits[0] = sf_pending_thread; waits[1] = sf_input_cancel_event;
+    waited = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+  }
+  else waited = WaitForSingleObject(sf_pending_thread, INFINITE);
+  if (waited == WAIT_OBJECT_0 + 1) {
+    /* O mesmo auxiliar será recolhido na próxima leitura ou na saída.
+     * Não há uma segunda leitura concorrente nem descarte da próxima linha. */
+    sf_pending_interrupted = 1;
+    *count = 0; SetLastError(ERROR_OPERATION_ABORTED); return 0;
+  }
   if (waited != WAIT_OBJECT_0) {
-    DWORD failure = waited == WAIT_OBJECT_0 + 1
-                  ? ERROR_OPERATION_ABORTED : GetLastError();
-    /* O sinal pode anteceder a entrada efetiva na syscall. Repetir até a
-     * conclusão cobre essa janela; não liberar buffer nem encerrar thread
-     * à força enquanto o sistema ainda o utiliza. */
-    do { CancelSynchronousIo(thread); }
-    while (WaitForSingleObject(thread, 10) != WAIT_OBJECT_0);
-    r.ok = FALSE; r.error = failure ? failure : ERROR_INVALID_FUNCTION;
+    DWORD failure = GetLastError();
+    sf_input_finish_reader();
+    *count = 0; SetLastError(failure ? failure : ERROR_INVALID_FUNCTION);
+    return 0;
   }
-  CloseHandle(thread);
-  if (r.error == ERROR_OPERATION_ABORTED) {
-    /* Ctrl+C pelo terminal cancela ReadConsoleW antes de a thread SIGINT
-     * publicar o gancho. Não devolver EINTR ainda: docall poderia restaurar
-     * SIG_DFL e o mesmo sinal terminaria o processo. Aguardar brevemente o
-     * evento do tratador; sem sinal, recomeçar a leitura, mantendo SIGINT
-     * instalado e a espera cancelável. O prazo não é uma condição de êxito.
-     * Também cobre o console que apenas cancela/limpa a linha sem sinal. */
-    waited = WaitForSingleObject(sf_input_cancel_event, 100);
-    if (waited == WAIT_TIMEOUT) goto retry_read;
-    if (waited != WAIT_OBJECT_0) {
-      r.ok = FALSE; r.error = ERROR_INVALID_FUNCTION;
+  CloseHandle(sf_pending_thread); sf_pending_thread = NULL;
+  was_interrupted = sf_pending_interrupted; sf_pending_interrupted = 0;
+  if (r->error == ERROR_OPERATION_ABORTED) {
+    /* Um Ctrl+C físico também encerra ReadConsoleW. A próxima leitura
+     * recolhe esse resultado antigo e começa outra, sem repetir o sinal. */
+    if (was_interrupted) goto retry_read;
+    if (sf_input_active) {
+      /* ReadConsoleW pode terminar antes de a thread SIGINT publicar o
+       * gancho. Esperar o evento evita restaurar SIG_DFL prematuramente. */
+      waited = WaitForSingleObject(sf_input_cancel_event, 100);
+      if (waited == WAIT_TIMEOUT) goto retry_read;
+      if (waited != WAIT_OBJECT_0) r->error = ERROR_INVALID_FUNCTION;
     }
+    *count = 0; SetLastError(r->error); return 0;
   }
-  SF_INPUT_TRACE("INPUT worker ok=%d count=%lu err=%lu\n",r.ok,(unsigned long)r.count,(unsigned long)r.error);
-  *count = r.count;
-  SetLastError(r.error);
-  return r.ok;
+  if (r->count > capacity || r->count > r->capacity) {
+    *count = 0; SetLastError(ERROR_INVALID_FUNCTION); return 0;
+  }
+  *count = r->count;
+  if (r->ok && r->count) memcpy(buffer, r->buffer, r->count * sizeof(WCHAR));
+  SetLastError(r->error);
+  return r->ok;
 }
+
 #else
 /* O simulador verifica conversão/fronteiras; cancelamento é ensaiado no
  * Windows nativo com threads e sinais reais, nas duas distribuições. */

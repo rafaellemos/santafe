@@ -37,7 +37,7 @@ jobs:
       - name: Compilar CLI nativo e testar decisões e erros
         run: |
           mkdir -p resultados21
-          make -C fonte/src mingw 'MYCFLAGS=-DSANTAFE_DADOS_EXPERIMENTAL -DLUA_USE_APICHECK -DSF_WININPUT_TRACE' > resultados21/compilacao.log 2>&1
+          make -C fonte/src mingw 'MYCFLAGS=-DSANTAFE_DADOS_EXPERIMENTAL -DLUA_USE_APICHECK' > resultados21/compilacao.log 2>&1
           gcc -std=c99 -Wall -Wextra -Werror dados21/testar-console-simulado.c -o resultados21/simulado.exe
           resultados21/simulado.exe > resultados21/simulado.log
           gcc -std=c99 -Wall -Wextra -Werror dados21/testar-entrada-simulada.c -o resultados21/entrada-simulada.exe

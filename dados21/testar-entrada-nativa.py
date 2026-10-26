@@ -209,7 +209,7 @@ def ensaiar(exe, destino):
         interromper(0, 'enquanto verdadeiro início fim')
         interromper(0, 'es.leia()')
         interromper(0, 'es.leia()', tecla=True)
-        for repeticao in range(10):
+        for repeticao in range(30):
             retomar_e_recursos()
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
     except Exception as exc:
