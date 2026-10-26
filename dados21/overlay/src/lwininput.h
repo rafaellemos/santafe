@@ -36,6 +36,11 @@ LUALIB_API void sf_input_shutdown(void);
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
+#ifdef SF_WININPUT_TRACE
+#define SF_INPUT_TRACE(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define SF_INPUT_TRACE(...) ((void)0)
+#endif
 
 #ifndef SF_WININPUT_TEST
 /* Um evento por processo CLI, compartilhado também na versão DLL. Nenhum
@@ -48,6 +53,7 @@ LUALIB_API int sf_input_evaluation(int active) {
     if (!sf_input_cancel_event) return 0;
   }
   if (sf_input_cancel_event && !ResetEvent(sf_input_cancel_event)) return 0;
+  SF_INPUT_TRACE("INPUT evaluation=%d\n", active);
   sf_input_active = active;
   return 1;
 }
@@ -82,8 +88,13 @@ static int sf_input_readwide(HANDLE input, WCHAR *buffer, DWORD capacity,
   sf_InputRead r;
   HANDLE waits[2], thread;
   DWORD waited;
-  if (!sf_input_active || !sf_input_cancel_event)
-    return ReadConsoleW(input, buffer, capacity, count, NULL);
+  SF_INPUT_TRACE("INPUT readwide active=%d\n", sf_input_active);
+  if (!sf_input_active || !sf_input_cancel_event) {
+    int direct = ReadConsoleW(input, buffer, capacity, count, NULL);
+    DWORD err = GetLastError();
+    SF_INPUT_TRACE("INPUT direct ok=%d count=%lu err=%lu\n",direct,(unsigned long)*count,(unsigned long)err);
+    SetLastError(err); return direct;
+  }
 retry_read:
   if (WaitForSingleObject(sf_input_cancel_event, 0) == WAIT_OBJECT_0) {
     *count = 0; SetLastError(ERROR_OPERATION_ABORTED); return 0;
@@ -120,6 +131,7 @@ retry_read:
       r.ok = FALSE; r.error = ERROR_INVALID_FUNCTION;
     }
   }
+  SF_INPUT_TRACE("INPUT worker ok=%d count=%lu err=%lu\n",r.ok,(unsigned long)r.count,(unsigned long)r.error);
   *count = r.count;
   SetLastError(r.error);
   return r.ok;

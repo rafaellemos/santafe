@@ -140,7 +140,7 @@ def ensaiar(exe, destino):
         assert k.FlushConsoleInputBuffer(inp)
         assert k.SetConsoleCP(850) and k.SetConsoleOutputCP(850)
         p = sp.Popen([str(exe), '-E', '-P', '-i'], stdout=sp.PIPE, stderr=sp.PIPE)
-        output = bytearray(); condition = threading.Condition()
+        output = bytearray(); errors = bytearray(); condition = threading.Condition()
         def ler():
             while True:
                 b = p.stdout.read(1)
@@ -148,9 +148,15 @@ def ensaiar(exe, destino):
                 with condition:
                     output.extend(b); condition.notify_all()
         reader = threading.Thread(target=ler, daemon=True); reader.start()
+        def ler_erros():
+            while True:
+                b = p.stderr.read(1)
+                if not b: break
+                errors.extend(b)
+        error_reader = threading.Thread(target=ler_erros, daemon=True); error_reader.start()
         def esperar(marker, occurrences=1):
             with condition:
-                assert condition.wait_for(lambda: output.count(marker)>=occurrences, timeout=15), (marker, bytes(output[-300:]), p.poll(), p.stderr.read() if p.poll() is not None else b'processo vivo')
+                assert condition.wait_for(lambda: output.count(marker)>=occurrences, timeout=15), (marker, bytes(output[-300:]), p.poll(), bytes(errors[-3000:]))
         def handles():
             n=w.DWORD(); assert k.GetProcessHandleCount(p._handle, c.byref(n)); return n.value
         try:
@@ -172,14 +178,16 @@ def ensaiar(exe, destino):
             escrever('fim\rso.saia(0)\r')
             assert p.wait(timeout=10)==0
             reader.join(timeout=5); assert not reader.is_alive()
-            err=p.stderr.read(); assert b'interrompido' in err, err
+            error_reader.join(timeout=5); assert not error_reader.is_alive()
+            err=bytes(errors); assert b'interrompido' in err, err
             assert (k.GetConsoleCP(), k.GetConsoleOutputCP())==(850,850)
             report['testes'].append({'nome':'repl-retoma-unicode-apos-sigint', 'passou':True})
             report['testes'].append({'nome':'300-leituras-sem-crescimento-de-handles', 'passou':True, 'antes':before, 'depois':after})
             salvar()
         finally:
             if p.poll() is None: p.kill(); p.wait(timeout=5)
-            reader.join(timeout=5); p.stdout.close(); p.stderr.close()
+            reader.join(timeout=5); error_reader.join(timeout=5)
+            p.stdout.close(); p.stderr.close()
             k.SetConsoleCtrlHandler(handler,False)
     try:
         for cp in (850, 1252, 65001):
