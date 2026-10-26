@@ -1,5 +1,8 @@
 {
+  "src/lauxlib.c": "5ecee31220c7ab9787cf7ea05182e29b2af575d57262dbd4a5af9abbdec25072",
+  "src/liolib.c": "839b9d9dadff5042c0f95b2285adcd433b2bbc709f93c81c8e81ec6bc5e6c6ef",
   "src/lua.h": "39809509164b685d9c2c1f6f1ed847cfebdfbb722b755a586370fbb64d0192bd",
   "src/lwinconsole.h": "ea60c27c6851de2a279dcbebcb18dd15bbcbffc0e3b8ec9e3f7ca43c82a21c11",
-  "src/santafe.c": "ac849bdbc4753d84d6cc2eeaea15bda32c6f8940ae356c33d65429172db8632a"
+  "src/lwininput.h": "c8b01f4eedd6715b08c1197460b55b54a8c2adeb1fd574ab01c7b63e37353fc8",
+  "src/santafe.c": "ead80ecb5027b2b611ec8964ec031fc1ce9dbd2d3963ecba5ba68251c2e0ee21"
 }

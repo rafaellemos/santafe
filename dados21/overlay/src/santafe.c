@@ -39,6 +39,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lwininput.h"
 
 
 
@@ -342,6 +343,31 @@ static int pushline (lua_State *L, int firstline) {
   char *b = buffer;
   size_t l;
   const char *prmt = get_prompt(L, firstline);
+#if defined(LUA_USE_WINDOWS)
+  if (sf_input_is_console(stdin)) {
+    luaL_Buffer input;
+    int ch, prompt_index = lua_gettop(L);
+    fputs(prmt, stdout); fflush(stdout);
+    sf_input_clear(stdin);
+    luaL_buffinit(L, &input);
+    /* Uma linha do console não pode ser dividida em comandos de 511 bytes. */
+    while ((ch = sf_input_getc(stdin)) != EOF && ch != '\n')
+      luaL_addchar(&input, ch);
+    luaL_pushresult(&input);
+    if (sf_input_error(stdin))
+      return luaL_error(L, "falha na leitura do console: %s", strerror(errno));
+    b = (char *)lua_tolstring(L, -1, &l);
+    if (ch == EOF && !l) return 0;
+    if (memchr(b, '\0', l) != NULL)
+      return luaL_error(L, "entrada do console contem caractere NUL");
+    lua_remove(L, prompt_index);
+    if (firstline && b[0] == '=') {
+      lua_pushfstring(L, "retorne %s", b + 1);
+      lua_remove(L, -2);
+    }
+    return 1;
+  }
+#endif
   int readstatus = lua_readline(L, b, prmt);
   if (readstatus == 0)
     return 0;  /* no input (prompt will be popped by caller) */

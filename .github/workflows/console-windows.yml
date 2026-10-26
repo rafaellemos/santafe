@@ -40,6 +40,8 @@ jobs:
           make -C fonte/src mingw 'MYCFLAGS=-DSANTAFE_DADOS_EXPERIMENTAL -DLUA_USE_APICHECK' > resultados21/compilacao.log 2>&1
           gcc -std=c99 -Wall -Wextra -Werror dados21/testar-console-simulado.c -o resultados21/simulado.exe
           resultados21/simulado.exe > resultados21/simulado.log
+          gcc -std=c99 -Wall -Wextra -Werror dados21/testar-entrada-simulada.c -o resultados21/entrada-simulada.exe
+          resultados21/entrada-simulada.exe > resultados21/entrada-simulada.log
       - name: Ensaio com console Windows próprio e pipes
         run: python dados21/testar-console-nativo.py fonte/src/santafe.exe resultados21/console.json
       - name: Entrada Unicode por eventos reais de teclado no console exclusivo

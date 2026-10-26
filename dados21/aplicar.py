@@ -1,4 +1,4 @@
-"""Sobrepõe somente três arquivos conferidos, após a base candidata dados20."""
+"""Sobrepõe somente os seis arquivos conferidos, após a base candidata dados20."""
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -8,7 +8,8 @@ here = Path(__file__).resolve().parent
 root = Path(sys.argv[1]).resolve()
 assert (root/'DADOS20-WINDOWS.json').is_file(), 'base dados20 não preparada'
 manifest = json.loads((here/'overlay.json').read_text(encoding='utf-8'))
-assert set(manifest) == {'src/lua.h', 'src/lwinconsole.h', 'src/santafe.c'}
+assert set(manifest) == {'src/lua.h', 'src/lwinconsole.h', 'src/santafe.c',
+                         'src/lwininput.h', 'src/lauxlib.c', 'src/liolib.c'}
 checked = {}
 for name, digest in manifest.items():
     assert not PurePosixPath(name).is_absolute() and '..' not in PurePosixPath(name).parts
