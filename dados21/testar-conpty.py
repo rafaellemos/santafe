@@ -42,6 +42,7 @@ write=signature('WriteFile',[w.HANDLE,c.c_void_p,w.DWORD,c.POINTER(w.DWORD),c.c_
 wait=signature('WaitForSingleObject',[w.HANDLE,w.DWORD],w.DWORD)
 exitcode=signature('GetExitCodeProcess',[w.HANDLE,c.POINTER(w.DWORD)])
 terminate=signature('TerminateProcess',[w.HANDLE,w.UINT])
+ctrl_handler=signature('SetConsoleCtrlHandler',[c.c_void_p,w.BOOL])
 def check(value):
     if not value: raise c.WinError(c.get_last_error())
 
@@ -66,6 +67,10 @@ class Session:
             # Microsoft Terminal discussão15814: STARTF_USESTDHANDLES+NULL.
             si.startup.flags=0x100
             cmd=c.create_unicode_buffer(subprocess.list2cmdline([str(exe),'-E','-P','-i']))
+            # O runner pode herdar IGNORE_CTRL_C. Remover apenas o atributo
+            # deste processo de ensaio antes de criar seu filho ConPTY;
+            # nenhum sinal é enviado ao console ou a outros processos do CI.
+            check(ctrl_handler(None,False))
             check(start(str(exe),cmd,None,None,False,0x00080000,None,None,c.byref(si),c.byref(self.process)))
             close(self.process.thread); self.process.thread=None
             for h in self.peers: close(h); self.handles.remove(h)
