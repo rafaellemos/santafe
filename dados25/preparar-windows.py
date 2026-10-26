@@ -45,6 +45,14 @@ def prepare(archive, destination, windows):
         if 'src/'+name in rows and rows['src/'+name][0] != (windows/name).read_bytes():
             raise ValueError('recurso Windows mudou: '+name)
         rows['src/'+name] = ((windows/name).read_bytes(), 0o644)
+    name='testes/integracao/sls/casos.py'
+    content, mode=rows[name]
+    old='"dados." in c.informacao.get("version", "")'
+    text=content.decode('utf-8')
+    if text.count(old)!=2:
+        raise ValueError('Seleção de contrato dos testes SLS mudou')
+    text=text.replace(old,'("dados." in c.informacao.get("version", "") or c.informacao.get("version") == "1.1.0-rc.1")')
+    rows[name]=(text.encode('utf-8'),mode)
     destination.mkdir(parents=True, mode=0o700)
     for name, (data, mode) in rows.items():
         p = destination/name
