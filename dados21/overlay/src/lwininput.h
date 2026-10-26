@@ -35,7 +35,10 @@ LUALIB_API void sf_input_clear(FILE *f);
 
 typedef struct {
   HANDLE handle;
-  WCHAR wide[256];
+  /* Em modo de linha o tamanho pedido também limita a edição no conhost.
+   * Um bloco pequeno descarta texto digitado antes de devolver CRLF. Usar a
+   * mesma capacidade de 16K adotada por CPython, mesmo para es.leia(1). */
+  WCHAR wide[16384];
   DWORD next, length;
   unsigned char bytes[4];
   unsigned int byte_next, byte_length;
@@ -73,7 +76,8 @@ static int sf_input_unit(sf_InputConsole *s) {
   if (s->error || s->eof) return EOF;
   if (s->next == s->length) {
     DWORD n = 0;
-    if (!ReadConsoleW(s->handle, s->wide, 256, &n, NULL)) {
+    if (!ReadConsoleW(s->handle, s->wide,
+                      (DWORD)(sizeof(s->wide)/sizeof(s->wide[0])), &n, NULL)) {
       DWORD error = GetLastError();
       s->error = error == ERROR_OPERATION_ABORTED ? EINTR : EIO;
       errno = s->error;

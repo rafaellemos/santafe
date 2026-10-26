@@ -73,10 +73,10 @@ def ensaiar(exe, destino):
         caso('leia-linha-nfc-nfd', 'ação cafe\u0301 🟢\r', ['-e', 'mostre("RESULTADO",es.leia())'], 'RESULTADO\tação cafe\u0301 🟢\n')
         caso('leia-octetos', 'ã\r', ['-e', 'local a=es.leia(1); local b=es.leia(1); mostre("RESULTADO",a..b,es.leia())'], 'RESULTADO\tã\t\n')
         caso('leia-numero-retorno-byte', '42ação\r', ['-e', 'local a=es.leia("*número"); mostre("RESULTADO",a,es.leia())'], 'RESULTADO\t42\tação\n')
-        long = 'a'*2048+'ação 🟢'
+        long = 'a'*9000+'ação 🟢'
         caso('repl-linha-longa', 'mostre("RESULTADO",#"'+long+'")\rso.saia(0)\r', ['-i'], 'RESULTADO\t'+str(len(long.encode()))+'\n')
         boundary = 'a'*255+'🟢ã'
-        caso('leia-par-utf16-na-fronteira', boundary+'\r', ['-e', 'local a=es.leia(); mostre("RESULTADO",#a,a)'], 'RESULTADO\t'+str(len(boundary.encode()))+'\t'+boundary+'\n')
+        caso('leia-par-utf16', boundary+'\r', ['-e', 'local a=es.leia(); mostre("RESULTADO",#a,a)'], 'RESULTADO\t'+str(len(boundary.encode()))+'\t'+boundary+'\n')
         caso('leia-ctrlz', '\x1a\r', ['-e', 'mostre("RESULTADO",es.leia()==inexistente)'], 'RESULTADO\tverdadeiro\n')
         caso('programa-stdin-unicode', 'local ã=3; mostre("RESULTADO",ã,"ação 🟢")\r\x1a\r', ['-'], 'RESULTADO\t3\tação 🟢\n')
         report['resultado'] = 'passou_entrada_console'; salvar(); return 0
