@@ -52,7 +52,10 @@ __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
  if(GetDriveTypeW(drive)!=DRIVE_FIXED||!GetVolumeInformationW(drive,NULL,0,NULL,NULL,NULL,fs,32)||_wcsicmp(fs,L"NTFS"))return refuse(h,L"DADOS20_TARGET_REQUIRES_FIXED_NTFS");
  swprintf(standard,1024,L"%sPrograms\\Santafe",base);
  swprintf(prefix,1024,L"%sPrograms\\Santafe-",base);
- if(!GetFullPathNameW(path,1024,full,NULL)||(_wcsicmp(full,standard)&&_wcsnicmp(full,prefix,wcslen(prefix))))return refuse(h,L"DADOS20_TARGET_OUTSIDE_USER_CHANNEL");
+ if(!GetFullPathNameW(path,1024,full,NULL))return refuse(h,L"DADOS20_TARGET_OUTSIDE_USER_CHANNEL");
+ size_t fulln=wcslen(full),standardn=wcslen(standard);
+ int isstandard=!_wcsicmp(full,standard)||(fulln==standardn+1&&full[fulln-1]==L'\\'&&!_wcsnicmp(full,standard,standardn));
+ if(!isstandard&&_wcsnicmp(full,prefix,wcslen(prefix)))return refuse(h,L"DADOS20_TARGET_OUTSIDE_USER_CHANNEL");
  if(_wcsicmp(path,full))return refuse(h,L"DADOS20_TARGET_NOT_CANONICAL");
  for(wchar_t *p=path+3;*p;p++){
   if(*p==L':'||*p<32)return refuse(h,L"DADOS20_TARGET_INVALID_COMPONENT");
