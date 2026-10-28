@@ -30,7 +30,7 @@ static int tree_safe(const wchar_t *path,unsigned depth,unsigned *count){
  FindClose(find);return safe;
 }
 __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
- wchar_t path[1024],base[1024],full[1024],old[1024],installed[32],related[512],remove[32];
+ wchar_t path[1024],base[1024],full[1024],standard[1024],prefix[1024],old[1024],installed[32],related[512],remove[32];
  if(!prop(h,L"REMOVE",remove,32))return ERROR_INSTALL_FAILURE;
  /* Uninstall also inspects the tree: a substituted junction must not
   * redirect removal of managed files into another directory. */
@@ -50,8 +50,9 @@ __declspec(dllexport) UINT __stdcall ValidateTarget(MSIHANDLE h){
  if(wcslen(path)<3||path[1]!=L':'||path[2]!=L'\\')return refuse(h,L"DADOS20_TARGET_NOT_LOCAL");
  wchar_t drive[4]={path[0],L':',L'\\',0},fs[32];
  if(GetDriveTypeW(drive)!=DRIVE_FIXED||!GetVolumeInformationW(drive,NULL,0,NULL,NULL,NULL,fs,32)||_wcsicmp(fs,L"NTFS"))return refuse(h,L"DADOS20_TARGET_REQUIRES_FIXED_NTFS");
- wcscat(base,L"Programs\\Santafe-");
- if(!GetFullPathNameW(path,1024,full,NULL)||_wcsnicmp(full,base,wcslen(base)))return refuse(h,L"DADOS20_TARGET_OUTSIDE_USER_CHANNEL");
+ swprintf(standard,1024,L"%sPrograms\\Santafe",base);
+ swprintf(prefix,1024,L"%sPrograms\\Santafe-",base);
+ if(!GetFullPathNameW(path,1024,full,NULL)||(_wcsicmp(full,standard)&&_wcsnicmp(full,prefix,wcslen(prefix))))return refuse(h,L"DADOS20_TARGET_OUTSIDE_USER_CHANNEL");
  if(_wcsicmp(path,full))return refuse(h,L"DADOS20_TARGET_NOT_CANONICAL");
  for(wchar_t *p=path+3;*p;p++){
   if(*p==L':'||*p<32)return refuse(h,L"DADOS20_TARGET_INVALID_COMPONENT");
