@@ -1,0 +1,76 @@
+name: Santafé 3.0.0 — embalagem final Windows
+on:
+  push:
+    branches: ['homologacao/windows-dados15']
+    paths: ['dados30/**', '.github/workflows/distribuicao-windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  embalagem:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-openssl
+      - name: Preparar a mesma fonte final Linux e as identidades Windows
+        run: python dados30/preparar.py
+      - name: Compilar distribuição final e conferir contrato básico
+        run: |
+          mkdir -p resultados30
+          make -C fonte/src mingw > resultados30/compilacao.log 2>&1
+          fonte/src/santafe.exe -v
+          fonte/src/santafe.exe -e 'garanta(tipo([])=="lista"); garanta(tabela.temChave({x=nulo},"x")); garanta(json.cod([nulo])=="[null]"); garanta(tipo({})=="tabela")'
+      - name: Conferir DLLs, ferramentas e pacote portátil final
+        run: python apoio30/testar.py fonte resultados30/ferramentas
+      - name: Compilar as proteções do instalador
+        run: python apoio30/compilar-guarda.py resultados30/ferramentas
+      - uses: actions/setup-python@v5
+        id: msi_python
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Instalação, atualização, reparação e reversão do canal final
+        shell: pwsh
+        run: |
+          & '${{ steps.msi_python.outputs.python-path }}' apoio30/testar-instalador.py resultados30/instalador resultados30/ferramentas fonte resultados30/ferramentas/instalador-guarda.dll dados20/baseline-dados16.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Instalar e remover com usuário padrão real
+        shell: pwsh
+        run: |
+          ./apoio30/usuario-padrao.ps1 -Python '${{ steps.msi_python.outputs.python-path }}' -OutputDir resultados30/instalador
+      - name: Conferir identidades finais e ausência de assinatura pública
+        shell: pwsh
+        run: ./apoio30/testar-assinatura.ps1 -OutputDir resultados30/instalador -ToolsDir resultados30/ferramentas
+      - name: Guardar artefatos e evidências; não publicar catálogo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: santafe-3.0.0-windows-prepublicacao
+          path: |
+            resultados30/*.log
+            fonte/PREPARACAO-WINDOWS.json
+            resultados30/ferramentas/*.json
+            resultados30/ferramentas/*.log
+            resultados30/ferramentas/santafe-3.0.0-windows-x64-portatil.zip
+            resultados30/instalador/*.json
+            resultados30/instalador/*.log
+            resultados30/instalador/santafe-3.0.0-windows-x64.msi
+          retention-days: 14
+          if-no-files-found: error
