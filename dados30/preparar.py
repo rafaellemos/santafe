@@ -73,7 +73,7 @@ for old,new in [
  ("guid('registration')","guid('stable-registration')"),
  ('Santafé dados — candidato Windows','Santafé 3 — Windows'),
  ('Candidato isolado; não instala serviços.','Núcleo, SLS e gerenciador; instalação por usuário, sem serviços.'),
- ('Santafe-Dados-Candidato','Santafe'),('Santafe Candidato','Santafe'),
+ ('Santafe-Dados-Candidato','Santafe-3'),('Santafe Candidato','Santafe'),
  ('Santafe candidato','Santafe'),('Santafé — candidato','Santafé — instalação'),
  ('Candidato de homologação, sem assinatura Authenticode; não instala serviços.','Sem assinatura Authenticode; confira a origem e o SHA-256 no portal oficial. Não instala serviços.'),
  ('Este candidato aceita instalação por usuário.','Esta distribuição aceita instalação por usuário.'),
@@ -82,7 +82,7 @@ shutil.copyfile(repo/'dados20/testar-instalador.py',dest/'testar-instalador.py')
 for old,new in [
  ('santafe-dados20-windows-x64','santafe-3.0.0-windows-x64'),
  ("'3.0.16'","'2.9.0'"),("'3.0.20'","'3.0.0'"),("'3.0.21'","'3.0.1'"),
- ('Santafe-Dados-Candidato','Santafe'),('/santafé/1.0/','/santafé/3.0/'),
+ ('Santafe-Dados-Candidato','Santafe-3'),('/santafé/1.0/','/santafé/3.0/'),
  ("'candidato':'dados.20'","'distribuicao':'3.0.0', 'baseline':'fixture dados16 reempacotada como2.9.0; não é versão pública'")]:edit('testar-instalador.py',old,new)
 edit('testar-assinatura.ps1','3.0.25.0','3.0.0.0')
 p=dest/'testar-assinatura.ps1';s=p.read_text(encoding='utf-8')
@@ -91,3 +91,6 @@ s=s.replace('-not $v.IsPreRelease','$v.IsPreRelease')
 p.write_text(s,encoding='utf-8')
 for p in dest.rglob('*.py'):compile(p.read_text(encoding='utf-8'),str(p),'exec')
 print('EMBALAGEM3_PREPARADA: código final conferido; canal separado; mesmas proteções; sem assinatura pública')
+
+# O canal padrão conserva o prefixo validado pela guarda, sem relaxá-la.
+edit('usuario-padrao.py','Programs/Santafe-Dados-Candidato','Programs/Santafe-3')
