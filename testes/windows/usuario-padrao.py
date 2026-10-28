@@ -34,7 +34,9 @@ try:
    os.environ.clear();os.environ.update(clean)
   finally:userenv.DestroyEnvironmentBlock(block)
  finally:kernel.CloseHandle(token)
- local=known('F1B32785-6FBA-4FCF-9D55-7B8E7F157091');target=Path(local)/'Programs/Santafe-Dados-Candidato'
+ # O ensaio precisa conferir o destino padrão declarado pelo MSI. Os demais
+ # ciclos usam um INSTALLDIR exclusivo; este reproduz a instalação comum.
+ local=known('F1B32785-6FBA-4FCF-9D55-7B8E7F157091');target=Path(local)/'Programs/Santafe'
  result['perfil_local']=str(target)
  if policy_test:
   call('recusar-por-politica',['/i',str(package)],1625)
