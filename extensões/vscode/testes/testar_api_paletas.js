@@ -34,8 +34,8 @@ const {tipoDosEscopos}=require('../realce-vscode');
      const s='local x = `🟢 '+corpo+'`', começo=s.indexOf(alvo);
      assert.deepEqual(trechosDoHospedeiro(s).filter(t=>t.estilo==='marcador').map(t=>s.slice(t.início,t.fim)),[alvo]);
      for(let p=começo;p<começo+alvo.length;p++)
-       assert(scopes(s,p).includes('variable.parameter.santafe'),nome+' cortado em '+p);
-     assert(!scopes(s,começo+alvo.length).includes('variable.parameter.santafe'));
+      assert(scopes(s,p).includes('variable.other.interpolation.santafe'),nome+' cortado em '+p);
+    assert(!scopes(s,começo+alvo.length).includes('variable.other.interpolation.santafe'));
    }
  }
  const adjacentes='local a=`®açãoⓇíndice—®variável!`';
