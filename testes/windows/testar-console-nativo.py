@@ -64,7 +64,7 @@ def ensaiar(exe, destino):
         return p
     try:
         for cp in (850, 1252, 65001):
-            executar('versao-'+str(cp), cp, ['-v'], trecho='Santafé 3.0.0-rc.1 (homologação dados.23; não publicado)')
+            executar('versao-'+str(cp), cp, ['-v'], trecho='Santafé 3.0.0')
         f = destino.parent/'acentos.fe'
         f.write_text('mostre("ação José cafe\u0301")\n', encoding='utf-8')
         executar('texto-nfc-nfd', 850, [str(f)], trecho='ação José cafe\u0301')
