@@ -20,7 +20,11 @@ function Run-StandardChild([string]$Mode) {
   $child = Start-Process -FilePath $Python -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $scratch -PassThru
   if (-not $child.WaitForExit(360000)) { $child.Kill(); throw 'Standard user test timed out' }
   $child.Refresh()
-  if ($child.ExitCode -ne 0) { throw ('Standard user test failed: ' + $child.ExitCode) }
+  if ($child.ExitCode -ne 0) {
+    $report = Join-Path $scratch $(if ($Mode -eq 'politica-bloqueia') { 'politica-usuario-padrao.json' } else { 'usuario-padrao.json' })
+    if (Test-Path $report) { Write-Host (Get-Content $report -Raw) }
+    throw ('Standard user test failed: ' + $child.ExitCode)
+  }
 }
 
 $out = (Resolve-Path $OutputDir).Path
