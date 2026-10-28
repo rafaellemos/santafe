@@ -8,8 +8,13 @@ def known(s):
  rc=ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(b),0x8000,None,ctypes.byref(p));assert rc==0,('SHGetKnownFolderPath',s,hex(rc & 0xffffffff))
  v=p.value;ctypes.windll.ole32.CoTaskMemFree(p);return v
 def call(name,args,expected=0):
- p=subprocess.run([str(Path(os.environ['SystemRoot'])/'System32/msiexec.exe'),*args,'/qn','/norestart','/l*v',str(out/(name+'.log'))],timeout=180)
- assert p.returncode==expected,(name,p.returncode,expected);result['testes'].append(name)
+ log=out/(name+'.log')
+ p=subprocess.run([str(Path(os.environ['SystemRoot'])/'System32/msiexec.exe'),*args,'/qn','/norestart','/l*v',str(log)],timeout=180)
+ if p.returncode!=expected:
+  lines=log.read_text(encoding='utf-16',errors='replace').splitlines() if log.exists() else []
+  result['diagnostico_msi']=[line for line in lines if 'DADOS20_' in line or 'Return value 3' in line or 'Error ' in line][-20:]
+  raise AssertionError((name,p.returncode,expected))
+ result['testes'].append(name)
 try:
  assert not result['administrador'],'The account must not be an administrator'
  assert hashlib.sha256(package.read_bytes()).hexdigest()==meta['sha256'],'Hash of the MSI differs from the tested package'
