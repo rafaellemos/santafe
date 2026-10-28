@@ -2,6 +2,7 @@
 -- registram domínios internacionalizados pela forma DNS (A-label/Punycode).
 
 local rede = importe "rede"
+local dados = importe "dados_experimentais"
 
 local transporte = { versão = "1.0.0" }
 local CRLF = "\r\n"
@@ -77,9 +78,11 @@ função transporte.prepareRetransmissor(conteúdo, remetente,
     se tipo(conteúdo) ~= "colar" então
         retorne nulo, "conteúdo do transporte deve ser um colar"
     fim
-    se tipo(destinatários) ~= "tabela" ou #destinatários == 0 então
-        retorne nulo, "transporte precisa de ao menos um destinatário"
+    local válida, sequência = proteja(dados.lista, destinatários)
+    se não válida ou #sequência == 0 então
+        retorne nulo, "transporte precisa de ao menos um destinatário em sequência densa"
     fim
+    destinatários = sequência
 
     local separador = CRLF .. CRLF
     local posição = conteúdo:procure(separador, 1, verdadeiro)
@@ -93,7 +96,7 @@ função transporte.prepareRetransmissor(conteúdo, remetente,
 
     local remetenteASCII, falha = transporte.endereçoASCII(remetente)
     se não remetenteASCII então retorne nulo, falha fim
-    local destinatáriosASCII = {}
+    local destinatáriosASCII = []
     para índice, endereço em ipares(destinatários) início
         destinatáriosASCII[índice], falha =
             transporte.endereçoASCII(endereço)

@@ -163,7 +163,7 @@ função acesso.novoLimitador(opções)
         se agora - últimaLimpeza < 60 então retorne fim
         para endereço, estado em pares(origens) início
             se agora - estado.visto > 120 então
-                origens[endereço] = nulo
+                tabela.apague(origens, endereço)
                 quantidade = quantidade - 1
             fim
         fim

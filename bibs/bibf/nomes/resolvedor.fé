@@ -160,7 +160,7 @@ local função nova(opções)
     local função limpeMemrap(agora)
         para chave, item em pares(memrap) início
             se item.expira <= agora então
-                memrap[chave] = nulo
+                tabela.apague(memrap, chave)
                 quantidadeNaMemrap = quantidadeNaMemrap - 1
             fim
         fim
@@ -186,7 +186,7 @@ local função nova(opções)
         fim
         local agora = so.tempo()
         se item.expira <= agora então
-            memrap[chave] = nulo
+            tabela.apague(memrap, chave)
             quantidadeNaMemrap = quantidadeNaMemrap - 1
             este.estatísticasDNS.falhasDaMemrap = este.estatísticasDNS.falhasDaMemrap + 1
             retorne nulo
@@ -212,7 +212,7 @@ local função nova(opções)
     fim
 
     local função retireEspera(estado)
-        se estado.id e pendentes[estado.id] == estado então pendentes[estado.id] = nulo fim
+        se estado.id e pendentes[estado.id] == estado então tabela.apague(pendentes, estado.id) fim
         estado.id = nulo
         se estado.relógio então estado.relógio:cancele(); estado.relógio = nulo fim
     fim
@@ -220,7 +220,7 @@ local função nova(opções)
     local função finalize(estado, resultado, falhaFinal, conserve)
         se estado.finalizado então retorne fim
         estado.finalizado = verdadeiro
-        estadosAtivos[estado] = nulo
+        tabela.apague(estadosAtivos, estado)
         retireEspera(estado)
         se estado.conectorTCP então estado.conectorTCP:feche(); estado.conectorTCP = nulo fim
         se estado.conexãoTCP então estado.conexãoTCP:feche(); estado.conexãoTCP = nulo fim
@@ -296,7 +296,7 @@ local função nova(opções)
         estado.relógio = rede.agende(este.tempoLimite,
             função(_, dado)
                 se dado.finalizado ou dado.id ~= id ou pendentes[id] ~= dado então retorne fim
-                pendentes[id] = nulo
+                tabela.apague(pendentes, id)
                 dado.id = nulo
                 dado.relógio = nulo
                 este.estatísticasDNS.tempoEsgotado =
@@ -793,7 +793,7 @@ local função nova(opções)
         se estado.fechada então retorne fim
         estado.fechada = verdadeiro
         estado.conexão:feche()
-        conexõesTCP[estado] = nulo
+        tabela.apague(conexõesTCP, estado)
         este.estatísticasDNS.tcpAtivas = mat.máximo(
             0, este.estatísticasDNS.tcpAtivas - 1
         )

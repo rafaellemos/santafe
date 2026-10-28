@@ -65,6 +65,7 @@
 ** standard implementation for 'gettable'
 */
 #define luaV_gettable(L,t,k,v) { const TValue *slot; \
+  luaH_checklist(L,t,k,0); \
   if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
   else luaV_finishget(L,t,k,v,slot); }
 
@@ -83,11 +84,14 @@
    : (slot = f(hvalue(t), k), \
      ttisnil(slot) ? 0 \
      : (luaC_barrierback(L, hvalue(t), v), \
+        sf_invalidate(hvalue(t),slot), \
         setobj2t(L, cast(TValue *,slot), v), \
+        sf_storenull(cast(TValue *,slot)), \
         1)))
 
 
 #define luaV_settable(L,t,k,v) { const TValue *slot; \
+  luaH_checklist(L,t,k,1); \
   if (!luaV_fastset(L,t,k,slot,luaH_get,v)) \
     luaV_finishset(L,t,k,v,slot); }
 

@@ -56,3 +56,9 @@ testes/**/*.svg
 *.key
 *_rsa
 *_ed25519
+
+# Resultados locais das baterias; fixture Windows pública verificada por SHA-256.
+evidencias/
+relatorios/
+resultados30/
+!testes/windows/baseline-dados16.zip

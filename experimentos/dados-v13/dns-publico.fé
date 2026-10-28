@@ -1,0 +1,25 @@
+módulo.caminho="bibs/bibf/?.fé;bibs/bibf/?/?.fé"
+módulo.caminhoC="bibs/bibc/?/?.so"
+local rede=importe "rede"
+local SPF=importe "correio.spf"
+local A=importe "correio.autenticação"
+local domínio="xn--santaf-gva.dev.br"
+local verificações=0
+SPF.verifiqueAssíncrono({endereço="143.208.252.1",remetente="homologacao@"..domínio,
+    nomeDoCliente=domínio,tempoLimite=10000},função(r)
+    garanta(r.resultado=="passa","SPF público do IP autorizado não passou")
+    verificações=verificações+1;rede.pareLaço()
+fim)
+rede.laço()
+local a=garanta(A.nova{nomeDoServidor="ensaio.test",domíniosLocais={domínio},tempoLimite=10000})
+garanta(a:avalieAssíncrono({remetente="homologacao@"..domínio,
+    endereçoRemoto="203.0.113.77",nomeDoCliente="fora.invalid",
+    conteúdo="From: Homologação <homologacao@"..domínio..">\r\nTo: teste@ensaio.test\r\nSubject: Somente teste local\r\n\r\nTexto sintético.\r\n"},
+    função(r,f)
+        garanta(não r e f e f.tipo=="autenticação-rejeitada","identidade falsa aceita")
+        garanta(f.autenticação.spf.resultado=="falha","SPF da origem reservada não falhou")
+        garanta(f.autenticação.dmarc.ação=="rejeitar")
+        verificações=verificações+1;rede.pareLaço()
+    fim))
+rede.laço();garanta(verificações==2)
+mostre("DNS_PUBLICO_CANDIDATO_OK")

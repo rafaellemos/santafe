@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='santafe-instalador-') as folder:
     prefix = tools / 'prefixo com espaços'
     for relative in ['bin/santafé', 'bin/santafec', 'bin/santafé-sls',
                      'include/lua.h', 'include/lauxlib.h', 'lib/liblua.a',
-                     'share/santafé/1.0/ferramentas/sls.fé', 'bin/arquivo-do-usuario']:
+                     'share/santafé/3.0/ferramentas/sls.fé', 'bin/arquivo-do-usuario']:
         target = prefix / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text('apenas teste')

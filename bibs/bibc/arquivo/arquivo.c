@@ -7,6 +7,9 @@
  */
 
 #define _POSIX_C_SOURCE 200809L
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE 1
+#endif
 
 #include <gio/gio.h>
 #include <glib.h>
@@ -432,7 +435,11 @@ static int l_arq_existe(lua_State *L) {
     return arq_agende(L, tarefa);
 }
 
+#include "atomico-lua.h"
+
 static const luaL_Reg arquivo_funções[] = {
+    {"graveAtômico", l_at_grave},
+    {"graveAtômicoAssíncrono", l_at_grave_async},
     {"leiaAss\xC3\xADncrono", l_arq_leia},
     {"graveDur\xC3\xA1velAss\xC3\xADncrono", l_arq_grave_durável},
     {"graveDur\xC3\xA1velComPermiss\xC3\xB5" "esAss\xC3\xADncrono",
@@ -450,3 +457,7 @@ int luaopen_arquivo(lua_State *L) {
     luaL_newlib(L, arquivo_funções);
     return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3)
+SANTAFE_MODULE_ABI;
+#endif

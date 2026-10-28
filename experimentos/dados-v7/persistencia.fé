@@ -1,0 +1,19 @@
+-- A codificação termina antes de tocar o destino. Falhas de dados lançam erro;
+-- falhas de E/S retornam nulo, mensagem, estado. Não há repetição automática.
+local função persistência()
+    local ok,biblioteca=proteja(importe,"arquivo")
+    garanta(ok e tipo(biblioteca.graveAtômico)=="função",
+        "persistência ONFÉ exige arquivo nativo compatível; indisponível neste executor")
+    retorne biblioteca
+fim
+
+função O.grave(caminho,dado)
+    local texto=O.cod(dado)
+    retorne persistência().graveAtômico(caminho,texto)
+fim
+
+função O.graveAssíncrono(caminho,dado,tratador,contexto)
+    garanta(tipo(tratador)=="função","tratador ONFÉ deve ser função")
+    local texto=O.cod(dado)
+    retorne persistência().graveAtômicoAssíncrono(caminho,texto,tratador,contexto)
+fim

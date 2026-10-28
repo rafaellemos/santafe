@@ -1,0 +1,31 @@
+-- Adaptador privado do laboratório para fronteiras conhecidas como sequências.
+-- Nunca inferir automaticamente que uma tabela arbitrária é uma matriz JSON.
+local dados = {}
+função dados.lista(valor)
+    se tipo(valor) == "lista" então retorne valor fim
+    garanta(tipo(valor) == "tabela", "sequência exige lista ou tabela densa")
+    local n, total = #valor, 0
+    para chave em pares(valor) início
+        garanta(tipo(chave) == "número" e chave % 1 == 0 e chave >= 1 e chave <= n,
+            "sequência não admite chaves extras ou buracos")
+        total = total + 1
+    fim
+    garanta(total == n, "sequência não admite buracos")
+    local saída = []
+    para i = 1,n início saída[i] = valor[i] fim
+    retorne saída
+fim
+função dados.codifiqueLista(valor)
+    retorne json.cod(dados.lista(valor))
+fim
+função dados.codifiqueDestinatários(valor)
+    garanta(tipo(valor) == "tabela", "destinatários visíveis devem ser um registro")
+    local registro = {}
+    para campo, endereços em pares(valor) início
+        garanta(campo == "para" ou campo == "cópia" ou campo == "cópiaOculta",
+            "campo de destinatários desconhecido")
+        registro[campo] = dados.lista(endereços)
+    fim
+    retorne json.cod(registro)
+fim
+retorne dados

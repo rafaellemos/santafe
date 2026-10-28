@@ -1,0 +1,82 @@
+[
+  {
+    "arquivo": "src/lua.h",
+    "antes": "\"dados.4\"",
+    "depois": "\"dados.5\""
+  },
+  {
+    "arquivo": "ferramentas/sls/sls.fé",
+    "antes": "1.0.0-dados.4",
+    "depois": "1.0.0-dados.5"
+  },
+  {
+    "arquivo": "ferramentas/sls/sls.fé",
+    "antes": "diretórioSLS..\"/../../experimentos/dados-v1/onfé.fé\"",
+    "depois": "diretórioSLS..\"/onfé.fé\""
+  },
+  {
+    "arquivo": "ferramentas/instalar-arquivos.sh",
+    "antes": "ferramentas/sls/api-publica.json \"$prefix/share",
+    "depois": "ferramentas/sls/api-publica.json ferramentas/sls/estrutura.fé ferramentas/sls/onfé.fé \"$prefix/share"
+  },
+  {
+    "arquivo": "ferramentas/desinstalar-arquivos.sh",
+    "antes": "transporte.fé api-publica.json nativo.so;",
+    "depois": "transporte.fé api-publica.json estrutura.fé onfé.fé nativo.so;"
+  },
+  {
+    "arquivo": "bibs/bibf/correio/transporte.fé",
+    "antes": "local rede = importe \"rede\"",
+    "depois": "local rede = importe \"rede\"\nlocal dados = importe \"dados_experimentais\""
+  },
+  {
+    "arquivo": "bibs/bibf/correio/transporte.fé",
+    "antes": "    se tipo(destinatários) ~= \"tabela\" ou #destinatários == 0 então\n        retorne nulo, \"transporte precisa de ao menos um destinatário\"\n    fim",
+    "depois": "    local válida, sequência = proteja(dados.lista, destinatários)\n    se não válida ou #sequência == 0 então\n        retorne nulo, \"transporte precisa de ao menos um destinatário em sequência densa\"\n    fim\n    destinatários = sequência"
+  },
+  {
+    "arquivo": "bibs/bibf/correio/transporte.fé",
+    "antes": "local destinatáriosASCII = {}",
+    "depois": "local destinatáriosASCII = []"
+  },
+  {
+    "arquivo": "bibs/bibf/correio/entrega.fé",
+    "antes": "tipo(intervalos) ~= \"tabela\" ou",
+    "depois": "(tipo(intervalos) ~= \"tabela\" e tipo(intervalos) ~= \"lista\") ou"
+  },
+  {
+    "arquivo": "aplicativos/carteiro/fonte/carteiro/páginas.fé",
+    "antes": "se tipo(lista) == \"tabela\" então",
+    "depois": "se tipo(lista) == \"tabela\" ou tipo(lista) == \"lista\" então"
+  },
+  {
+    "arquivo": "aplicativos/carteiro/fonte/carteiro/páginas.fé",
+    "antes": "tipo(participantes) ~= \"tabela\" ou",
+    "depois": "(tipo(participantes) ~= \"tabela\" e tipo(participantes) ~= \"lista\") ou"
+  },
+  {
+    "arquivo": "aplicativos/carteiro/fonte/carteiro/páginas.fé",
+    "antes": "se tipo(mensagens) ~= \"tabela\" ou mensagens.id então",
+    "depois": "se tipo(mensagens) ~= \"lista\" e (tipo(mensagens) ~= \"tabela\" ou mensagens.id) então"
+  },
+  {
+    "arquivo": "bibs/bibf/carteiro.fé",
+    "antes": "tipo(identificações) ~= \"tabela\" ou",
+    "depois": "(tipo(identificações) ~= \"tabela\" e tipo(identificações) ~= \"lista\") ou"
+  },
+  {
+    "arquivo": "experimentos/dados-v3/testar-wasm.js",
+    "antes": "WebAssembly dados.4:",
+    "depois": "WebAssembly dados.5:"
+  },
+  {
+    "arquivo": "instalar.sh",
+    "antes": "#!/usr/bin/env bash\n",
+    "depois": "#!/usr/bin/env bash\n# Candidato fechado para instalação operacional.\necho \"Candidato dados.5: use experimentos/dados-v3/construir.sh e os testes isolados; instalação pública indisponível.\" >&2\nexit 2\n"
+  },
+  {
+    "arquivo": "Makefile",
+    "antes": "fluxo estável",
+    "depois": "$(error Candidato dados.5: use sh experimentos/dados-v3/construir.sh; instalacao publica indisponivel)\n"
+  }
+]

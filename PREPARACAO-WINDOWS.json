@@ -1,0 +1,12 @@
+{
+  "fonte_sha256": "9705b3a4599f4a884cd2ac2118f436a00ed106abe752740c346574abf8b5ed54",
+  "arquivos_conferidos": 869,
+  "alterado": "src/Makefile",
+  "antes": "2a16117ee957063dff6c31249e7bafdca8c826ac9bdeea282f35e2ef9ed23d50",
+  "depois": "dc0f538187924cafae7d341aed465566756e6c99409358985b90cf2dd39a0898",
+  "adicionados": {
+    "src/santafe.rc": "925d0ff8b6afd714bcbc8f6fce1421e89d235b0687d54276a67d33a753ec3388",
+    "src/santafe.manifest": "260c4d2928a8e46703ca0af0114277f162162f5388188925b554971354b5cb4b"
+  },
+  "producao_alterada": false
+}

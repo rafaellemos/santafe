@@ -354,6 +354,24 @@ static int gctm (lua_State *L) {
 
 
 
+#ifdef SANTAFE_DADOS_V3
+static int checkmoduleabi(lua_State *L, void *lib) {
+  static const uint32_t expected[10] = SANTAFE_ABI_DESCRIPTOR;
+  const uint32_t *descriptor = NULL;
+#if defined(LUA_USE_DLOPEN)
+  descriptor = (const uint32_t *)dlsym(lib, "santafe_module_abi");
+#elif defined(LUA_DL_DLL)
+  descriptor = (const uint32_t *)GetProcAddress((HMODULE)lib, "santafe_module_abi");
+#endif
+  if (descriptor == NULL || descriptor[0] != expected[0] ||
+      descriptor[1] != expected[1] || memcmp(descriptor, expected, sizeof(expected))) {
+    lua_pushliteral(L, "IBA incompativel: modulo exige recompilacao e descritor santafe-3");
+    return 0;
+  }
+  return 1;
+}
+#endif
+
 /* error codes for 'lookforfunc' */
 #define ERRLIB		1
 #define ERRFUNC		2
@@ -374,6 +392,9 @@ static int lookforfunc (lua_State *L, const char *path, const char *sym) {
   if (reg == NULL) {  /* must load library? */
     reg = lsys_load(L, path, *sym == '*');  /* global symbols if 'sym'=='*' */
     if (reg == NULL) return ERRLIB;  /* unable to load library */
+#ifdef SANTAFE_DADOS_V3
+    if (!checkmoduleabi(L, reg)) { lsys_unloadlib(reg); return ERRLIB; }
+#endif
     addtoclib(L, path, reg);
   }
   if (*sym == '*') {  /* loading only library (no function)? */

@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix='santafe-sls-memoria-') as temporary:
     command=shlex.split(os.environ.get('CC','cc'))+['-std=c99','-Wall','-Wextra','-Werror','-I'+str(source)]
     command+=shlex.split(os.environ.get('CFLAGS',''))
     command+=[str(ROOT/'testes/integracao/sls/lexemas_memoria.c'),str(ROOT/'ferramentas/sls/nativo.c'),str(source/'liblua.a'),'-lm']
-    if sys.platform.startswith('linux'): command+=['-ldl']
+    if sys.platform.startswith('linux'): command+=['-ldl','-lcrypto']
     command+=shlex.split(os.environ.get('LDFLAGS',''))+['-o',str(binary)]
     subprocess.run(command,check=True,timeout=60)
     subprocess.run([str(binary),str(data)],check=True,timeout=60)

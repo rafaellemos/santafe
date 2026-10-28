@@ -1386,7 +1386,7 @@ local FPDF = {
                         caracteres = restantes
                     senão
                         local último = caracteres[#caracteres]
-                        caracteres[#caracteres] = nulo
+                        tabela.remova(caracteres)
                         emita(junte(1, #caracteres))
                         caracteres = { último }
                     fim
@@ -2072,8 +2072,8 @@ local FPDF = {
     _poeimagens = função(este)
         para k, img em pares(este.m_imagens) início
             este:_poeimagem(img)
-            img.dados = nulo -- liberando a memória
-            img.máscaraSuave = nulo -- idem
+            tabela.apague(img, "dados") -- liberando a memória
+            tabela.apague(img, "máscaraSuave") -- idem
         fim
     fim,
 
@@ -2123,7 +2123,7 @@ local FPDF = {
             máscara.ticosPorComponente = 8
             máscara.parâmetrosDeDecodificação = parâmetros
             máscara.dados = info.máscaraSuave
-            máscara.máscaraSuave = nulo
+            tabela.apague(máscara, "máscaraSuave")
             este:_poeimagem(máscara)
         fim
         -- Palette
@@ -2232,7 +2232,7 @@ local FPDF = {
             retorne (texto ou ""):troque("&", "&amp;"):troque("<", "&lt;"):troque(">", "&gt;"):troque('"', "&quot;"):troque("'", "&apos;")
         fim
         local criado = so.data("%Y-%m-%dT%H:%M:%S%z")
-        local xmp = colar.formate([[<?xpacket begin="%s" id="W5M0MpCehiHzreSzNTczkc9d"?>
+        local xmp = colar.formate([=[<?xpacket begin="%s" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about="" xmlns:pdf="http://ns.adobe.com/pdf/1.3/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" pdf:Producer="%s" xmp:CreateDate="%s" xmp:ModifyDate="%s">
@@ -2243,7 +2243,7 @@ local FPDF = {
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>
-<?xpacket end="w"?>]], utf8.caractere(0xFEFF), xml("RPDF " .. FPDF_VERSION), criado, criado, xml(este.m_titulo), xml(este.m_autor), xml(este.m_assunto))
+<?xpacket end="w"?>]=], utf8.caractere(0xFEFF), xml("RPDF " .. FPDF_VERSION), criado, criado, xml(este.m_titulo), xml(este.m_autor), xml(este.m_assunto))
         este:_novoobj()
         este.m_objetoMetadados = este.m_n
         este:_saidaformatada("<<\n/Type /Metadata\n/Subtype /XML\n/Length %d\n>>\n", #xmp)

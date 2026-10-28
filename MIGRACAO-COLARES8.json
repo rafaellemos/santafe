@@ -1,0 +1,90 @@
+[
+  {
+    "arquivo": "bibs/bibc/mariadb/servidor_db.fé",
+    "colares": 4
+  },
+  {
+    "arquivo": "bibs/bibc/rede/servidor.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "bibs/bibf/correio/mariadb.fé",
+    "colares": 93
+  },
+  {
+    "arquivo": "bibs/bibf/rpdf.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/cli.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "aplicativos/carteiro/fonte/carteiro/configurador.fé",
+    "colares": 14
+  },
+  {
+    "arquivo": "aplicativos/carteiro/fonte/carteiro/páginas.fé",
+    "colares": 44
+  },
+  {
+    "arquivo": "aplicativos/correio/migrar-depósito.fé",
+    "colares": 7
+  },
+  {
+    "arquivo": "testes/bibc/teste_carteiro_conversas_mariadb.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "testes/bibc/teste_correio_agência_mariadb.fé",
+    "colares": 2
+  },
+  {
+    "arquivo": "testes/bibc/teste_correio_autenticação_mariadb.fé",
+    "colares": 2
+  },
+  {
+    "arquivo": "testes/bibc/teste_correio_imap_append_mariadb.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "testes/bibc/teste_correio_imap_mariadb.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "testes/bibf/teste_gabarito_unicode.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "testes/bibf/teste_imagem.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "testes/bibf/teste_rpdf_imagens.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "testes/bibf/teste_sls_analisador.fé",
+    "colares": 3
+  },
+  {
+    "arquivo": "experimentos/dados-v1/exemplo.fé",
+    "colares": 1
+  },
+  {
+    "arquivo": "experimentos/dados-v1/exemplo.onfé",
+    "colares": 1
+  },
+  {
+    "arquivo": "experimentos/dados-v1/testar.fé",
+    "colares": 2
+  },
+  {
+    "arquivo": "experimentos/dados-v2/visual.fé",
+    "colares": 6
+  },
+  {
+    "arquivo": "experimentos/dados-v4/testar-colares.fé",
+    "colares": 1
+  }
+]

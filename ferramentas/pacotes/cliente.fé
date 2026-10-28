@@ -1,3 +1,5 @@
+local Windows = módulo.configuração:corte(1,1)=="\\"
+local função absoluto(p) retorne tipo(p)=="colar" e (Windows e p:separe("^[A-Za-z]:[/\\]")~=nulo ou não Windows e p:corte(1,1)=="/") fim
 local R=importe "pacotes.resolvedor"
 retorne função(N,F)
     local C={}
@@ -45,7 +47,7 @@ retorne função(N,F)
     fim
     local função origem(opções)
         se opções.repositórioLocal então
-            exija(opções.repositórioLocal:corte(1,1)=="/","repositório local deve ter caminho absoluto")
+            exija(absoluto(opções.repositórioLocal),"repositório local deve ter caminho absoluto")
             retorne "local:"..opções.repositórioLocal,não opções.semRede e garanta(N.raiz(opções.repositórioLocal)) ou nulo
         fim
         local url=opções.repositório ou "https://xn--santaf-gva.dev.br/est%C3%A1tico/bibliotecas/v1"
@@ -61,12 +63,12 @@ retorne função(N,F)
     fim
     local função baixe(raiz,origemURL,localRoot,caminho,limite,ca)
         se localRoot então retorne garanta(localRoot:leia(caminho,limite)) fim
-        local argumentos={"/usr/bin/curl","--disable","--silent","--show-error","--fail",
+        local argumentos={Windows e garanta(N.ferramenta("curl")) ou "/usr/bin/curl","--disable","--silent","--show-error","--fail",
             "--proto","=https","--proto-redir","=https","--location","--max-redirs","3",
             "--connect-timeout","10","--max-time","60","--max-filesize",paraColar(limite),
             "--url",origemURL.."/"..caminho}
         se ca então
-            exija(tipo(ca)=="colar" e ca:corte(1,1)=="/" e não ca:procure("%z"),"autoridade certificadora deve ser arquivo absoluto")
+            exija(tipo(ca)=="colar" e absoluto(ca) e não ca:procure("%z"),"autoridade certificadora deve ser arquivo absoluto")
             argumentos[#argumentos+1]="--cacert"; argumentos[#argumentos+1]=ca
         fim
         local código,conteúdo=raiz:execute(argumentos,65,limite)
@@ -168,15 +170,22 @@ retorne função(N,F)
                     local chave=N.chaveCaminho(módulo)
                     exija(não colisões[chave],"módulo fornecido por dois pacotes: "..módulo)
                     colisões[chave]=verdadeiro
-                    exija(opções.cabeçalhos e opções.cabeçalhos:corte(1,1)=="/","diretório de cabeçalhos Santafé ausente")
-                    local saída="nativo-"..módulo..".so"
-                    local argumentos={"/usr/bin/cc","-O2","-fPIC","-I"..opções.cabeçalhos,"-I.","-o",saída}
+                    exija(opções.cabeçalhos e absoluto(opções.cabeçalhos),"diretório de cabeçalhos Santafé ausente")
+                    local saída="nativo-"..módulo..(Windows e ".dll" ou ".so")
+                    local subraiz=garanta(raiz:subraiz(destino))
+                    local saídaCompilador=Windows e garanta(subraiz:caminhoNativo(saída)) ou saída
+                    local argumentos={Windows e garanta(N.ferramenta("cc")) ou "/usr/bin/cc","-O2","-fPIC","-I"..opções.cabeçalhos,"-I.","-o",saídaCompilador}
+                    se plataforma.abiDados então argumentos[#argumentos+1]="-DSANTAFE_DADOS_V3" fim
                     se plataforma.sistema=="Darwin" então
                         argumentos[#argumentos+1]="-bundle"; argumentos[#argumentos+1]="-undefined"; argumentos[#argumentos+1]="dynamic_lookup"
                     senão argumentos[#argumentos+1]="-shared" fim
+                    se Windows então
+                        exija(absoluto(opções.importação),"biblioteca de importação Santafé ausente")
+                        argumentos[#argumentos+1]="-Wl,--export-all-symbols"
+                    fim
                     para _,f em ipares(receita.fontes) início argumentos[#argumentos+1]="./"..f fim
                     para _,b em ipares(receita.bibliotecas ou {}) início argumentos[#argumentos+1]="-l"..b fim
-                    local subraiz=garanta(raiz:subraiz(destino))
+                    se Windows então argumentos[#argumentos+1]=opções.importação fim
                     local código,diagnóstico=subraiz:execute(argumentos,120); subraiz:feche()
                     exija(código==0,"compilação falhou: "..nome.."\n"..(diagnóstico ou ""))
                     local binário=garanta(raiz:leia(destino.."/"..saída,16*1024*1024))
@@ -195,9 +204,9 @@ retorne função(N,F)
             local anterior=anteriorBruto e F.json(anteriorBruto) ou {}
             local estado={formato=1,geracao=geração,anterior=anterior.geracao,
                 manifesto=N.sha256(manifestoBruto),lock=N.sha256(lockBruto),modulos=N.sha256(mapaBruto)}
-            local transação={formato=1,geracao=geração,arquivos={
+            local transação={formato=1,geracao=geração,arquivos=[
                 {caminho="santafe.json",antes=antesManifesto e N.base64(antesManifesto),depois=N.base64(manifestoBruto)},
-                {caminho="santafe.lock",antes=antesLock e N.base64(antesLock),depois=N.base64(lockBruto)}}}
+                {caminho="santafe.lock",antes=antesLock e N.base64(antesLock),depois=N.base64(lockBruto)}]}
             grave(raiz,".santafe/transacao.json",F.canônico(transação),falso)
             fase(opções,"transacao")
             grave(raiz,"santafe.json",manifestoBruto,verdadeiro); fase(opções,"manifesto")

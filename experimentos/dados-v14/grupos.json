@@ -1,0 +1,23 @@
+[
+  "réplica reutilizada sem duplicação de bancos e depósitos",
+  "SLS, CLI e SDK da geração candidata instalados no chroot",
+  "portal corrigido instalado e compilado somente na réplica",
+  "proteções conjuntas: DNS de ensaio, ClamAV real, retransmissor TLS AUTH e ACME local ativos",
+  "candidata: nginx capturado, TLS de teste e proxy dos dois domínios",
+  "candidata: zonas DNS reais em UDP/TCP e chaves DNSSEC preservadas",
+  "candidata: leitura dos aplicativos e conteúdo integral",
+  "recepção conjunta: SPF/DMARC, antivírus, fisgada e indisponibilidade recusam ou classificam sem perda",
+  "upload na réplica real: truncamento/CSRF recusados; imagem válida persistida com proteções ativas",
+  "candidata: SMTP TLS, filas, compositor, login e IMAP nos dois bancos",
+  "filas isoladas: SMTP AUTH/TLS, assinatura DKIM, autenticação no destino e leitura IMAP nos dois domínios",
+  "renovação ACME durante carga: nginx serve novo certificado sem encerrar leitores",
+  "carga prolongada da réplica",
+  "candidata: nginx capturado, TLS de teste e proxy dos dois domínios",
+  "candidata: zonas DNS reais em UDP/TCP e chaves DNSSEC preservadas",
+  "candidata: SMTP TLS, filas, compositor, login e IMAP nos dois bancos",
+  "candidata: leitura dos aplicativos e conteúdo integral",
+  "estavel: nginx capturado, TLS de teste e proxy dos dois domínios",
+  "estavel: zonas DNS reais em UDP/TCP e chaves DNSSEC preservadas",
+  "estavel: leitura dos aplicativos e conteúdo integral",
+  "reversão conjunta preserva mensagens, anexos e imagem nova após renovação/carga"
+]

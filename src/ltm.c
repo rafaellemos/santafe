@@ -60,7 +60,7 @@ void luaT_init (lua_State *L) {
 const TValue *luaT_gettm (Table *events, TMS event, TString *ename) {
   const TValue *tm = luaH_getshortstr(events, ename);
   lua_assert(event <= TM_EQ);
-  if (ttisnil(tm)) {  /* no tag method? */
+  if (ttisnull(tm)) {  /* no tag method? */
     events->flags |= cast_byte(1u<<event);  /* cache this fact */
     return NULL;
   }
@@ -80,7 +80,11 @@ const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
     default:
       mt = G(L)->mt[ttnov(o)];
   }
-  return (mt ? luaH_getshortstr(mt, G(L)->tmname[event]) : luaO_nilobject);
+  if (mt) {
+    const TValue *v = luaH_getshortstr(mt, G(L)->tmname[event]);
+    if (!ttisnull(v)) return v;
+  }
+  return luaO_nilobject;
 }
 
 

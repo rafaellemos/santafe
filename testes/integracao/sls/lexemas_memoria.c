@@ -64,7 +64,7 @@ int main(int argc,char **argv) {
             char data[512]; size_t n=(size_t)(i%512);
             for (j=0;j<(int)n;j++) { state=1664525*state+1013904223; data[j]=(char)(state>>24); }
             lexical(L,data,n); assert(lua_pcall(L,1,LUA_MULTRET,0)==LUA_OK);
-            assert(lua_istable(L,1));
+            assert(lua_islist(L,1));
             for (j=1;j<=(int)lua_rawlen(L,1);j++) {
                 lua_Integer start,end;
                 lua_rawgeti(L,1,j); lua_getfield(L,-1,"início"); start=lua_tointeger(L,-1); lua_pop(L,1);

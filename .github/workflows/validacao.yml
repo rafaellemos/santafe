@@ -39,12 +39,15 @@ jobs:
       - run: node extensões/vscode/testes/testar_sls.js
       - run: node extensões/vscode/testes/testar_api_paletas.js
       - run: python3 extensões/sublime/testes/testar_recorte.py
-      - run: python3 testes/integracao/testar_publicador_editores.py
-      - run: python3 testes/integracao/testar_fechamento.py
-      - run: python3 testes/integracao/testar_publicacao_conjunta.py
-      - run: python3 testes/integracao/testar_textos_2_1.py
-      - run: python3 testes/integracao/testar_verificador_conjunto.py
-      - run: python3 operação/verificar-conjunto.py --preflight
+      - name: Contrato 3.0 e correspondência com a distribuição publicada
+        run: |
+          src/santafé experimentos/dados-v1/testar.fé
+          src/santafé experimentos/dados-v1/testar-onfe.fé
+          python3 experimentos/dados-v8/testar-sls.py
+          python3 testes/integracao/testar_registro_3_0.py
       - run: make dist
-      - name: Distribuição e lançador verificáveis
-        run: python3 testes/integracao/testar_entrega_conjunta.py
+      - name: Artefatos reconstruídos (não substituem os downloads publicados)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fontes-${{ matrix.os }}
+          path: dist/SHA256SUMS

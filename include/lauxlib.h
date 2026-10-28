@@ -34,7 +34,13 @@ typedef struct luaL_Reg {
 } luaL_Reg;
 
 
-#define LUAL_NUMSIZES	(sizeof(lua_Integer)*16 + sizeof(lua_Number))
+/* IBA3: também recusa módulos ligados diretamente que chamam checkversion.
+** O carregador dinâmico exige o descritor de TODOS os módulos. */
+#ifdef SANTAFE_DADOS_V3
+#define LUAL_NUMSIZES (0x300000 + sizeof(lua_Integer)*16 + sizeof(lua_Number))
+#else
+#define LUAL_NUMSIZES (sizeof(lua_Integer)*16 + sizeof(lua_Number))
+#endif
 
 LUALIB_API void (luaL_checkversion_) (lua_State *L, lua_Number ver, size_t sz);
 #define luaL_checkversion(L)  \

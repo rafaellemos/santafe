@@ -1,0 +1,31 @@
+    função F.canônico(dados)
+        local passos=0
+        local ativos={}
+        local função codifique(v,profundidade)
+            passos=passos+1; exija(passos<=1000000 e profundidade<=64,"JSON complexo demais")
+            local espécie=tipo(v)
+            se espécie~="tabela" e espécie~="lista" então retorne garanta(json.cod(v)) fim
+            exija(obterMetatabela(v)==nulo,"JSON canônico não aceita metatabela")
+            exija(não ativos[v],"JSON canônico não aceita ciclos")
+            ativos[v]=verdadeiro
+            local partes={}
+            local resultado
+            se espécie=="lista" então
+                lista(v,1000000,"JSON")
+                para i=1,#v início partes[#partes+1]=codifique(v[i],profundidade+1) fim
+                resultado="["..tabela.concatene(partes,",").."]"
+            senão
+                local chaves={}
+                para k em pares(v) início
+                    exija(tipo(k)=="colar","chave JSON inválida")
+                    chaves[#chaves+1]=k
+                fim
+                tabela.ordene(chaves)
+                para _,k em ipares(chaves) início partes[#partes+1]=json.cod(k)..":"..codifique(v[k],profundidade+1) fim
+                resultado="{"..tabela.concatene(partes,",").."}"
+            fim
+            tabela.apague(ativos,v)
+            retorne resultado
+        fim
+        retorne codifique(dados,0)
+    fim

@@ -70,17 +70,23 @@ const {tipoDosEscopos}=require('../realce-vscode');
    onDidChangeVisibleTextEditors:event('visible'),onDidChangeActiveColorTheme:event('theme')},
   workspace:{getConfiguration:()=>config,onDidChangeConfiguration:event('config'),onDidChangeTextDocument:event('edit'),onDidCloseTextDocument:event('close')}};
  const a=registre(v,{subscriptions},tipoDosEscopos);
+ const estilo=d=>(d[v.window.activeColorTheme.kind===1?'light':'dark']||{}).fontStyle??d.fontStyle;
  const at=source.indexOf('<b>');
  a.atualize(doc,source,[{início:at+1,fim:at+2,scopes:['entity.name.tag.html']}]);
  assert([...decorated].some(([d,r])=>d.color===paletas.escura.Tag && r.length));
- assert([...decorated].some(([d,r])=>d.color==='#FD971F' && d.fontStyle==='normal' && r.length===2));
- assert([...decorated].some(([d,r])=>d.color==='#66D9EF' && d.fontStyle==='italic' && r.length));
+ assert([...decorated].some(([d,r])=>d.color==='#FD971F' && estilo(d)==='normal' && r.length===2));
+ assert([...decorated].some(([d,r])=>d.color==='#66D9EF' && estilo(d)==='italic' && r.length));
+ // Regressão observada no renderer 1.142: estilo no modelo escondia também
+ // a cor. O estilo continua explícito, mas aplicado pelo CSS de cada tema.
+ assert([...decorated.keys()].every(d=>d.fontStyle===undefined));
  mode='tema'; listeners.config({affectsConfiguration:()=>true});
  assert(![...decorated].some(([d,r])=>d.color===paletas.escura.Tag && r.length));
  mode='suave';v.window.activeColorTheme.kind=1;listeners.theme();
  assert([...decorated].some(([d,r])=>d.color===paletas.clara.Tag && r.length));
+ assert([...decorated].some(([d,r])=>d.color==='#995500' && estilo(d)==='normal' && r.length===2));
+ assert([...decorated].some(([d,r])=>d.color==='#66D9EF' && estilo(d)==='italic' && r.length));
  theme='Dark+';listeners.config({affectsConfiguration:()=>true});
- assert(![...decorated].some(([d,r])=>d.fontStyle==='italic' && r.length));
+ assert(![...decorated].some(([d,r])=>estilo(d)==='italic' && r.length));
  doc.version++;listeners.visible();assert([...decorated.values()].every(r=>r.length===0));
  a.atualize(doc,source,[]);doc.languageId='plaintext';listeners.close(doc);
  assert([...decorated.values()].every(r=>r.length===0));

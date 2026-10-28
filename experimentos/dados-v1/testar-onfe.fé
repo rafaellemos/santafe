@@ -1,0 +1,34 @@
+local O=executeArquivo("experimentos/dados-v1/onfé.fé")
+local n=0
+local função confira(c,m) garanta(c,m); n=n+1 fim
+local função recuse(s)
+    local ok=proteja(O.decod,s); confira(não ok,"ONFÉ deveria recusar: "..s)
+fim
+local dado=O.decod('{nome="José", vazio=[], registro={}, telefone=nulo, [1]="número", ["1"]="texto", dados=[1,nulo,3,],}')
+confira(dado.nome=="José" e dado[1]=="número" e dado["1"]=="texto","chaves distintas")
+confira(tipo(dado.vazio)=="lista" e tipo(dado.registro)=="tabela","vazios distintos")
+confira(tabela.temChave(dado,"telefone") e dado.telefone==nulo,"nulo armazenado")
+local volta=O.decod(O.cod(dado))
+confira(#volta.dados==3 e volta[1]==dado[1] e volta["1"]==dado["1"],"ida e volta")
+confira(tabela.temChave(volta,"telefone"),"presença ida e volta")
+confira(O.decod("-- comentário\n--[[multilinha]] [1,2]")[2]==2,"comentários")
+confira(O.decod('[=[®literal \\n]=]')=="®literal \\n","bruto não avaliado")
+confira(O.decod(O.cod(9223372036854775807))==9223372036854775807,"inteiro 64 bits")
+confira(O.decod(O.cod("a\0b\r\n\"'"))=="a\0b\r\n\"'","escapes")
+confira(O.cod(O.decod("nulo"))=="nulo","raiz nula")
+confira(O.paraJSON(O.deJSON('{"a":null,"b":[]}')):procure('"a":null',1,verdadeiro),"ponte JSON")
+para _,s em ipares({
+    'importe "segredo"', 'função() fim', '1+2', 'local a=1', 'retorne {}',
+    '`®{so.execute("id")}`', '{a=1,a=2}', '{a=nulo,a=2}', '{[nulo]=1}',
+    '{[1+1]=2}', '[1,,2]', '[1', '{} lixo', '[mat.infinito]',
+    '{[{}]=1}', '{["x"]=1,x=2}', '', '1e9999'
+}) início recuse(s) fim
+recuse(('['):replique(70)..'1'..(']'):replique(70))
+local ciclo={}; ciclo.eu=ciclo
+local ok=proteja(O.cod,ciclo); confira(não ok,"ciclo")
+ok=proteja(O.cod,{a=função() fim}); confira(não ok,"funções")
+ok=proteja(O.paraJSON,{[1]="a"}); confira(não ok,"JSON não perde chave numérica")
+local literal={tipo="tabela",entradas=[1,2]}
+volta=O.deJSON(O.paraJSON(literal))
+confira(volta.tipo=="tabela" e #volta.entradas==2,"não interpreta metadados falsos")
+mostre("ONFE_CANDIDATO_OK",n)

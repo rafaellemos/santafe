@@ -1,0 +1,67 @@
+{
+  "candidato": "dados.12",
+  "iba": "santafe-3",
+  "producao_instalada": false,
+  "producao_alterada": false,
+  "apto_para_homologacao": true,
+  "apto_para_promocao_estavel": false,
+  "estado": "pronto_para_homologacao",
+  "http503": {
+    "reproducao": "temporarios MariaDB compartilhados removidos por outra instancia",
+    "correcao": "tmpdir exclusivo no bootstrap e em cada servidor de ensaio",
+    "prova_controlada": "PASSOU",
+    "ocorrencia_original_dados10": "sem causa retrospectiva comprovada: corpo do erro nao foi preservado"
+  },
+  "regressoes": {
+    "sistemas": [
+      "macOS x86_64",
+      "Debian x86_64"
+    ],
+    "etapas_por_sistema": 10,
+    "subetapas_por_sistema": 11,
+    "iba_sdk_grupos_por_sistema": 14,
+    "instalacao_grupos_por_sistema": 5,
+    "operacao_grupos_por_sistema": 7,
+    "integracao_postal_completa": "PASSOU nos dois sistemas",
+    "wasm": "18 casos e recuperacao apos erro: PASSOU",
+    "editores": "47 entradas identicas entre kits macOS/Debian; sem nova inspecao visual"
+  },
+  "replica": {
+    "resultado": "PASSOU",
+    "grupos": 12,
+    "segundos": 3600.39,
+    "operacoes_http": 43176,
+    "clientes": 6,
+    "p95_ms": 54.89,
+    "amostras": 719,
+    "rss_max_kib": 323624,
+    "disco_livre_min_mib": 2748,
+    "registros_max_bytes": 71441690,
+    "descritores_max": 265,
+    "originais_iniciais": 141,
+    "originais_apos_reversao": 153,
+    "anexos_iniciais": 22,
+    "anexos_apos_reversao": 24,
+    "novas_escritas_preservadas": true,
+    "dados_privados_exportados": false
+  },
+  "carga_sintetica": {
+    "resultado": "PASSOU",
+    "segundos": 600.07,
+    "operacoes_http": 40373,
+    "smtp_persistidas": 60,
+    "dns_consultas": 1200
+  },
+  "pendencias": [
+    {
+      "codigo": "INTEGRACOES_EXTERNAS",
+      "estado": "nao_homologado",
+      "descricao": "Renovacao de certificados publicos, retransmissor externo, antimalware e triagem externos, autenticacao DNS externa e upload da comunidade."
+    },
+    {
+      "codigo": "PLATAFORMAS",
+      "estado": "escopo_a_definir",
+      "descricao": "Sem homologacao Windows/ARM ou perda eletrica real. Sem nova inspecao visual dos editores nesta revisao."
+    }
+  ]
+}

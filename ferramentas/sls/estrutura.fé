@@ -1,0 +1,20 @@
+-- Fronteira explícita entre estruturas internas e listas do protocolo LSP.
+-- Também funciona no núcleo estável: nenhuma mudança global de tipo/JSON.
+local D = { experimental = tipo(tabela.temChave) == "função" }
+função D.lista(valor)
+    se não D.experimental então
+        retorne #valor == 0 e json.matrizVazia ou valor
+    fim
+    se tipo(valor) == "lista" então retorne valor fim
+    local saída = json.decod("[]")
+    para i = 1, #valor início saída[i] = valor[i] fim
+    retorne saída
+fim
+função D.éLista(valor)
+    retorne tipo(valor) == (D.experimental e "lista" ou "tabela")
+fim
+função D.apague(t, chave)
+    se D.experimental então tabela.apague(t, chave)
+    senão t[chave] = nulo fim
+fim
+retorne D

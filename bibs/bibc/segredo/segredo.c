@@ -593,6 +593,7 @@ static const luaL_Reg segredo_funções[] = {
 };
 
 LUA_API int luaopen_segredo(lua_State *L) {
+    luaL_checkversion(L);
     if (sodium_init() < 0) {
         return luaL_error(L, "não foi possível iniciar a libsodium");
     }
@@ -601,3 +602,7 @@ LUA_API int luaopen_segredo(lua_State *L) {
     lua_setfield(L, -2, "algoritmo");
     return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3)
+SANTAFE_MODULE_ABI;
+#endif

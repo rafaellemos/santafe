@@ -223,8 +223,8 @@ função unicodePdf.localizeFonte()
     local candidatos = {
         "fonte/bibs/bibf/rpdf/fontes/NotoSans-Regular.ttf",
         "bibs/bibf/rpdf/fontes/NotoSans-Regular.ttf",
-        "/usr/local/share/santafé/1.0/bibf/rpdf/fontes/NotoSans-Regular.ttf",
-        "/usr/share/santafé/1.0/bibf/rpdf/fontes/NotoSans-Regular.ttf"
+        "/usr/local/share/santafé/3.0/bibf/rpdf/fontes/NotoSans-Regular.ttf",
+        "/usr/share/santafé/3.0/bibf/rpdf/fontes/NotoSans-Regular.ttf"
     }
     para _, caminho em ipares(candidatos) início
         local arquivo = caminho e es.abra(caminho, "leiturabin")

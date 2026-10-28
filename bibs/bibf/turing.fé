@@ -72,14 +72,14 @@ local função limparExpirados()
     -- desafios (semente)
     para id, d em pares(desafios) início
         se d.expiraEmMs <= agora então
-            desafios[id] = nulo
+            tabela.apague(desafios, id)
         fim
     fim
 
     -- bilhetes/bilhetes (uso único)
     para tk, t em pares(bilhetes) início
         se (t.expiraEmMs <= agora) ou t.usado então
-            bilhetes[tk] = nulo
+            tabela.apague(bilhetes, tk)
         fim
     fim
 fim
@@ -98,12 +98,12 @@ função turing.validarBilhete(bilhete, ip)
     fim
 
     se t.usado então
-        bilhetes[bilhete] = nulo
+        tabela.apague(bilhetes, bilhete)
         retorne falso, "bilhete já usado"
     fim
 
     se t.expiraEmMs <= agoraMs() então
-        bilhetes[bilhete] = nulo
+        tabela.apague(bilhetes, bilhete)
         retorne falso, "bilhete expirado"
     fim
 
@@ -114,7 +114,7 @@ função turing.validarBilhete(bilhete, ip)
 
     -- consumo (uso único)
     t.usado = verdadeiro
-    bilhetes[bilhete] = nulo
+    tabela.apague(bilhetes, bilhete)
     retorne verdadeiro
 fim
 
@@ -339,7 +339,7 @@ função turing.registrar(ap)
             retorne
         fim
         se d.expiraEmMs <= agoraMs() então
-            desafios[id] = nulo
+            tabela.apague(desafios, id)
             res:código(400):texto(json.cod({ válido=falso, motivo="desafio expirou" }))
             retorne
         fim

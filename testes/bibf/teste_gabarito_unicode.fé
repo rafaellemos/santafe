@@ -9,7 +9,7 @@ garanta(`®{variável} Ⓡ{variável}` == "composto combinado")
 garanta(`®variávelⓇvariável®ação` == "compostocombinadoação")
 garanta(`®variável—Ⓡvariável🟢` == "composto—combinado🟢")
 garanta(`\®variável \Ⓡvariável` == "®variável Ⓡvariável")
-garanta("®variável Ⓡvariável" == [[®variável Ⓡvariável]])
+garanta("®variável Ⓡvariável" == [=[®variável Ⓡvariável]=])
 garanta(`®́nome Ⓡ1nome ® Ⓡ` == "®́nome Ⓡ1nome ® Ⓡ")
 garanta(`®inexistênte Ⓡinexistênte` == " ")
 local lógico, número = falso, 256

@@ -1,9 +1,11 @@
+local Windows = módulo.configuração:corte(1,1)=="\\"
+local extensãoNativa=Windows e ".dll" ou ".so"
 -- Executado pelo intérprete instalado, nunca por um pacote baixado.
 -- Apenas registra um pesquisador; o fonte da biblioteca só roda no importe.
 local diretório=...
 local antigo=módulo.caminho
 módulo.caminho=diretório.."/../?.fé;"..antigo
-local N=garanta(módulo.carregarBib(diretório.."/nativo.so","luaopen_pacotes_nativo"))()
+local N=garanta(módulo.carregarBib(diretório.."/nativo"..extensãoNativa,"luaopen_pacotes_nativo"))()
 local F=(importe "pacotes.formatos")(N)
 módulo.caminho=antigo
 local raiz=garanta(N.raiz("."))

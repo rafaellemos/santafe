@@ -1,0 +1,140 @@
+{
+  "dados10-regressao.json": [
+    "colares",
+    "fontes",
+    "sls-incremental",
+    "regressao",
+    "kits",
+    "cores",
+    "editores25",
+    "editores45",
+    "sublime17",
+    "sublime7"
+  ],
+  "dados7-regressao.json": [
+    "persistencia",
+    "nucleo",
+    "onfe",
+    "fronteiras",
+    "arquivo-legado",
+    "abi",
+    "sls",
+    "sls-onfe",
+    "sls-carga",
+    "manual",
+    "instalacao"
+  ],
+  "iba10.json": [
+    "módulo atual: carga, repetição e símbolos globais",
+    "módulo sem_checkversion: carga, repetição e símbolos globais",
+    "módulo legado_sem_checkversion: carga, repetição e símbolos globais",
+    "módulo legado_com_checkversion: carga, repetição e símbolos globais",
+    "módulo epoca_errada: carga, repetição e símbolos globais",
+    "módulo numero_errado: carga, repetição e símbolos globais",
+    "módulo descritor_curto: carga, repetição e símbolos globais",
+    "descritor exportado mesmo com visibilidade oculta",
+    "SDK instalado C: pkg-config, IBA3, lista e nulo",
+    "SDK instalado C++: pkg-config, IBA3, lista e nulo",
+    "bytecode normal e sem depuração: listas/nulo/gabarito bruto preservados",
+    "36 cabeçalhos antigos/corrompidos/truncados recusados sem sinal",
+    "bytecode 2.1 e IBA3 recusados reciprocamente",
+    "identidade nativa do gerenciador inclui IBA e bytecode"
+  ],
+  "instalacao5.json": [
+    "candidato bloqueia instalador público e Makefile estável antes de efeitos",
+    "instalação completa em prefixo com espaços; núcleo, 5 bibC, Fé, CLI, SLS e ONFÉ",
+    "reinstalação/atualização idempotente sem remover arquivos alheios",
+    "rollback exato após 6 etapas, cópia ausente e falha de saúde do SLS",
+    "desinstalação remove suporte SLS/ONFÉ e preserva arquivo do usuário"
+  ],
+  "operacao6.json": [
+    "300 leituras concorrentes; 20 trocas atômicas",
+    "recuperação após término abrupto antes",
+    "recuperação após término abrupto depois",
+    "rollback pós-saúde",
+    "segundo escritor bloqueado",
+    "manifesto interno de biblioteca também coberto pela integridade",
+    "integridade recusada; estável e dados preservados"
+  ],
+  "kits": {
+    "santafe-dados-experimental-0.0.13.vsix": [
+      "[Content_Types].xml",
+      "extension.vsixmanifest",
+      "extension/.gitignore",
+      "extension/.vscodeignore",
+      "extension/LICENSE",
+      "extension/MARCA.md",
+      "extension/PUBLICAR.md",
+      "extension/README.md",
+      "extension/aparencia.js",
+      "extension/api-publica.json",
+      "extension/extension.js",
+      "extension/icon.png",
+      "extension/icon.svg",
+      "extension/language-configuration.json",
+      "extension/package.json",
+      "extension/paletas.json",
+      "extension/provedores-sls.js",
+      "extension/realce-embutido.js",
+      "extension/realce-vscode.js",
+      "extension/snippets/santafe.code-snippets",
+      "extension/syntaxes/onfe.tmLanguage.json",
+      "extension/syntaxes/santafe.tmLanguage.json",
+      "extension/vendor/README.md",
+      "extension/vendor/vscode-oniguruma/LICENSE.txt",
+      "extension/vendor/vscode-oniguruma/NOTICES.txt",
+      "extension/vendor/vscode-oniguruma/package.json",
+      "extension/vendor/vscode-oniguruma/release/main.js",
+      "extension/vendor/vscode-oniguruma/release/onig.wasm",
+      "extension/vendor/vscode-textmate/LICENSE.md",
+      "extension/vendor/vscode-textmate/package.json",
+      "extension/vendor/vscode-textmate/release/main.js"
+    ],
+    "SantafeDados.sublime-package": [
+      ".python-version",
+      "ColorSchemes/Breakers.sublime-color-scheme",
+      "ColorSchemes/Celeste.sublime-color-scheme",
+      "ColorSchemes/Mariana.sublime-color-scheme",
+      "ColorSchemes/Monokai.sublime-color-scheme",
+      "ColorSchemes/Sixteen.sublime-color-scheme",
+      "Homologacao.py",
+      "LICENSE",
+      "LSP-santafe-dados.sublime-settings.example",
+      "ONFE.tmLanguage",
+      "README.md",
+      "Realce.py",
+      "Santafe-Dados.sublime-syntax",
+      "SantafeDados.sublime-settings",
+      "paletas.json",
+      "realce_embutido.py"
+    ]
+  },
+  "servicos13.json": [
+    "ClamAV real: INSTREAM limpo, EICAR e arquivo ZIP",
+    "SMTP real: limpo persistido; ameaça 554 sem persistência",
+    "Triagem Santafé real: mensagem de fisgada em Indesejadas",
+    "Indisponibilidade do antivírus: recusa temporária sem persistência",
+    "Upload real: autenticação e CSRF recusam antes da escrita",
+    "Upload real: conteúdo falso, truncado e acima do limite recusados",
+    "Upload real: PNG/JPEG, nome seguro, publicação sem imagem e leitura escapada",
+    "Falha SQL do upload: imagem recém-gravada removida; anteriores preservadas"
+  ],
+  "acme13.json": [
+    "Certbot/Pebble: HTTP-01 e certificado carregado pelo servidor TLS candidato",
+    "Renovação ACME: certificado novo servido e cadeia/nome verificados",
+    "CA indisponível: renovação falha e certificado vigente continua utilizável"
+  ],
+  "migracao-portal13.json": [
+    "aplicação e compilação na cópia",
+    "segunda aplicação recusada",
+    "reversão recusa edição posterior",
+    "reversão exata; réplica original inalterada"
+  ],
+  "rede-publica13.json": [
+    "HTTPS público com cadeia e nome verificados",
+    "HTTPS público com cadeia e nome verificados",
+    "Núcleo candidato: SPF público positivo e falsificação local rejeitada",
+    "Mailjet público: STARTTLS verificado, SMTPUTF8 e 8BITMIME",
+    "Mailjet: autenticação somente, sem MAIL/RCPT/DATA"
+  ]
+}

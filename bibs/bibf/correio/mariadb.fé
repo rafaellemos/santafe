@@ -1,3 +1,4 @@
+local dados = importe "dados_experimentais"
 local correio = importe "correio"
 local rede = importe "rede"
 local segredo = importe "segredo"
@@ -74,15 +75,15 @@ local função confirme(transação, tratador, valor)
     retorne iniciou
 fim
 
-local função listaJSON(valor)
-    local funcionou, codificado = proteja(json.cod, valor)
+local função listaJSON(valor, registro)
+    local funcionou, codificado = proteja(registro e dados.codifiqueDestinatários ou dados.codifiqueLista, valor)
     se não funcionou então retorne nulo, codificado fim
     retorne codificado
 fim
 
 local função decodifiqueLista(valor)
     local funcionou, decodificado = proteja(json.decod, valor ou "{}")
-    se não funcionou ou tipo(decodificado) ~= "tabela" então retorne {} fim
+    se não funcionou ou tipo(decodificado) ~= "tabela" e tipo(decodificado) ~= "lista" então retorne {} fim
     retorne decodificado
 fim
 
@@ -192,9 +193,8 @@ fim
 local função insiraAnexos(escopo, mensagemId, anexos, índice, tratador)
     se índice > #anexos então tratador(verdadeiro); retorne fim
     local anexo = anexos[índice]
-    execute(escopo, [[
-INSERT INTO correio_anexos (carta_id,nome,tipo,tamanho,dados,dados_objeto)
-VALUES (?,?,?,?,NULL,?)]], {
+    execute(escopo, [=[INSERT INTO correio_anexos (carta_id,nome,tipo,tamanho,dados,dados_objeto)
+VALUES (?,?,?,?,NULL,?)]=], {
         mensagemId,
         util.nomeSeguroDoAnexo(anexo.nome),
         anexo.tipo ou "application/octet-stream",
@@ -219,9 +219,9 @@ fim
 
 local função reserveCota(escopo, caixaId, dados, tratador)
     local tamanho = tamanhoOcupado(dados)
-    execute(escopo, [[UPDATE correio_caixas
+    execute(escopo, [=[UPDATE correio_caixas
 SET uso_tacos=uso_tacos+?,atualizada_em=CURRENT_TIMESTAMP
-WHERE id=? AND uso_tacos+?<=cota_tacos]],
+WHERE id=? AND uso_tacos+?<=cota_tacos]=],
         { tamanho, caixaId, tamanho }, função(resultado, falha)
             local alteradas = resultado e resultado:linhasAfetadas() ou 0
             feche(resultado)
@@ -237,15 +237,14 @@ fim
 -- deriva do id global: cartas novas e movidas percorrem o mesmo contador.
 local função reserveUIDIMAP(escopo, caixaId, pasta, tratador)
     se não pastas[pasta] então tratador(nulo, "pasta inválida"); retorne fim
-    execute(escopo, [[
-INSERT INTO correio_pastas_imap
+    execute(escopo, [=[INSERT INTO correio_pastas_imap
 (caixa_id,pasta,validade_uid,proximo_uid) VALUES (?,?,?,1)
-ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
+ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]=],
         { caixaId, pasta, so.tempo() }, função(criação, falhaDaCriação)
             feche(criação)
             se falhaDaCriação então tratador(nulo, falhaDaCriação); retorne fim
-            execute(escopo, [[SELECT proximo_uid FROM correio_pastas_imap
-WHERE caixa_id=? AND pasta=? FOR UPDATE]], { caixaId, pasta },
+            execute(escopo, [=[SELECT proximo_uid FROM correio_pastas_imap
+WHERE caixa_id=? AND pasta=? FOR UPDATE]=], { caixaId, pasta },
                 função(estado, falhaDoEstado)
                     se falhaDoEstado então
                         feche(estado); tratador(nulo, falhaDoEstado); retorne
@@ -256,8 +255,8 @@ WHERE caixa_id=? AND pasta=? FOR UPDATE]], { caixaId, pasta },
                     se não uid então
                         tratador(nulo, "próximo UID da pasta ausente"); retorne
                     fim
-                    execute(escopo, [[UPDATE correio_pastas_imap
-SET proximo_uid=proximo_uid+1 WHERE caixa_id=? AND pasta=?]],
+                    execute(escopo, [=[UPDATE correio_pastas_imap
+SET proximo_uid=proximo_uid+1 WHERE caixa_id=? AND pasta=?]=],
                         { caixaId, pasta }, função(atualização, falhaDaAtualização)
                             feche(atualização)
                             tratador(falhaDaAtualização e nulo ou uid,
@@ -268,7 +267,7 @@ SET proximo_uid=proximo_uid+1 WHERE caixa_id=? AND pasta=?]],
 fim
 
 local função insiraMensagem(escopo, caixaId, dados, tratador)
-    local destinatários, falha = listaJSON(dados.destinatários ou {})
+    local destinatários, falha = listaJSON(dados.destinatários ou {}, verdadeiro)
     se não destinatários então tratador(nulo, falha); retorne fim
     local motivosDaTriagem
     motivosDaTriagem, falha = listaJSON(dados.motivosDaTriagem ou {})
@@ -276,15 +275,14 @@ local função insiraMensagem(escopo, caixaId, dados, tratador)
     reserveUIDIMAP(escopo, caixaId, dados.pasta,
         função(uid, falhaDoUID)
             se não uid então tratador(nulo, falhaDoUID); retorne fim
-            execute(escopo, [[
-INSERT INTO correio_cartas
+            execute(escopo, [=[INSERT INTO correio_cartas
 (caixa_id,uid_imap,direcao,pasta,identificacao,remetente,destinatarios,assunto,
  resumo,texto,html,mime,mime_objeto,tamanho,lida,importante,estado_entrega,
  falha_entrega,referencia_fila,criada_em,atualizada_em,responder_para,
  classificacao_triagem,pontuacao_suspeita,motivos_triagem,
  resultado_spf,resultado_dkim,resultado_dmarc,dominio_autor,politica_dmarc,
  acao_dmarc,decisao_usuario,regra_triagem,decidida_em,remetente_envelope)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)]], {
+VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)]=], {
         caixaId, uid, dados.direção, dados.pasta, dados.identificação,
         dados.remetente, destinatários, dados.assunto ou "",
         dados.resumo ou "", dados.texto, dados.html, dados.mimeObjeto,
@@ -348,15 +346,14 @@ função adaptador.novo(piscina, configuração, depósitoFornecido)
 
     local função garantaPastaIMAP(caixaId, pasta, tratador)
         se não pastas[pasta] então tratador(nulo, "pasta inválida"); retorne fim
-        execute(piscina, [[
-INSERT INTO correio_pastas_imap
+        execute(piscina, [=[INSERT INTO correio_pastas_imap
 (caixa_id,pasta,validade_uid,proximo_uid) VALUES (?,?,?,1)
-ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
+ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]=],
             { caixaId, pasta, so.tempo() }, função(resultado, falha)
                 feche(resultado)
                 se falha então tratador(nulo, falha); retorne fim
-                execute(piscina, [[SELECT validade_uid,proximo_uid
-FROM correio_pastas_imap WHERE caixa_id=? AND pasta=? LIMIT 1]],
+                execute(piscina, [=[SELECT validade_uid,proximo_uid
+FROM correio_pastas_imap WHERE caixa_id=? AND pasta=? LIMIT 1]=],
                     { caixaId, pasta }, função(consulta, falhaDaConsulta)
                         se falhaDaConsulta então
                             feche(consulta); tratador(nulo, falhaDaConsulta); retorne
@@ -382,8 +379,8 @@ FROM correio_pastas_imap WHERE caixa_id=? AND pasta=? LIMIT 1]],
                 se falhaDaTransação então
                     tratador(nulo, falhaDaTransação); retorne
                 fim
-                execute(transação, [[SELECT pasta FROM correio_cartas
-WHERE caixa_id=? AND id=? FOR UPDATE]], { caixaId, id },
+                execute(transação, [=[SELECT pasta FROM correio_cartas
+WHERE caixa_id=? AND id=? FOR UPDATE]=], { caixaId, id },
                     função(consulta, falhaDaConsulta)
                         se falhaDaConsulta então
                             feche(consulta)
@@ -401,10 +398,9 @@ WHERE caixa_id=? AND id=? FOR UPDATE]], { caixaId, id },
                             confirme(transação, tratador, verdadeiro)
                             retorne
                         fim
-                        execute(transação, [[
-INSERT INTO correio_pastas_imap
+                        execute(transação, [=[INSERT INTO correio_pastas_imap
 (caixa_id,pasta,validade_uid,proximo_uid) VALUES (?,?,?,1)
-ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
+ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]=],
                             { caixaId, pasta, so.tempo() },
                             função(criação, falhaDaCriação)
                                 feche(criação)
@@ -413,9 +409,8 @@ ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
                                         falhaDaCriação)
                                     retorne
                                 fim
-                                execute(transação, [[
-SELECT proximo_uid FROM correio_pastas_imap
-WHERE caixa_id=? AND pasta=? FOR UPDATE]], { caixaId, pasta },
+                                execute(transação, [=[SELECT proximo_uid FROM correio_pastas_imap
+WHERE caixa_id=? AND pasta=? FOR UPDATE]=], { caixaId, pasta },
                                     função(estado, falhaDoEstado)
                                         se falhaDoEstado então
                                             feche(estado)
@@ -432,9 +427,8 @@ WHERE caixa_id=? AND pasta=? FOR UPDATE]], { caixaId, pasta },
                                                 "próximo UID da pasta ausente")
                                             retorne
                                         fim
-                                        execute(transação, [[
-UPDATE correio_pastas_imap SET proximo_uid=proximo_uid+1
-WHERE caixa_id=? AND pasta=?]], { caixaId, pasta },
+                                        execute(transação, [=[UPDATE correio_pastas_imap SET proximo_uid=proximo_uid+1
+WHERE caixa_id=? AND pasta=?]=], { caixaId, pasta },
                                             função(atualizaEstado,
                                                    falhaDaAtualização)
                                                 feche(atualizaEstado)
@@ -444,10 +438,9 @@ WHERE caixa_id=? AND pasta=?]], { caixaId, pasta },
                                                         falhaDaAtualização)
                                                     retorne
                                                 fim
-                                                execute(transação, [[
-UPDATE correio_cartas
+                                                execute(transação, [=[UPDATE correio_cartas
 SET pasta=?,uid_imap=?,apagada_imap=FALSE,atualizada_em=?
-WHERE caixa_id=? AND id=?]],
+WHERE caixa_id=? AND id=?]=],
                                                     { pasta, uid, so.tempo(),
                                                       caixaId, id },
                                                     função(atualizaCarta,
@@ -508,8 +501,8 @@ WHERE caixa_id=? AND id=?]],
                 se falhaDaTransação então
                     tratador(nulo, falhaDaTransação); retorne
                 fim
-                execute(transação, [[SELECT id,tamanho FROM correio_cartas
-WHERE caixa_id=? AND id IN (]] .. tabela.concatene(lugares, ",") ..
+                execute(transação, [=[SELECT id,tamanho FROM correio_cartas
+WHERE caixa_id=? AND id IN (]=] .. tabela.concatene(lugares, ",") ..
                     ") FOR UPDATE", parâmetros,
                     função(cartas, falhaDasCartas)
                         se falhaDasCartas então
@@ -532,10 +525,9 @@ WHERE caixa_id=? AND id IN (]] .. tabela.concatene(lugares, ",") ..
                                 retorne
                             fim
                         fim
-                        execute(transação, [[
-SELECT COALESCE(SUM(a.tamanho),0)
+                        execute(transação, [=[SELECT COALESCE(SUM(a.tamanho),0)
 FROM correio_anexos a JOIN correio_cartas c ON c.id=a.carta_id
-WHERE c.caixa_id=? AND c.id IN (]] ..
+WHERE c.caixa_id=? AND c.id IN (]=] ..
                             tabela.concatene(lugares, ",") .. ")", parâmetros,
                             função(anexos, falhaDosAnexos)
                                 se falhaDosAnexos então
@@ -548,10 +540,9 @@ WHERE c.caixa_id=? AND c.id IN (]] ..
                                 feche(anexos)
                                 tacos = tacos + (paraNúmero(
                                     linhaDosAnexos e linhaDosAnexos[1]) ou 0)
-                                execute(transação, [[
-INSERT INTO correio_pastas_imap
+                                execute(transação, [=[INSERT INTO correio_pastas_imap
 (caixa_id,pasta,validade_uid,proximo_uid) VALUES (?,?,?,1)
-ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
+ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]=],
                                     { caixaId, pasta, so.tempo() },
                                     função(criação, falhaDaCriação)
                                         feche(criação)
@@ -560,9 +551,8 @@ ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
                                                 falhaDaCriação)
                                             retorne
                                         fim
-                                        execute(transação, [[
-SELECT validade_uid,proximo_uid FROM correio_pastas_imap
-WHERE caixa_id=? AND pasta=? FOR UPDATE]], { caixaId, pasta },
+                                        execute(transação, [=[SELECT validade_uid,proximo_uid FROM correio_pastas_imap
+WHERE caixa_id=? AND pasta=? FOR UPDATE]=], { caixaId, pasta },
                                             função(estado, falhaDoEstado)
                                                 se falhaDoEstado então
                                                     feche(estado)
@@ -582,10 +572,9 @@ WHERE caixa_id=? AND pasta=? FOR UPDATE]], { caixaId, pasta },
                                                         "estado UID da pasta ausente")
                                                     retorne
                                                 fim
-                                                execute(transação, [[
-UPDATE correio_caixas
+                                                execute(transação, [=[UPDATE correio_caixas
 SET uso_tacos=uso_tacos+?,atualizada_em=CURRENT_TIMESTAMP
-WHERE id=? AND uso_tacos+?<=cota_tacos]],
+WHERE id=? AND uso_tacos+?<=cota_tacos]=],
                                                     { tacos, caixaId, tacos },
                                                     função(cota, falhaDaCota)
                                                         local alteradas = cota e
@@ -599,9 +588,8 @@ WHERE id=? AND uso_tacos+?<=cota_tacos]],
                                                                 "cota da caixa postal excedida")
                                                             retorne
                                                         fim
-                                                        execute(transação, [[
-UPDATE correio_pastas_imap SET proximo_uid=proximo_uid+?
-WHERE caixa_id=? AND pasta=?]], { #ids, caixaId, pasta },
+                                                        execute(transação, [=[UPDATE correio_pastas_imap SET proximo_uid=proximo_uid+?
+WHERE caixa_id=? AND pasta=?]=], { #ids, caixaId, pasta },
                                                             função(contador,
                                                                    falhaDoContador)
                                                                 feche(contador)
@@ -624,8 +612,7 @@ WHERE caixa_id=? AND pasta=?]], { #ids, caixaId, pasta },
                                                                     local origem = ids[índice]
                                                                     local uid = primeiroUID +
                                                                         índice - 1
-                                                                    execute(transação, [[
-INSERT INTO correio_cartas
+                                                                    execute(transação, [=[INSERT INTO correio_cartas
 (uid_imap,caixa_id,direcao,pasta,identificacao,remetente,destinatarios,
  assunto,resumo,texto,html,mime,mime_objeto,tamanho,lida,importante,
  apagada_imap,estado_entrega,falha_entrega,referencia_fila,criada_em,
@@ -639,7 +626,7 @@ SELECT ?,caixa_id,direcao,?,identificacao,remetente,destinatarios,
  responder_para,classificacao_triagem,pontuacao_suspeita,motivos_triagem,
  resultado_spf,resultado_dkim,resultado_dmarc,dominio_autor,politica_dmarc,
  acao_dmarc,decisao_usuario,regra_triagem,decidida_em,remetente_envelope
-FROM correio_cartas WHERE caixa_id=? AND id=?]],
+FROM correio_cartas WHERE caixa_id=? AND id=?]=],
                                                                         { uid, pasta, so.tempo(),
                                                                           caixaId, origem },
                                                                         função(carta,
@@ -659,11 +646,10 @@ FROM correio_cartas WHERE caixa_id=? AND id=?]],
                                                                                     "carta não foi copiada")
                                                                                 retorne
                                                                             fim
-                                                                            execute(transação, [[
-INSERT INTO correio_anexos
+                                                                            execute(transação, [=[INSERT INTO correio_anexos
 (carta_id,nome,tipo,tamanho,dados,dados_objeto)
 SELECT ?,nome,tipo,tamanho,dados,dados_objeto
-FROM correio_anexos WHERE carta_id=? ORDER BY id]],
+FROM correio_anexos WHERE carta_id=? ORDER BY id]=],
                                                                                 { novaId, origem },
                                                                                 função(resultadoDosAnexos,
                                                                                        falhaDaCópiaDosAnexos)
@@ -704,17 +690,17 @@ FROM correio_anexos WHERE carta_id=? ORDER BY id]],
         local iniciou, falhaImediata = piscina:inicieTransaçãoAssíncrona(
             função(_, transação, falhaDaTransação)
                 se falhaDaTransação então tratador(nulo, falhaDaTransação); retorne fim
-                execute(transação, [[INSERT INTO correio_pastas_imap
+                execute(transação, [=[INSERT INTO correio_pastas_imap
 (caixa_id,pasta,validade_uid,proximo_uid) VALUES (?,?,?,1)
-ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]],
+ON DUPLICATE KEY UPDATE caixa_id=VALUES(caixa_id)]=],
                     { caixaId, pasta, so.tempo() },
                     função(criação, falhaDaCriação)
                         feche(criação)
                         se falhaDaCriação então
                             desfaça(transação, tratador, falhaDaCriação); retorne
                         fim
-                        execute(transação, [[SELECT proximo_uid
-FROM correio_pastas_imap WHERE caixa_id=? AND pasta=? FOR UPDATE]],
+                        execute(transação, [=[SELECT proximo_uid
+FROM correio_pastas_imap WHERE caixa_id=? AND pasta=? FOR UPDATE]=],
                             { caixaId, pasta }, função(estado, falhaDoEstado)
                                 se falhaDoEstado então
                                     feche(estado)
@@ -729,8 +715,8 @@ FROM correio_pastas_imap WHERE caixa_id=? AND pasta=? FOR UPDATE]],
                                         "próximo UID da pasta ausente")
                                     retorne
                                 fim
-                                execute(transação, [[UPDATE correio_pastas_imap
-SET proximo_uid=proximo_uid+? WHERE caixa_id=? AND pasta=?]],
+                                execute(transação, [=[UPDATE correio_pastas_imap
+SET proximo_uid=proximo_uid+? WHERE caixa_id=? AND pasta=?]=],
                                     { #ids, caixaId, pasta },
                                     função(atualização, falhaDaAtualização)
                                         feche(atualização)
@@ -763,11 +749,11 @@ SET proximo_uid=proximo_uid+? WHERE caixa_id=? AND pasta=?]],
                                             para índice = posição, último início
                                                 parâmetros[#parâmetros + 1] = ids[índice]
                                             fim
-                                            local sql = [[UPDATE correio_cartas
-SET pasta=?,uid_imap=CASE id ]] ..
+                                            local sql = [=[UPDATE correio_cartas
+SET pasta=?,uid_imap=CASE id ]=] ..
                                                 tabela.concatene(casos, " ") ..
-                                                [[ ELSE uid_imap END,
-apagada_imap=FALSE,atualizada_em=? WHERE caixa_id=? AND id IN (]] ..
+                                                [=[ ELSE uid_imap END,
+apagada_imap=FALSE,atualizada_em=? WHERE caixa_id=? AND id IN (]=] ..
                                                 tabela.concatene(lugares, ",") .. ")"
                                             execute(transação, sql, parâmetros,
                                                 função(resultado, falhaDoLote)
@@ -815,8 +801,8 @@ apagada_imap=FALSE,atualizada_em=? WHERE caixa_id=? AND id IN (]] ..
                         lugares[#lugares + 1] = "?"
                         parâmetros[#parâmetros + 1] = ids[índice]
                     fim
-                    execute(transação, [[UPDATE correio_cartas
-SET lida=?,atualizada_em=? WHERE caixa_id=? AND id IN (]] ..
+                    execute(transação, [=[UPDATE correio_cartas
+SET lida=?,atualizada_em=? WHERE caixa_id=? AND id IN (]=] ..
                         tabela.concatene(lugares, ",") .. ")", parâmetros,
                         função(resultado, falhaDoLote)
                             feche(resultado)
@@ -833,10 +819,10 @@ SET lida=?,atualizada_em=? WHERE caixa_id=? AND id IN (]] ..
     fim
 
     local função libereCota(transação, caixaId, tacos, tratador, valor)
-        execute(transação, [[UPDATE correio_caixas
+        execute(transação, [=[UPDATE correio_caixas
 SET uso_tacos=IF(uso_tacos>=?,uso_tacos-?,0),
     atualizada_em=CURRENT_TIMESTAMP
-WHERE id=?]], { tacos, tacos, caixaId },
+WHERE id=?]=], { tacos, tacos, caixaId },
             função(resultado, falha)
                 local alteradas = resultado e resultado:linhasAfetadas() ou 0
                 feche(resultado)
@@ -858,8 +844,8 @@ WHERE id=?]], { tacos, tacos, caixaId },
                 se falhaDaTransação então
                     tratador(nulo, falhaDaTransação); retorne
                 fim
-                execute(transação, [[SELECT pasta,tamanho
-FROM correio_cartas WHERE caixa_id=? AND id=? FOR UPDATE]],
+                execute(transação, [=[SELECT pasta,tamanho
+FROM correio_cartas WHERE caixa_id=? AND id=? FOR UPDATE]=],
                     { caixaId, id }, função(consulta, falhaDaConsulta)
                         se falhaDaConsulta então
                             feche(consulta)
@@ -879,8 +865,8 @@ FROM correio_cartas WHERE caixa_id=? AND id=? FOR UPDATE]],
                             retorne
                         fim
                         local tacos = paraNúmero(linha[2]) ou 0
-                        execute(transação, [[SELECT COALESCE(SUM(tamanho),0)
-FROM correio_anexos WHERE carta_id=?]], { id },
+                        execute(transação, [=[SELECT COALESCE(SUM(tamanho),0)
+FROM correio_anexos WHERE carta_id=?]=], { id },
                             função(anexos, falhaDosAnexos)
                                 se falhaDosAnexos então
                                     feche(anexos)
@@ -892,8 +878,8 @@ FROM correio_anexos WHERE carta_id=?]], { id },
                                 feche(anexos)
                                 tacos = tacos + (paraNúmero(
                                     linhaDosAnexos e linhaDosAnexos[1]) ou 0)
-                                execute(transação, [[DELETE FROM correio_cartas
-WHERE caixa_id=? AND id=? AND pasta='lixeira']], { caixaId, id },
+                                execute(transação, [=[DELETE FROM correio_cartas
+WHERE caixa_id=? AND id=? AND pasta='lixeira']=], { caixaId, id },
                                     função(exclusão, falhaDaExclusão)
                                         local alteradas = exclusão e
                                             exclusão:linhasAfetadas() ou 0
@@ -923,8 +909,8 @@ WHERE caixa_id=? AND id=? AND pasta='lixeira']], { caixaId, id },
                 se falhaDaTransação então
                     tratador(nulo, falhaDaTransação); retorne
                 fim
-                execute(transação, [[SELECT id,tamanho FROM correio_cartas
-WHERE caixa_id=? AND pasta='lixeira' FOR UPDATE]], { caixaId },
+                execute(transação, [=[SELECT id,tamanho FROM correio_cartas
+WHERE caixa_id=? AND pasta='lixeira' FOR UPDATE]=], { caixaId },
                     função(cartas, falhaDasCartas)
                         se falhaDasCartas então
                             feche(cartas)
@@ -945,9 +931,9 @@ WHERE caixa_id=? AND pasta='lixeira' FOR UPDATE]], { caixaId },
                             })
                             retorne
                         fim
-                        execute(transação, [[SELECT COALESCE(SUM(a.tamanho),0)
+                        execute(transação, [=[SELECT COALESCE(SUM(a.tamanho),0)
 FROM correio_anexos a JOIN correio_cartas c ON c.id=a.carta_id
-WHERE c.caixa_id=? AND c.pasta='lixeira']], { caixaId },
+WHERE c.caixa_id=? AND c.pasta='lixeira']=], { caixaId },
                             função(anexos, falhaDosAnexos)
                                 se falhaDosAnexos então
                                     feche(anexos)
@@ -959,8 +945,8 @@ WHERE c.caixa_id=? AND c.pasta='lixeira']], { caixaId },
                                 feche(anexos)
                                 tacos = tacos + (paraNúmero(
                                     linhaDosAnexos e linhaDosAnexos[1]) ou 0)
-                                execute(transação, [[DELETE FROM correio_cartas
-WHERE caixa_id=? AND pasta='lixeira']], { caixaId },
+                                execute(transação, [=[DELETE FROM correio_cartas
+WHERE caixa_id=? AND pasta='lixeira']=], { caixaId },
                                     função(exclusão, falhaDaExclusão)
                                         local alteradas = exclusão e
                                             exclusão:linhasAfetadas() ou 0
@@ -988,14 +974,14 @@ WHERE caixa_id=? AND pasta='lixeira']], { caixaId },
     local função apliqueRegraPessoal(escopo, caixaId, dados, tratador)
         local endereço = normalizeRemetente(dados.remetente) ou ""
         local domínio = domínioDoRemetente(endereço) ou ""
-        execute(escopo, [[SELECT escopo,valor,decisao
+        execute(escopo, [=[SELECT escopo,valor,decisao
 FROM correio_regras_triagem
 WHERE caixa_id=? AND (
     (escopo='endereco' AND valor=?) OR
     (escopo='dominio' AND valor=?)
 )
 ORDER BY CASE escopo WHEN 'endereco' THEN 0 ELSE 1 END
-LIMIT 1]], { caixaId, endereço, domínio }, função(resultado, falha)
+LIMIT 1]=], { caixaId, endereço, domínio }, função(resultado, falha)
             se falha então feche(resultado); tratador(nulo, falha); retorne fim
             local linha = resultado:obterLinha()
             feche(resultado)
@@ -1004,8 +990,8 @@ LIMIT 1]], { caixaId, endereço, domínio }, função(resultado, falha)
                 personalizados[chave] = valor
             fim
             personalizados.decisãoDoUsuário = "nenhuma"
-            personalizados.regraDaTriagem = nulo
-            personalizados.decididaEm = nulo
+            tabela.apague(personalizados, "regraDaTriagem")
+            tabela.apague(personalizados, "decididaEm")
             se linha então
                 local decisão = linha[3]
                 personalizados.decisãoDoUsuário =
@@ -1020,8 +1006,8 @@ LIMIT 1]], { caixaId, endereço, domínio }, função(resultado, falha)
     fim
 
     função este.confiraEstrutura(_, tratador)
-        execute(piscina, [[SELECT versao FROM correio_migracoes
-WHERE componente='correio' ORDER BY versao DESC LIMIT 1]], {},
+        execute(piscina, [=[SELECT versao FROM correio_migracoes
+WHERE componente='correio' ORDER BY versao DESC LIMIT 1]=], {},
             função(resultado, falha)
                 se falha então feche(resultado); tratador(nulo,
                     "não foi possível conferir a estrutura postal: " .. falha); retorne
@@ -1039,8 +1025,8 @@ WHERE componente='correio' ORDER BY versao DESC LIMIT 1]], {},
     fim
 
     função este.confiraEstruturaDoCarteiro(_, tratador)
-        execute(piscina, [[SELECT versao FROM correio_migracoes
-WHERE componente='carteiro' ORDER BY versao DESC LIMIT 1]], {},
+        execute(piscina, [=[SELECT versao FROM correio_migracoes
+WHERE componente='carteiro' ORDER BY versao DESC LIMIT 1]=], {},
             função(resultado, falha)
                 se falha então
                     feche(resultado)
@@ -1061,11 +1047,10 @@ WHERE componente='carteiro' ORDER BY versao DESC LIMIT 1]], {},
     fim
 
     função este.obtenhaUsuárioPorSessão(_, resumoDoBilhete, tratador)
-        execute(piscina, [[
-SELECT u.id,u.nome,u.usuario,u.email,s.csrf_token,u.papel
+        execute(piscina, [=[SELECT u.id,u.nome,u.usuario,u.email,s.csrf_token,u.papel
 FROM sessoes s JOIN usuarios u ON u.id=s.usuario_id
 WHERE s.token_hash=? AND s.expira_em>NOW() AND u.estado='ativo'
-LIMIT 1]], { resumoDoBilhete }, função(resultado, falha)
+LIMIT 1]=], { resumoDoBilhete }, função(resultado, falha)
             se falha então feche(resultado); tratador(nulo, falha); retorne fim
             local linha = resultado e resultado:obterLinha() ou nulo
             feche(resultado)
@@ -1087,9 +1072,8 @@ LIMIT 1]], { resumoDoBilhete }, função(resultado, falha)
             }, nulo)
         fim
         local função consulte()
-            execute(piscina, [[
-SELECT id,usuario_id,parte_local,dominio_ascii,endereco_exibido,nome_exibido,
-estado,cota_tacos,uso_tacos FROM correio_caixas WHERE usuario_id=? LIMIT 1]],
+            execute(piscina, [=[SELECT id,usuario_id,parte_local,dominio_ascii,endereco_exibido,nome_exibido,
+estado,cota_tacos,uso_tacos FROM correio_caixas WHERE usuario_id=? LIMIT 1]=],
                 { usuário.id }, função(consulta, falhaDaConsulta)
                     se falhaDaConsulta então
                         feche(consulta); tratador(nulo, falhaDaConsulta); retorne
@@ -1107,12 +1091,11 @@ estado,cota_tacos,uso_tacos FROM correio_caixas WHERE usuario_id=? LIMIT 1]],
                         retorne
                     fim
                     local endereçoExibido = parteLocal .. "@" .. configuração.domínio
-                    execute(piscina, [[
-INSERT INTO correio_caixas
+                    execute(piscina, [=[INSERT INTO correio_caixas
 (usuario_id,parte_local,dominio_ascii,endereco_exibido,nome_exibido)
 VALUES (?,?,?,?,?)
 ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id),nome_exibido=VALUES(nome_exibido),
-endereco_exibido=VALUES(endereco_exibido)]], {
+endereco_exibido=VALUES(endereco_exibido)]=], {
                         usuário.id, parteLocal, configuração.domínioASCII,
                         endereçoExibido, usuário.nome
                     }, função(resultado, falha)
@@ -1141,8 +1124,7 @@ endereco_exibido=VALUES(endereco_exibido)]], {
             local parte = identificador:corte(1, arroba - 1)
             local domínio = rede.domínioASCII(identificador:corte(arroba + 1))
             se parte ~= "" e domínio então
-                sql = [[
-SELECT u.id,u.nome,u.usuario,u.email,u.senha_hash,
+                sql = [=[SELECT u.id,u.nome,u.usuario,u.email,u.senha_hash,
        c.id,c.parte_local,c.dominio_ascii,c.endereco_exibido,c.estado,
        c.cota_tacos,c.uso_tacos
 FROM usuarios u
@@ -1150,31 +1132,29 @@ LEFT JOIN correio_caixas c ON c.usuario_id=u.id
 WHERE u.estado='ativo' AND
 ((c.parte_local=? AND c.dominio_ascii=?) OR
  (?=? AND u.usuario=?))
-LIMIT 1]]
+LIMIT 1]=]
                 parâmetros = { parte, domínio:minúscula(),
                     domínio:minúscula(), configuração.domínioASCII:minúscula(),
                     parte }
             fim
         senão se identificador ~= "" então
-            sql = [[
-SELECT u.id,u.nome,u.usuario,u.email,u.senha_hash,
+            sql = [=[SELECT u.id,u.nome,u.usuario,u.email,u.senha_hash,
        c.id,c.parte_local,c.dominio_ascii,c.endereco_exibido,c.estado,
        c.cota_tacos,c.uso_tacos
 FROM usuarios u
 LEFT JOIN correio_caixas c ON c.usuario_id=u.id
 WHERE u.usuario=? AND u.estado='ativo'
-LIMIT 1]]
+LIMIT 1]=]
             parâmetros = { identificador }
         fim fim
 
-        sql = sql ou [[
-SELECT u.id,u.nome,u.usuario,u.email,u.senha_hash,
+        sql = sql ou [=[SELECT u.id,u.nome,u.usuario,u.email,u.senha_hash,
        c.id,c.parte_local,c.dominio_ascii,c.endereco_exibido,c.estado,
        c.cota_tacos,c.uso_tacos
 FROM usuarios u
 LEFT JOIN correio_caixas c ON c.usuario_id=u.id
 WHERE u.usuario=? AND u.estado='ativo'
-LIMIT 1]]
+LIMIT 1]=]
         parâmetros = parâmetros ou { "" }
         execute(piscina, sql, parâmetros, função(resultado, falha)
             se falha então
@@ -1265,17 +1245,14 @@ LIMIT 1]]
             para _, valor em ipares(chaves) início
                 parâmetrosDosMetadados[#parâmetrosDosMetadados + 1] = valor
             fim
-            execute(piscina, [[
-SELECT meta.chave_conversa,meta.id,meta.direcao,meta.remetente,
+            execute(piscina, [=[SELECT meta.chave_conversa,meta.id,meta.direcao,meta.remetente,
        meta.destinatarios,a.id,a.nome,a.tipo,a.tamanho
 FROM (
-    SELECT id,direcao,remetente,destinatarios,criada_em,]] .. chave .. [[
-           AS chave_conversa
-    FROM correio_cartas WHERE ]] .. escopo .. [[
-) AS meta
+    SELECT id,direcao,remetente,destinatarios,criada_em,]=] .. chave .. [=[           AS chave_conversa
+    FROM correio_cartas WHERE ]=] .. escopo .. [=[) AS meta
 LEFT JOIN correio_anexos a ON a.carta_id=meta.id
-WHERE meta.chave_conversa IN (]] .. tabela.concatene(lugares, ",") .. [[)
-ORDER BY meta.chave_conversa,meta.criada_em,meta.id,a.id]],
+WHERE meta.chave_conversa IN (]=] .. tabela.concatene(lugares, ",") .. [=[)
+ORDER BY meta.chave_conversa,meta.criada_em,meta.id,a.id]=],
                 parâmetrosDosMetadados,
                 função(resultado, falhaDosMetadados)
                     se falhaDosMetadados então
@@ -1325,14 +1302,13 @@ ORDER BY meta.chave_conversa,meta.criada_em,meta.id,a.id]],
                     fim
                     feche(resultado)
                     para _, mensagem em ipares(mensagens) início
-                        mensagem.__remetentes = nulo
-                        mensagem.__anexos = nulo
+                        tabela.apague(mensagem, "__remetentes")
+                        tabela.apague(mensagem, "__anexos")
                     fim
                     tratador(mensagens, nulo, estado)
                 fim)
         fim
-        execute(piscina, [[
-SELECT id,direcao,pasta,identificacao,remetente,destinatarios,assunto,resumo,
+        execute(piscina, [=[SELECT id,direcao,pasta,identificacao,remetente,destinatarios,assunto,resumo,
 texto,html,tamanho,lida,importante,estado_entrega,falha_entrega,criada_em,
 atualizada_em,responder_para,classificacao_triagem,pontuacao_suspeita,
 motivos_triagem,resultado_spf,resultado_dkim,resultado_dmarc,dominio_autor,
@@ -1344,16 +1320,14 @@ texto,html,tamanho,lida,importante,estado_entrega,falha_entrega,criada_em,
 atualizada_em,responder_para,classificacao_triagem,pontuacao_suspeita,
 motivos_triagem,resultado_spf,resultado_dkim,resultado_dmarc,dominio_autor,
 politica_dmarc,acao_dmarc,decisao_usuario,regra_triagem,decidida_em,
-remetente_envelope,]] .. chave .. [[ AS chave_conversa,
-COUNT(*) OVER (PARTITION BY ]] .. chave .. [[) AS quantidade_conversa,
+remetente_envelope,]=] .. chave .. [=[ AS chave_conversa,
+COUNT(*) OVER (PARTITION BY ]=] .. chave .. [=[) AS quantidade_conversa,
 SUM(CASE WHEN lida=FALSE THEN 1 ELSE 0 END)
-    OVER (PARTITION BY ]] .. chave .. [[) AS nao_lidas_conversa,
-ROW_NUMBER() OVER (PARTITION BY ]] .. chave .. [[
-    ORDER BY criada_em DESC,id DESC) AS ordem_conversa
-FROM correio_cartas WHERE ]] .. escopo .. [[
-) AS conversas
+    OVER (PARTITION BY ]=] .. chave .. [=[) AS nao_lidas_conversa,
+ROW_NUMBER() OVER (PARTITION BY ]=] .. chave .. [=[    ORDER BY criada_em DESC,id DESC) AS ordem_conversa
+FROM correio_cartas WHERE ]=] .. escopo .. [=[) AS conversas
 WHERE ordem_conversa=1
-ORDER BY criada_em DESC,id DESC LIMIT ]] .. limiteDaConsulta ..
+ORDER BY criada_em DESC,id DESC LIMIT ]=] .. limiteDaConsulta ..
             " OFFSET " .. deslocamento,
             parâmetros,
             função(resultado, falha)
@@ -1403,13 +1377,12 @@ ORDER BY criada_em DESC,id DESC LIMIT ]] .. limiteDaConsulta ..
         local chave = assuntoDaConversaSQL("assunto")
         parâmetros[#parâmetros + 1] = caixaId
         parâmetros[#parâmetros + 1] = id
-        execute(piscina, [[
-SELECT id FROM correio_cartas
-WHERE ]] .. escopo .. [[ AND ]] .. chave .. [[=(
-    SELECT ]] .. chave .. [[ FROM correio_cartas
+        execute(piscina, [=[SELECT id FROM correio_cartas
+WHERE ]=] .. escopo .. [=[ AND ]=] .. chave .. [=[=(
+    SELECT ]=] .. chave .. [=[ FROM correio_cartas
     WHERE caixa_id=? AND id=? LIMIT 1
 )
-ORDER BY criada_em,id]], parâmetros, função(resultado, falha)
+ORDER BY criada_em,id]=], parâmetros, função(resultado, falha)
             se falha então feche(resultado); tratador(nulo, falha); retorne fim
             local ids = {}
             enquanto verdadeiro início
@@ -1443,8 +1416,8 @@ ORDER BY criada_em,id]], parâmetros, função(resultado, falha)
         local escopo, parâmetros, falhaDoEscopo =
             escopoDaListagem(caixaId, pasta, busca)
         se não escopo então tratador(nulo, falhaDoEscopo); retorne fim
-        execute(piscina, [[SELECT id,direcao,pasta FROM correio_cartas WHERE ]] ..
-            escopo .. [[ ORDER BY criada_em DESC,id DESC]],
+        execute(piscina, [=[SELECT id,direcao,pasta FROM correio_cartas WHERE ]=] ..
+            escopo .. [=[ ORDER BY criada_em DESC,id DESC]=],
             parâmetros, função(resultado, falha)
                 se falha então feche(resultado); tratador(nulo, falha); retorne fim
                 local mensagens = {}
@@ -1466,14 +1439,13 @@ ORDER BY criada_em,id]], parâmetros, função(resultado, falha)
     função este.listeMensagensIMAP(_, caixaId, pasta, tratador)
         garantaPastaIMAP(caixaId, pasta, função(estado, falhaDoEstado)
             se falhaDoEstado então tratador(nulo, falhaDoEstado); retorne fim
-            execute(piscina, [[
-SELECT id,direcao,pasta,identificacao,remetente,destinatarios,assunto,resumo,
+            execute(piscina, [=[SELECT id,direcao,pasta,identificacao,remetente,destinatarios,assunto,resumo,
 texto,html,tamanho,lida,importante,estado_entrega,falha_entrega,criada_em,
 atualizada_em,responder_para,classificacao_triagem,pontuacao_suspeita,
 motivos_triagem,resultado_spf,resultado_dkim,resultado_dmarc,dominio_autor,
 politica_dmarc,acao_dmarc,decisao_usuario,regra_triagem,decidida_em,
 remetente_envelope,uid_imap,apagada_imap
-FROM correio_cartas WHERE caixa_id=? AND pasta=? ORDER BY uid_imap]],
+FROM correio_cartas WHERE caixa_id=? AND pasta=? ORDER BY uid_imap]=],
                 { caixaId, pasta }, função(resultado, falha)
                     se falha então feche(resultado); tratador(nulo, falha); retorne fim
                     local mensagens = {}
@@ -1497,22 +1469,20 @@ FROM correio_cartas WHERE caixa_id=? AND pasta=? ORDER BY uid_imap]],
     fim
 
     função este.obtenhaMensagem(_, caixaId, id, tratador)
-        execute(piscina, [[
-SELECT id,direcao,pasta,identificacao,remetente,destinatarios,assunto,resumo,
+        execute(piscina, [=[SELECT id,direcao,pasta,identificacao,remetente,destinatarios,assunto,resumo,
 texto,html,tamanho,lida,importante,estado_entrega,falha_entrega,criada_em,
 atualizada_em,responder_para,classificacao_triagem,pontuacao_suspeita,
 motivos_triagem,resultado_spf,resultado_dkim,resultado_dmarc,dominio_autor,
 politica_dmarc,acao_dmarc,decisao_usuario,regra_triagem,decidida_em,
 remetente_envelope
-FROM correio_cartas WHERE caixa_id=? AND id=? LIMIT 1]],
+FROM correio_cartas WHERE caixa_id=? AND id=? LIMIT 1]=],
             { caixaId, id }, função(resultado, falha)
                 se falha então feche(resultado); tratador(nulo, falha); retorne fim
                 local mensagem = linhaDaMensagem(resultado:obterLinha())
                 feche(resultado)
                 se não mensagem então tratador(nulo, nulo); retorne fim
-                execute(piscina, [[
-SELECT id,nome,tipo,tamanho FROM correio_anexos
-WHERE carta_id=? ORDER BY id]], { id }, função(anexos, falhaDosAnexos)
+                execute(piscina, [=[SELECT id,nome,tipo,tamanho FROM correio_anexos
+WHERE carta_id=? ORDER BY id]=], { id }, função(anexos, falhaDosAnexos)
                     se falhaDosAnexos então
                         feche(anexos); tratador(nulo, falhaDosAnexos); retorne
                     fim
@@ -1534,9 +1504,9 @@ WHERE carta_id=? ORDER BY id]], { id }, função(anexos, falhaDosAnexos)
     função este.obtenhaMensagemIMAP(esta, caixaId, id, tratador)
         esta:obtenhaMensagem(caixaId, id, função(mensagem, falha)
             se falha ou não mensagem então tratador(mensagem, falha); retorne fim
-            execute(piscina, [[SELECT mime,mime_objeto,tamanho,uid_imap,
+            execute(piscina, [=[SELECT mime,mime_objeto,tamanho,uid_imap,
 apagada_imap
-FROM correio_cartas WHERE caixa_id=? AND id=? LIMIT 1]],
+FROM correio_cartas WHERE caixa_id=? AND id=? LIMIT 1]=],
                 { caixaId, id }, função(resultado, falhaDoMIME)
                     se falhaDoMIME então
                         feche(resultado); tratador(nulo, falhaDoMIME); retorne
@@ -1574,12 +1544,11 @@ FROM correio_cartas WHERE caixa_id=? AND id=? LIMIT 1]],
         local estatísticas = {
             cartas = 0, candidatos = 0, corrigidos = 0, ignorados = 0
         }
-        execute(piscina, [[
-SELECT DISTINCT c.id,c.mime,c.mime_objeto,c.tamanho
+        execute(piscina, [=[SELECT DISTINCT c.id,c.mime,c.mime_objeto,c.tamanho
 FROM correio_cartas c
 JOIN correio_anexos a ON a.carta_id=c.id
 WHERE a.nome REGEXP '^anexo-[0-9]+$'
-ORDER BY c.id]], {}, função(resultado, falhaDaLista)
+ORDER BY c.id]=], {}, função(resultado, falhaDaLista)
             se falhaDaLista então
                 feche(resultado); tratador(nulo, falhaDaLista); retorne
             fim
@@ -1613,8 +1582,8 @@ ORDER BY c.id]], {}, função(resultado, falhaDaLista)
                                 retorne
                             fim
                             local correção = correções[índice]
-                            execute(transação, [[UPDATE correio_anexos
-SET nome=? WHERE id=? AND carta_id=? AND nome=?]], {
+                            execute(transação, [=[UPDATE correio_anexos
+SET nome=? WHERE id=? AND carta_id=? AND nome=?]=], {
                                 correção.novo, correção.id,
                                 correção.cartaId, correção.anterior
                             }, função(atualização, falhaDaAtualização)
@@ -1650,8 +1619,8 @@ SET nome=? WHERE id=? AND carta_id=? AND nome=?]], {
                         estatísticas.ignorados = estatísticas.ignorados + 1
                         examineCarta(índice + 1); retorne
                     fim
-                    execute(piscina, [[SELECT id,nome,tipo,tamanho
-FROM correio_anexos WHERE carta_id=? ORDER BY id]], { carta.id },
+                    execute(piscina, [=[SELECT id,nome,tipo,tamanho
+FROM correio_anexos WHERE carta_id=? ORDER BY id]=], { carta.id },
                         função(anexos, falhaDosAnexos)
                             se falhaDosAnexos então
                                 feche(anexos); tratador(nulo, falhaDosAnexos); retorne
@@ -1780,9 +1749,8 @@ FROM correio_anexos WHERE carta_id=? ORDER BY id]], { carta.id },
                                                 desfaça(transação, tratador,
                                                     falhaDaMensagem); retorne
                                             fim
-                                            execute(transação, [[
-SELECT validade_uid FROM correio_pastas_imap
-WHERE caixa_id=? AND pasta=? LIMIT 1]],
+                                            execute(transação, [=[SELECT validade_uid FROM correio_pastas_imap
+WHERE caixa_id=? AND pasta=? LIMIT 1]=],
                                                 { caixa.id, pasta },
                                                 função(estado,
                                                        falhaDoEstado)
@@ -1815,12 +1783,11 @@ WHERE caixa_id=? AND pasta=? LIMIT 1]],
                                 fim)
                         fim
                         se pasta ~= "enviadas" então insira(); retorne fim
-                        execute(transação, [[
-SELECT c.id,c.uid_imap,c.mime_objeto,p.validade_uid
+                        execute(transação, [=[SELECT c.id,c.uid_imap,c.mime_objeto,p.validade_uid
 FROM correio_cartas c
 JOIN correio_pastas_imap p ON p.caixa_id=c.caixa_id AND p.pasta=c.pasta
 WHERE c.caixa_id=? AND c.pasta='enviadas' AND c.identificacao=?
-ORDER BY c.id DESC LIMIT 1 FOR UPDATE]],
+ORDER BY c.id DESC LIMIT 1 FOR UPDATE]=],
                             { caixa.id, identificação },
                             função(resultado, falhaDaBusca)
                                 se falhaDaBusca então
@@ -1851,9 +1818,9 @@ ORDER BY c.id DESC LIMIT 1 FOR UPDATE]],
     função este.atualizeSinalizadoresIMAP(_, caixaId, id, sinalizadores,
                                                      tratador)
         sinalizadores = sinalizadores ou {}
-        execute(piscina, [[UPDATE correio_cartas
+        execute(piscina, [=[UPDATE correio_cartas
 SET lida=?,importante=?,apagada_imap=?,atualizada_em=?
-WHERE caixa_id=? AND id=?]],
+WHERE caixa_id=? AND id=?]=],
             { sinalizadores.lida == verdadeiro,
               sinalizadores.importante == verdadeiro,
               sinalizadores.apagada == verdadeiro,
@@ -1862,8 +1829,8 @@ WHERE caixa_id=? AND id=?]],
                 feche(resultado)
                 se falha então tratador(nulo, falha); retorne fim
                 se alteradas == 0 então
-                    execute(piscina, [[SELECT id FROM correio_cartas
-WHERE caixa_id=? AND id=? LIMIT 1]], { caixaId, id },
+                    execute(piscina, [=[SELECT id FROM correio_cartas
+WHERE caixa_id=? AND id=? LIMIT 1]=], { caixaId, id },
                         função(consulta, falhaDaConsulta)
                             se falhaDaConsulta então
                                 feche(consulta); tratador(nulo, falhaDaConsulta); retorne
@@ -1890,10 +1857,9 @@ WHERE caixa_id=? AND id=? LIMIT 1]], { caixaId, id },
     fim
 
     função este.obtenhaAnexo(_, caixaId, mensagemId, anexoId, tratador)
-        execute(piscina, [[
-SELECT a.nome,a.tipo,a.tamanho,a.dados,a.dados_objeto
+        execute(piscina, [=[SELECT a.nome,a.tipo,a.tamanho,a.dados,a.dados_objeto
 FROM correio_anexos a JOIN correio_cartas m ON m.id=a.carta_id
-WHERE m.caixa_id=? AND m.id=? AND a.id=? LIMIT 1]],
+WHERE m.caixa_id=? AND m.id=? AND a.id=? LIMIT 1]=],
             { caixaId, mensagemId, anexoId }, função(resultado, falha)
                 se falha então feche(resultado); tratador(nulo, falha); retorne fim
                 local linha = resultado:obterLinha()
@@ -1925,8 +1891,8 @@ WHERE m.caixa_id=? AND m.id=? AND a.id=? LIMIT 1]],
     fim
 
     função este.marqueLida(_, caixaId, id, tratador)
-        execute(piscina, [[UPDATE correio_cartas SET lida=TRUE,atualizada_em=?
-WHERE caixa_id=? AND id=?]], { so.tempo(), caixaId, id },
+        execute(piscina, [=[UPDATE correio_cartas SET lida=TRUE,atualizada_em=?
+WHERE caixa_id=? AND id=?]=], { so.tempo(), caixaId, id },
             função(resultado, falha)
                 local alteradas = resultado e resultado:linhasAfetadas() ou 0
                 feche(resultado); tratador(falha e nulo ou alteradas > 0, falha)
@@ -1934,8 +1900,8 @@ WHERE caixa_id=? AND id=?]], { so.tempo(), caixaId, id },
     fim
 
     função este.marqueNãoLida(_, caixaId, id, tratador)
-        execute(piscina, [[UPDATE correio_cartas SET lida=FALSE,atualizada_em=?
-WHERE caixa_id=? AND id=?]], { so.tempo(), caixaId, id },
+        execute(piscina, [=[UPDATE correio_cartas SET lida=FALSE,atualizada_em=?
+WHERE caixa_id=? AND id=?]=], { so.tempo(), caixaId, id },
             função(resultado, falha)
                 local mudou = resultado e resultado:linhasAfetadas() > 0
                 feche(resultado)
@@ -1968,8 +1934,8 @@ WHERE caixa_id=? AND id=?]], { so.tempo(), caixaId, id },
     função este.remetenteConfiável(_, caixaId, remetente, tratador)
         local endereço = normalizeRemetente(remetente)
         se não endereço então tratador(falso, nulo); retorne fim
-        execute(piscina, [[SELECT 1 FROM correio_remetentes_confiaveis
-WHERE caixa_id=? AND endereco=? LIMIT 1]], { caixaId, endereço },
+        execute(piscina, [=[SELECT 1 FROM correio_remetentes_confiaveis
+WHERE caixa_id=? AND endereco=? LIMIT 1]=], { caixaId, endereço },
             função(resultado, falha)
                 se falha então feche(resultado); tratador(nulo, falha); retorne fim
                 local existe = resultado:obterLinha() ~= nulo
@@ -1983,9 +1949,9 @@ WHERE caixa_id=? AND endereco=? LIMIT 1]], { caixaId, endereço },
         se não endereço então
             tratador(nulo, "endereço do remetente inválido"); retorne
         fim
-        execute(piscina, [[INSERT INTO correio_remetentes_confiaveis
+        execute(piscina, [=[INSERT INTO correio_remetentes_confiaveis
 (caixa_id,endereco) VALUES (?,?)
-ON DUPLICATE KEY UPDATE atualizada_em=CURRENT_TIMESTAMP]],
+ON DUPLICATE KEY UPDATE atualizada_em=CURRENT_TIMESTAMP]=],
             { caixaId, endereço }, função(resultado, falha)
                 feche(resultado)
                 tratador(falha e nulo ou verdadeiro, falha)
@@ -1997,8 +1963,8 @@ ON DUPLICATE KEY UPDATE atualizada_em=CURRENT_TIMESTAMP]],
         se não endereço então
             tratador(nulo, "endereço do remetente inválido"); retorne
         fim
-        execute(piscina, [[DELETE FROM correio_remetentes_confiaveis
-WHERE caixa_id=? AND endereco=?]], { caixaId, endereço },
+        execute(piscina, [=[DELETE FROM correio_remetentes_confiaveis
+WHERE caixa_id=? AND endereco=?]=], { caixaId, endereço },
             função(resultado, falha)
                 feche(resultado)
                 tratador(falha e nulo ou verdadeiro, falha)
@@ -2006,10 +1972,10 @@ WHERE caixa_id=? AND endereco=?]], { caixaId, endereço },
     fim
 
     função este.listeRegrasDaTriagem(_, caixaId, tratador)
-        execute(piscina, [[SELECT escopo,valor,decisao,
+        execute(piscina, [=[SELECT escopo,valor,decisao,
 UNIX_TIMESTAMP(criada_em),UNIX_TIMESTAMP(atualizada_em)
 FROM correio_regras_triagem WHERE caixa_id=?
-ORDER BY escopo,valor]], { caixaId }, função(resultado, falha)
+ORDER BY escopo,valor]=], { caixaId }, função(resultado, falha)
             se falha então feche(resultado); tratador(nulo, falha); retorne fim
             local regras = {}
             enquanto verdadeiro início
@@ -2038,10 +2004,10 @@ ORDER BY escopo,valor]], { caixaId }, função(resultado, falha)
         piscina:inicieTransaçãoAssíncrona(
             função(_, transação, falhaDaTransação)
                 se falhaDaTransação então tratador(nulo, falhaDaTransação); retorne fim
-                execute(transação, [[INSERT INTO correio_regras_triagem
+                execute(transação, [=[INSERT INTO correio_regras_triagem
 (caixa_id,escopo,valor,decisao) VALUES (?,?,?,?)
 ON DUPLICATE KEY UPDATE decisao=VALUES(decisao),
-atualizada_em=CURRENT_TIMESTAMP]],
+atualizada_em=CURRENT_TIMESTAMP]=],
                     { caixaId, escopoInterno, valorInterno, decisão },
                     função(resultado, falhaDaRegra)
                         feche(resultado)
@@ -2050,8 +2016,8 @@ atualizada_em=CURRENT_TIMESTAMP]],
                         fim
                         local ação = decisão == "permitir" e
                             "regra_permitir" ou "regra_separar"
-                        execute(transação, [[INSERT INTO correio_historico_triagem
-(caixa_id,carta_id,acao,escopo,valor) VALUES (?,NULL,?,?,?)]],
+                        execute(transação, [=[INSERT INTO correio_historico_triagem
+(caixa_id,carta_id,acao,escopo,valor) VALUES (?,NULL,?,?,?)]=],
                             { caixaId, ação, escopoInterno, valorInterno },
                             função(histórico, falhaDoHistórico)
                                 feche(histórico)
@@ -2075,16 +2041,16 @@ atualizada_em=CURRENT_TIMESTAMP]],
         piscina:inicieTransaçãoAssíncrona(
             função(_, transação, falhaDaTransação)
                 se falhaDaTransação então tratador(nulo, falhaDaTransação); retorne fim
-                execute(transação, [[DELETE FROM correio_regras_triagem
-WHERE caixa_id=? AND escopo=? AND valor=?]],
+                execute(transação, [=[DELETE FROM correio_regras_triagem
+WHERE caixa_id=? AND escopo=? AND valor=?]=],
                     { caixaId, escopoInterno, valorInterno },
                     função(resultado, falhaDaRemoção)
                         feche(resultado)
                         se falhaDaRemoção então
                             desfaça(transação, tratador, falhaDaRemoção); retorne
                         fim
-                        execute(transação, [[INSERT INTO correio_historico_triagem
-(caixa_id,carta_id,acao,escopo,valor) VALUES (?,NULL,'regra_removida',?,?)]],
+                        execute(transação, [=[INSERT INTO correio_historico_triagem
+(caixa_id,carta_id,acao,escopo,valor) VALUES (?,NULL,'regra_removida',?,?)]=],
                             { caixaId, escopoInterno, valorInterno },
                             função(histórico, falhaDoHistórico)
                                 feche(histórico)
@@ -2106,8 +2072,8 @@ WHERE caixa_id=? AND escopo=? AND valor=?]],
         piscina:inicieTransaçãoAssíncrona(
             função(_, transação, falhaDaTransação)
                 se falhaDaTransação então tratador(nulo, falhaDaTransação); retorne fim
-                execute(transação, [[SELECT remetente,direcao
-FROM correio_cartas WHERE caixa_id=? AND id=? FOR UPDATE]],
+                execute(transação, [=[SELECT remetente,direcao
+FROM correio_cartas WHERE caixa_id=? AND id=? FOR UPDATE]=],
                     { caixaId, cartaId }, função(consulta, falhaDaConsulta)
                         se falhaDaConsulta então
                             feche(consulta); desfaça(transação, tratador,
@@ -2126,10 +2092,10 @@ FROM correio_cartas WHERE caixa_id=? AND id=? FOR UPDATE]],
                         fim
                         local regra = decisão == "regular" e
                             "permitir" ou "separar"
-                        execute(transação, [[INSERT INTO correio_regras_triagem
+                        execute(transação, [=[INSERT INTO correio_regras_triagem
 (caixa_id,escopo,valor,decisao) VALUES (?,'endereco',?,?)
 ON DUPLICATE KEY UPDATE decisao=VALUES(decisao),
-atualizada_em=CURRENT_TIMESTAMP]],
+atualizada_em=CURRENT_TIMESTAMP]=],
                             { caixaId, endereço, regra },
                             função(inclusão, falhaDaRegra)
                                 feche(inclusão)
@@ -2139,9 +2105,9 @@ atualizada_em=CURRENT_TIMESTAMP]],
                                 fim
                                 local pasta = decisão == "regular" e
                                     "entrada" ou "indesejadas"
-                                execute(transação, [[UPDATE correio_cartas
+                                execute(transação, [=[UPDATE correio_cartas
 SET pasta=?,decisao_usuario=?,regra_triagem=?,decidida_em=?,atualizada_em=?
-WHERE caixa_id=? AND id=?]], {
+WHERE caixa_id=? AND id=?]=], {
                                     pasta, decisão, "endereco:" .. endereço,
                                     so.tempo(), so.tempo(), caixaId, cartaId
                                 }, função(atualização, falhaDaAtualização)
@@ -2152,8 +2118,8 @@ WHERE caixa_id=? AND id=?]], {
                                     fim
                                     local ação = decisão == "regular" e
                                         "marcou_regular" ou "marcou_indesejada"
-                                    execute(transação, [[INSERT INTO correio_historico_triagem
-(caixa_id,carta_id,acao,escopo,valor) VALUES (?,? ,?,'endereco',?)]],
+                                    execute(transação, [=[INSERT INTO correio_historico_triagem
+(caixa_id,carta_id,acao,escopo,valor) VALUES (?,? ,?,'endereco',?)]=],
                                         { caixaId, cartaId, ação, endereço },
                                         função(histórico, falhaDoHistórico)
                                             feche(histórico)
@@ -2246,8 +2212,8 @@ WHERE caixa_id=? AND id=?]], {
     fim
 
     função este.atualizeEntrega(_, idDaFila, estado, falhaDaEntrega, tratador)
-        execute(piscina, [[UPDATE correio_cartas
-SET estado_entrega=?,falha_entrega=?,atualizada_em=? WHERE referencia_fila=?]],
+        execute(piscina, [=[UPDATE correio_cartas
+SET estado_entrega=?,falha_entrega=?,atualizada_em=? WHERE referencia_fila=?]=],
             { estado, falhaDaEntrega, so.tempo(), idDaFila },
             função(resultado, falha)
                 local alteradas = resultado e resultado:linhasAfetadas() ou 0
@@ -2262,12 +2228,12 @@ SET estado_entrega=?,falha_entrega=?,atualizada_em=? WHERE referencia_fila=?]],
            tipo(aviso.detalhes) ~= "tabela" então
             tratador(nulo, "aviso de entrega inválido"); retorne
         fim
-        execute(piscina, [[SELECT c.caixa_id,c.identificacao,c.remetente,
+        execute(piscina, [=[SELECT c.caixa_id,c.identificacao,c.remetente,
 c.assunto,c.mime,c.mime_objeto,c.tamanho,f.criada_em
 FROM correio_cartas c
 JOIN correio_fila f ON f.id=c.referencia_fila
 WHERE c.referencia_fila=? AND c.direcao='saida'
-ORDER BY c.id LIMIT 1]], { aviso.fila }, função(resultado, falha)
+ORDER BY c.id LIMIT 1]=], { aviso.fila }, função(resultado, falha)
             se falha então feche(resultado); tratador(nulo, falha); retorne fim
             local linha = resultado:obterLinha()
             feche(resultado)
@@ -2323,9 +2289,9 @@ ORDER BY c.id LIMIT 1]], { aviso.fila }, função(resultado, falha)
                             se falhaDaTransação então
                                 tratador(nulo, falhaDaTransação); retorne
                             fim
-                            execute(transação, [[SELECT estado,carta_id
+                            execute(transação, [=[SELECT estado,carta_id
 FROM correio_avisos_entrega
-WHERE fila_id=? AND tipo=? FOR UPDATE]],
+WHERE fila_id=? AND tipo=? FOR UPDATE]=],
                                 { aviso.fila, aviso.tipo },
                                 função(consulta, falhaDaConsulta)
                                     se falhaDaConsulta então
@@ -2370,11 +2336,10 @@ WHERE fila_id=? AND tipo=? FOR UPDATE]],
                                                             falhaDaMensagem)
                                                         retorne
                                                     fim
-                                                    execute(transação, [[
-UPDATE correio_avisos_entrega
+                                                    execute(transação, [=[UPDATE correio_avisos_entrega
 SET estado='entregue',carta_id=?,bilhete=NULL,arrendada_ate=NULL,
     atualizada_em=?
-WHERE fila_id=? AND tipo=? AND estado='processando']],
+WHERE fila_id=? AND tipo=? AND estado='processando']=],
                                                         { cartaId, so.tempo(),
                                                           aviso.fila, aviso.tipo },
                                                         função(atualização,
@@ -2425,8 +2390,8 @@ WHERE fila_id=? AND tipo=? AND estado='processando']],
         se não domínio então tratador(falso); retorne fim
 
         local função confiraCaixa()
-            execute(piscina, [[SELECT id FROM correio_caixas
-WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]],
+            execute(piscina, [=[SELECT id FROM correio_caixas
+WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]=],
                 { parte, domínio }, função(resultado, falha)
                     se falha então
                         feche(resultado); tratador(nulo, falha); retorne
@@ -2441,13 +2406,12 @@ WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]],
                     -- Um usuário ativo deve receber cartas mesmo antes de abrir
                     -- o Carteiro pela primeira vez. A restrição única torna o
                     -- provisionamento seguro sob pedidos simultâneos.
-                    execute(piscina, [[
-INSERT INTO correio_caixas
+                    execute(piscina, [=[INSERT INTO correio_caixas
 (usuario_id,parte_local,dominio_ascii,endereco_exibido,nome_exibido)
 SELECT u.id,?,?,?,u.nome FROM usuarios u
 WHERE u.usuario=? AND u.estado='ativo' LIMIT 1
 ON DUPLICATE KEY UPDATE nome_exibido=VALUES(nome_exibido),
-endereco_exibido=VALUES(endereco_exibido)]], {
+endereco_exibido=VALUES(endereco_exibido)]=], {
                         parte, domínio,
                         parte .. "@" .. (configuração.domínio ou domínio),
                         parte
@@ -2457,8 +2421,8 @@ endereco_exibido=VALUES(endereco_exibido)]], {
                             tratador(nulo, falhaDaInclusão)
                             retorne
                         fim
-                        execute(piscina, [[SELECT id FROM correio_caixas
-WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]],
+                        execute(piscina, [=[SELECT id FROM correio_caixas
+WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]=],
                             { parte, domínio },
                             função(confirmação, falhaDaConfirmação)
                                 se falhaDaConfirmação então
@@ -2483,8 +2447,8 @@ WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]],
         local parte = endereço:corte(1, arroba - 1):minúscula()
         local domínio, falha = rede.domínioASCII(endereço:corte(arroba + 1))
         se não domínio então tratador(nulo, falha); retorne fim
-        execute(escopo, [[SELECT id FROM correio_caixas
-WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]],
+        execute(escopo, [=[SELECT id FROM correio_caixas
+WHERE parte_local=? AND dominio_ascii=? AND estado='ativa' LIMIT 1]=],
             { parte, domínio }, função(resultado, falhaSQL)
                 se falhaSQL então feche(resultado); tratador(nulo, falhaSQL); retorne fim
                 local linha = resultado:obterLinha(); feche(resultado)

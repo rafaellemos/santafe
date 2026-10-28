@@ -50,6 +50,9 @@ ZLIB=(
 # CJSON é compilado separadamente; linit.c apenas registra luaopen_cjson.
 JSON=(lua_cjson.c strbuf.c fpconv.c)
 
+# O cabeçalho público habilita IBA3, inclusive no WebAssembly.
+DADOS_FLAGS=(-DLUA_USE_APICHECK)
+
 # O empacotador do Emscripten não aceita acentos no nome do símbolo gerado
 # para o caminho virtual. O carregador do Santafé também procura por .fe.
 emcc \
@@ -58,6 +61,7 @@ emcc \
   "${LIBS[@]}" \
   "${ZLIB[@]}" \
   "${JSON[@]}" \
+  "${DADOS_FLAGS[@]}" \
   -I. \
   -O2 \
   -D'lua_writestring(s,l)=sf_wasm_writestring(s,l)' \

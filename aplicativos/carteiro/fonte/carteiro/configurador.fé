@@ -35,7 +35,7 @@ função configurador.perfilApple(dados)
     local uuidDoPerfil = uuidDeterminístico(identidade .. ":perfil")
     local uuidDaConta = uuidDeterminístico(identidade .. ":conta")
 
-    retorne [[<?xml version="1.0" encoding="UTF-8"?>
+    retorne [=[<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -45,31 +45,31 @@ função configurador.perfilApple(dados)
       <key>EmailAccountDescription</key>
       <string>Correio Santafé</string>
       <key>EmailAccountName</key>
-      <string>]] .. escapeXML(nome) .. [[</string>
+      <string>]=] .. escapeXML(nome) .. [=[</string>
       <key>EmailAccountType</key>
       <string>EmailTypeIMAP</string>
       <key>EmailAddress</key>
-      <string>]] .. escapeXML(endereço) .. [[</string>
+      <string>]=] .. escapeXML(endereço) .. [=[</string>
       <key>IncomingMailServerAuthentication</key>
       <string>EmailAuthPassword</string>
       <key>IncomingMailServerHostName</key>
-      <string>]] .. escapeXML(servidor) .. [[</string>
+      <string>]=] .. escapeXML(servidor) .. [=[</string>
       <key>IncomingMailServerPortNumber</key>
       <integer>993</integer>
       <key>IncomingMailServerUseSSL</key>
       <true/>
       <key>IncomingMailServerUsername</key>
-      <string>]] .. escapeXML(usuário) .. [[</string>
+      <string>]=] .. escapeXML(usuário) .. [=[</string>
       <key>OutgoingMailServerAuthentication</key>
       <string>EmailAuthPassword</string>
       <key>OutgoingMailServerHostName</key>
-      <string>]] .. escapeXML(servidor) .. [[</string>
+      <string>]=] .. escapeXML(servidor) .. [=[</string>
       <key>OutgoingMailServerPortNumber</key>
       <integer>465</integer>
       <key>OutgoingMailServerUseSSL</key>
       <true/>
       <key>OutgoingMailServerUsername</key>
-      <string>]] .. escapeXML(usuário) .. [[</string>
+      <string>]=] .. escapeXML(usuário) .. [=[</string>
       <key>OutgoingPasswordSameAsIncomingPassword</key>
       <true/>
       <key>PayloadDescription</key>
@@ -77,36 +77,36 @@ função configurador.perfilApple(dados)
       <key>PayloadDisplayName</key>
       <string>Correio Santafé</string>
       <key>PayloadIdentifier</key>
-      <string>]] .. identificador .. [[.conta</string>
+      <string>]=] .. identificador .. [=[.conta</string>
       <key>PayloadType</key>
       <string>com.apple.mail.managed</string>
       <key>PayloadUUID</key>
-      <string>]] .. uuidDaConta .. [[</string>
+      <string>]=] .. uuidDaConta .. [=[</string>
       <key>PayloadVersion</key>
       <integer>1</integer>
     </dict>
   </array>
   <key>PayloadDescription</key>
-  <string>Configura a conta ]] .. escapeXML(endereço) .. [[ no Correio Santafé. A senha não faz parte deste perfil.</string>
+  <string>Configura a conta ]=] .. escapeXML(endereço) .. [=[ no Correio Santafé. A senha não faz parte deste perfil.</string>
   <key>PayloadDisplayName</key>
   <string>Correio Santafé</string>
   <key>PayloadIdentifier</key>
-  <string>]] .. identificador .. [[</string>
+  <string>]=] .. identificador .. [=[</string>
   <key>PayloadOrganization</key>
   <string>Santafé</string>
   <key>PayloadScope</key>
-  <string>]] .. escopo .. [[</string>
+  <string>]=] .. escopo .. [=[</string>
   <key>TargetDeviceType</key>
-  <integer>]] .. tipoDoAparelho .. [[</integer>
+  <integer>]=] .. tipoDoAparelho .. [=[</integer>
   <key>PayloadType</key>
   <string>Configuration</string>
   <key>PayloadUUID</key>
-  <string>]] .. uuidDoPerfil .. [[</string>
+  <string>]=] .. uuidDoPerfil .. [=[</string>
   <key>PayloadVersion</key>
   <integer>1</integer>
 </dict>
 </plist>
-]]
+]=]
 fim
 
 retorne configurador

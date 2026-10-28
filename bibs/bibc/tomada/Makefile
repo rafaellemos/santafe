@@ -93,7 +93,7 @@ limpar:
 
 # Instalação
 PREFIX= /usr/local
-INSTALL_BIN= $(PREFIX)/lib/santafé/1.0/bibc
+INSTALL_BIN= $(PREFIX)/lib/santafé/3.0/bibc
 
 instalar:
 	@# 1. Roda o make all silenciado com Spinner animado

@@ -2,7 +2,7 @@
 -- Chunks do corpo só são concatenados uma vez. Nunca ler stdin via stdio em
 -- paralelo com este módulo (o buffer de stdio esconderia bytes de poll).
 local T={}
-função T.novo(nativo)
+função T.novo(nativo, dados)
     local self={cancelados={},ativo=nulo,terminado=falso,falha=nulo}
     local fila,primeiroFila,final,naFila={},1,0,{}
     local octetosFila=0
@@ -85,9 +85,9 @@ função T.novo(nativo)
         enquanto primeiroFila>final e não self.terminado início self.puxe(30) fim
         se self.falha então retorne nulo,self.falha fim
         se primeiroFila>final então retorne nulo fim
-        local item=fila[primeiroFila]; fila[primeiroFila]=nulo; primeiroFila=primeiroFila+1
+        local item=fila[primeiroFila]; dados.apague(fila,primeiroFila); primeiroFila=primeiroFila+1
         octetosFila=octetosFila-item.tamanho
-        se tipo(item.pedido)=="tabela" e item.pedido.id~=nulo então naFila[item.pedido.id]=nulo fim
+        se tipo(item.pedido)=="tabela" e item.pedido.id~=nulo então dados.apague(naFila,item.pedido.id) fim
         se primeiroFila>final então fila,primeiroFila,final={},1,0 fim
         retorne item
     fim

@@ -1,0 +1,103 @@
+{
+  "candidato": "dados.22",
+  "base_sha256": "2aaa87ecd47749da0695e45b55b08e16783618c204261a56e283cfbc0ca8d72a",
+  "base_arquivos": 880,
+  "alterados": [
+    {
+      "arquivo": "src/lua.h",
+      "antes": "39809509164b685d9c2c1f6f1ed847cfebdfbb722b755a586370fbb64d0192bd",
+      "depois": "20f7f79c2105e118cb5db388f305bcaa779c10b9b4c0f9d3e3120ba65b95c5c4"
+    },
+    {
+      "arquivo": "ferramentas/sls/sls.fé",
+      "antes": "f3b9b1836fc5ca651920e5d544f07214c4c08833224bd36dd08182f9c41aa7ac",
+      "depois": "5626d4cbe408e4df4be752549472091443f6a82aabff93d8561caaf232fa1126"
+    },
+    {
+      "arquivo": "ferramentas/pacotes/cli.fé",
+      "antes": "f97d8e931e2cceeac5d5657574c04b2f9bbf12d5caf8c1fb64082d50b2c6827c",
+      "depois": "dd37c5a80c443e3770f78bbb8aad70180b002c6e5f310ae480e2ad928e5ee04e"
+    },
+    {
+      "arquivo": "Makefile",
+      "antes": "c065b34b2c8cdc26aa121d4d3c740fb15688ee280e09ac3d93ece5f275ada67a",
+      "depois": "415b5dee6146078c3797c35b07e4f5528a487ab559d7013c1910f2470354dd3d"
+    },
+    {
+      "arquivo": "instalar.sh",
+      "antes": "99464e59854d1470a2bc7ea9e155546cf145a4a7fa9034e4116e5fb95bbb1a6c",
+      "depois": "9a4ff27975940e95b586b44fe83ea36419f3ab0bb467e2749b56e832c2fc9e94"
+    },
+    {
+      "arquivo": "docs/manual.html",
+      "antes": "afad640731aa60a01661d0a3fe467d4637e9dbb64ab8440c13cc984574b4419c",
+      "depois": "d7c2f7fd83b795369f55962c7b61fc8178340655caff1aee5ce015e7d996d4ff"
+    },
+    {
+      "arquivo": "experimentos/dados-v2/editores.py",
+      "antes": "3c34b7d0ef45d4cf8bed4c1ab651101b899b48ccfab8b9662d7a507516c44104",
+      "depois": "590dd7cba0730254568cac9c85c472eb4aca7f84c29bfeebaf79fa5081bfde27"
+    },
+    {
+      "arquivo": "experimentos/dados-v2/testar-editores.js",
+      "antes": "2b48916a9d05abf3ff5a46ae2621dd8432044d1d05d66512e5b2a8e92c4431d7",
+      "depois": "6a16416d076f0e4b9093ff755bab51763225e6d8a46f56e9aa38a2bfddab719e"
+    },
+    {
+      "arquivo": "experimentos/dados-v3/testar-wasm.js",
+      "antes": "88310d70318054be3e03f12a9394d898b76a004284c86ab38f551d6fd957f7b1",
+      "depois": "412b6bc76ea4304dd5f2518a15fe4afab22dc31e9e05841cb66760d1f906fc35"
+    },
+    {
+      "arquivo": "experimentos/dados-v5/testar-instalacao.py",
+      "antes": "543dbad01062988dd6a1603295fc3f28fa8c3f0e2d489ad9c1e0dcb728cefd32",
+      "depois": "01e013be4a281115ec2e3ca09b04476ca7942af9e8282e04c0095f184c85e563"
+    },
+    {
+      "arquivo": "experimentos/dados-v6/operacao.py",
+      "antes": "81d52cfb3a029b853e24a5534501c7d15cf5d260bcb14be9b76ee70e7eeec828",
+      "depois": "0d89ec19a35039db26515e7e53c746b6c0afa8085838444c2085e545a6e3b8de"
+    },
+    {
+      "arquivo": "experimentos/dados-v6/testar-operacao.py",
+      "antes": "4f4920cb9dbe8fa90cfbc4fbb99b5bb0156ded350b9632547c55349e9efffc0a",
+      "depois": "0e57faf56e8a4dbafa657283eb3cf5004f4864142fd9320d3cedd2d174490094"
+    },
+    {
+      "arquivo": "experimentos/dados-v8/testar-editores.js",
+      "antes": "23e92cad56f2e976e8f803c18af53290bb0663938f9cebe83b47429ef5eff165",
+      "depois": "5b9513176795e99525d9561a45b2c049f2f59b19c2b85190bd88d2710df8e51d"
+    },
+    {
+      "arquivo": "experimentos/dados-v8/testar-recorte-sublime.py",
+      "antes": "0e394b9a7d30d4a23f9aafe3398a4b8087534df1d0b4a361fd1d8c3373b50888",
+      "depois": "3c1bbfa33c4962ea1154a041d6bf43f8ef831057bc2b928116a69e1e3efae0ab"
+    },
+    {
+      "arquivo": "experimentos/dados-v10/testar.py",
+      "antes": "8cbbcbf5f7e558fd59a41faee7a33cc19d86993d5a6f13941f119ee247205c8d",
+      "depois": "327902b72035ccf59803fd3bd6451feb4b7bf3fc21398f629218a34ffb145b35"
+    },
+    {
+      "arquivo": "experimentos/dados-v10/testar-iba.py",
+      "antes": "ce922b502c05f9b821ff64a84e997e701986bb590c1677e432ba0fceac06661d",
+      "depois": "65c09edc679b3ef90852490f4e3555fe52d7a9aada383d9b8b1251e05165189a",
+      "motivo": "correção isolada conferida na consolidação"
+    },
+    {
+      "arquivo": "experimentos/dados-v3/testar-mariadb.py",
+      "antes": "ea00c352de593fefdb11e52548f5dc51e14deadbd6a08af5d2673fa321f21ed1",
+      "depois": "56e40df661410298c2535a0bc080ced0e216ed929d5b7757b0884aeb68662c13",
+      "motivo": "correção isolada conferida na consolidação"
+    },
+    {
+      "arquivo": "experimentos/dados-v5/laboratorio.py",
+      "antes": "488687a9fae371865a70d3a48204498e81417ec51aaab28d1a36a8de4ce5b54a",
+      "depois": "0436845d0c65568b62139ee41ae6359d2ba509635585dc0f3dc752ba02a81eca",
+      "motivo": "correção isolada conferida na consolidação"
+    }
+  ],
+  "semantica_alterada": false,
+  "producao_alterada": false,
+  "publicacao_permitida": false
+}

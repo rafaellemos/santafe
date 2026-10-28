@@ -1,0 +1,14 @@
+local onfé=executeArquivo("experimentos/dados-v1/onfé.fé")
+local pessoa={nome="José",telefone=nulo}
+local lista=[pessoa,nulo,"última posição"]
+mostre(tipo(lista), #lista, tamanho(lista))
+mostre("telefone presente:",tabela.temChave(pessoa,"telefone"))
+tabela.apague(pessoa,"telefone")
+mostre("depois de apagar:",tabela.temChave(pessoa,"telefone"))
+local nome="José"
+mostre(`Olá, ®nome — Ⓡ{#lista} posições`)
+mostre([=[Este é um colar bruto:
+®nome não interpola e \n não vira quebra.]=])
+local dados=onfé.carregue("experimentos/dados-v1/exemplo.onfé")
+mostre("ONFÉ:",onfé.cod(dados))
+mostre("JSON:",onfé.paraJSON(dados))

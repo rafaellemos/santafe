@@ -12,7 +12,7 @@ BINARY = ROOT / 'src/santafé'
 
 with tempfile.TemporaryDirectory(prefix='santafe-rpdf-') as temporary:
     root = Path(temporary)
-    library = root / 'instalação isolada/share/santafé/1.0/bibf'
+    library = root / 'instalação isolada/share/santafé/3.0/bibf'
     font = library / 'rpdf/fontes/NotoSans-Regular.ttf'
     font.parent.mkdir(parents=True)
     shutil.copy2(ROOT / 'bibs/bibf/rpdf_unicode.fé', library)

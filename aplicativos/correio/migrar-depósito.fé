@@ -39,24 +39,24 @@ fim
 local migrações = {
     {
         nome = "cartas",
-        selecione = [[SELECT id,mime FROM correio_cartas
-WHERE mime_objeto IS NULL AND mime IS NOT NULL ORDER BY id LIMIT 1]],
-        atualize = [[UPDATE correio_cartas SET mime_objeto=?,mime=NULL
-WHERE id=? AND mime_objeto IS NULL]]
+        selecione = [=[SELECT id,mime FROM correio_cartas
+WHERE mime_objeto IS NULL AND mime IS NOT NULL ORDER BY id LIMIT 1]=],
+        atualize = [=[UPDATE correio_cartas SET mime_objeto=?,mime=NULL
+WHERE id=? AND mime_objeto IS NULL]=]
     },
     {
         nome = "anexos",
-        selecione = [[SELECT id,dados FROM correio_anexos
-WHERE dados_objeto IS NULL AND dados IS NOT NULL ORDER BY id LIMIT 1]],
-        atualize = [[UPDATE correio_anexos SET dados_objeto=?,dados=NULL
-WHERE id=? AND dados_objeto IS NULL]]
+        selecione = [=[SELECT id,dados FROM correio_anexos
+WHERE dados_objeto IS NULL AND dados IS NOT NULL ORDER BY id LIMIT 1]=],
+        atualize = [=[UPDATE correio_anexos SET dados_objeto=?,dados=NULL
+WHERE id=? AND dados_objeto IS NULL]=]
     },
     {
         nome = "fila",
-        selecione = [[SELECT id,conteudo FROM correio_fila
-WHERE conteudo_objeto IS NULL AND conteudo IS NOT NULL ORDER BY id LIMIT 1]],
-        atualize = [[UPDATE correio_fila SET conteudo_objeto=?,conteudo=NULL
-WHERE id=? AND conteudo_objeto IS NULL]]
+        selecione = [=[SELECT id,conteudo FROM correio_fila
+WHERE conteudo_objeto IS NULL AND conteudo IS NOT NULL ORDER BY id LIMIT 1]=],
+        atualize = [=[UPDATE correio_fila SET conteudo_objeto=?,conteudo=NULL
+WHERE id=? AND conteudo_objeto IS NULL]=]
     }
 }
 
@@ -116,8 +116,8 @@ mariadb.criePiscinaAssíncrona(configuração.banco,
     função(novaPiscina, falhaDaPiscina)
         se não novaPiscina então termineComFalha(falhaDaPiscina); retorne fim
         piscina = novaPiscina
-        execute([[SELECT versao FROM correio_migracoes
-WHERE componente='correio' ORDER BY versao DESC LIMIT 1]], {},
+        execute([=[SELECT versao FROM correio_migracoes
+WHERE componente='correio' ORDER BY versao DESC LIMIT 1]=], {},
             função(resultado, falhaDaEstrutura)
                 se falhaDaEstrutura então
                     feche(resultado); termineComFalha(falhaDaEstrutura); retorne

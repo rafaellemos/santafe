@@ -1,0 +1,147 @@
+-- SemVer e intervalos declarativos. Não executa código nem consulta a rede.
+local V={}
+local função divida(texto,separador)
+    local partes,posição={},1
+    enquanto verdadeiro início
+        local começo,final=texto:procure(separador,posição,verdadeiro)
+        se não começo então partes[#partes+1]=texto:corte(posição); retorne partes fim
+        partes[#partes+1]=texto:corte(posição,começo-1); posição=final+1
+    fim
+fim
+local função número(texto)
+    se não texto:separe("^%d+$") ou (#texto>1 e texto:corte(1,1)=="0") então retorne nulo fim
+    local n=paraNúmero(texto)
+    retorne n e n<=2147483647 e n ou nulo
+fim
+função V.leia(texto)
+    se tipo(texto)~="colar" ou #texto>192 então retorne nulo,"versão inválida" fim
+    local base,metadados=texto:separe("^(.-)%+(.+)$")
+    base=base ou texto
+    se metadados então
+        para _,parte em ipares(divida(metadados,".")) início
+            se não parte:separe("^[A-Za-z0-9-]+$") então retorne nulo,"metadados de versão inválidos" fim
+        fim
+    fim
+    local núcleo,pré=base:separe("^(%d+%.%d+%.%d+)%-(.+)$")
+    núcleo=núcleo ou base
+    local a,b,c=núcleo:separe("^(%d+)%.(%d+)%.(%d+)$")
+    se não a então retorne nulo,"versão deve ter três componentes" fim
+    a,b,c=número(a),número(b),número(c)
+    se não a ou não b ou não c então retorne nulo,"componente de versão inválido" fim
+    local identificadores={}
+    se pré então
+        identificadores=divida(pré,".")
+        para _,parte em ipares(identificadores) início
+            se não parte:separe("^[A-Za-z0-9-]+$") ou
+               (parte:separe("^%d+$") e #parte>1 e parte:corte(1,1)=="0") então
+                retorne nulo,"pré-lançamento inválido"
+            fim
+        fim
+    fim
+    retorne {a=a,b=b,c=c,pré=identificadores,texto=texto,metadados=metadados}
+fim
+local função compareTexto(a,b) se a==b então retorne 0 fim; retorne a<b e -1 ou 1 fim
+função V.compare(a,b)
+    se tipo(a)=="colar" então a=garanta(V.leia(a)) fim
+    se tipo(b)=="colar" então b=garanta(V.leia(b)) fim
+    para _,k em ipares({"a","b","c"}) início
+        se a[k]~=b[k] então retorne a[k]<b[k] e -1 ou 1 fim
+    fim
+    se #a.pré==0 ou #b.pré==0 então
+        se #a.pré==#b.pré então retorne 0 fim
+        retorne #a.pré==0 e 1 ou -1
+    fim
+    para i=1,mat.máximo(#a.pré,#b.pré) início
+        local x,y=a.pré[i],b.pré[i]
+        se não x então retorne -1 fim; se não y então retorne 1 fim
+        se x~=y então
+            local nx,ny=x:separe("^%d+$"),y:separe("^%d+$")
+            se nx e ny então
+                se #x~=#y então retorne #x<#y e -1 ou 1 fim
+                retorne compareTexto(x,y)
+            fim
+            se nx ou ny então retorne nx e -1 ou 1 fim
+            retorne compareTexto(x,y)
+        fim
+    fim
+    retorne 0
+fim
+local função versão(a,b,c) retorne {a=a,b=b,c=c,pré={}} fim
+local função condição(op,v) retorne {op=op,v=v} fim
+local função termo(texto)
+    local op,valor=texto:separe("^([<>=~^]+)(.+)$")
+    op,valor=op ou "=",valor ou texto
+    se op~="=" e op~="<" e op~="<=" e op~=">" e op~=">=" e op~="^" e op~="~" então
+        retorne nulo,"comparador inválido"
+    fim
+    se valor=="*" ou valor=="x" ou valor=="X" então
+        se op~="=" então retorne nulo,"comparador não aceita curinga" fim
+        retorne {}
+    fim
+    local partes=divida(valor,".")
+    local parcial=#partes<3
+    para _,p em ipares(partes) início
+        se p=="x" ou p=="X" ou p=="*" então parcial=verdadeiro fim
+    fim
+    se parcial então
+        se op~="=" e op~="~" e op~="^" então retorne nulo,"comparador exige versão completa" fim
+        se #partes>3 então retorne nulo,"intervalo inválido" fim
+        local números,curinga={},falso
+        para _,p em ipares(partes) início
+            se p=="*" ou p=="x" ou p=="X" então curinga=verdadeiro
+            senão
+                se curinga ou número(p)==nulo então retorne nulo,"intervalo parcial inválido" fim
+                números[#números+1]=número(p)
+            fim
+        fim
+        se #números==0 então retorne {} fim
+        local baixo=versão(números[1],números[2] ou 0,0)
+        local alto
+        se #números==1 então alto=versão(baixo.a+1,0,0)
+        senãose op=="^" e baixo.a>0 então alto=versão(baixo.a+1,0,0)
+        senão alto=versão(baixo.a,baixo.b+1,0) fim
+        retorne {condição(">=",baixo),condição("<",alto)}
+    fim
+    local v,falha=V.leia(valor); se não v então retorne nulo,falha fim
+    se op=="^" ou op=="~" então
+        local alto
+        se op=="~" então alto=versão(v.a,v.b+1,0)
+        senãose v.a>0 então alto=versão(v.a+1,0,0)
+        senãose v.b>0 então alto=versão(0,v.b+1,0)
+        senão alto=versão(0,0,v.c+1) fim
+        retorne {condição(">=",v),condição("<",alto)}
+    fim
+    retorne {condição(op,v)}
+fim
+função V.intervalo(texto)
+    se tipo(texto)~="colar" ou #texto==0 ou #texto>512 então retorne nulo,"intervalo inválido" fim
+    local alternativas={}
+    para _,parte em ipares(divida(texto,"||")) início
+        local condições,quantidade={},0
+        para token em parte:capture("[^ \t\r\n]+") início
+            quantidade=quantidade+1
+            se quantidade>16 então retorne nulo,"muitos comparadores" fim
+            local lista,falha=termo(token); se não lista então retorne nulo,falha fim
+            para _,c em ipares(lista) início condições[#condições+1]=c fim
+        fim
+        se quantidade==0 ou #alternativas>=16 então retorne nulo,"alternativa vazia ou excessiva" fim
+        alternativas[#alternativas+1]=condições
+    fim
+    retorne alternativas
+fim
+função V.satisfaz(versãoAtual,intervalo)
+    se tipo(versãoAtual)=="colar" então versãoAtual=garanta(V.leia(versãoAtual)) fim
+    se tipo(intervalo)=="colar" então intervalo=garanta(V.intervalo(intervalo)) fim
+    para _,condições em ipares(intervalo) início
+        local aceito,préPermitido=verdadeiro,#versãoAtual.pré==0
+        para _,c em ipares(condições) início
+            local cmp=V.compare(versãoAtual,c.v)
+            se não ((c.op=="=" e cmp==0) ou (c.op==">" e cmp>0) ou (c.op==">=" e cmp>=0) ou
+                    (c.op=="<" e cmp<0) ou (c.op=="<=" e cmp<=0)) então aceito=falso fim
+            se #c.v.pré>0 e c.v.a==versãoAtual.a e c.v.b==versãoAtual.b e c.v.c==versãoAtual.c então préPermitido=verdadeiro fim
+        fim
+        se aceito e préPermitido então retorne verdadeiro fim
+    fim
+    retorne falso
+fim
+retorne V

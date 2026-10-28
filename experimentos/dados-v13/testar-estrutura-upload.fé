@@ -1,0 +1,16 @@
+módulo.caminho="bibs/bibf/?.fé;bibs/bibf/?/?.fé"
+local confira=executeArquivo("experimentos/dados-v13/estrutura-upload.fé")
+local png=(importe "imagem").codifique("png",3,3,função(x,y) retorne x*80,y*80,90,255 fim)
+garanta(confira(png,"png"))
+para i=0,#png-1 início garanta(não confira(png:corte(1,i),"png"),"PNG truncado aceito") fim
+para i=9,#png início
+ local alterado=png:corte(1,i-1)..colar.caractere(png:byte(i)~1)..png:corte(i+1)
+ garanta(não confira(alterado,"png"),"mutação PNG sem CRC aceita")
+fim
+local f=garanta(es.abra("testes/recursos/mat-santafe.jpg","rb"));local jpg=f:leia("tudo");f:feche()
+garanta(confira(jpg,"jpeg"))
+para _,i em ipares({0,1,2,20,100,#jpg-2,#jpg-1}) início garanta(não confira(jpg:corte(1,i),"jpeg")) fim
+garanta(não confira(jpg.."sobra","jpeg"))
+garanta(não confira(png.."sobra","png"))
+garanta(não confira("<svg/>","svg"))
+mostre("ESTRUTURA_UPLOAD_OK",#png)

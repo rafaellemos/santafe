@@ -1,0 +1,180 @@
+-- ONFÉ experimental. Somente lexemas e dados; nunca carregue/executeArquivo.
+local O = {}
+local limite = 4 * 1024 * 1024
+local profundidadeMáxima = 64
+
+função O.decod(texto)
+    garanta(tipo(texto)=="colar", "ONFÉ exige texto")
+    garanta(#texto<=limite,"ONFÉ excede 4 MiB")
+    local tokens, falha=depure.lexemas(texto,"@dados.onfé")
+    garanta(não falha,"ONFÉ: erro léxico")
+    garanta(#tokens<=200000,"ONFÉ excede limite de lexemas")
+    local p=1
+    local função veja() retorne tokens[p] ou {texto="",tipo="fim",["início"]=#texto} fim
+    local função erroAqui(m)
+        erro("ONFÉ no octeto " .. paraColar(veja()["início"]) .. ": " .. m)
+    fim
+    local função aceite(s)
+        se veja().texto==s então p=p+1; retorne verdadeiro fim
+        retorne falso
+    fim
+    local função exija(s) se não aceite(s) então erroAqui("esperado " .. s) fim fim
+    local valor
+    local função escalar()
+        local t=veja()
+        se t.tipo=="colar" ou t.tipo=="número" então
+            p=p+1
+            local v=t.valor
+            se t.tipo=="número" então
+                v=paraNúmero(t.texto)
+                garanta(v~=nulo e v==v e v~=mat.infinito e v~=-mat.infinito,"ONFÉ exige número finito")
+            fim
+            retorne v
+        fim
+        se aceite("-") então
+            t=veja()
+            se t.tipo~="número" então erroAqui("esperado número depois de -") fim
+            p=p+1
+            local v=paraNúmero("-" .. t.texto)
+            garanta(v~=nulo e v==v e v~=mat.infinito e v~=-mat.infinito,"ONFÉ exige número finito")
+            retorne v
+        fim
+        se aceite("nulo") então retorne nulo fim
+        se aceite("verdadeiro") então retorne verdadeiro fim
+        se aceite("falso") então retorne falso fim
+        erroAqui("esperado dado literal; código e gabaritos não são permitidos")
+    fim
+    valor=função(nível)
+        garanta(nível<=profundidadeMáxima,"ONFÉ excede profundidade 64")
+        se aceite("[") então
+            local l=[]
+            enquanto não aceite("]") início
+                l[#l+1]=valor(nível+1)
+                se não aceite(",") então exija("]"); pare fim
+            fim
+            retorne l
+        fim
+        se aceite("{") então
+            local t={}
+            enquanto não aceite("}") início
+                local chave
+                se aceite("[") então
+                    chave=escalar(); exija("]")
+                    garanta(tipo(chave)=="colar" ou tipo(chave)=="número" ou tipo(chave)=="lógico",
+                        "ONFÉ exige chave textual, numérica ou lógica")
+                senão
+                    se veja().tipo~="nome" então erroAqui("esperado identificador ou [chave literal]") fim
+                    chave=veja().texto; p=p+1
+                fim
+                exija("=")
+                se tabela.temChave(t,chave) então erroAqui("chave duplicada") fim
+                t[chave]=valor(nível+1)
+                se não aceite(",") então exija("}"); pare fim
+            fim
+            retorne t
+        fim
+        retorne escalar()
+    fim
+    local resultado=valor(0)
+    se p<=#tokens então erroAqui("conteúdo depois do valor raiz") fim
+    retorne resultado
+fim
+
+função O.cod(dado)
+    local ativos={}
+    local partes={}
+    local bytes=0
+    local função escreva(s)
+        bytes=bytes+#s; garanta(bytes<=limite,"ONFÉ excede 4 MiB")
+        partes[#partes+1]=s
+    fim
+    local função primitivo(v)
+        local t=tipo(v)
+        se t=="nulo" então retorne "nulo" fim
+        se t=="lógico" então retorne v e "verdadeiro" ou "falso" fim
+        se t=="colar" então retorne colar.formate("%q",v) fim
+        se t=="número" então
+            garanta(v==v e v~=mat.infinito e v~=-mat.infinito,"ONFÉ exige número finito")
+            -- %q conserva a representação numérica de ida e volta do núcleo.
+            retorne colar.formate("%q",v)
+        fim
+        erro("ONFÉ não serializa " .. t)
+    fim
+    local emitir
+    emitir=função(v,nível)
+        garanta(nível<=profundidadeMáxima,"ONFÉ excede profundidade 64")
+        local t=tipo(v)
+        se t~="tabela" e t~="lista" então escreva(primitivo(v)); retorne fim
+        garanta(não ativos[v],"ONFÉ não aceita ciclos")
+        garanta(obterMetatabela(v)==nulo,"ONFÉ não serializa objetos com metatabela")
+        ativos[v]=verdadeiro
+        se t=="lista" então
+            escreva("[")
+            para i=1,#v início
+                se i>1 então escreva(",") fim
+                emitir(v[i],nível+1)
+            fim
+            escreva("]")
+        senão
+            escreva("{")
+            local primeiro=verdadeiro
+            para k,x em pares(v) início
+                local kt=tipo(k)
+                garanta(kt=="colar" ou kt=="número" ou kt=="lógico","chave ONFÉ não serializável")
+                se não primeiro então escreva(",") fim
+                primeiro=falso
+                escreva("[" .. primitivo(k) .. "]=")
+                emitir(x,nível+1)
+            fim
+            escreva("}")
+        fim
+        tabela.apague(ativos,v)
+    fim
+    emitir(dado,0)
+    retorne tabela.concatene(partes)
+fim
+
+-- Diagnóstico de dados para o SLS: nunca compila/executa o documento ONFÉ.
+função O.analise(texto)
+    se #texto>limite então retorne falso,{mensagem="ONFÉ excede 4 MiB",["início"]=0,["fim"]=0} fim
+    local tokens,falha=depure.lexemas(texto,"@dados.onfé")
+    se falha então retorne falso,falha fim
+    local ok,valor=proteja(O.decod,texto)
+    se ok então retorne verdadeiro fim
+    local começo=paraNúmero(paraColar(valor):separe("ONFÉ no octeto (%d+):")) ou 0
+    local final=começo
+    para _,t em ipares(tokens) início se t["início"]==começo então final=t["fim"]; pare fim fim
+    retorne falso,{mensagem=paraColar(valor),["início"]=começo,["fim"]=final}
+fim
+
+função O.carregue(caminho)
+    local f,m=es.abra(caminho,"rb"); garanta(f,m)
+    local texto=f:leia(limite+1); f:feche()
+    retorne O.decod(texto ou "")
+fim
+
+-- Ponte JSON comum explícita: tabelas de chaves textuais e listas nativas.
+-- Não infere envelopes pelo nome dos campos e não converte "1" em 1.
+função O.paraJSON(dado) retorne json.cod(dado) fim
+função O.deJSON(texto) retorne json.decod(texto) fim
+-- A codificação termina antes de tocar o destino. Falhas de dados lançam erro;
+-- falhas de E/S retornam nulo, mensagem, estado. Não há repetição automática.
+local função persistência()
+    local ok,biblioteca=proteja(importe,"arquivo")
+    garanta(ok e tipo(biblioteca.graveAtômico)=="função",
+        "persistência ONFÉ exige arquivo nativo compatível; indisponível neste executor")
+    retorne biblioteca
+fim
+
+função O.grave(caminho,dado)
+    local texto=O.cod(dado)
+    retorne persistência().graveAtômico(caminho,texto)
+fim
+
+função O.graveAssíncrono(caminho,dado,tratador,contexto)
+    garanta(tipo(tratador)=="função","tratador ONFÉ deve ser função")
+    local texto=O.cod(dado)
+    retorne persistência().graveAtômicoAssíncrono(caminho,texto,tratador,contexto)
+fim
+
+retorne O

@@ -1,0 +1,54 @@
+{
+  "ferramentas/pacotes/ambiente.f\u00e9": {
+    "antes": "b0f10e324b4135e4ea54b4996fb070ce2c7facb30b3ad4a053f70cded473848f",
+    "depois": "930df500db38626a55588f4decabbb77e755a91cd378f93e16f3662ae2038231"
+  },
+  "ferramentas/pacotes/cli.f\u00e9": {
+    "antes": "6b26ae6e5a0c174c9d1a0160d197b181beb9a9f1d42520ea642ca81066b74746",
+    "depois": "f97d8e931e2cceeac5d5657574c04b2f9bbf12d5caf8c1fb64082d50b2c6827c"
+  },
+  "ferramentas/pacotes/cliente.f\u00e9": {
+    "antes": "9cc40a5121f5b7d406c1eb6088bea52bf06a6601fc2527378378ba6eea2a3fe4",
+    "depois": "0f159c14de481aa1d271027459afee0ccc42801783c78ab7bb42d4d469206da4"
+  },
+  "ferramentas/pacotes/nativo-windows.c": {
+    "antes": null,
+    "depois": "bf0112f0e62d4680b4b5ebf4bac0b46ce469d8546970c422477f1deab1b92231"
+  },
+  "ferramentas/sls/iniciador-windows.c": {
+    "antes": null,
+    "depois": "9b146f03f6b0ce23e385a241fb279841d66d9dadaaf97523c6d2fe2c9b7fa497"
+  },
+  "ferramentas/sls/nativo-windows.c": {
+    "antes": null,
+    "depois": "d47705fa184018884832d808c7207a7f59cbda572e8720ea46fbac32eb90ec1b"
+  },
+  "ferramentas/sls/projetos.f\u00e9": {
+    "antes": "6e3d1d7ad24d2653f506dd980f60ec4cb0a758e6ffbc4a4bc416b828419f4b8f",
+    "depois": "32091bad40c2a53570bf53b47fad6bd7eca2867d01db539f7ef5f632f97380e8"
+  },
+  "ferramentas/sls/sls.f\u00e9": {
+    "antes": "4f25eb491ddba1a2d7c25af64067a0c3b7f64aa4c81b63975abfb6400868a306",
+    "depois": "f3b9b1836fc5ca651920e5d544f07214c4c08833224bd36dd08182f9c41aa7ac"
+  },
+  "ferramentas/windows/arquivos.h": {
+    "antes": null,
+    "depois": "ed88d3142c30701c91170f7a591fab9d626fbf6f12ea1aaeab13e757e1f55c43"
+  },
+  "src/lua.h": {
+    "antes": "2822058bd9deb4561484051603a875efd755983009519c52fbbc67c49197caf8",
+    "depois": "c87b7a5c4d2d4047711d22f8a0f974c65a8c51a67e30fac31b6c29ad7069e790"
+  },
+  "src/santafe.c": {
+    "antes": "e643cffb61fd97fd1ceda5d6a7391791d087c47f105f8251a7e2accddcb4da54",
+    "depois": "f44b4b4e35e7e752d8e4d79c0c8b435e5d149a5eb3aff6c0078724008227d47a"
+  },
+  "testes/integracao/sls/casos.py": {
+    "antes": "3736aef70b67743b8ffe37d82052b991d5aaafbe9f530fd770d8e8a2e3d9e1b7",
+    "depois": "7fb1019e0e7604d342cae40e005c08a82e491a3da012e008e935884817178880"
+  },
+  "testes/integracao/testar_sls_aceitacao.py": {
+    "antes": "0be505050ab3938c5a30d34e45e5aec3df440d86585fb9c177f52c3da1206252",
+    "depois": "ad308d0223d8002f493fbbedc1f3e2c818e0815366640a2288d82189f303c09f"
+  }
+}

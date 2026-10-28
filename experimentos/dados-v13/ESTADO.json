@@ -1,0 +1,20 @@
+{
+  "candidato": "dados.13",
+  "iba": "santafe-3",
+  "producao_instalada": false,
+  "producao_alterada": false,
+  "apto_para_homologacao": true,
+  "apto_para_promocao_estavel": false,
+  "estado": "pronto_para_homologacao",
+  "base_fontes_sha256": "1de126f3f0f16dbf21079f39b7f8847b03250178093c446e4e4ba25f0a2ab4e8",
+  "regressoes": {"sistemas": ["macOS x86_64", "Debian x86_64"], "etapas": 10, "subetapas": 11, "iba_grupos": 14, "instalacao_grupos": 5, "reversao_grupos": 7, "wasm_casos": 18, "gerenciador": "PASSOU", "nova_inspecao_visual": false},
+  "integracoes": {"servicos_sinteticos_grupos": 8, "acme_local_grupos": 3, "rede_publica_grupos": 5, "dkim_originais_aceitos": 30, "dkim_adulteracoes_recusadas": 30, "dkim_expiradas_recusadas": 14, "migracao_portal_grupos": 4, "mensagens_enviadas": 0},
+  "correcao": "Portal: rejeita PNG/JPEG estruturalmente truncados; transformação aplicada e revertida em cópia privada",
+  "carga_prolongada": {"candidato": "dados.12", "herdada": true, "repetida_nesta_revisao": false},
+  "pendencias": [
+    {"codigo": "MAILJET_ENTREGA", "estado": "aguarda_destino_autorizado", "descricao": "Uma mensagem sintética e confirmação de recebimento; AUTH não comprova entrega."},
+    {"codigo": "ACME_PUBLICO", "estado": "nao_homologado", "descricao": "Sem subdomínio de ensaio; ACME local passou, emissão/renovação pública não executada."},
+    {"codigo": "PROMOCAO_INTEGRAL", "estado": "nao_homologado", "descricao": "Migrar e validar a instalação conjunta dados.13 com as integrações habilitadas; carga longa anterior pertence à dados.12."},
+    {"codigo": "PLATAFORMAS", "estado": "escopo_a_definir", "descricao": "Sem Windows/ARM, perda elétrica real ou nova inspeção visual nesta revisão."}
+  ]
+}

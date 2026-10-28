@@ -1,0 +1,41 @@
+{
+  "candidato": "dados.15",
+  "iba": "santafe-3",
+  "estado": "preparado_para_homologacao_publica",
+  "producao_alterada": false,
+  "producao_instalada": false,
+  "apto_para_homologacao": true,
+  "apto_para_promocao_estavel": false,
+  "base_fontes_sha256": "ddca28b7e058795ab5ff5d15a412ee8517962d421279df3bee20812cca47e5ce",
+  "acme_publico": {
+    "estado": "aguarda_execucao_com_sudo",
+    "dominio": "xn--podocaf-xwa4d.com.br",
+    "ordens_maximas": 2,
+    "aceite_automatico_de_termos": false,
+    "certificados_instalados": false,
+    "gravacao_transitoria": "apenas desafios HTTP-01 na rota existente; limpeza ao final"
+  },
+  "pendencias": [
+    {
+      "codigo": "ACME_PUBLICO",
+      "descricao": "Executar roteiro e conferir evidência antes de declarar emissão/renovação pública homologadas."
+    },
+    {
+      "codigo": "PLATAFORMAS",
+      "descricao": "Windows/ARM não ensaiados; perda elétrica real não simulada; nesta revisão as janelas abertas eram dados.8, sem inspeção visual nova de dados.15."
+    }
+  ],
+  "herdado_dados14": {
+    "conjunto_grupos": 21,
+    "imagens_reversao_grupos": 6,
+    "carga_segundos": 3600.42,
+    "operacoes": 43176,
+    "nao_repetido_nesta_revisao": true
+  },
+  "testes_novos": {
+    "regressoes_macos_debian": true,
+    "acme_auxiliar_grupos_por_sistema": 12,
+    "certbot_pebble_grupos": 3,
+    "acme_local_nao_equivale_a_publico": true
+  }
+}

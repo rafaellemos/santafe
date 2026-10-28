@@ -1,0 +1,46 @@
+<section id="contrato-dados6" aria-labelledby="titulo-dados6">
+<h3 id="titulo-dados6">Candidato dados.6 — contrato da próxima versão maior</h3>
+<p class="sf-nota"><strong>Somente homologação.</strong> Este manual acompanha o candidato, não substitui a documentação pública da Santafé 2.1.0. Não instale o candidato sobre serviços existentes.</p>
+<p>Listas usam <code>[]</code>; tabelas continuam usando <code>{}</code>. Nulo passa a ser armazenável. A leitura de chave ausente também retorna nulo; presença e valor são conceitos separados. Não existem tipos novos indefinido ou removido, nem função temVar.</p>
+<table class="sf-tabela-fn">
+<tr><th>API</th><th>Contrato</th></tr>
+<tr><td><code>tabela.temChave(t, chave)</code></td><td>Consulta a chave própria, inclusive com nulo; não chama __índice.</td></tr>
+<tr><td><code>tabela.apague(t, chave)</code></td><td>Remove explicitamente e retorna um lógico. Em lista, compacta os índices seguintes.</td></tr>
+</table>
+<p><code>local x</code> inicializa x com nulo; x continua declarado. <code>se x então</code> não executa o ramo quando x é nulo. Nulo presente bloqueia __índice; __novoÍndice só atende chaves ausentes. Listas ainda não admitem metatabelas.</p>
+<div class="sf-code"><button class="sf-run" data-run-target="#code-dados6-presenca" type="button">Executar</button><button class="sf-copy" data-copy-target="#code-dados6-presenca" type="button">Copiar</button>
+<pre class="language-santafé"><code id="code-dados6-presenca" class="language-santafé">local t={telefone=nulo}
+garanta(tabela.temChave(t,"telefone"))
+garanta(não tabela.temChave(t,"ausente"))
+garanta(não t.telefone)
+garanta(tabela.apague(t,"telefone"))
+garanta(não tabela.temChave(t,"telefone"))
+mostre("presença e exclusão: ok")</code></pre></div>
+<p><code>#lista</code> e <code>tamanho(lista)</code> incluem posições nulas e têm custo constante. Escrever em n+1 acrescenta; além disso dá erro sem preencher buracos. Ler um inteiro positivo além do fim retorna nulo. Índices inválidos são recusados. Tabelas numéricas esparsas continuam existindo e seu # não é contador de chaves.</p>
+<div class="sf-code"><button class="sf-run" data-run-target="#code-dados6-listas" type="button">Executar</button><button class="sf-copy" data-copy-target="#code-dados6-listas" type="button">Copiar</button>
+<pre class="language-santafé"><code id="code-dados6-listas" class="language-santafé">local itens=["ler",nulo,"testar"]
+garanta(#itens==3 e tamanho(itens)==3)
+local contagem=0
+para i,v em ipares(itens) início contagem=contagem+1 fim
+garanta(contagem==3)
+itens[2]=nulo
+garanta(#itens==3)
+garanta(tabela.apague(itens,2))
+garanta(#itens==2 e itens[2]=="testar")
+garanta(json.cod([])=="[]" e json.cod({})=="{}")
+mostre("listas e JSON: ok")</code></pre></div>
+<h4>Colares e dados ONFÉ</h4>
+<p>Dois acentos graves delimitam colares brutos; um delimita gabaritos ® e Ⓡ. Os comentários -- e --[[...]] não mudam. Colares brutos não interpretam \n nem interpolam. JSON representa quebras reais como \n e uma barra literal como \\.</p>
+<div class="sf-code"><button class="sf-run" data-run-target="#code-dados6-colares" type="button">Executar</button><button class="sf-copy" data-copy-target="#code-dados6-colares" type="button">Copiar</button>
+<pre class="language-santafé"><code id="code-dados6-colares" class="language-santafé">local bruto=``Primeira linha
+®nome e \n literais``
+garanta(json.decod(json.cod(bruto))==bruto)
+local nome="José"
+garanta(`Olá, Ⓡnome`=="Olá, José")
+mostre("colares e JSON: ok")</code></pre></div>
+<p>ONFÉ é dado, nunca programa: use <code>onfé.decod</code>, <code>onfé.cod</code> e <code>onfé.carregue</code>, nunca executeArquivo sobre dados. O módulo do candidato fica junto ao SLS; ainda não é um pacote publicado. <code>onfé.paraJSON</code> e <code>onfé.deJSON</code> preservam nulos e listas. Chaves numéricas/lógicas de tabelas são preservadas em ONFÉ e recusadas em JSON comum. "1" e 1 permanecem distintos.</p>
+<p>Limites ONFÉ: 4 MiB, profundidade 64, 200 mil lexemas; código, gabaritos, duplicatas, ciclos e valores executáveis são recusados. A API de persistência ONFÉ ainda precisa de homologação específica. Não prometa gravação atômica usando um arquivo aberto diretamente para escrita.</p>
+<h4>Migração operacional</h4>
+<p>Não basta recompilar: [[1]] antes era colar e agora pode ser lista. O migrador usa o lexer estável para converter colares; atribuições nulas e construtores {} exigem revisão de intenção. Não transforme todos os {} em []. Recompile bibliotecas C para a ABI candidata e não reutilize bytecode antigo. Os gates da ABI definitiva e plataformas não ensaiadas permanecem abertos.</p>
+<p>O laboratório prepara gerações completas com manifesto, verifica saúde, bloqueia escritores concorrentes e troca um ponteiro atomicamente. Cada processo fixa a geração ao iniciar. Banco, depósito e dados do usuário ficam fora da troca. Restaurar binários não reverte dados produzidos pela versão nova; não faça downgrade de dados sem uma migração explícita. Nenhum comando do laboratório publica serviços.</p>
+</section>

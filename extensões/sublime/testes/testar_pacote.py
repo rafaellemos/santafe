@@ -18,24 +18,27 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 def principal() -> None:
     metadados = json.loads((RAIZ / "package-metadata.json").read_text(encoding="utf-8"))
     assert metadados["name"] == "Santafe"
-    assert metadados["version"] == "1.1.1"
+    assert metadados["version"] == "2.0.0"
     leia_me = (RAIZ / "README.md").read_text(encoding="utf-8")
-    assert f"Pacote {metadados['version']} para Sublime Text 4" in leia_me
-    assert "O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0" in leia_me
+    assert f"Santafé — extensão {metadados['version']}" in leia_me
+    assert "Compatível com o núcleo Santafé 3.0.0 e SLS 1.1.0" in leia_me
     assert "O SLS 0.1.1 publicado" not in leia_me
     assert "perfil 0.2.0-dev.1" not in leia_me
     assert (RAIZ / ".python-version").read_text(encoding="ascii").strip() == "3.8"
     sintaxe = (RAIZ / "Santafe.sublime-syntax").read_text(encoding="utf-8")
     assert "scope: source.santafe" in sintaxe
-    assert "file_extensions:" in sintaxe and "- fé" in sintaxe
-    assert "entity.name.function.santafe" in sintaxe
-    assert "ident_before" in sintaxe
+    assert "file_extensions:" in sintaxe and "fé" in sintaxe
+    assert "entity.name.function.call.santafe" in sintaxe
     contextos = re.findall(r"^  (\S[^\n:]*):$", sintaxe, re.MULTILINE)
     assert len(contextos) == len(set(contextos)), "contextos de sintaxe duplicados"
-    assert "variable.parameter.santafe" in sintaxe
-    assert "embed: scope:text.html.basic" in sintaxe
-    assert "embed: scope:source.js" in sintaxe
-    assert "palavra_reservada: '{{ident_before}}" in sintaxe
+    assert "storage.type.function.santafe" in sintaxe
+    assert "string.quoted.other.raw.santafe" in sintaxe
+    assert "punctuation.section.interpolation.begin.santafe" in sintaxe
+    html = (RAIZ / "HTML-Santafe.sublime-syntax").read_text(encoding="utf-8")
+    javascript = (RAIZ / "JavaScript-Santafe.sublime-syntax").read_text(encoding="utf-8")
+    assert "extends: Packages/HTML/HTML.sublime-syntax" in html
+    assert "scope:source.js.santafe-template" in html
+    assert "extends: Packages/JavaScript/JavaScript.sublime-syntax" in javascript
     assert '"selector": "source.santafe"' in (RAIZ / "Santafe.sublime-build").read_text(encoding="utf-8")
     subprocess.run([sys.executable, str(RAIZ / "gerar_catalogo.py")], check=True)
     subprocess.run([sys.executable, str(RAIZ / "testes" / "testar_comportamento.py")], check=True)

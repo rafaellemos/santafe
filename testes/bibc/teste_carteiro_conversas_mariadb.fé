@@ -41,9 +41,8 @@ mariadb.criePiscinaAssíncrona({
 }, função(novaPiscina, falhaDaPiscina)
     se não novaPiscina então encerre(falhaDaPiscina); retorne fim
     piscina = novaPiscina
-    piscina:executePreparadoAssíncrono([[
-SELECT caixa_id,pasta FROM correio_cartas
-WHERE apagada_imap=FALSE ORDER BY id DESC LIMIT 1]], {},
+    piscina:executePreparadoAssíncrono([=[SELECT caixa_id,pasta FROM correio_cartas
+WHERE apagada_imap=FALSE ORDER BY id DESC LIMIT 1]=], {},
         função(_, resultado, falhaDaReferência)
             se falhaDaReferência então
                 se resultado então resultado:feche() fim

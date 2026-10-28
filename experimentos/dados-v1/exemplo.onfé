@@ -1,0 +1,8 @@
+-- Dados; não é um programa e não será executado.
+{
+    pessoa={nome="José",telefone=nulo},
+    tarefas=["ler contrato",nulo,"experimentar candidato"],
+    listaVazia=[],
+    tabelaVazia={},
+    descrição=[=[Colar bruto com ®literal e \n literal]=],
+}

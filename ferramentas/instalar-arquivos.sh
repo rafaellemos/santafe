@@ -16,34 +16,34 @@ case "$stage" in
     install -m 644 src/liblua.a "$prefix/lib/"
     ;;
   sls)
-    install -d "$prefix/share/santafé/1.0/ferramentas"
-    install -m 644 ferramentas/sls/sls.fé "$prefix/share/santafé/1.0/ferramentas/"
-    install -d "$prefix/share/santafé/1.0/ferramentas/sls"
-    install -m 644 ferramentas/sls/analisador.fé ferramentas/sls/projetos.fé ferramentas/sls/semantica.fé ferramentas/sls/transporte.fé ferramentas/sls/api-publica.json "$prefix/share/santafé/1.0/ferramentas/sls/"
+    install -d "$prefix/share/santafé/3.0/ferramentas"
+    install -m 644 ferramentas/sls/sls.fé "$prefix/share/santafé/3.0/ferramentas/"
+    install -d "$prefix/share/santafé/3.0/ferramentas/sls"
+    install -m 644 ferramentas/sls/analisador.fé ferramentas/sls/projetos.fé ferramentas/sls/semantica.fé ferramentas/sls/transporte.fé ferramentas/sls/api-publica.json ferramentas/sls/estrutura.fé ferramentas/sls/onfé.fé "$prefix/share/santafé/3.0/ferramentas/sls/"
     if [[ "$platform" != mingw ]]; then
-      install -m 755 ferramentas/sls/nativo.so "$prefix/share/santafé/1.0/ferramentas/sls/"
+      install -m 755 ferramentas/sls/nativo.so "$prefix/share/santafé/3.0/ferramentas/sls/"
     fi
     ;;
   pacotes)
     if [[ "$platform" != mingw ]]; then
-      install -d "$prefix/share/santafé/1.0/ferramentas/pacotes"
+      install -d "$prefix/share/santafé/3.0/ferramentas/pacotes"
       for name in versoes resolvedor formatos cliente administracao ambiente cli; do
-        install -m 644 "ferramentas/pacotes/$name.fé" "$prefix/share/santafé/1.0/ferramentas/pacotes/"
+        install -m 644 "ferramentas/pacotes/$name.fé" "$prefix/share/santafé/3.0/ferramentas/pacotes/"
       done
-      install -m 755 ferramentas/pacotes/nativo.so "$prefix/share/santafé/1.0/ferramentas/pacotes/"
+      install -m 755 ferramentas/pacotes/nativo.so "$prefix/share/santafé/3.0/ferramentas/pacotes/"
     fi
     ;;
   c)
-    install -d "$prefix/lib/santafé/1.0/bibc"
+    install -d "$prefix/lib/santafé/3.0/bibc"
     suffix=so; [[ "$platform" != mingw ]] || suffix=dll
     for name in arquivo rede mariadb segredo tomada; do
-      install -m 755 "bibs/bibc/$name/$name.$suffix" "$prefix/lib/santafé/1.0/bibc/"
+      install -m 755 "bibs/bibc/$name/$name.$suffix" "$prefix/lib/santafé/3.0/bibc/"
     done
     ;;
   fe)
     while IFS= read -r -d '' file; do
       relative=${file#bibs/bibf/}
-      target="$prefix/share/santafé/1.0/bibf/$relative"
+      target="$prefix/share/santafé/3.0/bibf/$relative"
       install -d "$(dirname "$target")"
       install -m 644 "$file" "$target"
     done < <(find bibs/bibf -type f \( -name '*.fé' -o -name '*.fé' -o -name '*.md' -o -name '*.ttf' -o -name 'OFL.txt' \) -print0)
@@ -55,7 +55,8 @@ case "$stage" in
       printf '%s\n' 'exec_prefix=${prefix}' 'libdir=${exec_prefix}/lib' 'includedir=${prefix}/include' ''
       printf '%s\n' 'Name: Santafe' 'Description: Santafé (ramificação de Lua 5.3)'
       printf 'Version: %s\n' "${4:?versão}"
-      printf '%s\n' 'Libs: -L${libdir} -llua' 'Libs.private: -lm' 'Cflags: -I${includedir}'
+      printf '%s\n' 'Libs: -L"${libdir}" -llua' 'Libs.private: -lm'
+      printf '%s\n' 'Cflags: -I"${includedir}"' 
     } > "$prefix/lib/pkgconfig/santafe.pc"
     ;;
   *) echo 'Etapa desconhecida.' >&2; exit 2 ;;

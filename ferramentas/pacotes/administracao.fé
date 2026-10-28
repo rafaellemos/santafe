@@ -5,8 +5,8 @@ retorne função(N,F)
         local raiz=garanta(N.raiz(diretório))
         local ok,bruto=proteja(função()
             local manifesto=F.manifesto(F.json(garanta(raiz:leia("santafe.json",1024*1024))),verdadeiro)
-            local arquivos={}
-            local caminhos={}; para _,p em ipares(manifesto.arquivos) início caminhos[#caminhos+1]=p fim
+            local arquivos=[]
+            local caminhos=[]; para _,p em ipares(manifesto.arquivos) início caminhos[#caminhos+1]=p fim
             tabela.ordene(caminhos); manifesto.arquivos=caminhos
             para _,caminho em ipares(caminhos) início
                 local conteúdo=garanta(raiz:leia(caminho,8*1024*1024))

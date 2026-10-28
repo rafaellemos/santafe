@@ -1,3 +1,5 @@
+local Windows = módulo.configuração:corte(1,1)=="\\"
+local extensãoNativa=Windows e ".dll" ou ".so"
 -- SLS — Servidor de Linguagem Santafé.
 --
 -- Usa o analisador do núcleo sem executar o fonte. Intervalos são obtidos do
@@ -17,17 +19,21 @@ local entrada = es.entradaPadrão
 local saída = es.saídaPadrão
 local inicializado = falso
 local encerrado = falso
-local diretórioSLS = (arg[0] ou ""):separe("^(.*)/[^/]+$") ou "."
+local diretórioSLS = (arg[0] ou ""):troque("\\","/"):separe("^(.*)/[^/]+$") ou "."
 local sondagem = es.abra(diretórioSLS .. "/analisador.fé", "rb")
 se sondagem então sondagem:feche() senão diretórioSLS=diretórioSLS.."/sls" fim
 local Analisador = executeArquivo(diretórioSLS.."/analisador.fé")
 local Projetos = executeArquivo(diretórioSLS.."/projetos.fé")
 local Semântica = executeArquivo(diretórioSLS.."/semantica.fé")
-local carregadorNativo = módulo.carregarBib(diretórioSLS.."/nativo.so", "luaopen_sls_nativo")
+local Dados = executeArquivo(diretórioSLS.."/estrutura.fé")
+local ONFE = Dados.experimental e executeArquivo(diretórioSLS.."/onfé.fé")
+local avisosEscopo = falso
+local carregadorNativo = módulo.pré["sls.nativo"] ou módulo.carregarBib(diretórioSLS.."/nativo"..extensãoNativa, "luaopen_sls_nativo")
 local nativo = carregadorNativo e carregadorNativo() ou nulo
+se Windows então garanta(nativo,"SLS Windows exige a camada nativa de proteção e transporte") fim
 local semântica
 local Transporte=executeArquivo(diretórioSLS.."/transporte.fé")
-local transporte=nativo e Transporte.novo(nativo) ou nulo
+local transporte=nativo e Transporte.novo(nativo, Dados) ou nulo
 
 local função escrevaQuadro(mensagem)
     local conteúdo = garanta(json.cod(mensagem))
@@ -212,11 +218,13 @@ fim
 
 semântica = Semântica.novo(Analisador, Projetos, {
     documentos=documentos, posição=posiçãoDoOcteto, offset=octetoDaPosição,
-    indexe=indexe, diretório=diretórioSLS, nativo=nativo
+    indexe=indexe, diretório=diretórioSLS, nativo=nativo, dados=Dados
 })
 
 local função publiqueDiagnósticos(uri, documento)
-    local ok, falha = depure.analise(documento.texto, "@" .. uri)
+    local ok, falha
+    se documento.onfe então ok,falha=ONFE.analise(documento.texto)
+    senão ok,falha=depure.analise(documento.texto, "@" .. uri) fim
     local diagnósticos = json.matrizVazia
 
     se não ok então
@@ -236,7 +244,7 @@ local função publiqueDiagnósticos(uri, documento)
         }}
         -- O compilador continua sendo a autoridade. A recuperação estrutural
         -- só acrescenta erros em fonte já rejeitado, nunca em programa válido.
-        local recuperada=semântica.analise(documento,uri)
+        local recuperada=documento.onfe e {erros={}} ou semântica.analise(documento,uri)
         local vistos={[paraColar(começo ou 0)..":"..paraColar(final ou 0)]=verdadeiro}
         para _,outro em ipares(recuperada.erros) início
             local chave=paraColar(outro.começo)..":"..paraColar(outro.final)
@@ -251,13 +259,16 @@ local função publiqueDiagnósticos(uri, documento)
         fim
     fim
 
+    se ok e avisosEscopo e não documento.onfe então
+        diagnósticos=semântica.avisos(documento,uri)
+    fim
     escrevaQuadro({
         jsonrpc = "2.0",
         method = "textDocument/publishDiagnostics",
         params = {
             uri = uri,
             version = documento.versão,
-            diagnostics = diagnósticos
+            diagnostics = diagnósticos == json.matrizVazia e diagnósticos ou Dados.lista(diagnósticos)
         }
     })
 fim
@@ -288,7 +299,9 @@ local função aoAbrir(parâmetros)
     documentos[documento.uri] = {
         texto = documento.text,
         versão = documento.version,
-        linhas = linhas
+        linhas = linhas,
+        onfe = ONFE e (documento.languageId=="onfe-experimental" ou documento.languageId=="onfe" ou
+            documento.uri:separe("%.onfé$")~=nulo ou documento.uri:minúscula():separe("%.onf%%c3%%a9$")~=nulo) ou falso
     }
     totalOctetos, totalDocumentos = totalOctetos + #documento.text, totalDocumentos + 1
     semântica.projetos.invalide()
@@ -296,7 +309,7 @@ local função aoAbrir(parâmetros)
 fim
 
 local função apliqueMudanças(guardado, mudanças)
-    se tipo(mudanças) ~= "tabela" ou #mudanças == 0 ou #mudanças > LIMITE_MUDANÇAS então
+    se não Dados.éLista(mudanças) ou #mudanças == 0 ou #mudanças > LIMITE_MUDANÇAS então
         retorne nulo, "lista de mudanças inválida ou excessiva"
     fim
     para chave em pares(mudanças) início
@@ -362,6 +375,7 @@ local função aoMudar(parâmetros)
     fim
     totalOctetos = totalOctetos - #guardado.texto + #novo.texto
     novo.versão = documento.version
+    novo.onfe = guardado.onfe
     documentos[documento.uri] = novo
     semântica.projetos.invalide()
     publiqueDiagnósticos(documento.uri, novo)
@@ -390,7 +404,7 @@ local função aoFechar(parâmetros)
     se guardado então
         totalOctetos = totalOctetos - #guardado.texto
         totalDocumentos = totalDocumentos - 1
-        documentos[documento.uri] = nulo
+        Dados.apague(documentos, documento.uri)
         semântica.projetos.invalide()
     fim
     escrevaQuadro({
@@ -439,13 +453,13 @@ local função parâmetrosVálidos(m,p)
     se m=="textDocument/formatting" e (tipo(p.options)~="tabela" ou não inteiro(p.options.tabSize,1) ou
         p.options.tabSize>32 ou tipo(p.options.insertSpaces)~="lógico") então retorne falso fim
     se m=="textDocument/selectionRange" então
-        se tipo(p.positions)~="tabela" ou #p.positions>128 então retorne falso fim
+        se não Dados.éLista(p.positions) ou #p.positions>128 então retorne falso fim
         para k,v em pares(p.positions) início
             se não inteiro(k,1) ou k>#p.positions ou não posição(v) então retorne falso fim
         fim
     fim
     se m=="textDocument/codeAction" e (não intervalo(p.range) ou tipo(p.context)~="tabela" ou
-        tipo(p.context.diagnostics)~="tabela") então retorne falso fim
+        não Dados.éLista(p.context.diagnostics)) então retorne falso fim
     retorne verdadeiro
 fim
 
@@ -485,11 +499,12 @@ local função processe(pedido)
                 retorne verdadeiro
             fim
             inicializado = verdadeiro
+            avisosEscopo=tipo(parâmetros.initializationOptions)=="tabela" e parâmetros.initializationOptions.avisosEscopo==verdadeiro
             semântica.projetos.configure(parâmetros)
             responda(pedido.id, {
                 capabilities = {
                     positionEncoding = "utf-16",
-                    completionProvider={triggerCharacters={".",":"}},
+                    completionProvider={triggerCharacters=Dados.lista({".",":"})},
                     hoverProvider=verdadeiro,
                     definitionProvider=verdadeiro,
                     referencesProvider=verdadeiro,
@@ -498,19 +513,19 @@ local função processe(pedido)
                     workspaceSymbolProvider=verdadeiro,
                     workspace={workspaceFolders={supported=verdadeiro,changeNotifications=verdadeiro}},
                     renameProvider={prepareProvider=verdadeiro},
-                    signatureHelpProvider={triggerCharacters={"(",","}},
+                    signatureHelpProvider={triggerCharacters=Dados.lista({"(",","})},
                     foldingRangeProvider=verdadeiro,
                     selectionRangeProvider=verdadeiro,
                     documentFormattingProvider=verdadeiro,
-                    codeActionProvider={codeActionKinds={"quickfix"}},
-                    semanticTokensProvider={full=verdadeiro,legend={tokenTypes={"variable","function","parameter"},tokenModifiers={"declaration"}}},
+                    codeActionProvider={codeActionKinds=Dados.lista({"quickfix"})},
+                    semanticTokensProvider={full=verdadeiro,legend={tokenTypes=Dados.lista({"variable","function","parameter"}),tokenModifiers=Dados.lista({"declaration"})}},
                     textDocumentSync = {
                         openClose = verdadeiro,
                         change = 2,
                         save = { includeText = verdadeiro }
                     }
                 },
-                serverInfo = { name = "SLS", version = "1.0.0" }
+                serverInfo = { name = "SLS", version = "1.1.0" }
             })
         fim
     senão se método == "shutdown" então
@@ -535,6 +550,13 @@ local função processe(pedido)
     senão se métodos[método] e éPedido então
         se não parâmetrosVálidos(método,parâmetros) então
             respondaFalha(pedido.id,-32602,"parâmetros inválidos para "..método)
+            retorne verdadeiro
+        fim
+        local doc=parâmetros.textDocument e documentos[parâmetros.textDocument.uri]
+        se doc e doc.onfe então
+            se método=="textDocument/rename" então respondaFalha(pedido.id,-32602,"ONFÉ contém dados, não símbolos renomeáveis")
+            senão responda(pedido.id,método=="textDocument/semanticTokens/full" e {data=json.matrizVazia} ou
+                ((método=="textDocument/hover" ou método=="textDocument/definition" ou método=="textDocument/prepareRename" ou método=="textDocument/signatureHelp") e json.valorNulo ou json.matrizVazia)) fim
             retorne verdadeiro
         fim
         transporte.ativo=pedido.id
@@ -563,7 +585,7 @@ local função processe(pedido)
         fim
         transporte.ativo=nulo
         se transporte.cancelados[pedido.id] ou resultado==cancelamento então
-            transporte.cancelados[pedido.id]=nulo
+            Dados.apague(transporte.cancelados, pedido.id)
             semântica.projetos.invalide()
             respondaFalha(pedido.id,-32800,"pedido cancelado")
         senãose resultado==limite ou so.relógio()-começou>2 então

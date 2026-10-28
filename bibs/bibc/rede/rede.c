@@ -2220,7 +2220,11 @@ static int l_rede_schedule(lua_State *L) {
 
 static void push_dns_records(lua_State *L, GList *records,
                              GResolverRecordType record_type) {
+#ifdef SANTAFE_DADOS_V3
+    lua_createlist(L, 0);
+#else
     lua_newtable(L);
+#endif
     lua_Integer index = 1;
     for (GList *item = records; item; item = item->next) {
         GVariant *record = (GVariant*)item->data;
@@ -2276,7 +2280,11 @@ static void dns_lookup_finish_cb(GObject *source_object, GAsyncResult *res,
      * temporária, evitando rejeitar definitivamente um domínio por engano. */
     if (err && g_error_matches(err, G_RESOLVER_ERROR,
                                G_RESOLVER_ERROR_NOT_FOUND)) {
+#ifdef SANTAFE_DADOS_V3
+        lua_createlist(L, 0);
+#else
         lua_newtable(L);
+#endif
         lua_pushnil(L);
     } else if (err) {
         lua_pushnil(L);
@@ -2320,14 +2328,22 @@ static void dns_address_finish_cb(GObject *source_object, GAsyncResult *res,
     lua_remove(L, -2);
     if (err && g_error_matches(err, G_RESOLVER_ERROR,
                                G_RESOLVER_ERROR_NOT_FOUND)) {
+#ifdef SANTAFE_DADOS_V3
+        lua_createlist(L, 0);
+#else
         lua_newtable(L);
+#endif
         lua_pushnil(L);
     } else if (err) {
         lua_pushnil(L);
         lua_pushstring(L, ctx->timed_out ? "tempo limite excedido" :
                        gio_error_message(err, "resolução de endereço falhou"));
     } else {
+#ifdef SANTAFE_DADOS_V3
+        lua_createlist(L, 0);
+#else
         lua_newtable(L);
+#endif
         lua_Integer index = 1;
         for (GList *item = addresses; item; item = item->next) {
             GInetAddress *address = G_INET_ADDRESS(item->data);
@@ -2853,6 +2869,7 @@ static const luaL_Reg rede_funcs[] = {
 
 
 int luaopen_rede(lua_State *L) {
+    luaL_checkversion(L);
     /* metatable rede{cliente} */
     if (luaL_newmetatable(L, "rede{cliente}")) {
         luaL_setfuncs(L, pclient_methods, 0);
@@ -2923,3 +2940,7 @@ int luaopen_rede(lua_State *L) {
     luaL_newlib(L, rede_funcs);
     return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3)
+SANTAFE_MODULE_ABI;
+#endif

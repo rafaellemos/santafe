@@ -55,6 +55,11 @@ LUAI_FUNC void luaH_resizearray (lua_State *L, Table *t, unsigned int nasize);
 LUAI_FUNC void luaH_free (lua_State *L, Table *t);
 LUAI_FUNC int luaH_next (lua_State *L, Table *t, StkId key);
 LUAI_FUNC lua_Unsigned luaH_getn (Table *t);
+#ifdef SANTAFE_DADOS_V3
+LUAI_FUNC void luaH_checklist (lua_State *L, const TValue *t, const TValue *key, int write);
+#else
+#define luaH_checklist(L,t,k,w) ((void)0)
+#endif
 
 
 #if defined(LUA_DEBUG)

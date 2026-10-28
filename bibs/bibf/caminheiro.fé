@@ -228,7 +228,7 @@ fim
 
 local função retirarConexãoDoAplicativo(res, conexão)
     se res._ap e res._ap._conexões e conexão então
-        res._ap._conexões[conexão] = nulo
+        tabela.apague(res._ap._conexões, conexão)
     fim
 fim
 
@@ -939,7 +939,7 @@ função caminheiro.novo(opções)
                     "[Caminheiro] falha ao configurar conexão:",
                     falhaDoTempo ou falhaDosLimites
                 )
-                ap._conexões[conexaoHTTP] = nulo
+                tabela.apague(ap._conexões, conexaoHTTP)
                 conexaoHTTP:feche()
                 armarAceite(servidorLocal)
                 retorne
@@ -951,7 +951,7 @@ função caminheiro.novo(opções)
             )
             se falhaDaLeitura então
                 mostre("[Caminheiro] não foi possível ler a requisição:", falhaDaLeitura)
-                ap._conexões[conexaoHTTP] = nulo
+                tabela.apague(ap._conexões, conexaoHTTP)
                 conexaoHTTP:feche()
             fim
 

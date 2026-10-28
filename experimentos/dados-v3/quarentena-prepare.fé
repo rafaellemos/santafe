@@ -1,0 +1,20 @@
+-- Exercita reserva inválida; não tenta entregar mensagens pela rede.
+garanta(so.obterVariável("SANTAFE_DADOS3_BANCO") == "isolado")
+local banco = importe "mariadb"
+local correio = importe "correio"
+local rede = importe "rede"
+local terminou = falso
+local falhaFinal
+banco.criePiscinaAssíncrona({
+    endereço="127.0.0.1", usuário="ensaio", senha="somente-laboratorio", banco="dados3",
+    porta=paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")), mínimo=1, máximo=2
+}, função(piscina, falha)
+    garanta(piscina, falha)
+    local fila=garanta(correio.filaMariaDB(piscina,{tabela="correio_fila"}))
+    fila:reservePróximaAssíncrono(função(item, erroReserva)
+        se item ~= nulo ou não erroReserva então falhaFinal="reserva inválida não recusada" fim
+        terminou=verdadeiro; piscina:feche(); rede.pareLaço()
+    fim)
+fim)
+rede.laço()
+garanta(terminou e não falhaFinal, falhaFinal ou "reserva não terminou")

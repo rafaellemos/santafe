@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+base=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+exec "$base/dist/candidato-dados-v2/santafé-dados" -E -P "$base/ferramentas/sls/sls.fé" "$@"

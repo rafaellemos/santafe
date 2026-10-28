@@ -1,5 +1,45 @@
 # Publicação conjunta — trabalho em andamento
 
+## Editores 1.1.1 — portal preparado, ainda não publicado — 21/10/2026
+
+- Retomada solicitada pelo usuário antes da auditoria de linguagens. Essa
+  auditoria/migração não foi iniciada; a entrega abaixo atualiza exclusivamente
+  os arquivos dos editores e a página de download, não uma nova versão do núcleo.
+- Marketplace 1.1.1 já público e submissão Sublime #9622 atualizada, ainda
+  aberta/não integrada. CI do commit `802df7d` passou nos dois workflows:
+  execuções `39599366034` (SLS/bibliotecas) e `39599366025` (núcleo/manual/editores).
+- Portal `/baixar` e catálogo HTTPS próprio ainda oferecem 1.1.0. Preparada
+  atualização independente para 1.1.1, com READMEs corrigidos, link do
+  Marketplace e indicação explícita da aprovação pendente do catálogo geral.
+  O catálogo próprio declara Sublime >=4171, como a submissão oficial, e inclui
+  SHA-256 do pacote. Os arquivos versionados anteriores permanecem intocados.
+- Publicador e empacotador: `operação/*editores-1.1.1.py`. Reutilizam a transação
+  existente, mantêm backup/rollback, recusam deriva, links simbólicos e
+  substituição de artefatos imutáveis. Plano limitado a 12 arquivos: página e
+  espelho, VSIX, Sublime manual/versionado, catálogo e somas. Núcleo, SLS, manual,
+  gerenciador, fontes históricas e aplicações empresariais não são destinos.
+- 11 regressões passaram localmente, além das suítes de ambos os editores e do
+  publicador histórico. Novo teste adicionado ao workflow, ainda não enviado ao
+  GitHub nesta etapa; não confundir com os runs verdes anteriores.
+- Entrega local: `/private/tmp/santafe-portal-editores-1.1.1.tt35eMZp/entrega`.
+  Enviada para `/tmp/santafe-editores-1.1.1.dQuL6uOz/entrega` no servidorsfdev.
+  Todas as somas conferidas; pré-validação real com `santafec -p`, integridade
+  dos pacotes/READMEs, plano e estado do portal terminou com
+  `EDITORES_1_1_1_PREFLIGHT_OK`, código zero, sem sudo.
+- Após o pré-teste, hashes do portal, núcleo, lançador SLS, manual e TAR/ZIP
+  2.1.0 continuaram idênticos aos anteriores; horários dos quatro serviços
+  conferidos também permaneceram iguais. Nenhuma instalação ou reinício.
+
+Próxima ação do usuário:
+
+```bash
+sudo bash /tmp/santafe-editores-1.1.1.dQuL6uOz/entrega/publicar-editores-1.1.1.sh
+```
+
+A publicação reinicia somente `sfdev.service`, verifica arquivos e respostas
+HTTPS, e restaura a versão anterior em caso de falha. Depois conferir o portal
+e o catálogo próprio; não declarar publicado antes da execução do usuário.
+
 ## Revisão textual r2 publicada e conferida — 21/10/2026
 
 - Após confirmação do usuário, manual público e espelho conferidos com
@@ -442,3 +482,515 @@ Contrato: `REPOSITORIO-BIBLIOTECAS-1.0.md`. Módulos em `ferramentas/pacotes`:
    catálogo/página de bibliotecas, versões, CI e pacote de distribuição somente
    depois dos gates. Publicador reversível/artefatos+hashes, envio a `/tmp` e
    comando conferido para o usuário. NÃO dar comando de um arquivo inexistente.
+
+## Rodada posterior — candidato de dados.3, 23/10/2026
+
+O registro acima descreve o trabalho histórico de 21/10, não o estado atual
+da versão estável. A rodada atual é o experimento de nova semântica de dados,
+sem instalação em produção. Retomar por `experimentos/dados-v3/PLANO.md` e
+`experimentos/dados-v3/RELATORIO.md`.
+
+Bibliotecas migradas em árvore isolada: macOS/Debian, 76 ensaios gerais + 12
+em banco temporário próprio; SLS 39 adversariais + 39 LSP em cada plataforma;
+WASM 15 casos e recuperação; núcleo/ONFÉ, ABI e sanitizadores conforme relatório.
+Nada foi publicado, etiquetado ou enviado ao Git. Restam a cadeia integral de
+aplicativos/ferramentas, UI, compatibilidade final e os gates da versão maior.
+
+## Continuação — candidato dados.4, 23/10/2026
+
+Retomar por `experimentos/dados-v4/PLANO.md` e `RELATORIO.md`. O usuário pediu
+seguir a bateria sem refazer a demonstração. Corrigida a migração do gerenciador
+(listas, nulos, serialização canônica, retrocesso do resolvedor e ABI nativa).
+Dez baterias adicionais passaram em macOS/Debian; regressões de bibliotecas,
+12 ensaios SQL em instância temporária, 39 SLS e 39 LSP em cada sistema;
+WASM 16 casos e recuperação. Um ensaio adicional expôs controles crus e
+truncamento no NUL aceitos pelo decodificador JSON: corrigidos no modo
+experimental e todas as baterias repetidas após a correção.
+ASan/UBSan passou nos harnesses nativos e de lexer no Mac. Produção intacta.
+Faltam aplicativos integrais, distribuição/rollback, plataformas e inspeção
+visual atual; nenhuma aprovação estável foi inferida dessa bateria.
+
+## Continuação — dados.5 e dados.6, 23/10/2026
+
+Retomar por `experimentos/dados-v6/RELATORIO.md` e `PLANO.md`.
+Dados.5 fechou 13 percursos reais dos aplicativos, instalação, oito pontos de
+rollback e atualização entre candidatos. Dados.6 acrescentou gerações isoladas
+com trava/journal/troca atômica (300 leituras, 20 trocas, sete grupos), carga
+concorrente com proteções ativas em macOS/Debian, 200 edições incrementais SLS,
+manual candidato (174 exemplos compilados, 12 executados), WASM 16 casos e
+três demonstrações reais no navegador. Corrigidos fila IMAP vazia, descrições
+de nulo/listas/JSON/SQL, caminho WASM antigo e transbordamento móvel do manual.
+
+Regressão de editores: 25 TextMate/embutidos e 17 recorte Sublime; UI nativa
+indisponível nesta sessão, não aprovada. Manual visual em 390/1280 px tem
+capturas; fonte de ícones da prévia ainda apresenta fallback. A migração
+operacional ensaiada não equivale a troca completa dos serviços estáveis.
+Fontes/evidências/checksums em `dist/candidato-dados-v6`; servidor somente /tmp.
+Nenhuma instalação/publicação/reinicialização em produção, tag ou push.
+Gates restantes enumerados no relatório: ABI/bytecode, ONFÉ atômico, migração
+completa de dados/configurações, soak prolongado, UI nativa e plataformas.
+# Continuação — dados.7, 23/10/2026
+
+Retomar por `experimentos/dados-v7/RELATORIO.md` e `PERSISTENCIA.md`.
+Usuário decidiu manter listas sem metatabelas nesta versão. Implementadas
+gravações ONFÉ síncrona/assíncrona com substituição atômica, estados explícitos
+inalterado/publicado/durável, descritor do diretório fixado e teste de falhas.
+ONFÉ instalado em bibf; completude SLS, manual e manifesto de APIs atualizados
+apenas na árvore candidata. macOS Intel/Debian: 17 grupos ONFÉ, sanitizadores
+do helper C, núcleo, SLS, instalação/rollback, sete grupos operacionais e 13
+percursos dos aplicativos passaram. WASM: 17 casos e recuperação passaram.
+Manual: 174 exemplos compilados, 264 contratos C, 351 Fé; 12 exemplos executados.
+Base imutável dados.6 preservada. Artefatos finais em dist/candidato-dados-v7.
+Servidor usado apenas em /tmp/santafe-dados7.1S7FpWIE. Produção intocada.
+
+Próxima etapa: fechar ABI/bytecode e preparar réplica operacional integral da
+instalação estável em laboratório, com migração/retorno de dados; depois soak
+prolongado e validação visual/plataformas. Não confundir o ensaio atual de
+gerações com uma migração completa da instalação estável. Não publicar nem
+reiniciar serviços sem validação final do usuário.
+
+## Continuação — dados.8, 23/10/2026
+
+Usuário decidiu conservar função ... fim e substituir os dois acentos graves
+dos colares brutos por [=[...]=], [==[...]==] e níveis superiores com =.
+Retomar por experimentos/dados-v8/RELATORIO.md e LEIA-ME.md. A semântica de
+quebras é compatível com os colares longos estáveis: uma quebra inicial é
+suprimida. Migração lexical a partir de dados.7 preserva o valor acrescentando
+uma quebra de proteção quando necessário. [[...]] continua lista aninhada;
+um acento grave continua gabarito. ONFÉ não executa gabaritos nem código.
+
+Núcleo, ONFÉ, SLS, kits isolados 0.0.8 dos editores, HTML/JS concatenados,
+Prism/manual e migradores atualizados. macOS/Debian: 14 grupos novos,
+183 fontes Fé compilados, regressão de 11 etapas, 17 grupos de persistência,
+39 testes SLS, recuperação incremental e 13 percursos de aplicativos com
+carga de 60s. WASM: 18 casos + recuperação. macOS adicional: aceitação LSP
+39/39, 900 falhas de alocação/3.000 entradas, ASan/UBSan do helper atômico.
+Kits: 25+45 TextMate/embutidos; 17+7 recorte Sublime; cinco regras Prism.
+Manual: 174 compilações, 12 execuções, 264 contratos C e 351 Fé.
+
+Fontes/evidências em dist/candidato-dados-v8; Debian somente em
+/tmp/santafe-dados8.fhLMCQzP. Nada instalado em produção ou nos perfis dos
+editores; nenhuma tag, push ou publicação externa. UI nativa não foi
+homologada nesta rodada. Gates maiores continuam os enumerados em dados.7.
+
+### Dados.8 — hosts dos editores, 23/10/2026
+
+Retomar por `experimentos/dados-v8/VALIDACAO-EDITORES.md`. VS Code 1.142.0:
+extensão 0.0.8 e SLS 1.0.0-dados.8 ativos, oito grupos repetidos duas vezes.
+Sublime 4215: seis grupos repetidos, escopos/estilos/regiões reais; curingas
+laranja normal, paleta suave, HTML/JS concatenados e recuperação de delimitador.
+Corrigidos somente os harnesses: Python do Sublime remove assert no modo otimizado;
+verificações agora usam exceções explícitas e sentinela. Falhas anteriores do
+harness preservadas. TextMate45/Prism5/recorte7 repetidos na árvore candidata;
+112 checksums do pacote selado continuam válidos. Produção intocada.
+
+Captura/controle de janelas nativas indisponível: **inspeção de pixels continua
+pendente**. Não confundir os ensaios de host com aprovação visual. Laboratório
+temporário `santafe-dados8-host-gslwbyhb`; pacote Sublime separado
+`SantafeDados8Hostgslwbyhb` ainda disponível apenas para a conferência visual.
+Próxima ação: capturas do fixture nas duas janelas; depois arquivar esse pacote
+temporário sem alterar Santafe/SantafeDados. Nenhum novo candidato publicado.
+
+### Dados.8 — acesso nativo liberado, 23/10/2026
+
+Após a atualização do aplicativo pelo usuário, leitura e captura das janelas
+funcionam nos dois editores. Sublime: inspeção real dos pixels de `visual.fé`
+(linhas 1–29) concluída; delimitadores, HTML/JS concatenados, paleta suave,
+gabaritos Unicode, listas e comentários sem defeito visual observado.
+
+VS Code: o vínculo nativo selecionava apenas a instância habitual. Aberto o
+mesmo kit selado num perfil separado `Santafe dados.8 visual temporario`, sem
+substituir extensões do perfil habitual. A janela do candidato agora é visível,
+mas inicialmente estava em Modo Restrito. A revisão automática rejeitou
+**Confiar**, exigindo confirmação atual. O usuário autorizou somente o workspace
+de teste; a confiança foi resolvida e o SLS candidato iniciou corretamente.
+Retomar pelo relato em `experimentos/dados-v8/VALIDACAO-EDITORES.md`.
+Produção e artefatos selados preservados; nenhum candidato novo gerado.
+
+### Dados.8 — correção após inspeção visual, 24/10/2026
+
+Capturas reais nos dois editores concluídas. Sublime passou sem alteração do
+kit. VS Code 1.142.0 expôs falha que os testes de tokens não detectavam: a
+propriedade fontStyle na raiz das decorações impedia exibir a paleta suave e
+o laranja dos gabaritos. A cópia de laboratório com light.fontStyle/dark.fontStyle
+renderiza corretamente e preserva normal/italic. Inserção temporária de função
+confirmou ciano oblíquo e atualização ao editar; desfeita após captura.
+
+Correção no fonte compartilhado `extensões/vscode/aparencia.js`; regressão de
+API/cores com 612 entradas passou. Patch e hashes para o kit isolado em
+`experimentos/dados-v8/correcoes/`. Os 112 checksums selados continuam válidos.
+Não confundir a aprovação visual da cópia corrigida com o kit dados.8 original.
+A próxima montagem deve incorporar esse patch. Perfis habituais e produção
+preservados, sem publicação, reinício de serviços, tag ou push.
+
+Regressão final da cópia corrigida: oito grupos passaram novamente no Extension
+Host real, dentro da janela temporária já confiável. Evidência e hashes em
+`experimentos/dados-v8/evidencias-host/vscode-correcao-visual*.json`. O comando
+temporário de teste foi removido, os fixtures foram restaurados e a janela
+recarregada. Tentativa anterior em perfil sem confiança preservada como falha
+de preparação do ensaio, não como aprovação. Inspeção visual concluída; próximo
+passo de empacotamento é incorporar o patch sem sobrescrever dados.8.
+
+### Dados.9 — preparação, 24/10/2026
+
+Solicitado novo candidato com correção visual, sem produção. Receita em
+`experimentos/dados-v9/preparar.py`, base imutável dados.8 SHA-256
+`f95592a0737d663f7a70d01a70aa96fda9c83a111c34cdd0d2f8287d5b75cabb`.
+Árvore local `/private/tmp/santafe-dados9-fbvcbt5g`; Debian em
+`/tmp/santafe-dados9.TVessQnc/arvore`. Fontes enviados somente ao laboratório.
+Mantida a decisão de listas adjacentes e colares brutos com pelo menos um `=`.
+Correção visual por light/dark.fontStyle incorporada; kits 0.0.9 e SLS
+1.0.0-dados.9. Primeira regressão local parou no teste de instalação porque
+a expectativa de versão ainda dizia dados.8; logs preservados em
+`evidencias/tentativa1-versao-instalada`. Expectativas e identificadores
+ajustados, sem relaxar critérios; nova rodada macOS e Debian em andamento.
+Próximo: concluir baterias, repetir hosts dos editores, conferir artefatos
+e selar a entrega. Não afirmar aprovação antes dos resultados.
+
+### Dados.9 — baterias e visual concluídos, 24/10/2026
+
+Retomar por `experimentos/dados-v9/RELATORIO.md`. macOS e Debian: dez etapas
+novas e onze de regressão passaram, 14 grupos de colares, 183 fontes, 17 grupos
+ONFÉ atômico, 39 SLS e recuperação incremental, 13 percursos de aplicativos,
+carga de 60s, instalação/atualização/rollback e sete grupos de gerações.
+WASM recompilado: 18 casos + recuperação. Manual: 174 compilações, 12 execuções,
+264 contratos C, 351 Fé. API/cores: 612; TextMate: 25+45; Sublime: 17+7;
+Prism: cinco. Logs incluem falhas iniciais e repetições aprovadas.
+
+VS Code 1.142.0: oito grupos no host; Sublime 4215: seis, namespace exclusivo9.
+Capturas reais aprovadas em ambos, com kits 0.0.9/SLS 1.0.0-dados.9 e correção
+light/dark.fontStyle. Fixtures restaurados; comando temporário retirado e
+VS Code recarregado. Perfil temporário mantém nome dados.8, mas versões/hashes
+comprovam9. Nenhuma troca de perfil habitual ou produção.
+
+Gerações: Debian observou candidata e estável durante as trocas; macOS só
+observou estável. Não ampliar essa evidência. Baseline somente núcleo 2.1,
+sem migração de bancos. Gates maiores remanescentes no relatório; não repetir
+como pendente a inspeção dos dois editores já concluída.
+
+Próxima ação: conferir que fonte final coincide com os executáveis ensaiados,
+selar fontes/kits/WASM/manual/evidências e enviar somente ao diretório de
+homologação `/tmp/santafe-dados9.TVessQnc/entrega`. Nenhum comando de produção.
+
+### Dados.9 — entrega confirmada, 24/10/2026
+
+Pacote final: `dist/santafe-candidato-dados.9-homologacao.tar.gz`, SHA-256
+`1eaeb9415facdbb0d3f151aaf26e506f667d04b40fb2a7c7288d3d4d2c3836ad`.
+Fontes (739): `59cecf0965e3ce5f25a21c667faaea94c689f7fe90bc70632dd6458bb7c3c253`.
+Duas montagens dos fontes produziram bytes idênticos. Comparação com o pacote
+ensaiado: mudanças posteriores só no plano/receita/delta e adição de relatório,
+harnesses de host e selador; código de produto preservado. Dados.8 intacto.
+
+Enviado e extraído em `/tmp/santafe-dados9.TVessQnc/entrega`; 133 checksums
+conferidos pelo Python e por sha256sum. 415 fontes de produto/manual comparados
+no próprio Debian com a árvore ensaiada: idênticos. Fixtures locais restaurados
+e extension.js/package.json/aparencia.js do host temporário iguais ao kit limpo.
+O VS Code foi recarregado após retirar a instrumentação. Produção intocada.
+
+Comando de conferência, sem instalar:
+`cd /tmp/santafe-dados9.TVessQnc/entrega && sha256sum -c SHA256SUMS`
+
+Esta solicitação de preparar o próximo candidato está concluída. Próxima ação
+é a homologação pelo usuário; para a versão maior estável, manter os gates do
+RELATORIO.md (ABI/bytecode, réplica completa, soak, aplicativos/plataformas).
+Não publicar nem promover esta entrega sem nova instrução do usuário.
+
+### Dados.10 — IBA e réplica, 24/10/2026 (em andamento)
+
+Base: fontes selados dados.9, SHA-256
+59cecf0965e3ce5f25a21c667faaea94c689f7fe90bc70632dd6458bb7c3c253.
+Árvore de ensaio: `/private/tmp/santafe-dados10-e1jl697w`.
+Receita reproduzível em `experimentos/dados-v10/preparar.py`, patches somente
+nessa árvore. IBA3 (`santafe-3`): descritor obrigatório por DSO, validação antes
+do inicializador mesmo sem checkversion, fence C, assinatura ESC SF3 e formato
+0x30 do bytecode. Gerenciador identifica a IBA no cache; cinco bibC e helpers
+recompilados. SDK/pkg-config corrigido para fornecer a definição candidata e
+preservar caminhos com espaços. Não tratar dlopen como sandbox.
+
+14 grupos IBA passaram no macOS, incluindo SDK C/C++ instalado, carga global,
+recusa de módulos antigos e bytecode recíproco 2.1/3. Regressão de dez etapas
+mais onze subetapas passou antes da correção do SDK; repetição completa com
+manual/SDK final em andamento. Gerenciador passou, inclusive módulo nativo e
+recuperação em seis fases. Logs de falhas de preparação preservados, não
+contados como aprovação. Debian/WASM ainda não concluídos nesta anotação.
+
+Acesso SSH rafael não lê /opt/carteiro, /etc/santafe e depósitos; sudo sem senha
+não autorizado pela máquina. Foi solicitado ao usuário executar o coletor
+`sudo python3 /tmp/capturar-replica-dados10.py --copiar-dados`, já enviado e
+conferido. Ele somente lê produção e cria cópia privada em /var/tmp, com dump
+transacional; não para serviços. Dados/segredos não devem sair do servidor.
+A captura ainda não existe. Não alegar migração completa com dados sintéticos.
+`unshare --user --map-root-user --net` está disponível para isolar a rede da
+réplica. Próximo: concluir Debian/WASM, preparar verificação de integridade da
+captura e adaptação isolada; executar migração real apenas após a captura.
+Nenhuma instalação em produção, alteração de banco/serviço, publicação ou push.
+
+### Dados.10 — evidências intermediárias e pendências
+
+macOS x86_64 e Debian x86_64: IBA passou em 14 grupos, incluindo SDK C/C++
+instalado, e regressão passou em dez etapas + onze subetapas. Gerenciador,
+instalação e sete grupos de gerações/rollback passaram. macOS completou 13
+percursos de aplicativos e carga de 60s. Debian repetiu 13 percursos/carga60s;
+WASM recompilado passou 18 casos + recuperação. Carga Debian ampliada para180s
+em execução. Nenhuma alegação de suporte Windows/ARM ou soak de horas.
+
+Falhas encontradas nos ensaios: pkgconf Debian escapava octetos UTF-8 antes da
+leitura; corrigida a análise de argumentos em octetos. O PULSO terminou a quinta
+escrita depois de o cliente observar cinco recusas TLS; contador agora aguarda
+até3s mantendo a exigência de todos os eventos. Relatório de carga deixava
+PASSOU antes de concluir assertivas; agora registra FALHOU em qualquer exceção.
+Uma carga Debian teve HTTP503 isolado; a repetição de60s passou, mas a causa
+continua desconhecida. Não dar essa falha por corrigida nem promover estável.
+
+Captura real ainda ausente. Verificador/restaurador (`experimentos/dados-v10/`)
+passaram dez testes SINTÉTICOS no Debian, incluindo ambos os bancos, hashes
+SQL/depósitos, corrupção, permissões, symlink/traversal e recusa sem namespace.
+Corrigida a inspeção da rede para usar netlink (a montagem sysfs ainda refletia
+interfaces do host). Coletor exige ambos os bancos e apenas tabelas InnoDB.
+A restauração usa MariaDB exclusivo sem TCP, eventos ou destinos externos.
+Isso prepara o primeiro gate; não migra/valida aplicativos reais sozinho.
+A réplica privada aguarda execução do coletor com sudo pelo usuário.
+
+Receita refeita a partir do arquivo9: zero divergências nos fontes de produto,
+manual, bibliotecas, aplicativos, testes e editores da árvore ensaiada10.
+Produção conferida por leitura: núcleo2.1.0 e cinco serviços ativos.
+Próximo: concluir carga180s, selar pacote com gates abertos explícitos, conferir
+checksum no servidor e retomar captura/restauração/migração real quando existir.
+
+### Dados.10 — entrega de homologação confirmada, 24/10/2026
+
+Carga Debian ampliada concluiu 180,07s com 10.555 operações HTTP medidas, 60 cartas
+persistidas, 1.200 consultas DNS e 230.428KiB de RSS agregado no pico. Nenhum 503
+nessa rodada; isso não esclarece a falha da primeira. A investigação permanece
+explicitamente aberta em ESTADO.json. macOS: 60,10s, 1.915 operações HTTP,
+199.028KiB. As evidências atuais estão aprovadas; as tentativas falhas foram
+preservadas. Não promover a versão estável por esse conjunto isolado.
+
+Entrega: `dist/santafe-candidato-dados.10-homologacao.tar.gz`
+SHA-256: `25e0a08e3b83a7bf95651312e5afd6f5d2e31d32e7c3f771807a51c9ce0f7fee`.
+Fontes (762): `0098b7388db7b851c00137e89ec3240f9be2b7f3e20b2bb4cd6ed00a4581af3a`.
+Duas montagens idênticas. Servidor: `/tmp/santafe-dados10.v901wuit/entrega`,
+162 checksums conferidos por Python e sha256sum; 415 fontes de produto/manual
+idênticos à árvore Debian ensaiada. Pacotes 9 e 8 selados preservados.
+Coletor remoto conferido, SHA-256
+`47bf8601915195b9d0afeccfc3f683b6e98fa0f8752696b9f4893e83fae91bf9`.
+
+Não há publicador de produção. Conferência inofensiva da entrega:
+`cd /tmp/santafe-dados10.v901wuit/entrega && sha256sum -c SHA256SUMS`.
+
+Próxima ação depende da captura real pelo usuário, já solicitada:
+`sudo python3 /tmp/capturar-replica-dados10.py --copiar-dados`.
+Somente então executar verificar-replica.py/restaurar-replica.py no caminho
+retornado, sem baixar dados privados. Esses scripts comprovam apenas captura
+íntegra/restauração; continuar a adaptação dos aplicativos reais, testes de
+atualização/rollback preservando novas escritas e investigação do 503. Não
+marcar a migração real concluída. Pendências e limites em
+`experimentos/dados-v10/RELATORIO.md` e MIGRACAO.md. Produção permanece 2.1.0.
+
+### Dados.11 — réplica real recebida, 24/10/2026
+
+O operador executou o coletor. Captura privada no servidor:
+`/var/tmp/santafe-replica-dados10-4vr_jg0i`, 1.841 arquivos e dois bancos.
+Verificação SHA-256/permissões passou. Restauração validada em
+`/var/tmp/santafe-restauro11-sbldf9cz`: 13 tabelas por banco, 212 objetos
+referenciados em Santafé e 35 em Pão do Café, nenhum ausente ou divergente.
+Dados, mensagens, SQL e credenciais permanecem no servidor.
+
+Errata do harness dados.10: o hash dos objetos postais é BLAKE2b-256
+(`segredo.resuma`), não SHA-256. A checagem anterior gerou falsos divergentes.
+Corrigidos restaurador e fixture sintética em `experimentos/dados-v11`;
+dez ensaios sintéticos repetidos passaram. O manifesto da captura continua
+corretamente usando SHA-256. Não modificar a entrega selada dados.10.
+
+Preparado `migrar-replica.py`: chroot próprio por geração, namespaces de rede,
+PID e montagem; sistema operacional montado somente para leitura, bibliotecas
+e aplicativos copiados, banco e depósitos privados compartilhados entre as
+gerações para conferir rollback preservando novas escritas. O teste de
+montagem somente leitura passou no Debian sem sudo. Produção intocada.
+Não confundir restauração íntegra com aprovação da migração dos aplicativos.
+
+O controle automático recusou imprimir fontes privados da captura no chat.
+Alternativa adotada: fontes locais e comparação remota por hashes; mensagens,
+configurações, erros completos e demais conteúdos privados não são exportados.
+Próxima ação: executar adaptação, leitura histórica integral, escritas de teste
+e retorno à geração estável na réplica. Corrigir falhas reais, registrar limites
+e preparar dados.11 sem promoção estável nem instalação operacional.
+
+### Dados.11 — migração completa ensaiada e baterias repetidas
+
+Árvores compiladas: macOS `/private/tmp/santafe-dados11-8si4nn8u`, Debian
+`/tmp/santafe-dados11-t_gq3n4g`. Base imutável dados.10, IBA3 preservada.
+Regressão: dez etapas e onze subetapas nos dois sistemas; IBA/SDK 14 grupos;
+instalação cinco, gerações sete, gerenciador com recuperação seis fases.
+WASM reconstruído: 18 casos + recuperação. Manual: 174 exemplos, 264 contratos
+C e 351 Fé; fontes de produto 183. Gramáticas/paletas repetidas, sem nova
+inspeção visual das janelas (camada visual inalterada).
+
+Réplica FINAL privada: `/var/tmp/santafe-migracao11-2okin__d`, 23 grupos aprovados.
+Dois bancos/depósitos, 77 fontes finais compilados, SDK/CLI/SLS dados.11 instalados
+no chroot, nginx de ambos os domínios, duas zonas DNS UDP/TCP com chaves DNSSEC
+preservadas, recebedor, agência TLS, IMAP, dois Carteiros, portal e Pão do Café.
+Logins e novas escritas usam contas sintéticas. Originais históricos e anexos
+são conferidos por BLAKE2b-256. Ciclo estável → candidata → estável preservou
+as novas escritas: 105 originais/16 anexos iniciais, 141/22 no final. Nenhuma
+troca de banco de produção, serviço, catálogo, push ou etiqueta.
+
+Carga final da réplica: seis clientes, 9.280 operações HTTP em 60,07s, sem falha.
+Rodada anterior sem checagem final SLS/SDK: 10.045 em 60,03s. Não somar durações.
+O 503 do primeiro teste dados.10 continua sem causa demonstrada. Demais limites:
+certificados de teste; integrações externas desativadas; estáticos em leitura;
+sem upload da comunidade, soak de horas, Windows/ARM ou perda elétrica real.
+
+Defeito real encontrado na baseline: GET /entrar sem destino retornava 500 por
+acesso ao valor nulo em destinoApósEntrada. Corrigido SOMENTE na candidata,
+com teste exigindo 200. Também migrada a exclusão de limites expirados para
+tabela.apague. A baseline reproduz o defeito ao fazer rollback, documentado.
+Os erros restantes das tentativas eram de preparação do harness, preservados
+nos logs; somente as rodadas concluídas entram no estado de aprovação.
+
+Incidente de laboratório: cópias repetidas esgotaram temporariamente o disco
+compartilhado. Removidas apenas cópias encerradas desta tarefa, preservando
+captura original, restauração íntegra, rodada final e registros privados.
+Adicionadas reserva de 2 GiB e montagem de estáticos em leitura sem duplicação.
+Após a limpeza, sete serviços estavam ativos e quatro endpoints HTTPS dos
+dois domínios responderam 200. Núcleo operacional continua 2.1.0. Essa evidência
+pontual não prova ausência de falhas transitórias durante o esgotamento.
+Última medição de espaço: 2,88 GiB livres após limpeza das rodadas anteriores.
+
+Relatório exportável: `evidencias/replica11-real.json` dentro da árvore Debian;
+foi criado por seleção de contagens/resultados. Não copiar SQL, snapshots,
+mensagens, configurações ou logs privados ao Mac/pacote. Compilar/selar apenas
+fontes públicos e evidências sanitizadas. Próximo: comparar reprodução limpa,
+selar entrega dados.11 e conferir SHA-256 no diretório de homologação do servidor.
+Não há publicador de produção; promoção estável permanece bloqueada pelos
+gates de `experimentos/dados-v11/ESTADO.json`.
+
+### Dados.11 — entrega selada e conferida no servidor
+
+Reprodução limpa e árvore ensaiada geraram os mesmos 778 fontes. SHA-256:
+`5ff4e9f68f512e964f0401c7722c3fc9581ac74c3bbd99b7587ed4e3018f0c31`.
+O relatório distingue chaves sintéticas de teste de segredos de produção;
+nenhum conteúdo privado da réplica foi exportado. Foram retirados da entrega
+os pacotes intermediários usados para gerar os editores; os únicos instaladores
+oferecidos são VS Code experimental 0.0.11 e SantafeDados 0.0.11 para Sublime.
+
+Entrega local: `dist/candidato-dados-v11`, com 88 arquivos conferidos pelo
+manifesto (89 incluindo SHA256SUMS). Pacote de homologação:
+`dist/santafe-candidato-dados.11-homologacao.tar.gz`, 3.674.687 bytes, SHA-256
+`33c88a5d48990fe293648d49d2748dee7c766632df165b6dd15c543d55f65b07`.
+
+Cópia extraída e validada no servidor:
+`/tmp/santafe-dados11-t_gq3n4g/entrega`. Os 88 checksums passaram; 584 arquivos
+de produto/testes/manual corresponderam exatamente à árvore Debian ensaiada.
+O conteúdo de ambos os instaladores correspondeu aos kits ensaiados no Debian.
+Nenhum instalador de produção foi executado. Conferência inofensiva:
+
+```sh
+cd /tmp/santafe-dados11-t_gq3n4g/entrega && sha256sum -c SHA256SUMS
+```
+
+Próximas pendências para a promoção estável: reproduzir/investigar o HTTP 503
+isolado de dados.10, soak prolongado com orçamento de recursos e ensaios das
+integrações externas ainda não cobertas. Evitar novas cópias integrais sem
+verificar o espaço: o incidente de disco e seus limites estão registrados no
+relatório. Dados.11 está pronto para homologação, não para promoção estável.
+
+### Dados.12 — investigação e carga prolongada em andamento
+
+Terminologia definida pelo usuário: alternativa (fallback), reversão (rollback),
+retorno (callback); função de retorno quando for necessário distinguir do valor.
+Registrada em docs/TERMINOLOGIA.md; comandos SQL/APIs externas preservados.
+
+Árvores novas: macOS /private/tmp/santafe-dados12-6doadl8p; Debian
+/tmp/santafe-dados12-zz4m7fc1, derivadas do fonte selado dados.11 SHA-256
+5ff4e9f68f512e964f0401c7722c3fc9581ac74c3bbd99b7587ed4e3018f0c31.
+Nenhuma instalação de produção. Réplica dados.11 reutilizada em
+/var/tmp/santafe-migracao11-2okin__d; registros anteriores preservados em
+registros-dados11. Evitou duplicar banco/depósitos.
+
+HTTP 503 reproduzido no laboratório sintético /tmp/santafe-apps5-w6hxpari:
+Error on delete of /tmp/#sql-temptable-…MAI, Errcode 2. O evento ocorreu
+às 18:02:06 UTC, um segundo após nova inicialização de MariaDB da réplica.
+Ambos usavam /tmp. O código MariaDB 10.11 mysql_rm_tmp_tables limpa #sql*
+na inicialização. Prova negativa/positiva em testar-temporarios.py passou:
+compartilhar diretório privado remove sentinela; separar preserva. Nenhum
+ensaio adversarial remove arquivos no /tmp público. A ocorrência original
+dados.10 não preservou corpo/causa; a reprodução identifica o mecanismo sem
+inventar evidência histórica. Correção: --tmpdir exclusivo em bootstrap e
+servidores de ensaio, conferido por SELECT @@tmpdir.
+
+Primeira tentativa de carga da réplica interrompida: monitor lia /proc do host,
+registrando RSS zero. Corrigido para proc do namespace, com recusa de amostra
+vazia. Segunda tentativa de reinício recusou registro parcial em vez do original;
+corrigido uso do registro preservado. Terceira interrompida para corrigir tmpdir.
+Nenhuma dessas tentativas conta como aprovação.
+
+Rodada válida iniciada com registro /tmp/dados12-replica-r4.log: alvo 3600s,
+6 leitores, no máximo 12 pedidos/s, prioridade reduzida, reserva livre 2 GiB,
+crescimento do filesystem <=256 MiB, RSS agregado <=800 MiB, memória disponível
+>=768 MiB, registros <=128 MiB e descritores <=2048. Monitor a cada 5s.
+Resultado e mensagens continuam privados no servidor; exportar apenas contagens
+e consumo. INTERROMPER-DADOS12 no laboratório solicita parada limpa. Não
+considerar conclusão antes de resultado-dados12.json PASSOU e duração >=3600.
+
+Regressões de núcleo/SLS/gramáticas, IBA, gerenciador e gerações passaram nos
+dois sistemas. A primeira tentativa macOS usou binário instalado antigo sem -P
+e referência dados.11 no lugar de dados.7; corrigidas referências e repetida
+com src/santafé 2.1.0 e /private/tmp/santafe-dados7-hx7q0pf7/src/santafé.
+Carga sintética corrigida de 600s e WebAssembly ainda em andamento.
+
+Dados.12, continuação: WebAssembly passou 18 casos e recuperação após erro.
+Carga sintética corrigida passou 600,07s e 40.373 operações HTTP, mais SMTP,
+IMAP e DNS. Roteiro genérico de integração postal completo passou no macOS e
+Debian após a separação de tmpdir (logs dados12-integracao-postal-*).
+
+Rodada r4 interrompida: o monitor contava registros ativos, mas não os
+rotacionados. A reserva de disco continuava respeitada. Registros preservados
+em registros-tentativa4; não contar como aprovação. Corrigido contador para
+somar todos os arquivos em candidata/var/log. Rodada r5 iniciada em 18:16 UTC,
+com a hora completa novamente, log /tmp/dados12-replica-r5.log. Não reduzir a
+janela nem aceitar resultado parcial. Resultado final deverá ter 12 grupos,
+três leituras de conteúdo, novas escritas preservadas e >=3600s monitorados.
+
+Removidos somente bancos sintéticos encerrados de dados12 (178 MiB do ensaio
+HTTP e 180 MiB da integração genérica), com shutdown confirmado e ausência
+de processo usando o datadir. Logs preservados. Não remover captura original,
+restauração ou réplica real de trabalho. Relatório/estado dados12 ainda são
+rascunhos e não estão aprovados para homologação até a conclusão da carga.
+
+Rodada r5 interrompida: a soma de RSS/descritores precisava incluir também os
+filhos nginx. Corrigido para todos os processos do namespace (inclui executor),
+com nova rodada r6 às 18:22 UTC, /tmp/dados12-replica-r6.log, sessão local 35540.
+Conferência independente por namespace PID visto do host passou: 13 processos,
+315568 KiB/250 descritores versus monitor 315548 KiB/249 na amostra próxima.
+Evidência pública monitor12.json. R5 preservada em registros-tentativa5.
+A duração requerida continua 3600s inteiros nesta rodada. Sem alterar produção.
+
+À metade da rodada r6: 1946s, 23346 pedidos, RSS agregado ~315 MiB,
+2776 MiB livres e ~48 MiB de registros. Nenhum erro HTTP. Não aprovar ainda.
+
+O controle automático recusou transferir um arquivo amplo de JSON/logs, por
+não haver prova de segurança de cada conteúdo. Alternativa concluída sem
+nova autorização: exportar-publicos.py confere uma lista explícita com rótulos
+fixos locais (rotulos-publicos.json), contagens, hashes e marcadores constantes;
+não copia linhas de logs nem texto livre. Os 13 resultados sanitizados (9351
+bytes) foram aceitos e estão em /private/tmp/dados12-resultados-sanitizados.json,
+materializados em /private/tmp/dados12-coleta/evidencias/debian. Os registros
+completos permanecem no servidor. Exportar-evidencias.py também foi reforçado
+com a ordem fixa dos 12 grupos, fases/versão fixas e métricas exclusivamente
+numéricas antes de exportar a réplica final. Não transferir o arquivo amplo
+/tmp/dados12-evidencias-publicas-parciais.tar.gz; foi protegido com modo 0600.
+
+Rodada r6 concluída com PASSOU: 3600,39s, 43176 requisições HTTP, seis leitores,
+p95 54,89ms e 719 amostras. RSS máximo 323624 KiB, disco livre mínimo 2748 MiB,
+registros incluindo rotações até 71441690 bytes, descritores até 265.
+Os 12 grupos passaram; 141 originais/22 anexos antes, 153/24 após novas escritas,
+e os mesmos 153/24 preservados após reversão. Nenhum HTTP 503 na rodada válida.
+Fonte da evidência: replica12-real.json, exportado com rótulos fixos e métricas.
+
+Produção: núcleo 2.1.0 com SHA-256 inalterado; mesmos sete processos/instantes
+de início; quatro endpoints HTTPS 200. Resumo sanitizado producao12.json.
+Conteúdo dos dois kits de editores idêntico macOS/Debian: 47 entradas.
+Evidências reunidas em /private/tmp/dados12-coleta. Falta somente sincronizar
+documentação final, repetir comparação dos fontes, selar e conferir a entrega
+no servidor. Nenhuma promoção estável, instalação, publicação externa ou push.

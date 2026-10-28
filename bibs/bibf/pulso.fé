@@ -89,7 +89,7 @@ local função copieDados(valor, estado, profundidade)
         fim
         retorne valor
     fim
-    se espécie ~= "tabela" então
+    se espécie ~= "tabela" e espécie ~= "lista" então
         retorne nulo, "dados do PULSO não aceitam valores do tipo " .. espécie
     fim
     se profundidade > estado.limiteProfundidade então
@@ -100,16 +100,16 @@ local função copieDados(valor, estado, profundidade)
     fim
 
     estado.visitadas[valor] = verdadeiro
-    local cópia = {}
+    local cópia = espécie == "lista" e [] ou {}
     para chave, item em pares(valor) início
         estado.itens = estado.itens + 1
         se estado.itens > estado.limiteItens então
-            estado.visitadas[valor] = nulo
+            tabela.apague(estado.visitadas, valor)
             retorne nulo, "dados do PULSO excederam a quantidade de itens permitida"
         fim
         local tipoDaChave = tipo(chave)
         se tipoDaChave ~= "colar" e tipoDaChave ~= "número" então
-            estado.visitadas[valor] = nulo
+            tabela.apague(estado.visitadas, valor)
             retorne nulo, "chaves dos dados do PULSO devem ser colares ou números"
         fim
         se chaveSigilosa(chave, estado.camposSigilosos) então
@@ -117,13 +117,13 @@ local função copieDados(valor, estado, profundidade)
         senão
             local copiado, falha = copieDados(item, estado, profundidade + 1)
             se falha então
-                estado.visitadas[valor] = nulo
+                tabela.apague(estado.visitadas, valor)
                 retorne nulo, falha
             fim
             cópia[chave] = copiado
         fim
     fim
-    estado.visitadas[valor] = nulo
+    tabela.apague(estado.visitadas, valor)
     retorne cópia
 fim
 
@@ -400,7 +400,7 @@ função pulso.novo(opções)
 
         enquanto este.inícioDaFila <= este.fimDaFila início
             local mensagem = este.fila[este.inícioDaFila]
-            este.fila[este.inícioDaFila] = nulo
+            tabela.apague(este.fila, este.inícioDaFila)
             este.inícioDaFila = este.inícioDaFila + 1
 
             para _, destino em ipares(este.destinos) início

@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix='santafe-pacotes-memoria-') as temporary
     command+=shlex.split(os.environ.get('CFLAGS',''))
     command+=[str(ROOT/'testes/integracao/pacotes_memoria.c'),str(ROOT/'ferramentas/pacotes/nativo.c'),str(source/'liblua.a'),'-lm']
     command+=shlex.split(subprocess.check_output(['pkg-config','--libs','glib-2.0'],text=True))
-    if sys.platform.startswith('linux'): command+=['-ldl']
+    if sys.platform.startswith('linux'): command+=['-ldl','-lcrypto']
     command+=shlex.split(os.environ.get('LDFLAGS',''))+['-o',str(base/'teste')]
     subprocess.run(command,check=True,timeout=60)
     subprocess.run([str(base/'teste'),str(data)],check=True,timeout=90)

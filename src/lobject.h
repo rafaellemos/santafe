@@ -143,6 +143,20 @@ typedef struct lua_TValue {
 #define ttisfloat(o)		checktag((o), LUA_TNUMFLT)
 #define ttisinteger(o)		checktag((o), LUA_TNUMINT)
 #define ttisnil(o)		checktag((o), LUA_TNIL)
+#ifdef SANTAFE_DADOS_V3
+/* Ausência privada e nulo armazenado têm representações distintas. */
+#define LUA_TSTOREDNULL (LUA_TNIL | (1 << 4))
+#define ttisnull(o) checktype((o), LUA_TNIL)
+#define setstorednull(o) { TValue *sn_=(o); val_(sn_).p=NULL; settt_(sn_, LUA_TSTOREDNULL); }
+#define sf_storenull(o) (ttisnil(o) ? (settt_(o,LUA_TSTOREDNULL),0) : 0)
+#define sf_invalidate(h,o) (ttisnull(o) ? ((h)->flags=0,0) : 0)
+#define setstoredvalue(L,o,v) { setobj2t(L,o,v); if (ttisnil(o)) setstorednull(o); }
+#else
+#define ttisnull(o) ttisnil(o)
+#define sf_storenull(o) 0
+#define sf_invalidate(h,o) 0
+#define setstoredvalue(L,o,v) setobj2t(L,o,v)
+#endif
 #define ttisboolean(o)		checktag((o), LUA_TBOOLEAN)
 #define ttislightuserdata(o)	checktag((o), LUA_TLIGHTUSERDATA)
 #define ttisstring(o)		checktype((o), LUA_TSTRING)
@@ -178,7 +192,7 @@ typedef struct lua_TValue {
 /* a dead value may get the 'gc' field, but cannot access its contents */
 #define deadvalue(o)	check_exp(ttisdeadkey(o), cast(void *, val_(o).gc))
 
-#define l_isfalse(o)	(ttisnil(o) || (ttisboolean(o) && bvalue(o) == 0))
+#define l_isfalse(o)	(ttisnull(o) || (ttisboolean(o) && bvalue(o) == 0))
 
 
 #define iscollectable(o)	(rttype(o) & BIT_ISCOLLECTABLE)
@@ -496,6 +510,10 @@ typedef struct Node {
 
 typedef struct Table {
   CommonHeader;
+#ifdef SANTAFE_DADOS_V3
+  unsigned int listlen;
+  lu_byte islist;
+#endif
   lu_byte flags;  /* 1<<p means tagmethod(p) is not present */
   lu_byte lsizenode;  /* log2 of size of 'node' array */
   unsigned int sizearray;  /* size of 'array' array */

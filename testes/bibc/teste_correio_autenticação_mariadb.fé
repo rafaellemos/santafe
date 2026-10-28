@@ -50,9 +50,8 @@ mariadb.criePiscinaAssíncrona({
 }, função(novaPiscina, falhaDaPiscina)
     se não novaPiscina então encerre(falhaDaPiscina); retorne fim
     piscina = novaPiscina
-    piscina:executePreparadoAssíncrono([[
-INSERT INTO usuarios (nome,usuario,email,papel,estado)
-VALUES (?,?,?,?,?)]], {
+    piscina:executePreparadoAssíncrono([=[INSERT INTO usuarios (nome,usuario,email,papel,estado)
+VALUES (?,?,?,?,?)]=], {
         "Autenticação Postal", "autenticacao-postal",
         "autenticacao-postal@santafé.dev.br", "usuário", "ativo"
     }, função(_, inclusão, falhaDaInclusão)
@@ -92,9 +91,8 @@ VALUES (?,?,?,?,?)]], {
             }
             adaptador:recebaSMTP(envelope, função(quantidade, falhaDoRecebimento)
                 se quantidade ~= 1 então encerre(falhaDoRecebimento); retorne fim
-                piscina:executePreparadoAssíncrono([[
-SELECT id FROM correio_cartas WHERE caixa_id=?
-AND identificacao='<autenticacao@example.net>' LIMIT 1]], { caixa.id },
+                piscina:executePreparadoAssíncrono([=[SELECT id FROM correio_cartas WHERE caixa_id=?
+AND identificacao='<autenticacao@example.net>' LIMIT 1]=], { caixa.id },
                     função(_, consulta, falhaDaConsulta)
                         se falhaDaConsulta então
                             se consulta então consulta:feche() fim

@@ -649,6 +649,7 @@ LUA_API int lua_rawget (lua_State *L, int idx) {
   lua_lock(L);
   t = index2addr(L, idx);
   api_check(L, ttistable(t), "tabela esperada");
+  luaH_checklist(L,t,L->top-1,0);
   setobj2s(L, L->top - 1, luaH_get(hvalue(t), L->top - 1));
   lua_unlock(L);
   return ttnov(L->top - 1);
@@ -660,6 +661,9 @@ LUA_API int lua_rawgeti (lua_State *L, int idx, lua_Integer n) {
   lua_lock(L);
   t = index2addr(L, idx);
   api_check(L, ttistable(t), "tabela esperada");
+#ifdef SANTAFE_DADOS_V3
+  { TValue k; setivalue(&k,n); luaH_checklist(L,t,&k,0); }
+#endif
   setobj2s(L, L->top, luaH_getint(hvalue(t), n));
   api_incr_top(L);
   lua_unlock(L);
@@ -674,6 +678,7 @@ LUA_API int lua_rawgetp (lua_State *L, int idx, const void *p) {
   t = index2addr(L, idx);
   api_check(L, ttistable(t), "tabela esperada");
   setpvalue(&k, cast(void *, p));
+  luaH_checklist(L,t,&k,0);
   setobj2s(L, L->top, luaH_get(hvalue(t), &k));
   api_incr_top(L);
   lua_unlock(L);
@@ -692,6 +697,53 @@ LUA_API void lua_createtable (lua_State *L, int narray, int nrec) {
   luaC_checkGC(L);
   lua_unlock(L);
 }
+
+#ifdef SANTAFE_DADOS_V3
+LUA_API int lua_islist (lua_State *L, int idx) {
+  const TValue *v = index2addr(L,idx);
+  return ttistable(v) && hvalue(v)->islist;
+}
+
+LUA_API void lua_createlist (lua_State *L, int reserve) {
+  lua_createtable(L,reserve,0);
+  hvalue(index2addr(L,-1))->islist = 1;
+}
+
+LUA_API int lua_rawpresent (lua_State *L, int idx) {
+  const TValue *t = index2addr(L,idx);
+  int present;
+  api_check(L,ttistable(t),"tabela esperada");
+  luaH_checklist(L,t,L->top-1,0);
+  present = !ttisnil(luaH_get(hvalue(t),L->top-1));
+  L->top--;
+  return present;
+}
+
+LUA_API int lua_rawdelete (lua_State *L, int idx) {
+  const TValue *t = index2addr(L,idx);
+  const TValue *slot;
+  Table *h;
+  int present;
+  api_check(L,ttistable(t),"tabela esperada");
+  h = hvalue(t);
+  luaH_checklist(L,t,L->top-1,0);
+  slot = luaH_get(h,L->top-1);
+  present = !ttisnil(slot);
+  if (present && h->islist) {
+    lua_Integer i; luaV_tointeger(L->top-1,&i,0);
+    for (; (lua_Unsigned)i < h->listlen; ++i) {
+      TValue *dst = cast(TValue *,luaH_getint(h,i));
+      setobj2t(L,dst,luaH_getint(h,i+1));
+    }
+    setnilvalue(cast(TValue *,luaH_getint(h,h->listlen)));
+    h->listlen--;
+  }
+  else if (present) setnilvalue(cast(TValue *,slot));
+  invalidateTMcache(h);
+  L->top--;
+  return present;
+}
+#endif
 
 
 LUA_API int lua_getmetatable (lua_State *L, int objindex) {
@@ -805,8 +857,15 @@ LUA_API void lua_rawset (lua_State *L, int idx) {
   api_checknelems(L, 2);
   o = index2addr(L, idx);
   api_check(L, ttistable(o), "tabela esperada");
+  luaH_checklist(L,o,L->top-2,1);
   slot = luaH_set(L, hvalue(o), L->top - 2);
-  setobj2t(L, slot, L->top - 1);
+  setstoredvalue(L, slot, L->top - 1);
+#ifdef SANTAFE_DADOS_V3
+  if (hvalue(o)->islist) {
+    lua_Integer i; luaV_tointeger(L->top-2,&i,0);
+    if ((lua_Unsigned)i > hvalue(o)->listlen) hvalue(o)->listlen=(unsigned int)i;
+  }
+#endif
   invalidateTMcache(hvalue(o));
   luaC_barrierback(L, hvalue(o), L->top-1);
   L->top -= 2;
@@ -820,7 +879,14 @@ LUA_API void lua_rawseti (lua_State *L, int idx, lua_Integer n) {
   api_checknelems(L, 1);
   o = index2addr(L, idx);
   api_check(L, ttistable(o), "tabela esperada");
+#ifdef SANTAFE_DADOS_V3
+  { TValue key; setivalue(&key,n); luaH_checklist(L,o,&key,1); }
+#endif
   luaH_setint(L, hvalue(o), n, L->top - 1);
+#ifdef SANTAFE_DADOS_V3
+  if (hvalue(o)->islist && (lua_Unsigned)n > hvalue(o)->listlen)
+    hvalue(o)->listlen=(unsigned int)n;
+#endif
   luaC_barrierback(L, hvalue(o), L->top-1);
   L->top--;
   lua_unlock(L);
@@ -835,8 +901,10 @@ LUA_API void lua_rawsetp (lua_State *L, int idx, const void *p) {
   o = index2addr(L, idx);
   api_check(L, ttistable(o), "tabela esperada");
   setpvalue(&k, cast(void *, p));
+  luaH_checklist(L,o,&k,1);
   slot = luaH_set(L, hvalue(o), &k);
-  setobj2t(L, slot, L->top - 1);
+  setstoredvalue(L, slot, L->top - 1);
+  invalidateTMcache(hvalue(o));
   luaC_barrierback(L, hvalue(o), L->top - 1);
   L->top--;
   lua_unlock(L);
@@ -849,12 +917,16 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
   lua_lock(L);
   api_checknelems(L, 1);
   obj = index2addr(L, objindex);
-  if (ttisnil(L->top - 1))
+  if (ttisnull(L->top - 1))
     mt = NULL;
   else {
     api_check(L, ttistable(L->top - 1), "tabela esperada");
     mt = hvalue(L->top - 1);
   }
+#ifdef SANTAFE_DADOS_V3
+  if (ttistable(obj) && hvalue(obj)->islist && mt)
+    luaG_runerror(L,"listas do candidato não aceitam metatabelas");
+#endif
   switch (ttnov(obj)) {
     case LUA_TTABLE: {
       hvalue(obj)->metatable = mt;

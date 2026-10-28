@@ -20,8 +20,8 @@ PACOTE = RAIZ / "package.json"
 def principal() -> None:
     manifesto = json.loads(PACOTE.read_text(encoding="utf-8"))
     leia_me = (RAIZ / "README.md").read_text(encoding="utf-8")
-    assert f"Extensão Santafé {manifesto['version']}" in leia_me
-    assert "O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0" in leia_me
+    assert f"Santafé — extensão {manifesto['version']}" in leia_me
+    assert "Compatível com o núcleo Santafé 3.0.0 e SLS 1.1.0" in leia_me
     assert "análise semântica futura do SLS" not in leia_me
     assert manifesto["main"] == "./extension.js"
     assert manifesto["icon"] == "./icon.png"

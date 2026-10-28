@@ -43,7 +43,7 @@ class Incremental(unittest.TestCase):
 
     def test_anuncia_incremental(self):
         self.assertEqual(self.cliente.capacidades["textDocumentSync"]["change"], 2)
-        self.assertEqual(self.cliente.informacao["version"], "1.0.0")
+        self.assertEqual(self.cliente.informacao["version"], "1.1.0")
 
     def test_token_utf16(self):
         texto = 'local emoji = "🟢 é"; local índice = )\n'

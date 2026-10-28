@@ -409,7 +409,7 @@ local função nova(definição)
             definição.dnssec ou {}
         local estadoDNSSEC
         estadoDNSSEC, falha = móduloDNSSEC.assineZona(este, opçõesDNSSEC)
-        opçõesDNSSEC.chavePrivada = nulo
+        tabela.apague(opçõesDNSSEC, "chavePrivada")
         se não estadoDNSSEC então retorne nulo, falha fim
         este.dnssec = estadoDNSSEC
     fim

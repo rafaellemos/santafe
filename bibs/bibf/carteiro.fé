@@ -156,7 +156,7 @@ função carteiro.novo(opções)
             tratador(nulo, "pasta inválida")
             retorne
         fim
-        se tipo(identificações) ~= "tabela" ou #identificações == 0 então
+        se (tipo(identificações) ~= "tabela" e tipo(identificações) ~= "lista") ou #identificações == 0 então
             tratador(nulo, "selecione ao menos uma carta")
             retorne
         fim
@@ -213,7 +213,7 @@ função carteiro.novo(opções)
     fim
 
     local função marqueCartas(caixa, identificações, lida, tratador)
-        se tipo(identificações) ~= "tabela" ou #identificações == 0 então
+        se (tipo(identificações) ~= "tabela" e tipo(identificações) ~= "lista") ou #identificações == 0 então
             tratador(nulo, "selecione ao menos uma carta")
             retorne
         fim

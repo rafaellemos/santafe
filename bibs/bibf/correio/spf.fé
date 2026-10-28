@@ -338,7 +338,7 @@ avalieDomínio = função(contexto, domínio, tratador)
     consulta(contexto, contexto.consulteTXT, domínio,
         função(registros, falhaDNS, natureza)
             local função finalize(valor)
-                contexto.visitados[domínio] = nulo
+                tabela.apague(contexto.visitados, domínio)
                 contexto.profundidade = contexto.profundidade - 1
                 tratador(valor)
             fim

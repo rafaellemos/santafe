@@ -7,7 +7,7 @@ local função objeto(t,permitidos,descrição)
     para k em pares(t) início exija(tipo(k)=="colar" e permitidos[k],descrição..": campo desconhecido "..paraColar(k)) fim
 fim
 local função lista(t,máximo,descrição)
-    exija(tipo(t)=="tabela",descrição..": lista esperada")
+    exija(tipo(t)=="lista",descrição..": lista esperada")
     local n=0
     para k em pares(t) início
         exija(tipo(k)=="número" e k>=1 e k%1==0 e k<=máximo,descrição..": índice inválido")
@@ -39,21 +39,32 @@ retorne função(N)
     local F={exija=exija,lista=lista,objeto=objeto,dependências=dependências,móduloVálido=móduloVálido}
     função F.canônico(dados)
         local passos=0
+        local ativos={}
         local função codifique(v,profundidade)
             passos=passos+1; exija(passos<=1000000 e profundidade<=64,"JSON complexo demais")
-            se tipo(v)~="tabela" então retorne garanta(json.cod(v)) fim
-            local n,chaves=0,{}
-            para k em pares(v) início n=n+1; chaves[#chaves+1]=k fim
+            local espécie=tipo(v)
+            se espécie~="tabela" e espécie~="lista" então retorne garanta(json.cod(v)) fim
+            exija(obterMetatabela(v)==nulo,"JSON canônico não aceita metatabela")
+            exija(não ativos[v],"JSON canônico não aceita ciclos")
+            ativos[v]=verdadeiro
             local partes={}
-            se n>0 e tipo(chaves[1])=="número" então
+            local resultado
+            se espécie=="lista" então
                 lista(v,1000000,"JSON")
-                para _,item em ipares(v) início partes[#partes+1]=codifique(item,profundidade+1) fim
-                retorne "["..tabela.concatene(partes,",").."]"
+                para i=1,#v início partes[#partes+1]=codifique(v[i],profundidade+1) fim
+                resultado="["..tabela.concatene(partes,",").."]"
+            senão
+                local chaves={}
+                para k em pares(v) início
+                    exija(tipo(k)=="colar","chave JSON inválida")
+                    chaves[#chaves+1]=k
+                fim
+                tabela.ordene(chaves)
+                para _,k em ipares(chaves) início partes[#partes+1]=json.cod(k)..":"..codifique(v[k],profundidade+1) fim
+                resultado="{"..tabela.concatene(partes,",").."}"
             fim
-            para _,k em ipares(chaves) início exija(tipo(k)=="colar","chave JSON inválida") fim
-            tabela.ordene(chaves)
-            para _,k em ipares(chaves) início partes[#partes+1]=json.cod(k)..":"..codifique(v[k],profundidade+1) fim
-            retorne "{"..tabela.concatene(partes,",").."}"
+            tabela.apague(ativos,v)
+            retorne resultado
         fim
         retorne codifique(dados,0)
     fim

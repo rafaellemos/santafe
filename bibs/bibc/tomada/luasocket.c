@@ -98,7 +98,12 @@ static int base_open(lua_State *L) {
 \*-------------------------------------------------------------------------*/
 LUASOCKET_API int luaopen_tomada(lua_State *L) {
     int i;
+    luaL_checkversion(L);
     base_open(L);
     for (i = 0; mod[i].name; i++) mod[i].func(L);
     return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3)
+SANTAFE_MODULE_ABI;
+#endif

@@ -31,7 +31,7 @@ def confira_vsix(caminho):
         manifesto = json.loads(pacote.read("extension/package.json"))
         leia_me = pacote.read("extension/readme.md").decode("utf-8")
         assert f"Extensão Santafé {manifesto['version']}" in leia_me
-        assert "O SLS 1.0.0, publicado com o núcleo Santafé 2.1.0" in leia_me
+        assert "Compatível com o núcleo Santafé 3.0.0 e SLS 1.1.0" in leia_me
         assert "análise semântica futura do SLS" not in leia_me
         for chave, valor in original.items():
             assert manifesto[chave] == valor, chave

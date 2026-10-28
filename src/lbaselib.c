@@ -225,6 +225,9 @@ static int luaB_collectgarbage (lua_State *L) {
 
 
 static int luaB_type (lua_State *L) {
+#ifdef SANTAFE_DADOS_V3
+  if (lua_islist(L,1)) { lua_pushliteral(L,"lista"); return 1; }
+#endif
   int t = lua_type(L, 1);
   luaL_argcheck(L, t != LUA_TNONE, 1, "valor esperado");
   lua_pushstring(L, lua_typename(L, t));
@@ -272,6 +275,17 @@ static int luaB_pairs (lua_State *L) {
 static int ipairsaux (lua_State *L) {
   lua_Integer i = luaL_checkinteger(L, 2) + 1;
   lua_pushinteger(L, i);
+#ifdef SANTAFE_DADOS_V3
+  if (lua_islist(L,1)) {
+    if ((lua_Unsigned)i > lua_rawlen(L,1)) return 0;
+    lua_geti(L,1,i); return 2;
+  }
+  if (lua_istable(L,1)) {
+    lua_pushinteger(L,i);
+    if (!lua_rawpresent(L,1)) return 0;
+    lua_geti(L,1,i); return 2;
+  }
+#endif
   return (lua_geti(L, 1, i) == LUA_TNIL) ? 1 : 2;
 }
 

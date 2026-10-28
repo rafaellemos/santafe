@@ -1,0 +1,45 @@
+-- Contratos de migração; somente dados de laboratório, sem redes ou bancos.
+módulo.caminho = "bibs/bibf/?.fé;bibs/bibf/?/?.fé"
+módulo.caminhoC = "bibs/bibc/?/?.so"
+local dados = importe "dados_experimentais"
+local pulso = importe "pulso"
+
+garanta(dados.codifiqueLista({}) == "[]")
+garanta(json.cod({}) == "{}")
+garanta(dados.codifiqueLista({nulo, "José", nulo}) == '[null,"José",null]')
+local lista = [nulo, falso]
+garanta(dados.lista(lista) == lista e #lista == 2)
+para _, valor em pares({{[1]="a", [3]="b"}, {["1"]="a"}, {a=1}, {[0]="a"}}) início
+    local ok = proteja(dados.lista, valor)
+    garanta(não ok, "mapa ou tabela esparsa não pode virar lista implicitamente")
+fim
+local registro = json.decod(dados.codifiqueDestinatários({["para"]={}, cópia=["josé@exemplo.invalid"]}))
+garanta(tipo(registro) == "tabela" e tipo(registro["para"]) == "lista" e #registro["para"] == 0)
+garanta(registro.cópia[1] == "josé@exemplo.invalid")
+garanta(não proteja(dados.codifiqueDestinatários, {desconhecido={}}))
+
+local canal = garanta(pulso.novo({serviço="laboratório", instância="dados3"}))
+local comum = {presente=nulo, senha="segredo-fictício"}
+local entrada = {vazia=[], objeto={}, itens=[nulo, comum, comum, falso], ausente=nulo}
+local sinal = garanta(canal:sinal("nulosEListas", entrada))
+local texto = json.cod(sinal)
+local saída = json.decod(texto).dados
+garanta(tipo(saída.vazia) == "lista" e #saída.vazia == 0)
+garanta(tipo(saída.objeto) == "tabela" e próximo(saída.objeto) == nulo)
+garanta(tipo(saída.itens) == "lista" e #saída.itens == 4)
+garanta(tabela.temChave(saída.itens, 1) e saída.itens[1] == nulo)
+garanta(saída.itens[4] == falso e tabela.temChave(saída, "ausente"))
+para i=2,3 início
+    garanta(tabela.temChave(saída.itens[i], "presente"))
+    garanta(saída.itens[i].senha == "[protegido]")
+fim
+garanta(comum.senha == "segredo-fictício", "proteção não pode alterar o dado original")
+local dec = garanta(pulso.novoDecodificador({}))
+local volta = garanta(dec:alimente(garanta(pulso.codifique(sinal))))
+garanta(#volta == 1 e #volta[1].dados.itens == 4)
+local ciclo = []; ciclo[1] = ciclo
+local recusado, falha = canal:sinal("ciclo", {itens=ciclo})
+garanta(recusado == nulo e falha:procure("circular", 1, verdadeiro))
+garanta(canal:sinal("depoisDaFalha", {itens=[nulo]}))
+garanta(canal:feche())
+mostre("Fronteiras PULSO/JSON: listas, nulos, proteção e rejeição de mapas: ok")

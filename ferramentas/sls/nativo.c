@@ -15,6 +15,33 @@
 #include <unistd.h>
 #include "lua.h"
 #include "lauxlib.h"
+#if defined(SANTAFE_SLS_EMBUTIDO)
+#if defined(__APPLE__)
+#include <CommonCrypto/CommonDigest.h>
+#define SLS_SHA256_SIZE CC_SHA256_DIGEST_LENGTH
+#else
+#include <openssl/sha.h>
+#define SLS_SHA256_SIZE SHA256_DIGEST_LENGTH
+#endif
+static int hash_source(lua_State *L) {
+    size_t size, i;
+    const char *source = luaL_checklstring(L, 1, &size);
+    unsigned char digest[SLS_SHA256_SIZE];
+    char hex[SLS_SHA256_SIZE * 2 + 1];
+    static const char digits[] = "0123456789abcdef";
+    luaL_argcheck(L, size <= 16 * 1024 * 1024, 1, "fonte excessiva");
+#if defined(__APPLE__)
+    CC_SHA256(source, (CC_LONG)size, digest);
+#else
+    if (!SHA256((const unsigned char *)source, size, digest))
+        return luaL_error(L, "SHA-256 indisponível");
+#endif
+    for (i=0; i<sizeof(digest); i++) {
+        hex[2*i]=digits[digest[i]>>4]; hex[2*i+1]=digits[digest[i]&15];
+    }
+    lua_pushlstring(L,hex,2*sizeof(digest)); return 1;
+}
+#endif
 
 typedef struct { int fd; } Handle;
 typedef struct { DIR *directory; } Directory;
@@ -189,6 +216,9 @@ static int protected_request(lua_State *L) {
 
 int luaopen_sls_nativo(lua_State *L) {
     static const luaL_Reg api[] = {
+#if defined(SANTAFE_SLS_EMBUTIDO)
+        {"sha256", hash_source},
+#endif
         {"abraRaiz", open_root}, {"listeFontes", list_sources}, {"leiaFonte", read_source},
         {"entradaPronta", input_ready}, {"leiaEntrada", read_input},
         {"executeProtegido", protected_request}, {NULL, NULL}
@@ -202,3 +232,7 @@ int luaopen_sls_nativo(lua_State *L) {
     }
     lua_pop(L, 1); luaL_newlib(L, api); return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3) && !defined(SANTAFE_SLS_EMBUTIDO)
+SANTAFE_MODULE_ABI;
+#endif

@@ -1,0 +1,9 @@
+{
+  "origem": "gramáticas nativas do VS Code 1.142.0 usadas nos ensaios",
+  "licenca": "Ver LICENCAS.txt: avisos e licenças das gramáticas extraídos de ThirdPartyNotices.txt do editor",
+  "sha256": {
+    "extensions/html/syntaxes/html.tmLanguage.json": "a042290a8410d18c90577111b755caa272b296a432a3b66cf6c6770abb74af7a",
+    "extensions/javascript/syntaxes/JavaScript.tmLanguage.json": "fbb253d385c855075ef743c958ffa3ef63939c7e65ced110ba3d2575be7a5025",
+    "extensions/css/syntaxes/css.tmLanguage.json": "1fe1c50fe650f7fe07b381012d624080955170e376cf7ffc66170d783de7e436"
+  }
+}

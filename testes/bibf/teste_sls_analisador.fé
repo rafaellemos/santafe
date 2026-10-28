@@ -6,32 +6,32 @@ local função analise(texto)
     garanta(não a.falhaLéxica)
     retorne a
 fim
-local a=analise([[local índice = 1
+local a=analise([=[local índice = 1
 início
  local índice = 2
  mostre(índice)
 fim
 mostre(índice)
 -- índice
-local texto = "índice"]])
+local texto = "índice"]=])
 garanta(#a.símbolos == 3)
 garanta(#a.símbolos[1].referências == 2 e #a.símbolos[2].referências == 2)
 local b=analise('local nome="Ana"; local s=`®nome Ⓡnome ®{nome} Ⓡ{nome} nome`')
 garanta(#b.símbolos[1].referências == 5)
 local c=analise('local variável, variável = 1,2; mostre(`®variávelⓇvariável ®{variável + variável}`)')
 garanta(#c.símbolos[1].referências == 3 e #c.símbolos[2].referências == 3)
-local d=analise([[local x=1
+local d=analise([=[local x=1
 início local x=x+1; mostre(x) fim
-mostre(x)]])
+mostre(x)]=])
 garanta(#d.símbolos[1].referências == 3 e #d.símbolos[2].referências == 2)
 local função encontre(análise,nome)
     para _,s em ipares(análise.símbolos) início se s.nome==nome então retorne s fim fim
 fim
-local f=analise([[local função somar(a,b)
+local f=analise([=[local função somar(a,b)
  local função dentro(c) retorne somar(a,c) fim
  retorne a+b
 fim
-somar(1,2)]])
+somar(1,2)]=])
 garanta(#encontre(f,"somar").referências == 3)
 garanta(#encontre(f,"a").referências == 3 e #encontre(f,"b").referências == 2)
 garanta(#encontre(f,"somar").parâmetros == 2)

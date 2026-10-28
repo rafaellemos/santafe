@@ -1494,7 +1494,11 @@ static int l_res_fetch_row(lua_State *L) {
             }
         }
 
+#ifdef SANTAFE_DADOS_V3
+        lua_createlist(L, ud->num_fields);
+#else
         lua_createtable(L, ud->num_fields, 0);
+#endif
         for (int i = 0; i < ud->num_fields; i++) {
             ps_stmt_column_t *column = &ud->columns[i];
             if (column->is_null) lua_pushnil(L);
@@ -1516,7 +1520,11 @@ static int l_res_fetch_row(lua_State *L) {
     MYSQL_ROW row = mysql_fetch_row(ud->res);
     if (row) {
         unsigned long *len = mysql_fetch_lengths(ud->res);
+#ifdef SANTAFE_DADOS_V3
+        lua_createlist(L, ud->num_fields);
+#else
         lua_createtable(L, ud->num_fields, 0);
+#endif
         for(int i=0; i<ud->num_fields; i++) {
             if (row[i]) lua_pushlstring(L, row[i], len[i]);
             else lua_pushnil(L);
@@ -2770,6 +2778,7 @@ static const luaL_Reg mysql_funcs[] = {
 };
 
 LUA_API int luaopen_mariadb(lua_State *L) {
+    luaL_checkversion(L);
     mysql_library_init(0, NULL, NULL);
     if (luaL_newmetatable(L, PS_MYSQL_CON)) {
         luaL_setfuncs(L, con_methods, 0);
@@ -2798,3 +2807,7 @@ LUA_API int luaopen_mariadb(lua_State *L) {
     luaL_newlib(L, mysql_funcs);
     return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3)
+SANTAFE_MODULE_ABI;
+#endif

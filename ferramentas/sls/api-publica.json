@@ -2,6 +2,20 @@
   "versão": 1,
   "itens": [
     {
+      "rótulo": "RPDF:novo",
+      "origem": "bibs/bibf/rpdf.fé",
+      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
+      "assinatura": "RPDF:novo()",
+      "documentação": "Cria um documento PDF 2.0 vazio."
+    },
+    {
+      "rótulo": "Vigia.novo",
+      "origem": "bibs/bibf/vigia.fé",
+      "categoria": "Vigia",
+      "assinatura": "Vigia.novo([opções])",
+      "documentação": "Cria uma proteção independente."
+    },
+    {
       "rótulo": "_G",
       "origem": "src/lbaselib.c",
       "categoria": "API C / núcleo"
@@ -143,6 +157,20 @@
       "documentação": "Consulta a existência de um caminho."
     },
     {
+      "rótulo": "arquivo.graveAtômico",
+      "assinatura": "arquivo.graveAtômico(caminho, conteúdo)",
+      "documentação": "Grava bytes por substituição atômica; retorna ok, falha, estado.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibc/arquivo/arquivo.c"
+    },
+    {
+      "rótulo": "arquivo.graveAtômicoAssíncrono",
+      "assinatura": "arquivo.graveAtômicoAssíncrono(caminho, conteúdo, tratador [, contexto])",
+      "documentação": "Grava bytes sem bloquear o laço; tratador recebe ok, falha, estado, contexto.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibc/arquivo/arquivo.c"
+    },
+    {
       "rótulo": "arquivo.graveDurávelAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
       "categoria": "API C / núcleo",
@@ -266,6 +294,13 @@
       "categoria": "Nomes"
     },
     {
+      "rótulo": "bit32.bTeste",
+      "origem": "bibs/bibf/bit32.fé",
+      "categoria": "bit32",
+      "assinatura": "bit32.bTeste(...)",
+      "documentação": "Testa se o \"E\" bit a bit de todos os argumentos é diferente de zero."
+    },
+    {
       "rótulo": "bit32.be",
       "origem": "bibs/bibf/bit32.fé",
       "categoria": "bit32",
@@ -292,13 +327,6 @@
       "categoria": "bit32",
       "assinatura": "bit32.boux(...)",
       "documentação": "Aplica OU exclusivo bit a bit aos valores."
-    },
-    {
-      "rótulo": "bit32.bTeste",
-      "origem": "bibs/bibf/bit32.fé",
-      "categoria": "bit32",
-      "assinatura": "bit32.bTeste(...)",
-      "documentação": "Testa se o \"E\" bit a bit de todos os argumentos é diferente de zero."
     },
     {
       "rótulo": "bit32.desloqueAritméticoDireita",
@@ -700,18 +728,18 @@
       "documentação": "Conecta de forma assíncrona."
     },
     {
-      "rótulo": "cliente:definaTempoLimite",
-      "origem": "bibs/bibc/rede/rede.c",
-      "categoria": "API C / núcleo",
-      "assinatura": "cliente:definaTempoLimite(ms)",
-      "documentação": "Define o prazo das próximas conexões."
-    },
-    {
       "rótulo": "cliente:definaTLS",
       "origem": "bibs/bibc/rede/rede.c",
       "categoria": "API C / núcleo",
       "assinatura": "cliente:definaTLS(usar)",
       "documentação": "Liga ou desliga TLS antes da conexão."
+    },
+    {
+      "rótulo": "cliente:definaTempoLimite",
+      "origem": "bibs/bibc/rede/rede.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "cliente:definaTempoLimite(ms)",
+      "documentação": "Define o prazo das próximas conexões."
     },
     {
       "rótulo": "cliente:definaValidaçãoTLS",
@@ -2335,6 +2363,21 @@
       "categoria": "API C / núcleo"
     },
     {
+      "rótulo": "nomes.CLASSES",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.CÓDIGOS",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
+      "rótulo": "nomes.TIPOS",
+      "origem": "bibs/bibf/nomes.fé",
+      "categoria": "Nomes"
+    },
+    {
       "rótulo": "nomes.acesso.novo",
       "origem": "bibs/bibf/nomes/acesso.fé",
       "categoria": "Nomes"
@@ -2355,11 +2398,6 @@
       "categoria": "Nomes"
     },
     {
-      "rótulo": "nomes.CLASSES",
-      "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
-    },
-    {
       "rótulo": "nomes.codifiqueMensagem",
       "origem": "bibs/bibf/nomes.fé",
       "categoria": "Nomes",
@@ -2372,11 +2410,6 @@
       "categoria": "Nomes",
       "assinatura": "nomes.codifiqueNome(nome)",
       "documentação": "Transforma um nome no formato binário DNS."
-    },
-    {
-      "rótulo": "nomes.CÓDIGOS",
-      "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
     },
     {
       "rótulo": "nomes.decodifiqueMensagem",
@@ -2431,11 +2464,6 @@
       "documentação": "Converte um tipo DNS para seu número."
     },
     {
-      "rótulo": "nomes.TIPOS",
-      "origem": "bibs/bibf/nomes.fé",
-      "categoria": "Nomes"
-    },
-    {
       "rótulo": "nomes.zona.nova",
       "origem": "bibs/bibf/nomes/zona.fé",
       "categoria": "Nomes"
@@ -2460,6 +2488,55 @@
       "categoria": "API C / núcleo",
       "assinatura": "octetos(s)",
       "documentação": "Conta todos os octetos armazenados no colar s, inclusive zeros; atende a dados binários. A consulta é constante e não converte números implicitamente."
+    },
+    {
+      "rótulo": "onfé.carregue",
+      "assinatura": "onfé.carregue(caminho)",
+      "documentação": "Lê e decodifica um arquivo ONFÉ sob controle da aplicação.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
+    },
+    {
+      "rótulo": "onfé.cod",
+      "assinatura": "onfé.cod(dado)",
+      "documentação": "Serializa dados sem executá-los; limita a 4 MiB.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
+    },
+    {
+      "rótulo": "onfé.deJSON",
+      "assinatura": "onfé.deJSON(texto)",
+      "documentação": "Decodifica JSON preservando listas e nulos.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
+    },
+    {
+      "rótulo": "onfé.decod",
+      "assinatura": "onfé.decod(texto)",
+      "documentação": "Decodifica dados ONFÉ sem executar programas.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
+    },
+    {
+      "rótulo": "onfé.grave",
+      "assinatura": "onfé.grave(caminho, dado)",
+      "documentação": "Grava ONFÉ por substituição atômica; retorna ok, falha, estado. Síncrono.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
+    },
+    {
+      "rótulo": "onfé.graveAssíncrono",
+      "assinatura": "onfé.graveAssíncrono(caminho, dado, tratador [, contexto])",
+      "documentação": "Agenda E/S. Tratador recebe ok, falha, estado, contexto; estados inalterado/publicado/durável.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
+    },
+    {
+      "rótulo": "onfé.paraJSON",
+      "assinatura": "onfé.paraJSON(dado)",
+      "documentação": "Converte dados para JSON comum; recusa chaves não textuais.",
+      "categoria": "Dados / persistência",
+      "origem": "bibs/bibf/onfé.fé"
     },
     {
       "rótulo": "paraColar",
@@ -3594,13 +3671,6 @@
       "documentação": "Lê a próxima linha de um resultado."
     },
     {
-      "rótulo": "RPDF:novo",
-      "origem": "bibs/bibf/rpdf.fé",
-      "categoria": "RPDF — superfície estável; auxiliares privados não aparecem aqui",
-      "assinatura": "RPDF:novo()",
-      "documentação": "Cria um documento PDF 2.0 vazio."
-    },
-    {
       "rótulo": "segredo.assineRSA256",
       "origem": "bibs/bibc/segredo/segredo.c",
       "categoria": "API C / núcleo",
@@ -4080,13 +4150,6 @@
       "categoria": "API C / núcleo",
       "assinatura": "utf8.tamanho(s [, início [, fim]])",
       "documentação": "Número de pontos de código UTF-8 (não bytes)."
-    },
-    {
-      "rótulo": "Vigia.novo",
-      "origem": "bibs/bibf/vigia.fé",
-      "categoria": "Vigia",
-      "assinatura": "Vigia.novo([opções])",
-      "documentação": "Cria uma proteção independente."
     },
     {
       "rótulo": "zona:adicione",

@@ -13,15 +13,15 @@ PLAT = none
 V   = 5.3
 R   = $V.6            # 5.3.6 (versão do Lua)
 # Versão "pública" do Santafé para caminhos de bibliotecas e ferramentas.
-SFV = 1.0
+SFV = 3.0
 
 # Diretórios de instalação padrão
 INSTALL_TOP  = /usr/local
 INSTALL_BIN  = $(INSTALL_TOP)/bin
 INSTALL_INC  = $(INSTALL_TOP)/include
 INSTALL_LIB  = $(INSTALL_TOP)/lib
-INSTALL_LMOD = $(INSTALL_TOP)/share/santafé/1.0/bibf
-INSTALL_CMOD = $(INSTALL_TOP)/lib/santafé/1.0/bibc
+INSTALL_LMOD = $(INSTALL_TOP)/share/santafé/3.0/bibf
+INSTALL_CMOD = $(INSTALL_TOP)/lib/santafé/3.0/bibc
 
 # Ferramentas de instalação
 INSTALL      = install -p
@@ -313,7 +313,7 @@ desinstalar:
 
 
 PROJECT := santafe
-VERSION := 2.1.0
+VERSION := 3.0.0
 DISTDIR := $(PROJECT)-$(VERSION)
 vscode-catalogo:
 	@python3 extensões/vscode/gerar_catalogo.py

@@ -20,20 +20,50 @@
 #define LUA_VERSION_RELEASE	"0"
 
 /*
-** Os números acima preservam o layout de módulos e o formato binário 1.0.
-** A versão pública é independente. LUA_VERSION_NUM permanece 503
-** porque identifica a ABI C herdada do Lua 5.3; não significa
-** compatibilidade da sintaxe ou do vocabulário público com Lua.
+** Os números LUA_VERSION_* são identificadores históricos da API.
+** A IBA é SANTAFE_ABI_MAJOR=3, os módulos usam o diretório 3.0 e
+** o bytecode usa SF3. LUA_VERSION_NUM=503 não autoriza carregar
+** bibliotecas binárias Lua nem módulos Santafé de gerações anteriores.
 */
 #define LUA_VERSION_NUM		503
 
-#define SANTAFE_VERSION_MAJOR "2"
-#define SANTAFE_VERSION_MINOR "1"
+#define SANTAFE_VERSION_MAJOR "3"
+#define SANTAFE_VERSION_MINOR "0"
 #define SANTAFE_VERSION_PATCH "0"
 #define LUA_VERSION	"Santafé " SANTAFE_VERSION_MAJOR "." SANTAFE_VERSION_MINOR
 #define LUA_RELEASE	LUA_VERSION "." SANTAFE_VERSION_PATCH
+#undef LUA_RELEASE
+#define LUA_RELEASE "Santafé 3.0.0"
 #define LUA_COPYRIGHT	LUA_RELEASE "  (C) 2025-2026 Rafael Alves Lemos - Baseado em Lua 5.3.6"
 #define LUA_AUTHORS	"Rafael Alves Lemos"
+
+/* IBA da próxima versão maior. LUA_VERSION_NUM é vocabulário herdado,
+** não promessa de compatibilidade binária. Estados/objetos internos são opacos.
+** Cada DSO deve declarar SANTAFE_MODULE_ABI em UMA unidade de tradução.
+** O carregador valida o descritor antes de devolver/chamar luaopen_*.
+** Isto não é sandbox: dlopen pode executar construtores da biblioteca. */
+#ifdef SANTAFE_DADOS_V3
+#include <stdint.h>
+#define SANTAFE_ABI_MAJOR 3
+#define SANTAFE_ABI_ID "santafe-3"
+#define SANTAFE_BYTECODE_VERSION 0x30
+#if defined(_WIN32)
+#define SANTAFE_ABI_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__)
+#define SANTAFE_ABI_EXPORT __attribute__((visibility("default")))
+#else
+#define SANTAFE_ABI_EXPORT
+#endif
+#define SANTAFE_ABI_DESCRIPTOR {0x53464942u, 10, SANTAFE_ABI_MAJOR, \
+ sizeof(void*), sizeof(lua_Integer), sizeof(lua_Number), LUA_INT_TYPE, \
+ LUA_FLOAT_TYPE, LUA_EXTRASPACE, LUAI_MAXSTACK}
+#ifdef __cplusplus
+#define SANTAFE_ABI_LINKAGE extern "C"
+#else
+#define SANTAFE_ABI_LINKAGE
+#endif
+#define SANTAFE_MODULE_ABI SANTAFE_ABI_LINKAGE SANTAFE_ABI_EXPORT const uint32_t santafe_module_abi[10] = SANTAFE_ABI_DESCRIPTOR
+#endif
 
 /*
 ** Vocabulário público dos metamétodos do Santafé.
@@ -74,6 +104,10 @@
 
 /* mark for precompiled code ('<esc>Lua') */
 #define LUA_SIGNATURE	"\x1bLua"
+#ifdef SANTAFE_DADOS_V3
+#undef LUA_SIGNATURE
+#define LUA_SIGNATURE "\x1bSF3"
+#endif
 
 /* option for multiple returns in 'lua_pcall' and 'lua_call' */
 #define LUA_MULTRET	(-1)
@@ -99,6 +133,12 @@
 
 
 typedef struct lua_State lua_State;
+#ifdef SANTAFE_DADOS_V3
+LUA_API int lua_islist (lua_State *L, int idx);
+LUA_API void lua_createlist (lua_State *L, int reserve);
+LUA_API int lua_rawpresent (lua_State *L, int idx);
+LUA_API int lua_rawdelete (lua_State *L, int idx);
+#endif
 
 
 /*

@@ -42,8 +42,7 @@ mariadb.conecteAssíncrono(
 )
 
 -- Página padrão
-local página_inicial = [[
-<!DOCTYPE html>
+local página_inicial = [=[<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -55,10 +54,9 @@ local página_inicial = [[
     <p>Veja a hora do banco em <a href="/hora">/hora</a>.</p>
   </body>
 </html>
-]]
+]=]
 
-local página_db_indisponível = [[
-<!DOCTYPE html>
+local página_db_indisponível = [=[<!DOCTYPE html>
 <html>
   <head><meta charset="utf-8"><title>DB indisponível</title></head>
   <body>
@@ -66,7 +64,7 @@ local página_db_indisponível = [[
     <p>O banco de dados ainda não está conectado. Tente novamente em instantes.</p>
   </body>
 </html>
-]]
+]=]
 
 -- Handler HTTP para cada requisição
 local função tratarRequisição(conexãoHTTP, req, erroHTTP, dado)
@@ -147,16 +145,15 @@ local função tratarRequisição(conexãoHTTP, req, erroHTTP, dado)
                     agora = linha[1] ou agora
                 fim
 
-                local corpo = [[
-<!DOCTYPE html>
+                local corpo = [=[<!DOCTYPE html>
 <html>
   <head><meta charset="utf-8"><title>Hora do banco</title></head>
   <body>
     <h1>NOW() do MariaDB/MySQL</h1>
-    <p>]] .. agora .. [[</p>
+    <p>]=] .. agora .. [=[</p>
   </body>
 </html>
-]]
+]=]
                 local resp = rede.respostaHTTP(200, corpo, "text/html; charset=utf-8")
 
                 conexaoHTTP_passado:envieAssíncrono(

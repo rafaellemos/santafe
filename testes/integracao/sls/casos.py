@@ -138,6 +138,9 @@ local html = --[[html]] [[<a title="]] .. nome .. [[">link</a>]]
 local js = --[[javascript]] [[/* início ]] .. nome .. [[ fim */ const x = 1;]]
 local gabarito = `®nome Ⓡnome ®{1 + 2} Ⓡ{1 + 2}`
 '''
+    if ("dados." in c.informacao.get("version", "") or c.informacao.get("version") == "1.1.0"):
+        # Só os delimitadores dos colares mudam; comentários anotados permanecem.
+        texto = texto.replace(' [[', ' [=[').replace(']] ..', ']=] ..').replace('>]]', '>]=]').replace(';]]', ';]=]')
     uri = c.abra(texto)
     confira(c.diagnosticos(uri, 1) == [], "gabaritos ou concatenações não compilam")
 
@@ -217,7 +220,7 @@ def conclusao_fe(c, contexto):
     uri = c.abra(texto)
     labels = conclusoes(c.solicite("textDocument/completion", c.no_ponto(uri, texto, "Correio.", dentro=8)))
     # Rótulos definidos pelo catálogo auditado do próprio projeto, não inventados pelo teste.
-    manifesto = json.loads((contexto["repositorio"] / "extensões/vscode/api-publica.json").read_text())
+    manifesto = json.loads((contexto["repositorio"] / "extensões/vscode/api-publica.json").read_text(encoding="utf-8"))
     nomes = {item["rótulo"].split(".")[-1] for item in manifesto["itens"]
              if item["rótulo"].startswith("correio.imap.")}
     confira(bool(nomes), "fixture API Fé precisa acompanhar catálogo público")
@@ -296,7 +299,7 @@ def renomeacao(c, contexto):
     confira(set(edicoes) == {uri}, "rename alterou arquivos indevidos")
     esperado = SOMBRA.replace("local índice = 1", "local posição = 1").replace("fim\nmostre(índice)", "fim\nmostre(posição)")
     confira(aplique_edicoes(SOMBRA, edicoes[uri]) == esperado, "rename corrompeu escopos, comentário ou colar")
-    confira((c.raiz / "principal.fé").read_text() == SOMBRA, "servidor aplicou a edição sem aprovação do cliente")
+    confira((c.raiz / "principal.fé").read_text(encoding="utf-8") == SOMBRA, "servidor aplicou a edição sem aprovação do cliente")
 
 
 @caso("renomeacao-recusa-palavra-reservada", "refatoracao", capacidade="renameProvider")
@@ -426,6 +429,9 @@ local html = [[<a title="]] .. nome .. [[">ação 🟢</a>]]
 retorne `®nome Ⓡ{nome}`, html
 fim
 '''
+    candidato = ("dados." in c.informacao.get("version", "") or c.informacao.get("version") == "1.1.0")
+    if candidato:
+        texto = texto.replace('[[', '[=[').replace(']]', ']=]')
     uri = c.abra(texto)
     parametros = {"textDocument": {"uri": uri}, "options": {"tabSize": 4, "insertSpaces": True}}
     edicoes = c.solicite("textDocument/formatting", parametros)
@@ -433,6 +439,8 @@ fim
     novo = aplique_edicoes(texto, edicoes)
     confira(novo != texto and "\n    local html" in novo, "indentação da função não corrigida")
     for fragmento in ['[[<a title="]]', '[[">ação 🟢</a>]]', '`®nome Ⓡ{nome}`', '-- comentário preservado']:
+        if candidato:
+            fragmento = fragmento.replace('[[', '[=[').replace(']]', ']=]')
         confira(fragmento in novo, "formatação alterou texto literal/comentário: " + fragmento)
     c.mude(uri, novo)
     confira(c.diagnosticos(uri, 2) == [], "formatador produziu fonte inválido")

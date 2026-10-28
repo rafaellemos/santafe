@@ -1,0 +1,11 @@
+-- Dados, não código executável.
+{
+    pessoa = { nome = "José", telefone = nulo },
+    lista = [[1, nulo], [], [3]],
+    tabelaVazia = {},
+    descrição = [=[
+Primeira linha — ®variável e Ⓡ{expressão} permanecem literais.
+Segunda linha com \n literal.
+]=],
+    delimitadores = [==[aceita ]=] no conteúdo]==],
+}

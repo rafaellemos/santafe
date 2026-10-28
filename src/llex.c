@@ -380,7 +380,7 @@ static int readdecesc (LexState *ls) {
 }
 
 
-static void read_string (LexState *ls, int del, SemInfo *seminfo) {
+static int read_string (LexState *ls, int del, SemInfo *seminfo) {
   save_and_next(ls);  /* salva delimitador */
   while (ls->current != del) {
     switch (ls->current) {
@@ -464,6 +464,7 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
   save_and_next(ls);  /* skip delimiter */
   seminfo->ts = luaX_newstring(ls, luaZ_buffer(ls->buff) + 1,
                                    luaZ_bufflen(ls->buff) - 2);
+  return 0;
 }
 
 
@@ -512,7 +513,12 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       }
       case '[': {  /* long string or simply '[' */
         size_t sep = skip_sep(ls);
+#ifdef SANTAFE_DADOS_V3
+        /* Pelo menos um '=': [[1],[2]] continua sendo lista de listas. */
+        if (sep >= 3) {
+#else
         if (sep >= 2) {
+#endif
           read_long_string(ls, seminfo, sep);
           return TK_STRING;
         }
@@ -556,7 +562,10 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         ls->gabarito_start = ls->tokenstart;
         /* Lê o conteúdo entre crases como uma string normal,
            armazenando em gabarito_seminfo. */
-        read_string(ls, ls->current, &ls->gabarito_seminfo);
+        if (read_string(ls, ls->current, &ls->gabarito_seminfo)) {
+          *seminfo = ls->gabarito_seminfo;
+          return TK_STRING;
+        }
 
         /* Marca que o PRÓXIMO token deve ser a string lida acima. */
         ls->tem_gabarito = 1;
@@ -678,7 +687,11 @@ static int lexemes_template (LexState *ls, LexemesInput *input, const char *s, s
   size_t i = 1;
   lua_Integer count = 0;
   int incomplete = 0;
+#ifdef SANTAFE_DADOS_V3
+  lua_createlist(L, 0);
+#else
   lua_newtable(L);
+#endif
   while (i + 1 < n) {
     size_t marker = 0, start, end;
     int expression = 0;
@@ -722,7 +735,10 @@ static int lexemes_worker (lua_State *L) {
   LexState ls;
   ZIO z;
   lua_Integer count = 0;
-  TString *source = luaS_new(L, lua_tostring(L, 2));
+  /* Reuse the string anchored in argument 2. luaS_new creates a distinct
+     object for long names: a bare C pointer would be collected during the
+     scan, then dereferenced when reporting a lexical error/limit. */
+  TString *source = tsvalue(L->ci->func + 2);
   memset(&ls, 0, sizeof(ls));
   ls.buff = &input->buffer;
   lua_newtable(L);  /* lexer string anchors, alive for the entire scan */
@@ -791,7 +807,11 @@ int luaX_lexemes (lua_State *L) {
   lua_pushstring(L, luaL_optstring(L, 2, "=(lexemas)"));
   lua_replace(L, 2);
   lua_settop(L, 2);
-  lua_newtable(L);  /* result stays anchored here across pcall */
+#ifdef SANTAFE_DADOS_V3
+  lua_createlist(L, 0);  /* result stays anchored here across pcall */
+#else
+  lua_newtable(L);
+#endif
   lua_pushcfunction(L, lexemes_worker);
   lua_pushvalue(L, 1);
   lua_pushvalue(L, 2);

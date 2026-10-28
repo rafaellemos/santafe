@@ -1,0 +1,19 @@
+<h4 id="onfe-persistencia7">Gravação atômica de ONFÉ</h4>
+<table class="sf-tabela-fn"><tr><th>Função</th><th>Contrato</th></tr>
+<tr><td><code>onfé.cod(dado)</code></td><td>Serializa dados ONFÉ, sem execução; até 4 MiB.</td></tr>
+<tr><td><code>onfé.decod(texto)</code></td><td>Analisa dados ONFÉ, sem executar código.</td></tr>
+<tr><td><code>onfé.carregue(caminho)</code></td><td>Lê arquivo de dados controlado pela aplicação e decodifica.</td></tr>
+<tr><td><code>onfé.paraJSON(dado)</code></td><td>Gera JSON comum; recusa chaves de tabela não textuais.</td></tr>
+<tr><td><code>onfé.deJSON(texto)</code></td><td>Lê JSON mantendo listas e nulos.</td></tr>
+<tr><td><code>onfé.grave(caminho, dado)</code></td><td>Grava ONFÉ atomicamente, de forma síncrona.</td></tr>
+<tr><td><code>onfé.graveAssíncrono(caminho, dado, tratador [, contexto])</code></td><td>Serializa e agenda a gravação ONFÉ.</td></tr>
+<tr><td><code>arquivo.graveAtômico(caminho, conteúdo)</code></td><td>Primitiva síncrona de bytes; retorna ok, falha, estado.</td></tr>
+<tr><td><code>arquivo.graveAtômicoAssíncrono(caminho, conteúdo, tratador [, contexto])</code></td><td>Primitiva assíncrona de bytes; tratador recebe ok, falha, estado, contexto.</td></tr></table>
+<p><code>onfé.grave(caminho, dado)</code> serializa antes de alterar o destino e retorna <code>ok, falha, estado</code>. Erros de dados geram exceção; erros de E/S retornam nulo e diagnóstico. O sucesso retorna verdadeiro, nulo, "durável".</p>
+<p><code>onfé.graveAssíncrono(caminho, dado, tratador [, contexto])</code> serializa antes de agendar, devolve verdadeiro ao agendar e chama <code>tratador(ok, falha, estado, contexto)</code> no laço principal. Mantenha a VM e o laço vivos até terminar. A serialização é síncrona e limitada a 4 MiB; a E/S é feita na piscina GIO. Use a forma assíncrona em servidores.</p>
+<table class="sf-tabela-fn"><tr><th>Estado</th><th>Garantia da tentativa</th></tr>
+<tr><td>inalterado</td><td>Esta tentativa não trocou o destino; outro escritor ainda pode alterá-lo.</td></tr>
+<tr><td>publicado</td><td>O novo arquivo já está visível, mas houve falha ao confirmar a durabilidade. Não significa rollback; não repita cegamente.</td></tr>
+<tr><td>durável</td><td>Arquivo e diretório sincronizados conforme as garantias do sistema de arquivos.</td></tr></table>
+<p>O diretório pai deve existir e ser confiável. Temporário exclusivo, modo 0600, escrita completa, sincronização e troca atômica preservam leituras completas. O destino existente deve ser arquivo regular. Não há sandbox de caminhos, preservação de ACL/xattrs, transação entre arquivos nem trava de leitura-modificação-gravação: o último escritor vence. Término abrupto pode deixar temporário órfão; não o carregue nem o apague automaticamente. Restaurar o programa antigo não converte dados novos.</p>
+<p>As primitivas de bytes <code>arquivo.graveAtômico</code> e <code>arquivo.graveAtômicoAssíncrono</code> usam os mesmos retornos e tratador. O módulo nativo é necessário; não há promessa de persistência durável no WebAssembly. A homologação atual limita-se a POSIX macOS/Linux, não a perda elétrica real ou volumes de rede.</p>

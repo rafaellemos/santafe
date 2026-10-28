@@ -6,16 +6,20 @@ const ID = /[\p{L}_][\p{L}\p{M}\p{N}_]*/uy;
 const INTERPOLAÇÃO = /[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*/uy;
 const NUM = /(?:0[xX][\da-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/y;
 const LONGO = /\[(=*)\[/y;
+const BRUTO = /\[(=+)\[/y;
 const PRECEDÊNCIA = {ou: 1, e: 2, "<": 3, ">": 3, "<=": 3, ">=": 3, "~=": 3, "==": 3,
   "|": 4, "~": 5, "&": 6, "<<": 7, ">>": 7, "..": 8, "+": 9, "-": 9,
   "*": 10, "/": 10, "//": 10, "%": 10, "^": 12};
 const RESERVADAS = new Set("local função fim retorne se então senão para em início enquanto repita até pare vápara".split(" "));
 const ESCAPES = {a: "\x07", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v"};
+// O empacotador do laboratório liga isto só na extensão isolada.
+const DIALETO_DADOS = true;
 
 function recorte(fonte) {
   const literais = [], fluxos = [];
   let i = 0;
   function longo() { LONGO.lastIndex = i; return LONGO.exec(fonte); }
+  function bruto() { BRUTO.lastIndex = i; return BRUTO.exec(fonte); }
   function comentário() {
     const começo = i;
     i += 2;
@@ -31,7 +35,7 @@ function recorte(fonte) {
     return fonte.slice(começo, i);
   }
   function literal(anotação, profundidade) {
-    const início = i, abre = longo(), marca = fonte[i];
+    const início = i, abre = DIALETO_DADOS ? bruto() : longo(), marca = fonte[i];
     const fim = abre ? "]" + abre[1] + "]" : marca;
     i += abre ? abre[0].length : 1;
     const conteúdo = i, partes = [];
@@ -44,7 +48,7 @@ function recorte(fonte) {
         if (fonte[i] === "z") { i += 1; while (/\s/u.test(fonte[i] || "") && i < fonte.length) i++; }
         else if (fonte[i] === "\r" && fonte[i + 1] === "\n") i += 2;
         else i = Math.min(fonte.length, i + 1);
-      } else if (marca === "`" && /[®Ⓡ]/u.test(fonte[i])) {
+      } else if (!abre && marca === "`" && /[®Ⓡ]/u.test(fonte[i])) {
         INTERPOLAÇÃO.lastIndex = i;
         const variável = INTERPOLAÇÃO.exec(fonte);
         if (fonte[i + 1] === "{" && profundidade < 128) {
@@ -72,13 +76,13 @@ function recorte(fonte) {
     while (i < fonte.length) {
       if (/\s/u.test(fonte[i])) { i++; continue; }
       if (fonte.startsWith("--", i)) {
-        const anotado = /^--\[\[(html|javascript)\]\]$/.exec(comentário());
-        anotação = anotado ? anotado[1] : null; continue;
+        const anotado = /^--\[\[(html|javascript|js)\]\]$/.exec(comentário());
+        anotação = anotado ? (anotado[1] === "js" ? "javascript" : anotado[1]) : null; continue;
       }
       if (expressão && fonte[i] === "}" && chaves === 0) { i++; break; }
       if (fonte[i] === "{") chaves++;
       if (fonte[i] === "}") chaves--;
-      if (/["'`]/.test(fonte[i]) || longo()) {
+      if (/["'`]/.test(fonte[i]) || (DIALETO_DADOS ? bruto() : longo())) {
         tokens.push(literal(anotação, profundidade)); anotação = null; continue;
       }
       anotação = null;

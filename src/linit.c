@@ -34,6 +34,9 @@
 #include "lualib.h"
 #include "lauxlib.h"
 #include "zlib.h"      /* O compilador vai achar na pasta libs/zlib */
+#if defined(SANTAFE_SLS_EMBUTIDO)
+extern int luaopen_sls_nativo(lua_State *L);
+#endif
 
 /*
 ** these libs are loaded by lua.c and are readily available to any Lua
@@ -62,4 +65,12 @@ LUALIB_API void luaL_openlibs (lua_State *L) {
     luaL_requiref(L, lib->name, lib->func, 1);
     lua_pop(L, 1);  /* remove lib */
   }
+#if defined(SANTAFE_SLS_EMBUTIDO)
+  /* Only the isolated candidate links this module, with the same ABI.
+     Do not enable loading production .so modules into the candidate. */
+  luaL_getsubtable(L, LUA_REGISTRYINDEX, LUA_PRELOAD_TABLE);
+  lua_pushcfunction(L, luaopen_sls_nativo);
+  lua_setfield(L, -2, "sls.nativo");
+  lua_pop(L, 1);
+#endif
 }

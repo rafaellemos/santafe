@@ -1,0 +1,110 @@
+[
+  {
+    "arquivo": "src/lua.h",
+    "antes": "#define SANTAFE_DADOS_VERSION \"dados.3\"",
+    "depois": "#define SANTAFE_DADOS_VERSION \"dados.4\"",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/sls/sls.fé",
+    "antes": "1.0.0-dados.3",
+    "depois": "1.0.0-dados.4",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "experimentos/dados-v3/testar-wasm.js",
+    "antes": "const deadline=setTimeout",
+    "depois": "cases.push(fs.readFileSync(path.join(root,\"experimentos/dados-v4/testar-colares.fé\"),\"utf8\").replace(\"experimentos/dados-v1/onfé.fé\",\"/onfé.fé\"));\nconst deadline=setTimeout",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "experimentos/dados-v3/testar-wasm.js",
+    "antes": "WebAssembly dados.3:",
+    "depois": "WebAssembly dados.4:",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/formatos.fé",
+    "antes": "exija(tipo(t)==\"tabela\",descrição..\": lista esperada\")",
+    "depois": "exija(tipo(t)==\"lista\",descrição..\": lista esperada\")",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/formatos.fé",
+    "antes": "    função F.canônico(dados)\n        local passos=0\n        local função codifique(v,profundidade)\n            passos=passos+1; exija(passos<=1000000 e profundidade<=64,\"JSON complexo demais\")\n            se tipo(v)~=\"tabela\" então retorne garanta(json.cod(v)) fim\n            local n,chaves=0,{}\n            para k em pares(v) início n=n+1; chaves[#chaves+1]=k fim\n            local partes={}\n            se n>0 e tipo(chaves[1])==\"número\" então\n                lista(v,1000000,\"JSON\")\n                para _,item em ipares(v) início partes[#partes+1]=codifique(item,profundidade+1) fim\n                retorne \"[\"..tabela.concatene(partes,\",\")..\"]\"\n            fim\n            para _,k em ipares(chaves) início exija(tipo(k)==\"colar\",\"chave JSON inválida\") fim\n            tabela.ordene(chaves)\n            para _,k em ipares(chaves) início partes[#partes+1]=json.cod(k)..\":\"..codifique(v[k],profundidade+1) fim\n            retorne \"{\"..tabela.concatene(partes,\",\")..\"}\"\n        fim\n        retorne codifique(dados,0)\n    fim\n",
+    "depois": "    função F.canônico(dados)\n        local passos=0\n        local ativos={}\n        local função codifique(v,profundidade)\n            passos=passos+1; exija(passos<=1000000 e profundidade<=64,\"JSON complexo demais\")\n            local espécie=tipo(v)\n            se espécie~=\"tabela\" e espécie~=\"lista\" então retorne garanta(json.cod(v)) fim\n            exija(obterMetatabela(v)==nulo,\"JSON canônico não aceita metatabela\")\n            exija(não ativos[v],\"JSON canônico não aceita ciclos\")\n            ativos[v]=verdadeiro\n            local partes={}\n            local resultado\n            se espécie==\"lista\" então\n                lista(v,1000000,\"JSON\")\n                para i=1,#v início partes[#partes+1]=codifique(v[i],profundidade+1) fim\n                resultado=\"[\"..tabela.concatene(partes,\",\")..\"]\"\n            senão\n                local chaves={}\n                para k em pares(v) início\n                    exija(tipo(k)==\"colar\",\"chave JSON inválida\")\n                    chaves[#chaves+1]=k\n                fim\n                tabela.ordene(chaves)\n                para _,k em ipares(chaves) início partes[#partes+1]=json.cod(k)..\":\"..codifique(v[k],profundidade+1) fim\n                resultado=\"{\"..tabela.concatene(partes,\",\")..\"}\"\n            fim\n            tabela.apague(ativos,v)\n            retorne resultado\n        fim\n        retorne codifique(dados,0)\n    fim\n",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/administracao.fé",
+    "antes": "local arquivos={}",
+    "depois": "local arquivos=[]",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/administracao.fé",
+    "antes": "local caminhos={}",
+    "depois": "local caminhos=[]",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/resolvedor.fé",
+    "antes": "visitando[nome]=nulo",
+    "depois": "tabela.apague(visitando,nome)",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/resolvedor.fé",
+    "antes": "seleção[próximo]=nulo",
+    "depois": "tabela.apague(seleção,próximo)",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/cliente.fé",
+    "antes": "local transação={formato=1,geracao=geração,arquivos={",
+    "depois": "local transação={formato=1,geracao=geração,arquivos=[",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/cliente.fé",
+    "antes": "depois=N.base64(lockBruto)}}}",
+    "depois": "depois=N.base64(lockBruto)}]}",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "ferramentas/pacotes/cliente.fé",
+    "antes": "                    se plataforma.sistema==\"Darwin\" então",
+    "depois": "                    se plataforma.abiDados então argumentos[#argumentos+1]=\"-DSANTAFE_DADOS_EXPERIMENTAL\" fim\n                    se plataforma.sistema==\"Darwin\" então",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "testes/integracao/testar_pacotes.py",
+    "antes": "int luaopen_soma(lua_State*L){lua_pushcfunction(L,f);",
+    "depois": "int luaopen_soma(lua_State*L){luaL_checkversion(L);lua_pushcfunction(L,f);",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "testes/integracao/testar_pacotes.py",
+    "antes": "ENV = {**os.environ, 'LUA_PATH': str(ROOT / 'ferramentas/?.fé')+';;'}",
+    "depois": "ENV = {k:os.environ[k] for k in ('PATH','TMPDIR','LANG','LC_ALL') if k in os.environ}\nENV.update(LUA_PATH=str(ROOT/'ferramentas/?.fé'), LUA_CPATH=str(ROOT/'ferramentas/?/?.so'),GSETTINGS_BACKEND='memory')",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "testes/integracao/testar_pacotes_memoria.py",
+    "antes": "command+=['-ldl']",
+    "depois": "command+=['-ldl','-lcrypto']",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "testes/integracao/testar_sls_memoria.py",
+    "antes": "command+=['-ldl']",
+    "depois": "command+=['-ldl','-lcrypto']",
+    "ocorrencias": 1
+  },
+  {
+    "arquivo": "testes/integracao/sls/lexemas_memoria.c",
+    "antes": "assert(lua_istable(L,1));",
+    "depois": "assert(lua_islist(L,1));",
+    "ocorrencias": 1
+  }
+]

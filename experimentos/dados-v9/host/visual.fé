@@ -1,0 +1,28 @@
+-- Homologação isolada dados.8: este arquivo não é executado pelo editor.
+local variável = "José"
+local variável = "Ana"
+local título = "Pão do Café"
+
+-- Sem etiqueta: detecção automática, atributo cortado entre dois níveis.
+local página = [=[<!doctype html>
+<html lang="pt-BR"><head><title>]=] .. título .. [==[</title></head>
+<body><div class="prefixo-]==] .. variável .. [=[-final" data-id="7">
+  <p>Olá &amp; bem-vindo</p>
+</div></body></html>]=]
+
+-- Com etiqueta: comentário JS atravessando a concatenação.
+local roteiro = --[[js]] [==[const total = 7;
+/* comentário iniciado ]==] .. variável .. [=[ retomado */
+const pronto = true;
+console.log("Olá", total);
+]=]
+
+local bruto = [==[®variável e Ⓡ{título} são literais; \n também.
+Um fechamento de outro nível: ]=] não encerra este colar.
+]==]
+local molde = `Olá ®variável / Ⓡvariável / Ⓡ{título .. "!"}`
+local lista = [[1, nulo], [2, 3], []]
+--[[ comentário comum: [=[isto não abre um colar]=] ]]
+--[==[ comentário de nível: ]=] não encerra ]==]
+local após = 42
+mostre(página, roteiro, bruto, molde, lista, após, variável)

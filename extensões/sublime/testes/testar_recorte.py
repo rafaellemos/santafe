@@ -32,11 +32,11 @@ for caso in casos():
         assert any(a <= p < b for a, b in mapa) == bool(caso['tem']), caso
     partes = [p for l in recorte(fonte)[0] for p in l['partes'] if not p.get('buraco')]
     assert all(any(p['inicio'] <= a < b <= p['fim'] for p in partes) for a,b in mapa)
-grande = 'local a = [[<b title="]] ' + '.. nome .. [[x]] ' * 3000 + '.. [[fim">Oi</b>]]'
+grande = 'local a = [=[<b title="]] ' + '.. nome .. [=[x]=] ' * 3000 + '.. [=[fim">Oi</b>]=]'
 inicio = time.monotonic()
 documentos = documentos_embutidos(grande)
 assert len(documentos) == 1 and documentos[0]['texto'].endswith('fim">Oi</b>')
 assert time.monotonic() - inicio < 5
-for s in ['local a = "', 'local a = `®{', 'local a = [[<b title="x]] .. (', 'local a = ('*500]:
+for s in ['local a = "', 'local a = `®{', 'local a = [=[<b title="x]=] .. (', 'local a = ('*500]:
     documentos_embutidos(s)
 print('Recorte Sublime: {} casos, isolamento, entrada incompleta e 3000 fragmentos: ok'.format(len(casos())))

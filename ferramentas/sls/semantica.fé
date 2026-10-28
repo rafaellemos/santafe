@@ -2,24 +2,38 @@
 -- textuais. Edições são devolvidas ao cliente; nunca gravadas pelo servidor.
 local S={}
 local função acrescente(t,v) t[#t+1]=v; retorne v fim
-local função matriz(t) se #t==0 então retorne json.matrizVazia fim; retorne t fim
 local função nuloJSON(v) retorne v ou json.valorNulo fim
 
 função S.novo(A, P, configuração)
+    local Dados=configuração.dados
+    local matriz=Dados.lista
     local docs, posição, offset, diretório = configuração.documentos, configuração.posição,
         configuração.offset, configuração.diretório
     local hash
     local carreguePacotes=módulo.carregarBib(diretório.."/../pacotes/nativo.so","luaopen_pacotes_nativo")
     se carreguePacotes então hash=carreguePacotes().sha256 fim
-    local projetos=P.novo(configuração.nativo,docs,configuração.indexe,hash)
+    hash=hash ou (configuração.nativo e configuração.nativo.sha256)
+    local projetos=P.novo(configuração.nativo,docs,configuração.indexe,hash,Dados)
     local catálogo, porNome={},{}
     local f=es.abra(diretório.."/api-publica.json","rb")
     se f então
         local raw=f:leia(2*1024*1024); f:feche()
         local ok, valor=proteja(json.decod,raw)
-        se ok e tipo(valor)=="tabela" e tipo(valor.itens)=="tabela" então
+        se ok e tipo(valor)=="tabela" e Dados.éLista(valor.itens) então
             catálogo=valor.itens
             para _,item em ipares(catálogo) início porNome[item["rótulo"]]=item fim
+        fim
+    fim
+    se Dados.experimental então
+        local extras={
+            {["rótulo"]="tabela.temChave",assinatura="tabela.temChave(tabelaOuLista, chave)",
+             ["documentação"]="Consulta presença própria, incluindo nulo armazenável; não chama __índice."},
+            {["rótulo"]="tabela.apague",assinatura="tabela.apague(tabelaOuLista, chave)",
+             ["documentação"]="Apaga explicitamente uma associação; em listas compacta os índices. Retorna se existia."}
+        }
+        para _,item em ipares(extras) início
+            item.categoria="API experimental / dados.2"
+            acrescente(catálogo,item); porNome[item["rótulo"]]=item
         fim
     fim
     local self={projetos=projetos}
@@ -29,13 +43,32 @@ função S.novo(A, P, configuração)
     local função intervaloToken(d,t) retorne intervalo(d,t["início"],t["fim"]) fim
     local função análise(d,u)
         se não d.análise então
-            d.análise=A.analise(d.texto,u)
+            d.análise=A.analise(d.texto,u,Dados.experimental)
             d.uri=u
             para _,s em ipares(d.análise.símbolos) início s.documento=d; s.uri=u fim
         fim
         retorne d.análise
     fim
     self.analise=análise
+    função self.avisos(d,u)
+        local a=análise(d,u); local avisos={}; local vistos={}
+        para _,r em ipares(a.referências) início
+            local nome=r.token.texto
+            se não r.símbolo e não r.dono e não r.escrita e não porNome[nome] e
+               não a.globais[nome] e não vistos[nome] e #avisos<32 então
+                local biblioteca=falso
+                para label em pares(porNome) início
+                    se label:corte(1,#nome+1)==nome.."." então biblioteca=verdadeiro; pare fim
+                fim
+                se não biblioteca então
+                    vistos[nome]=verdadeiro
+                    acrescente(avisos,{range=intervaloToken(d,r.token),severity=2,source="SLS",code="nome-sem-declaração-local",
+                        message="'"..nome.."' não tem declaração local visível; confira o nome ou a intenção de acessar um global dinâmico."})
+                fim
+            fim
+        fim
+        retorne matriz(avisos)
+    fim
     local função resolva(r,d,visitados)
         se não r então retorne nulo fim
         se r.símbolo então retorne r.símbolo fim
@@ -244,6 +277,7 @@ função S.novo(A, P, configuração)
             fim
             acrescente(edições[v.uri].edits,{range=intervaloToken(v.d,v.r.token),newText=novo})
         fim
+        para _,item em ipares(ordem) início item.edits=matriz(item.edits) fim
         retorne {documentChanges=matriz(ordem)}
     fim
     função self.assinatura(params)
@@ -267,7 +301,7 @@ função S.novo(A, P, configuração)
                     local s=resolva(referência,d)
                     se s e s.classe=="função" então
                         local parâmetros={}; para _,nome em ipares(s.parâmetros) início acrescente(parâmetros,{label=nome}) fim
-                        retorne {signatures={{label=assinatura(s),parameters=matriz(parâmetros)}},activeSignature=0,
+                        retorne {signatures=matriz({{label=assinatura(s),parameters=matriz(parâmetros)}}),activeSignature=0,
                             activeParameter=mat.mínimo(entrada.vírgulas,mat.máximo(0,#parâmetros-1))}
                     senãose não s então
                         local item=itemDoCatálogo(referência)
@@ -279,8 +313,8 @@ função S.novo(A, P, configuração)
                                 local nome=parte:troque("^%e+",""):troque("%e+$","")
                                 acrescente(parâmetros,{label=nome})
                             fim
-                            retorne {signatures={{label=texto,parameters=matriz(parâmetros),
-                                documentation={kind="plaintext",value=item["documentação"] ou ""}}},
+                            retorne {signatures=matriz({{label=texto,parameters=matriz(parâmetros),
+                                documentation={kind="plaintext",value=item["documentação"] ou ""}}}),
                                 activeSignature=0,activeParameter=mat.mínimo(entrada.vírgulas,mat.máximo(0,#parâmetros-1))}
                         fim
                     fim
@@ -343,7 +377,7 @@ função S.novo(A, P, configuração)
     fim
     função self.selecione(params)
         local d,a=noPonto(params); local respostas={}
-        se não d ou tipo(params.positions)~="tabela" ou #params.positions>128 então retorne json.matrizVazia fim
+        se não d ou não Dados.éLista(params.positions) ou #params.positions>128 então retorne json.matrizVazia fim
         para _,p em ipares(params.positions) início
             local o=offset(d.texto,d.linhas,p); se o==nulo então retorne json.matrizVazia fim
             local candidatos={{começo=0,final=#d.texto}}
@@ -354,7 +388,9 @@ função S.novo(A, P, configuração)
             para _,n em ipares(candidatos) início
                 se não anterior ou (n.começo>=anterior.começo e n.final<=anterior.final e
                    (n.começo~=anterior.começo ou n.final~=anterior.final)) então
-                    pai={range=intervalo(d,n.começo,n.final),parent=pai}; anterior=n
+                    local próximo={range=intervalo(d,n.começo,n.final)}
+                    se pai então próximo.parent=pai fim
+                    pai=próximo; anterior=n
                 fim
             fim
             acrescente(respostas,pai)
@@ -420,10 +456,10 @@ função S.novo(A, P, configuração)
         local quebra=d.texto:procure("\r\n",1,verdadeiro) e "\r\n" ou "\n"
         local adição=quebra.."fim"..quebra
         se não depure.analise(d.texto..adição) então retorne json.matrizVazia fim
-        retorne {{title="Adicionar fim ausente",kind="quickfix",
-            edit={documentChanges={{textDocument={uri=d.uri,version=d.versão},edits={{
+        retorne matriz({{title="Adicionar fim ausente",kind="quickfix",
+            edit={documentChanges=matriz({{textDocument={uri=d.uri,version=d.versão},edits=matriz({{
                 range=intervalo(d,#d.texto,#d.texto),newText=adição
-            }}}}}}}
+            }})}})}}})
     fim
     self.intervalo=intervalo
     self.noPonto=noPonto

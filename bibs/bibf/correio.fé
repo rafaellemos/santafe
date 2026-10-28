@@ -1,3 +1,4 @@
+local dados = importe "dados_experimentais"
 -- Correio Santafé - mensagens MIME e SMTP assíncrono.
 --
 -- A biblioteca separa construção de mensagem, entrega SMTP e recepção SMTP.
@@ -150,7 +151,7 @@ fim
 
 local função copieLista(valor, nome, permitaVazia)
     se tipo(valor) == "colar" então valor = { valor } fim
-    se tipo(valor) ~= "tabela" então
+    se tipo(valor) ~= "tabela" e tipo(valor) ~= "lista" então
         retorne nulo, nome .. " deve ser um endereço ou uma lista"
     fim
     local lista = {}
@@ -1916,7 +1917,7 @@ função correio.servidor(opções)
         se sessão.fechada então retorne fim
         sessão.fechada = verdadeiro
         sessão.conexão:feche()
-        servidor.conexões[sessão] = nulo
+        tabela.apague(servidor.conexões, sessão)
         servidor.total = mat.máximo(0, servidor.total - 1)
         servidor.vigia:conclua(sessão.endereço)
         evento("leitura", "correio.conexãoFechada",
@@ -2606,7 +2607,7 @@ função correio.servidor(opções)
             comandos = 0,
             mensagens = 0,
             comandoAtual = nulo,
-            rastro = {},
+            rastro = [],
             tentativasDeAutenticação = 0
         }
         conexão:definaTempoLimite(configuração.tempoLimite)
@@ -2824,7 +2825,7 @@ função correio.filaMariaDB(piscina, opções)
 
     local função insira(esta, direção, estado, remetente, destinatários,
                              conteúdo, tratador, dado, objetoPreparado)
-        local codificou, lista = proteja(json.cod, destinatários)
+        local codificou, lista = proteja(dados.codifiqueLista, destinatários)
         se não codificou então
             chame(tratador, nulo, lista, dado)
             retorne nulo, lista
@@ -3052,15 +3053,15 @@ função correio.filaMariaDB(piscina, opções)
     função fila.adieParcialAssíncrono(esta, identificação,
             destinatáriosPendentes, falhasPermanentes, falhaDaEntrega,
             segundos, tratador, dado)
-        se tipo(destinatáriosPendentes) ~= "tabela" ou
+        se (tipo(destinatáriosPendentes) ~= "tabela" e tipo(destinatáriosPendentes) ~= "lista") ou
            #destinatáriosPendentes == 0 então
             retorne falhe("adiamento parcial exige destinatários pendentes")
         fim
         falhasPermanentes = falhasPermanentes ou {}
-        local okPendentes, pendentesJSON = proteja(json.cod,
+        local okPendentes, pendentesJSON = proteja(dados.codifiqueLista,
             destinatáriosPendentes)
         se não okPendentes então retorne nulo, pendentesJSON fim
-        local okPermanentes, permanentesJSON = proteja(json.cod,
+        local okPermanentes, permanentesJSON = proteja(dados.codifiqueLista,
             falhasPermanentes)
         se não okPermanentes então retorne nulo, permanentesJSON fim
         segundos = segundos ou 60
@@ -3084,7 +3085,7 @@ função correio.filaMariaDB(piscina, opções)
 
     função fila.marqueFalhouAssíncrono(esta, identificação, falhaDaEntrega,
             falhasPermanentes, tratador, dado)
-        local okPermanentes, permanentesJSON = proteja(json.cod,
+        local okPermanentes, permanentesJSON = proteja(dados.codifiqueLista,
             falhasPermanentes ou {})
         se não okPermanentes então retorne nulo, permanentesJSON fim
         local sql = "UPDATE `" .. esta.tabela .. "` SET estado='falhou'," ..
@@ -3135,7 +3136,7 @@ função correio.filaMariaDB(piscina, opções)
 
     função fila.marqueFalhouEAviseAssíncrono(esta, identificação,
             falhaDaEntrega, falhasPermanentes, detalhes, tratador, dado)
-        local funcionou, permanentesJSON = proteja(json.cod,
+        local funcionou, permanentesJSON = proteja(dados.codifiqueLista,
             falhasPermanentes ou {})
         se não funcionou então retorne nulo, permanentesJSON fim
         local avisoJSON, falhaDoAviso = codifiqueAviso("falha", detalhes)

@@ -70,7 +70,7 @@ local função piscinaFalsa(modo)
             resposta = resultado { alteradas = 1 }
         senão se sql:procure("DELETE FROM correio_remetentes_confiaveis",
             1, verdadeiro) então
-            piscina.remetentesConfiáveis[parâmetros[2]] = nulo
+            tabela.apague(piscina.remetentesConfiáveis, parâmetros[2])
             resposta = resultado { alteradas = 1 }
         senão se sql:procure("SELECT escopo,valor,decisao\nFROM",
             1, verdadeiro) então
@@ -105,7 +105,7 @@ local função piscinaFalsa(modo)
             resposta = resultado { alteradas = 1 }
         senão se sql:procure("DELETE FROM correio_regras_triagem",
             1, verdadeiro) então
-            piscina.regrasDaTriagem[parâmetros[2] .. ":" .. parâmetros[3]] = nulo
+            tabela.apague(piscina.regrasDaTriagem, parâmetros[2] .. ":" .. parâmetros[3])
             resposta = resultado { alteradas = 1 }
         senão se sql:procure("INSERT INTO correio_historico_triagem",
             1, verdadeiro) então

@@ -13,19 +13,19 @@ case "$stage" in
     fi
     for name in lua.h luaconf.h lauxlib.h lualib.h lua.hpp; do remove_file "include/$name"; done
     remove_file lib/liblua.a
-    remove_file share/santafé/1.0/ferramentas/sls.fé
-    for name in analisador.fé projetos.fé semantica.fé transporte.fé api-publica.json nativo.so; do
-      remove_file "share/santafé/1.0/ferramentas/sls/$name"
+    remove_file share/santafé/3.0/ferramentas/sls.fé
+    for name in analisador.fé projetos.fé semantica.fé transporte.fé api-publica.json estrutura.fé onfé.fé nativo.so; do
+      remove_file "share/santafé/3.0/ferramentas/sls/$name"
     done
     for name in versoes.fé resolvedor.fé formatos.fé cliente.fé administracao.fé ambiente.fé cli.fé nativo.so; do
-      remove_file "share/santafé/1.0/ferramentas/pacotes/$name"
+      remove_file "share/santafé/3.0/ferramentas/pacotes/$name"
     done
     ;;
   bibs)
     suffix=so; [[ "$platform" != mingw ]] || suffix=dll
-    for name in arquivo rede mariadb segredo tomada; do remove_file "lib/santafé/1.0/bibc/$name.$suffix"; done
+    for name in arquivo rede mariadb segredo tomada; do remove_file "lib/santafé/3.0/bibc/$name.$suffix"; done
     while IFS= read -r -d '' file; do
-      remove_file "share/santafé/1.0/bibf/${file#bibs/bibf/}"
+      remove_file "share/santafé/3.0/bibf/${file#bibs/bibf/}"
     done < <(find bibs/bibf -type f \( -name '*.fé' -o -name '*.fé' -o -name '*.md' -o -name '*.ttf' -o -name 'OFL.txt' \) -print0)
     remove_file lib/pkgconfig/santafe.pc
     ;;

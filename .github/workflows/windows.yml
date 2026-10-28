@@ -1,0 +1,71 @@
+name: Windows — núcleo, SLS, bibliotecas e instalador 3.0
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-binutils mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-openssl
+      - name: Compilar os fontes deste commit
+        run: |
+          mkdir -p resultados30
+          make -C src mingw > resultados30/compilacao.log 2>&1
+          src/santafe.exe -v
+          src/santafe.exe experimentos/dados-v1/testar.fé
+          src/santafe.exe experimentos/dados-v1/testar-onfe.fé
+      - name: Ferramentas nativas, confinamento, SLS e distribuição portátil
+        run: python testes/windows/testar.py . resultados30/ferramentas
+      - name: Proteções do instalador
+        run: python testes/windows/compilar-guarda.py resultados30/ferramentas
+      - uses: actions/setup-python@v5
+        id: msi_python
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Console Unicode, entrada, interrupção e ConPTY
+        shell: pwsh
+        run: |
+          foreach ($suite in @('testar-console-nativo', 'testar-entrada-nativa', 'testar-conpty')) {
+            & '${{ steps.msi_python.outputs.python-path }}' "testes/windows/$suite.py" src/santafe.exe "resultados30/$suite.json"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Instalação, atualização, reparação e reversão
+        shell: pwsh
+        run: |
+          & '${{ steps.msi_python.outputs.python-path }}' testes/windows/testar-instalador.py resultados30/instalador resultados30/ferramentas . resultados30/ferramentas/instalador-guarda.dll testes/windows/baseline-dados16.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Usuário padrão real e identidades do pacote
+        shell: pwsh
+        run: |
+          ./testes/windows/usuario-padrao.ps1 -Python '${{ steps.msi_python.outputs.python-path }}' -OutputDir resultados30/instalador
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./testes/windows/testar-assinatura.ps1 -OutputDir resultados30/instalador -ToolsDir resultados30/ferramentas
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-3.0-evidencias
+          path: |
+            resultados30/*.json
+            resultados30/*.log
+            resultados30/ferramentas/*.json
+            resultados30/ferramentas/*.log
+            resultados30/instalador/*.json
+            resultados30/instalador/*.log
+          retention-days: 14
+          if-no-files-found: error

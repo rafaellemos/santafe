@@ -161,6 +161,7 @@ void luaV_finishget (lua_State *L, const TValue *t, TValue *key, StkId val,
                       const TValue *slot) {
   int loop;  /* counter to avoid infinite loops */
   const TValue *tm;  /* metamethod */
+  luaH_checklist(L,t,key,0);
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
     if (slot == NULL) {  /* 't' is not a table? */
       lua_assert(!ttistable(t));
@@ -204,6 +205,7 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
                      StkId val, const TValue *slot) {
   int loop;  /* counter to avoid infinite loops */
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
+    luaH_checklist(L,t,key,1);
     const TValue *tm;  /* metamétodo '__novoÍndice' */
     if (slot != NULL) {  /* is 't' a table? */
       Table *h = hvalue(t);  /* save 't' table */
@@ -213,7 +215,13 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
         if (slot == luaO_nilobject)  /* no previous entry? */
           slot = luaH_newkey(L, h, key);  /* create one */
         /* no metamethod and (now) there is an entry with given key */
-        setobj2t(L, cast(TValue *, slot), val);  /* set its new value */
+        setstoredvalue(L, cast(TValue *, slot), val);
+#ifdef SANTAFE_DADOS_V3
+        if (h->islist) {
+          lua_Integer index; luaV_tointeger(key, &index, 0);
+          if ((lua_Unsigned)index > h->listlen) h->listlen = (unsigned int)index;
+        }
+#endif
         invalidateTMcache(h);
         luaC_barrierback(L, h, val);
         return;
@@ -406,6 +414,9 @@ int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r) {
 */
 int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
   const TValue *tm;
+#ifdef SANTAFE_DADOS_V3
+  if (ttisnull(t1) && ttisnull(t2)) return 1;
+#endif
   if (ttype(t1) != ttype(t2)) {  /* not the same variant? */
     if (ttnov(t1) != ttnov(t2) || ttnov(t1) != LUA_TNUMBER)
       return 0;  /* only numbers can be equal with different variants */
@@ -772,12 +783,14 @@ void luaV_finishOp (lua_State *L) {
 ** metamethod (which can reallocate the stack)
 */
 #define gettableProtected(L,t,k,v)  { const TValue *slot; \
+  luaH_checklist(L,t,k,0); \
   if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
   else Protect(luaV_finishget(L,t,k,v,slot)); }
 
 
 /* same for 'luaV_settable' */
 #define settableProtected(L,t,k,v) { const TValue *slot; \
+  luaH_checklist(L,t,k,1); \
   if (!luaV_fastset(L,t,k,slot,luaH_get,v)) \
     Protect(luaV_finishset(L,t,k,v,slot)); }
 
@@ -868,6 +881,9 @@ void luaV_execute (lua_State *L) {
         int b = GETARG_B(i);
         int c = GETARG_C(i);
         Table *t = luaH_new(L);
+#ifdef SANTAFE_DADOS_V3
+        if (c == MAXARG_C) { t->islist = 1; c = 0; }
+#endif
         sethvalue(L, ra, t);
         if (b != 0 || c != 0)
           luaH_resize(L, t, luaO_fb2int(b), luaO_fb2int(c));
@@ -1254,7 +1270,7 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_TFORLOOP) {
         l_tforloop:
-        if (!ttisnil(ra + 1)) {  /* continue loop? */
+        if (!ttisnull(ra + 1)) {  /* continue loop? */
           setobjs2s(L, ra, ra + 1);  /* save control variable */
            ci->u.l.savedpc += GETARG_sBx(i);  /* jump back */
         }
@@ -1272,6 +1288,9 @@ void luaV_execute (lua_State *L) {
         }
         h = hvalue(ra);
         last = ((c-1)*LFIELDS_PER_FLUSH) + n;
+#ifdef SANTAFE_DADOS_V3
+        if (h->islist) h->listlen = last;
+#endif
         if (last > h->sizearray)  /* needs more space? */
           luaH_resizearray(L, h, last);  /* preallocate it at once */
         for (; n > 0; n--) {

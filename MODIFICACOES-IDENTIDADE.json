@@ -1,0 +1,46 @@
+{
+  "fonte_base": "de81368853e333a004e5eaab49bc262e934ca06a987fe9fd039d46429bc6e5db",
+  "mudancas": [
+    {
+      "arquivo": "src/lua.h",
+      "antes": "b261524b7b6728ab2d5f74d71e0e608a93752b59dd77a563bd4eefcb92de83c4",
+      "depois": "a15a5972418f96d48d87050e027c4cf95055db0271fa44ff2ddde54feb8e04c1"
+    },
+    {
+      "arquivo": "ferramentas/sls/sls.fé",
+      "antes": "6fbce4c1fe1114cd7282c4ccb7f8d9856f493c506e1ed88336846217b422cd3b",
+      "depois": "0a40868ab485e4783fcf1abe125c370d5277e772898e4b8b7d4f1bc142c7741b"
+    },
+    {
+      "arquivo": "ferramentas/pacotes/cli.fé",
+      "antes": "17d6e5ef82ef96c27a2776781e719c9c1a856858a0bc1b4dca9ae7d7794752f8",
+      "depois": "eb7004a7ac601b4e6cd02e34cbc1b5abbd4e842cfaa3e747ce8f1cdaf6279d97"
+    },
+    {
+      "arquivo": "ferramentas/pacotes/cli.fé",
+      "antes": "eb7004a7ac601b4e6cd02e34cbc1b5abbd4e842cfaa3e747ce8f1cdaf6279d97",
+      "depois": "9bd8b6c45765821b327c942f3f34ac7ad8b2224bda4e1e9b13c55d925dedc7a9"
+    },
+    {
+      "arquivo": "Makefile",
+      "antes": "8ad6d9a93469ab2a25a98258f1b0a3115bce2e04a3f862ec1b94644e4f76810f",
+      "depois": "adc7e1b33041975189e2d2a538a2b9a03b4f63d2bf8c791118bc4d79bce64972"
+    },
+    {
+      "arquivo": "experimentos/dados-v5/testar-instalacao.py",
+      "antes": "6c3db608fe6877679e02c0e1839a1153ea8f8767b075d41dcdcf2b1f0eb9cf58",
+      "depois": "b8093caa7fd889c85bb3a32493f196b2a6aec227188bcd27b71dcf5907c47bec"
+    },
+    {
+      "arquivo": "experimentos/dados-v6/testar-operacao.py",
+      "antes": "2bc17ded17f209a42db51c929765c77f3ee20f000e6ea54ff40f17fd8d7ddb55",
+      "depois": "c73c761cacdae8e6ffc941f984b798bedb07c9fd53b35c0842ac34c654ae4718"
+    },
+    {
+      "arquivo": "experimentos/dados-v23-distribuicao/testar-distribuicao.py",
+      "antes": "f529cf7f277d8d3fd4921766bc6b2ebc5b6f82bfe11914c0db3b5725d18e066f",
+      "depois": "ef5e3305c7d0ff9485a45934f325ff4250b34a804299fff3e3feb593f747d866"
+    }
+  ],
+  "limite": "Identidade para compilar/testar. Manual, instaladores, Windows e portal ainda não consolidados."
+}

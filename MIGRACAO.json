@@ -1,0 +1,430 @@
+{
+  "origem": "/Users/fernandatalini/SantaFé/desenvolvimento/santafe",
+  "destino": "/tmp/santafe-dados3-wfd440ch",
+  "lexico": [
+    {
+      "arquivo": "aplicativos/carteiro/fonte/carteiro/configurador.fé",
+      "sha256_antes": "c5c3a0da480f1984ab41ddf1a21206e97e0646b27023828a4071801abe046f37",
+      "sha256_depois": "15b12e11878e264be5b1298f0526a5142acdadb85a20e8d636002f840740291d"
+    },
+    {
+      "arquivo": "aplicativos/carteiro/fonte/carteiro/páginas.fé",
+      "sha256_antes": "2a43ac5746d084ed95d7a49f9f1abf34eccd82e65ddcbef14c17ef3028441665",
+      "sha256_depois": "cdc6908f55a36acad25842afaba1403c3c9cea88423a31ba1f16332d5d3fe873"
+    },
+    {
+      "arquivo": "aplicativos/correio/migrar-depósito.fé",
+      "sha256_antes": "5e023661fde55e02fa230fca787cf14e4efa1819253c34879fb9139cade766d5",
+      "sha256_depois": "90b81f5866c844fdbd2b0b2c8cbf9d638f929b09217703e3eb67037ea15b8fa3"
+    },
+    {
+      "arquivo": "bibs/bibc/mariadb/servidor_db.fé",
+      "sha256_antes": "c6a79d4258d34c0922b2a21df6868e9a0e55601ef103b477de11839b9429b397",
+      "sha256_depois": "38ff7ecd434dbe4325f33fa09ea7dbb0f7849a59a0567f1ee894219d706919fb"
+    },
+    {
+      "arquivo": "bibs/bibc/rede/servidor.fé",
+      "sha256_antes": "e21dacea4d02783431a46a40d2b1f530fc13417848be132ae70a2fcddebcc7c4",
+      "sha256_depois": "227811a5c514a02fb1d06f8349fae68beac1be015d49dac2b1be7534ef78a1f3"
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "sha256_antes": "ccb15b5c8bc399b1bb3ccd94e5a2b437174dbbe523f3739c661bbcd3563e537a",
+      "sha256_depois": "c64ec2d89f0c94191f41f7ffbaafc3c3d24b07327c2536413efbbcd3cd0d1273"
+    },
+    {
+      "arquivo": "bibs/bibf/rpdf.fé",
+      "sha256_antes": "03e7245ffe8c2b64777c323ab2411e1f840f7683b7bac46eef424be71787bd09",
+      "sha256_depois": "49d4e071cd0ce2f37a9b6a5a3e8073eedf3a1e2072fa0f064b0dcd106dd4a5e1"
+    },
+    {
+      "arquivo": "testes/bibc/teste_carteiro_conversas_mariadb.fé",
+      "sha256_antes": "07660c52f8a16cc5b94c22de694d345089424d7095ad9cc56107113a08d047ac",
+      "sha256_depois": "4885bf24d583419f0e2bf49e01bc1af82ee22ce4487e58491845deb8fbad5d9c"
+    },
+    {
+      "arquivo": "testes/bibc/teste_correio_agência_mariadb.fé",
+      "sha256_antes": "8e232077d8f679c3ec7d7077a88d5374365ebbcce0a7b6b4225cf44ca05e2169",
+      "sha256_depois": "479e0866ef169f598fc25ff7a7877d59b24a49c0e8ba96b3883dfb04e7080d90"
+    },
+    {
+      "arquivo": "testes/bibc/teste_correio_autenticação_mariadb.fé",
+      "sha256_antes": "8f2346a3d9dc720be5ce1e4b811476e97019af0d7cff67cb6c620e11045b2b76",
+      "sha256_depois": "e85817c16133b08182c4ebf66b3971c275fe89567ec1deebb0d205f1a5a407c0"
+    },
+    {
+      "arquivo": "testes/bibc/teste_correio_imap_append_mariadb.fé",
+      "sha256_antes": "11428bb349c1757db78b66e3db1bdd7fcff752cc1405a9b7fac62efdd5ace47c",
+      "sha256_depois": "79fcf646ca2287300c54d82b44b1263d54f86b244a9c1e81dfa21b318ed1f3d5"
+    },
+    {
+      "arquivo": "testes/bibc/teste_correio_imap_mariadb.fé",
+      "sha256_antes": "4c81e1ddf1dd8c1a4001b1e61d08643f1f4279f99647a9740671dabbe8bae3a5",
+      "sha256_depois": "a07db27e6f2e669e225f53f628d61a19ec149261ec34091ee26585b96cdaa830"
+    },
+    {
+      "arquivo": "testes/bibf/teste_gabarito_unicode.fé",
+      "sha256_antes": "03803b4b52d6b1320d6dedefb51eb91fecf1b07144b75b282cbde56012140d31",
+      "sha256_depois": "c40a4b5a5c77d3cf3ff848d018f9a532dda2f941437a597087e3c9f2c23c93cc"
+    },
+    {
+      "arquivo": "testes/bibf/teste_imagem.fé",
+      "sha256_antes": "e6a2909269f23b4a0b622c78b3e4506a116899979aabbe1f6da451c55f51df4f",
+      "sha256_depois": "dcf17d805d222bf88b1a764df91b92fdb1ea3a9a4738e040250bd2f41972f1f3"
+    },
+    {
+      "arquivo": "testes/bibf/teste_rpdf_imagens.fé",
+      "sha256_antes": "2a4e384ad8295be86c11583f94db4607c9c6fd5911a4b21a94516d1ef3626a82",
+      "sha256_depois": "9aa98e8ca16a0db4008f2b854e39767d2a5d33af8c38183d18b5b42912a99b17"
+    },
+    {
+      "arquivo": "testes/bibf/teste_sls_analisador.fé",
+      "sha256_antes": "449a1724a45d2c1a72775b343a8f0f7e1c5852c92216964b8f51d7c0029706c9",
+      "sha256_depois": "2f8cea75a2b4f93a38813c2719cc42adb25b40745cbbdc4df3e5c05a2d10e957"
+    }
+  ],
+  "semantico": [
+    {
+      "arquivo": "bibs/bibf/pulso.fé",
+      "antes": "estado.visitadas[valor] = nulo",
+      "depois": "tabela.apague(estado.visitadas, valor)",
+      "ocorrencias": 4
+    },
+    {
+      "arquivo": "bibs/bibf/pulso.fé",
+      "antes": "este.fila[este.inícioDaFila] = nulo",
+      "depois": "tabela.apague(este.fila, este.inícioDaFila)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/caminheiro.fé",
+      "antes": "res._ap._conexões[conexão] = nulo",
+      "depois": "tabela.apague(res._ap._conexões, conexão)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/caminheiro.fé",
+      "antes": "ap._conexões[conexaoHTTP] = nulo",
+      "depois": "tabela.apague(ap._conexões, conexaoHTTP)",
+      "ocorrencias": 2
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "servidor.conexões[sessão] = nulo",
+      "depois": "tabela.apague(servidor.conexões, sessão)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/imap.fé",
+      "antes": "servidor.conexões[sessão] = nulo",
+      "depois": "tabela.apague(servidor.conexões, sessão)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/turing.fé",
+      "antes": "desafios[id] = nulo",
+      "depois": "tabela.apague(desafios, id)",
+      "ocorrencias": 2
+    },
+    {
+      "arquivo": "bibs/bibf/turing.fé",
+      "antes": "bilhetes[tk] = nulo",
+      "depois": "tabela.apague(bilhetes, tk)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/turing.fé",
+      "antes": "bilhetes[bilhete] = nulo",
+      "depois": "tabela.apague(bilhetes, bilhete)",
+      "ocorrencias": 3
+    },
+    {
+      "arquivo": "bibs/bibf/vigia.fé",
+      "antes": "chaves[chave] = nulo",
+      "depois": "tabela.apague(chaves, chave)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/vigia.fé",
+      "antes": "chaves[chaveMaisAntiga] = nulo",
+      "depois": "tabela.apague(chaves, chaveMaisAntiga)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/autoridade.fé",
+      "antes": "este.conexões[estado] = nulo",
+      "depois": "tabela.apague(este.conexões, estado)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/acesso.fé",
+      "antes": "origens[endereço] = nulo",
+      "depois": "tabela.apague(origens, endereço)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/resolvedor.fé",
+      "antes": "memrap[chave] = nulo",
+      "depois": "tabela.apague(memrap, chave)",
+      "ocorrencias": 2
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/resolvedor.fé",
+      "antes": "estadosAtivos[estado] = nulo",
+      "depois": "tabela.apague(estadosAtivos, estado)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/resolvedor.fé",
+      "antes": "pendentes[estado.id] = nulo",
+      "depois": "tabela.apague(pendentes, estado.id)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/resolvedor.fé",
+      "antes": "pendentes[id] = nulo",
+      "depois": "tabela.apague(pendentes, id)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/resolvedor.fé",
+      "antes": "conexõesTCP[estado] = nulo",
+      "depois": "tabela.apague(conexõesTCP, estado)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/spf.fé",
+      "antes": "contexto.visitados[domínio] = nulo",
+      "depois": "tabela.apague(contexto.visitados, domínio)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/zona.fé",
+      "antes": "opçõesDNSSEC.chavePrivada = nulo",
+      "depois": "tabela.apague(opçõesDNSSEC, \"chavePrivada\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes/dnssec.fé",
+      "antes": "chave.privada = nulo",
+      "depois": "tabela.apague(chave, \"privada\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "personalizados.regraDaTriagem = nulo",
+      "depois": "tabela.apague(personalizados, \"regraDaTriagem\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "personalizados.decididaEm = nulo",
+      "depois": "tabela.apague(personalizados, \"decididaEm\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "mensagem.__remetentes = nulo",
+      "depois": "tabela.apague(mensagem, \"__remetentes\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "mensagem.__anexos = nulo",
+      "depois": "tabela.apague(mensagem, \"__anexos\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/multibanco.fé",
+      "antes": "limpa.bancoPostal = nulo",
+      "depois": "tabela.apague(limpa, \"bancoPostal\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/dkim.fé",
+      "antes": "resultado.motivo = nulo",
+      "depois": "tabela.apague(resultado, \"motivo\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/rpdf.fé",
+      "antes": "img.dados = nulo",
+      "depois": "tabela.apague(img, \"dados\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/rpdf.fé",
+      "antes": "img.máscaraSuave = nulo",
+      "depois": "tabela.apague(img, \"máscaraSuave\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/rpdf.fé",
+      "antes": "máscara.máscaraSuave = nulo",
+      "depois": "tabela.apague(máscara, \"máscaraSuave\")",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/rpdf.fé",
+      "antes": "caracteres[#caracteres] = nulo",
+      "depois": "tabela.remova(caracteres)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/pulso.fé",
+      "antes": "se espécie ~= \"tabela\" então",
+      "depois": "se espécie ~= \"tabela\" e espécie ~= \"lista\" então",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/pulso.fé",
+      "antes": "local cópia = {}",
+      "depois": "local cópia = espécie == \"lista\" e [] ou {}",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/nomes.fé",
+      "antes": "se tipo(valor) ~= \"tabela\" então erro(\"TXT",
+      "depois": "se tipo(valor) ~= \"tabela\" e tipo(valor) ~= \"lista\" então erro(\"TXT",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "proteja(json.cod, destinatários)",
+      "depois": "proteja(dados.codifiqueLista, destinatários)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "local função listaJSON(valor)",
+      "depois": "local função listaJSON(valor, registro)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "proteja(json.cod, valor)",
+      "depois": "proteja(registro e dados.codifiqueDestinatários ou dados.codifiqueLista, valor)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "listaJSON(dados.destinatários ou {})",
+      "depois": "listaJSON(dados.destinatários ou {}, verdadeiro)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/mariadb.fé",
+      "antes": "tipo(decodificado) ~= \"tabela\"",
+      "depois": "tipo(decodificado) ~= \"tabela\" e tipo(decodificado) ~= \"lista\"",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "proteja(json.cod,\n            destinatáriosPendentes)",
+      "depois": "proteja(dados.codifiqueLista,\n            destinatáriosPendentes)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "proteja(json.cod,\n            falhasPermanentes)",
+      "depois": "proteja(dados.codifiqueLista,\n            falhasPermanentes)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "proteja(json.cod,\n            falhasPermanentes ou {})",
+      "depois": "proteja(dados.codifiqueLista,\n            falhasPermanentes ou {})",
+      "ocorrencias": 2
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "rastro = {}",
+      "depois": "rastro = []",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/imap.fé",
+      "antes": "rastro = {}",
+      "depois": "rastro = []",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "se tipo(valor) ~= \"tabela\" então\n        retorne nulo, nome .. \" deve ser um endereço ou uma lista\"",
+      "depois": "se tipo(valor) ~= \"tabela\" e tipo(valor) ~= \"lista\" então\n        retorne nulo, nome .. \" deve ser um endereço ou uma lista\"",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio.fé",
+      "antes": "se tipo(destinatáriosPendentes) ~= \"tabela\" ou",
+      "depois": "se (tipo(destinatáriosPendentes) ~= \"tabela\" e tipo(destinatáriosPendentes) ~= \"lista\") ou",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "bibs/bibf/correio/entrega.fé",
+      "antes": "se tipo(destinatários) ~= \"tabela\" ou",
+      "depois": "se (tipo(destinatários) ~= \"tabela\" e tipo(destinatários) ~= \"lista\") ou",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/bibc/teste_carteiro_repositorio.fé",
+      "antes": "piscina.remetentesConfiáveis[parâmetros[2]] = nulo",
+      "depois": "tabela.apague(piscina.remetentesConfiáveis, parâmetros[2])",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/bibc/teste_carteiro_repositorio.fé",
+      "antes": "piscina.regrasDaTriagem[parâmetros[2] .. \":\" .. parâmetros[3]] = nulo",
+      "depois": "tabela.apague(piscina.regrasDaTriagem, parâmetros[2] .. \":\" .. parâmetros[3])",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/bibf/teste_correio.fé",
+      "antes": "tipo(fechamento.dados.rastro) == \"tabela\"",
+      "depois": "tipo(fechamento.dados.rastro) == \"lista\"",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/bibf/teste_analise_sintatica.fé",
+      "antes": "[=[não terminou",
+      "depois": "``não terminou",
+      "ocorrencias": 2
+    },
+    {
+      "arquivo": "testes/bibf/teste_analise_sintatica.fé",
+      "antes": "[[<div>]]",
+      "depois": "``<div>``",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/integracao/sls/corpus.fé",
+      "antes": "local falhas={}",
+      "depois": "local falhas=[]",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/integracao/sls/corpus.fé",
+      "antes": "A.analise(fonte,caminho)",
+      "depois": "A.analise(fonte,caminho,verdadeiro)",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "testes/integracao/sls/corpus.fé",
+      "antes": "erros=a.erros",
+      "depois": "erros=[tabela.desempacote(a.erros)]",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "src/lua.h",
+      "antes": "#define SANTAFE_DADOS_VERSION \"dados.2\"",
+      "depois": "#define SANTAFE_DADOS_VERSION \"dados.3\"",
+      "ocorrencias": 1
+    },
+    {
+      "arquivo": "ferramentas/sls/sls.fé",
+      "antes": "1.0.0-dados.2",
+      "depois": "1.0.0-dados.3",
+      "ocorrencias": 1
+    }
+  ]
+}

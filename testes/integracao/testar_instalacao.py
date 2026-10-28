@@ -9,21 +9,21 @@ import tempfile
 
 prefix = Path(sys.argv[1]).resolve()
 env = dict(os.environ, GSETTINGS_BACKEND='memory',
-           LUA_PATH=f'{prefix}/share/santafé/1.0/bibf/?.fé;{prefix}/share/santafé/1.0/bibf/?/?.fé;;',
-           LUA_CPATH=f'{prefix}/lib/santafé/1.0/bibc/?.so;;')
+           LUA_PATH=f'{prefix}/share/santafé/3.0/bibf/?.fé;{prefix}/share/santafé/3.0/bibf/?/?.fé;;',
+           LUA_CPATH=f'{prefix}/lib/santafé/3.0/bibc/?.so;;')
 env.pop('RPDF_FONTE', None)  # a instalação precisa localizar sua própria fonte
 binary = prefix / 'bin/santafé'
 version = subprocess.run([str(binary), '-v'], capture_output=True, check=True, timeout=10)
-assert b'Santaf\xc3\xa9 2.1.0 ' in version.stdout + version.stderr
+assert b'Santaf\xc3\xa9 3.0.0 ' in version.stdout + version.stderr
 pc = (prefix / 'lib/pkgconfig/santafe.pc').read_text()
 pc_prefixes = [line[len('prefix='):] for line in pc.splitlines() if line.startswith('prefix=')]
 assert len(pc_prefixes) == 1 and Path(pc_prefixes[0]).is_absolute()
 assert Path(pc_prefixes[0]).resolve() == prefix, 'pkg-config aponta para outro prefixo'
-assert 'Version: 2.1.0\n' in pc
+assert 'Version: 3.0.0\n' in pc
 source = '; '.join('garanta(importe "%s")' % name for name in
                    ['arquivo', 'rede', 'mariadb', 'segredo', 'tomada', 'correio.imap', 'nomes', 'rpdf', 'vigia'])
 subprocess.run([str(binary), '-e', source], env=env, cwd='/tmp', check=True, timeout=10)
-font = prefix / 'share/santafé/1.0/bibf/rpdf/fontes/NotoSans-Regular.ttf'
+font = prefix / 'share/santafé/3.0/bibf/rpdf/fontes/NotoSans-Regular.ttf'
 located = subprocess.run([str(binary), '-e',
                           'mostre((importe "rpdf_unicode").localizeFonte())'],
                          env=env, cwd='/tmp', capture_output=True, text=True,
@@ -48,7 +48,7 @@ for message in messages:
     frames += ('Content-Length: %d\r\n\r\n' % len(body)).encode() + body
 result = subprocess.run([str(prefix / 'bin/santafé-sls')], input=frames,
                         capture_output=True, cwd='/tmp', check=True, timeout=10)
-assert b'Content-Length:' in result.stdout and b'"1.0.0"' in result.stdout
+assert b'Content-Length:' in result.stdout and b'"1.1.0"' in result.stdout
 assert b'"error"' not in result.stdout
 with tempfile.TemporaryDirectory(prefix='santafe-sls-ambiente-') as directory:
     # Nem estado corrompido do projeto nem LUA_INIT devem afetar o analisador.
@@ -58,6 +58,6 @@ with tempfile.TemporaryDirectory(prefix='santafe-sls-ambiente-') as directory:
                         LUA_INIT_5_3='erro("LUA_INIT_5_3 não deve executar no SLS")')
     isolated = subprocess.run([str(prefix/'bin/santafé-sls')], input=frames,
         capture_output=True, cwd=directory, env=isolated_env, check=True, timeout=10)
-    assert b'Content-Length:' in isolated.stdout and b'"1.0.0"' in isolated.stdout
+    assert b'Content-Length:' in isolated.stdout and b'"1.1.0"' in isolated.stdout
     assert b'"error"' not in isolated.stdout
 print('Instalação: versão, bibliotecas, PDF e SLS com espaços no caminho: ok')

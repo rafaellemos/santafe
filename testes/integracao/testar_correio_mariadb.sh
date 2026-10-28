@@ -87,11 +87,13 @@ encerre() {
 }
 trap encerre EXIT INT TERM
 
-"$MARIADB_INSTALAR" --no-defaults \
+mkdir -m 700 "$TEMPORARIO/temporarios-db"
+
+"$MARIADB_INSTALAR" --no-defaults --tmpdir="$TEMPORARIO/temporarios-db" \
     --datadir="$DADOS" --auth-root-authentication-method=normal \
     --skip-test-db >/dev/null
 
-"$MARIADBD" --no-defaults --datadir="$DADOS" \
+"$MARIADBD" --no-defaults --tmpdir="$TEMPORARIO/temporarios-db" --datadir="$DADOS" \
     --socket="$SOQUETE" --port="$PORTA_BANCO" --bind-address=127.0.0.1 \
     --pid-file="$TEMPORARIO/mariadb.pid" \
     --log-error="$TEMPORARIO/mariadb.log" --skip-name-resolve \

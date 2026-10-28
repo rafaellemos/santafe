@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix='santafe-publicacao-conjunta-') as tempo
     for name in ('lua.h','luaconf.h','lauxlib.h','lualib.h','lua.hpp'): write(prefix/'include'/name,'fixture')
     write(prefix/'lib/liblua.a','fixture')
     write(prefix/'lib/pkgconfig/santafe.pc','prefix='+str(prefix)+'\nVersion: '+v['nucleo']+'\n')
-    tools=Path('share/santafé/1.0/ferramentas')
+    tools=Path('share/santafé/3.0/ferramentas')
     write(prefix/tools/'sls.fé','fixture')
     for name in ('analisador.fé','projetos.fé','semantica.fé','transporte.fé','api-publica.json','nativo.so'): write(prefix/tools/'sls'/name,'fixture')
     for name in ('versoes','resolvedor','formatos','cliente','administracao','ambiente','cli','nativo'): write(prefix/tools/'pacotes'/(name+('.so' if name=='nativo' else '.fé')),'fixture')
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='santafe-publicacao-conjunta-') as tempo
     app=root/'app.fé'; write(app,page); write(site/'sfdev.fé',page)
     write(public/'baixar/SHA256SUMS','0'*64+'  santafe-2.0.3.tar.gz\n')
     old=public/'baixar/santafe-2.0.3.tar.gz'; write(old,'histórico')
-    enterprise=system/'share/santafé/1.0/bibf/correio.fé'; write(enterprise,'não alterar')
+    enterprise=system/'share/santafé/3.0/bibf/correio.fé'; write(enterprise,'não alterar')
     m.prepare(source,snapshot,prefix,downloads,registry,system,site,public,app,out)
     plan=out/'plan.json'; entries=json.loads(plan.read_text())
     assert app.read_text()==page and old.read_text()=='histórico'

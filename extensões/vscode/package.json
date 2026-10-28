@@ -1,10 +1,12 @@
 {
   "name": "santafe",
   "displayName": "Santafé",
-  "description": "Sintaxe, conclusões, navegação local e diagnósticos para Santafé.",
-	"version": "1.1.1",
+  "description": "Santafé 3: listas, nulo armazenável, ONFÉ e integração com SLS 1.1.",
+  "version": "2.0.0",
   "capabilities": {
-    "untrustedWorkspaces": { "supported": false }
+    "untrustedWorkspaces": {
+      "supported": false
+    }
   },
   "publisher": "santafe",
   "license": "MIT",
@@ -29,50 +31,150 @@
     "workspace"
   ],
   "activationEvents": [
-    "onLanguage:santafe"
+    "onLanguage:santafe-dados",
+    "onLanguage:onfe"
   ],
   "contributes": {
-    "configurationDefaults": {"[santafe]": {"editor.semanticHighlighting.enabled": true}},
+    "configurationDefaults": {
+      "[santafe-dados]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
     "semanticTokenTypes": [
-      {"id":"santafeEmbeddedTag","description":"Tag HTML em colar"},
-      {"id":"santafeEmbeddedAttribute","description":"Atributo HTML em colar"},
-      {"id":"santafeEmbeddedComment","description":"Comentário embutido"},
-      {"id":"santafeEmbeddedString","description":"Colar embutido"},
-      {"id":"santafeEmbeddedNumber","description":"Número embutido"},
-      {"id":"santafeEmbeddedConstant","description":"Constante embutida"},
-      {"id":"santafeEmbeddedKeyword","description":"Palavra-chave embutida"},
-      {"id":"santafeEmbeddedStorage","description":"Declaração embutida"},
-      {"id":"santafeEmbeddedOperator","description":"Operador embutido"},
-      {"id":"santafeEmbeddedFunction","description":"Função embutida"},
-      {"id":"santafeEmbeddedType","description":"Tipo embutido"},
-      {"id":"santafeEmbeddedSupport","description":"Símbolo nativo embutido"},
-      {"id":"santafeEmbeddedVariable","description":"Variável embutida"},
-      {"id":"santafeEmbeddedParameter","description":"Parâmetro embutido"},
-      {"id":"santafeEmbeddedProperty","description":"Propriedade embutida"},
-      {"id":"santafeEmbeddedEntity","description":"Entidade ou escape embutido"},
-      {"id":"santafeEmbeddedPunctuation","description":"Pontuação embutida"},
-      {"id":"santafeEmbeddedText","description":"Texto embutido"}
+      {
+        "id": "santafeEmbeddedTag",
+        "description": "Tag HTML em colar"
+      },
+      {
+        "id": "santafeEmbeddedAttribute",
+        "description": "Atributo HTML em colar"
+      },
+      {
+        "id": "santafeEmbeddedComment",
+        "description": "Comentário embutido"
+      },
+      {
+        "id": "santafeEmbeddedString",
+        "description": "Colar embutido"
+      },
+      {
+        "id": "santafeEmbeddedNumber",
+        "description": "Número embutido"
+      },
+      {
+        "id": "santafeEmbeddedConstant",
+        "description": "Constante embutida"
+      },
+      {
+        "id": "santafeEmbeddedKeyword",
+        "description": "Palavra-chave embutida"
+      },
+      {
+        "id": "santafeEmbeddedStorage",
+        "description": "Declaração embutida"
+      },
+      {
+        "id": "santafeEmbeddedOperator",
+        "description": "Operador embutido"
+      },
+      {
+        "id": "santafeEmbeddedFunction",
+        "description": "Função embutida"
+      },
+      {
+        "id": "santafeEmbeddedType",
+        "description": "Tipo embutido"
+      },
+      {
+        "id": "santafeEmbeddedSupport",
+        "description": "Símbolo nativo embutido"
+      },
+      {
+        "id": "santafeEmbeddedVariable",
+        "description": "Variável embutida"
+      },
+      {
+        "id": "santafeEmbeddedParameter",
+        "description": "Parâmetro embutido"
+      },
+      {
+        "id": "santafeEmbeddedProperty",
+        "description": "Propriedade embutida"
+      },
+      {
+        "id": "santafeEmbeddedEntity",
+        "description": "Entidade ou escape embutido"
+      },
+      {
+        "id": "santafeEmbeddedPunctuation",
+        "description": "Pontuação embutida"
+      },
+      {
+        "id": "santafeEmbeddedText",
+        "description": "Texto embutido"
+      }
     ],
-    "semanticTokenScopes": [{"language":"santafe","scopes":{
-      "santafeEmbeddedTag":["entity.name.tag"],
-      "santafeEmbeddedAttribute":["entity.other.attribute-name"],
-      "santafeEmbeddedComment":["comment"],
-      "santafeEmbeddedString":["string"],
-      "santafeEmbeddedNumber":["constant.numeric"],
-      "santafeEmbeddedConstant":["constant.language"],
-      "santafeEmbeddedKeyword":["keyword.control"],
-      "santafeEmbeddedStorage":["storage.type"],
-      "santafeEmbeddedOperator":["keyword.operator"],
-      "santafeEmbeddedFunction":["entity.name.function"],
-      "santafeEmbeddedType":["entity.name.type"],
-      "santafeEmbeddedSupport":["support.function"],
-      "santafeEmbeddedVariable":["variable.other"],
-      "santafeEmbeddedParameter":["variable.parameter"],
-      "santafeEmbeddedProperty":["variable.other.property"],
-      "santafeEmbeddedEntity":["constant.character.entity"],
-      "santafeEmbeddedPunctuation":["punctuation"],
-      "santafeEmbeddedText":["text.html.basic"]
-    }}],
+    "semanticTokenScopes": [
+      {
+        "language": "santafe",
+        "scopes": {
+          "santafeEmbeddedTag": [
+            "entity.name.tag"
+          ],
+          "santafeEmbeddedAttribute": [
+            "entity.other.attribute-name"
+          ],
+          "santafeEmbeddedComment": [
+            "comment"
+          ],
+          "santafeEmbeddedString": [
+            "string"
+          ],
+          "santafeEmbeddedNumber": [
+            "constant.numeric"
+          ],
+          "santafeEmbeddedConstant": [
+            "constant.language"
+          ],
+          "santafeEmbeddedKeyword": [
+            "keyword.control"
+          ],
+          "santafeEmbeddedStorage": [
+            "storage.type"
+          ],
+          "santafeEmbeddedOperator": [
+            "keyword.operator"
+          ],
+          "santafeEmbeddedFunction": [
+            "entity.name.function"
+          ],
+          "santafeEmbeddedType": [
+            "entity.name.type"
+          ],
+          "santafeEmbeddedSupport": [
+            "support.function"
+          ],
+          "santafeEmbeddedVariable": [
+            "variable.other"
+          ],
+          "santafeEmbeddedParameter": [
+            "variable.parameter"
+          ],
+          "santafeEmbeddedProperty": [
+            "variable.other.property"
+          ],
+          "santafeEmbeddedEntity": [
+            "constant.character.entity"
+          ],
+          "santafeEmbeddedPunctuation": [
+            "punctuation"
+          ],
+          "santafeEmbeddedText": [
+            "text.html.basic"
+          ]
+        }
+      }
+    ],
     "languages": [
       {
         "id": "santafe",
@@ -85,6 +187,16 @@
           ".fe"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "onfe",
+        "aliases": [
+          "ONFÉ"
+        ],
+        "extensions": [
+          ".onfé"
+        ],
+        "configuration": "./onfe-configuration.json"
       }
     ],
     "grammars": [
@@ -95,6 +207,11 @@
         "embeddedLanguages": {
           "meta.embedded.inline.santafe": "santafe"
         }
+      },
+      {
+        "language": "onfe",
+        "scopeName": "source.onfe",
+        "path": "./syntaxes/onfe.tmLanguage.json"
       }
     ],
     "snippets": [
@@ -122,7 +239,10 @@
       "properties": {
         "santafe.highlight.embeddedPalette": {
           "type": "string",
-          "enum": ["tema", "suave"],
+          "enum": [
+            "tema",
+            "suave"
+          ],
           "default": "tema",
           "description": "Paleta de HTML/JavaScript dentro de colares: acompanhar o tema ou cores suaves. Não altera arquivos HTML/JS independentes."
         },
@@ -130,7 +250,7 @@
           "type": "boolean",
           "default": true,
           "scope": "window",
-          "description": "Ativa o diagnóstico sintático fornecido pelo SLS."
+          "description": "Ativa os diagnósticos e a navegação do SLS local compatível com Santafé 3."
         },
         "santafe.languageServer.command": {
           "type": "string",
@@ -152,6 +272,11 @@
           "default": false,
           "scope": "window",
           "description": "Registra os quadros LSP enviados e recebidos no canal de saída Santafé SLS."
+        },
+        "santafe.languageServer.scopeWarnings": {
+          "type": "boolean",
+          "default": false,
+          "description": "Avisa sobre nomes sem declaração local visível. Globais dinâmicos continuam válidos; não cria temVar."
         }
       }
     }

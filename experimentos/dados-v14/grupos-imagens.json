@@ -1,0 +1,8 @@
+[
+  "réplica reutilizada sem duplicação de bancos e depósitos",
+  "SLS, CLI e SDK da geração candidata instalados no chroot",
+  "imagens capturadas e novos uploads preservados em cópia privada",
+  "candidata: página referencia upload e HTTPS entrega bytes íntegros",
+  "estavel: página referencia upload e HTTPS entrega bytes íntegros",
+  "leitura após reversão preserva bancos e imagens"
+]

@@ -154,7 +154,7 @@ local função junteEndereços(valor)
     local partes = {}
     para _, chave em ipares({ "para", "cópia", "cópiaOculta" }) início
         local lista = valor[chave]
-        se tipo(lista) == "tabela" então
+        se tipo(lista) == "tabela" ou tipo(lista) == "lista" então
             para _, endereço em ipares(lista) início
                 partes[#partes + 1] = util.endereçoLegível(endereço)
             fim
@@ -165,7 +165,7 @@ fim
 
 local função participantesDaConversa(mensagem, interlocutor)
     local participantes = mensagem.remetentesNaConversa
-    se tipo(participantes) ~= "tabela" ou #participantes == 0 então
+    se (tipo(participantes) ~= "tabela" e tipo(participantes) ~= "lista") ou #participantes == 0 então
         retorne interlocutor
     fim
     local legíveis = {}
@@ -188,13 +188,13 @@ local função tipoBreveDoAnexo(tipo, nome)
     retorne "ARQUIVO"
 fim
 
-local ÍCONE_PDF = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone PDF"><path fill="#E5252A" d="M128 0H302L448 150V448c0 35.346-28.654 64-64 64H128c-35.346 0-64-28.654-64-64V64C64 28.654 92.654 0 128 0Z"/><path fill="#ED676A" d="M302 0 448 150H302V0Z"/><g fill="#FFFFFF"><path d="M139 289h39c19.7 0 32 12.2 32 31.7 0 19.8-12.3 31.3-32 31.3h-16v30h-23v-93Zm23 20v23h14c7.4 0 12-4.4 12-11.5S183.4 309 176 309h-14Z"/><path fill-rule="evenodd" d="M221 289h37c27.3 0 44 18.3 44 46.5S285.3 382 258 382h-37v-93Zm23 20v53h12c14.2 0 23-10.2 23-26.5S270.2 309 256 309h-12Z"/><path d="M315 289h66v20h-43v17h35v20h-35v36h-23v-93Z"/></g></svg>]]
+local ÍCONE_PDF = [=[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone PDF"><path fill="#E5252A" d="M128 0H302L448 150V448c0 35.346-28.654 64-64 64H128c-35.346 0-64-28.654-64-64V64C64 28.654 92.654 0 128 0Z"/><path fill="#ED676A" d="M302 0 448 150H302V0Z"/><g fill="#FFFFFF"><path d="M139 289h39c19.7 0 32 12.2 32 31.7 0 19.8-12.3 31.3-32 31.3h-16v30h-23v-93Zm23 20v23h14c7.4 0 12-4.4 12-11.5S183.4 309 176 309h-14Z"/><path fill-rule="evenodd" d="M221 289h37c27.3 0 44 18.3 44 46.5S285.3 382 258 382h-37v-93Zm23 20v53h12c14.2 0 23-10.2 23-26.5S270.2 309 256 309h-12Z"/><path d="M315 289h66v20h-43v17h35v20h-35v36h-23v-93Z"/></g></svg>]=]
 
-local ÍCONE_SVG = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone de arquivo SVG alaranjado"><path d="M128 0H302L448 150V448C448 483.3 419.3 512 384 512H128C92.7 512 64 483.3 64 448V64C64 28.7 92.7 0 128 0Z" fill="#F57C00"/><path d="M302 0L448 150H302Z" fill="#FFB15C"/><text x="256" y="382" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" fill="#FFFFFF">SVG</text></svg>]]
+local ÍCONE_SVG = [=[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone de arquivo SVG alaranjado"><path d="M128 0H302L448 150V448C448 483.3 419.3 512 384 512H128C92.7 512 64 483.3 64 448V64C64 28.7 92.7 0 128 0Z" fill="#F57C00"/><path d="M302 0L448 150H302Z" fill="#FFB15C"/><text x="256" y="382" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" fill="#FFFFFF">SVG</text></svg>]=]
 
-local ÍCONE_PNG = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Ícone PNG com fundo transparente"><defs><filter id="carteiro-anexo-png-sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.18"/></filter></defs><g filter="url(#carteiro-anexo-png-sombra)"><path d="M185 95H453L636 278V688Q636 724 600 724H199Q163 724 163 688V117Q163 95 185 95Z" fill="#10C987"/><rect x="163" y="541" width="473" height="183" fill="#08B873"/><rect x="163" y="540" width="473" height="3" fill="#8FE6C7" opacity="0.8"/><path d="M453 95L636 278H513Q477 278 453 254Q453 278 453 216Z" fill="#0CB06F"/><path d="M453 95L636 278H513Q453 278 453 218Z" fill="#0DB878"/><path d="M509 278L636 405V278Z" fill="#000000" opacity="0.12"/><g fill="none" stroke="#F3F3F3" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"><rect x="246" y="286" width="309" height="177" rx="28" ry="28"/><circle cx="312" cy="359" r="22"/><path d="M302 441L362 373L411 441"/><path d="M395 441L437 376L500 441"/></g><text x="400" y="665" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" fill="#F7F7F7">PNG</text></g></svg>]]
+local ÍCONE_PNG = [=[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Ícone PNG com fundo transparente"><defs><filter id="carteiro-anexo-png-sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.18"/></filter></defs><g filter="url(#carteiro-anexo-png-sombra)"><path d="M185 95H453L636 278V688Q636 724 600 724H199Q163 724 163 688V117Q163 95 185 95Z" fill="#10C987"/><rect x="163" y="541" width="473" height="183" fill="#08B873"/><rect x="163" y="540" width="473" height="3" fill="#8FE6C7" opacity="0.8"/><path d="M453 95L636 278H513Q477 278 453 254Q453 278 453 216Z" fill="#0CB06F"/><path d="M453 95L636 278H513Q453 278 453 218Z" fill="#0DB878"/><path d="M509 278L636 405V278Z" fill="#000000" opacity="0.12"/><g fill="none" stroke="#F3F3F3" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"><rect x="246" y="286" width="309" height="177" rx="28" ry="28"/><circle cx="312" cy="359" r="22"/><path d="M302 441L362 373L411 441"/><path d="M395 441L437 376L500 441"/></g><text x="400" y="665" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" fill="#F7F7F7">PNG</text></g></svg>]=]
 
-local ÍCONE_JPG = [[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone JPG em SVG"><defs><clipPath id="carteiro-anexo-jpg-recorte"><path d="M72 4h302l78 78v418c0 4.4-3.6 8-8 8H72c-4.4 0-8-3.6-8-8V12c0-4.4 3.6-8 8-8z"/></clipPath></defs><path d="M72 4h302l78 78v418c0 4.4-3.6 8-8 8H72c-4.4 0-8-3.6-8-8V12c0-4.4 3.6-8 8-8z" fill="#cdcbc2"/><path d="M342 4l110 110H342z" fill="#c4c2b7"/><g clip-path="url(#carteiro-anexo-jpg-recorte)"><circle cx="173" cy="129" r="42" fill="#e8ca53"/><path d="M64 358L214 224l51 50 96-136 151 151v69z" fill="#33bba0"/><rect x="64" y="358" width="388" height="150" fill="#1ea892"/><rect x="64" y="357" width="388" height="2" fill="#48cdb7" opacity="0.9"/></g><text x="258" y="484" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="129" font-weight="400" fill="#f4f4f2">JPG</text></svg>]]
+local ÍCONE_JPG = [=[<svg class="carteiro-anexo-ícone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ícone JPG em SVG"><defs><clipPath id="carteiro-anexo-jpg-recorte"><path d="M72 4h302l78 78v418c0 4.4-3.6 8-8 8H72c-4.4 0-8-3.6-8-8V12c0-4.4 3.6-8 8-8z"/></clipPath></defs><path d="M72 4h302l78 78v418c0 4.4-3.6 8-8 8H72c-4.4 0-8-3.6-8-8V12c0-4.4 3.6-8 8-8z" fill="#cdcbc2"/><path d="M342 4l110 110H342z" fill="#c4c2b7"/><g clip-path="url(#carteiro-anexo-jpg-recorte)"><circle cx="173" cy="129" r="42" fill="#e8ca53"/><path d="M64 358L214 224l51 50 96-136 151 151v69z" fill="#33bba0"/><rect x="64" y="358" width="388" height="150" fill="#1ea892"/><rect x="64" y="357" width="388" height="2" fill="#48cdb7" opacity="0.9"/></g><text x="258" y="484" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="129" font-weight="400" fill="#f4f4f2">JPG</text></svg>]=]
 
 local função íconeDoAnexo(tipo, nome)
     local breve = tipoBreveDoAnexo(tipo, nome)
@@ -426,30 +426,28 @@ função páginas.base(usuário, caixa, título, conteúdo, pastaAtual)
         util.escapeHTML(identidade.ícone) .. '" alt="">' ou
         '<i class="material-icons" aria-hidden="true">local_post_office</i>'
     local favicon = identidade.ícone ou "/estático/fotos/santafe.ico"
-    retorne [[<!DOCTYPE html>
+    retorne [=[<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
-  <meta name="theme-color" content="]] .. util.escapeHTML(identidade.corDoTema) .. [[">
-  <title>Carteiro | ]] .. util.escapeHTML(título) .. [[</title>
-  <link rel="icon" href="]] .. util.escapeHTML(favicon) .. [[">
+  <meta name="theme-color" content="]=] .. util.escapeHTML(identidade.corDoTema) .. [=[">
+  <title>Carteiro | ]=] .. util.escapeHTML(título) .. [=[</title>
+  <link rel="icon" href="]=] .. util.escapeHTML(favicon) .. [=[">
   <link href="/estático/css/materialize.css" rel="stylesheet">
   <link href="/estático/css/material-icons.css" rel="stylesheet">
   <link href="/carteiro/estático/css/carteiro.css?v=32" rel="stylesheet">
-  ]] .. estilo .. [[
-</head>
+  ]=] .. estilo .. [=[</head>
 <body>
   <header class="carteiro-topo">
     <a class="carteiro-marca" href="/carteiro/" aria-label="Carteiro, caixa de entrada">
-      ]] .. ícone .. [[
-      <strong>Correio</strong><small>]] .. marca .. [[</small>
+      ]=] .. ícone .. [=[      <strong>Correio</strong><small>]=] .. marca .. [=[</small>
     </a>
     <div class="carteiro-conta">
-      <span><strong>]] .. nome .. [[</strong><small>]] .. endereço .. [[</small></span>
-      <a href="]] .. util.escapeHTML(identidade.destino) .. [[" class="white-text">]] .. marca .. [[</a>
+      <span><strong>]=] .. nome .. [=[</strong><small>]=] .. endereço .. [=[</small></span>
+      <a href="]=] .. util.escapeHTML(identidade.destino) .. [=[" class="white-text">]=] .. marca .. [=[</a>
       <form action="/sair" method="POST">
-        <input type="hidden" name="csrf" value="]] .. util.escapeHTML(usuário.csrf) .. [[">
+        <input type="hidden" name="csrf" value="]=] .. util.escapeHTML(usuário.csrf) .. [=[">
         <button class="btn-flat white-text" type="submit">Sair</button>
       </form>
     </div>
@@ -459,9 +457,9 @@ função páginas.base(usuário, caixa, título, conteúdo, pastaAtual)
       <a class="btn amber darken-3 carteiro-nova" href="/carteiro/nova">
         <i class="material-icons left" aria-hidden="true">edit</i>Nova mensagem
       </a>
-      <nav>]] .. navegaçãoDaCaixa(pastaAtual) .. [[</nav>
+      <nav>]=] .. navegaçãoDaCaixa(pastaAtual) .. [=[</nav>
     </aside>
-    <main class="carteiro-conteúdo">]] .. conteúdo .. [[</main>
+    <main class="carteiro-conteúdo">]=] .. conteúdo .. [=[</main>
   </div>
   <dialog class="carteiro-visualizador documento" data-visualizador-anexo>
     <header><strong data-visualizador-título>Visualização do anexo</strong>
@@ -479,7 +477,7 @@ função páginas.base(usuário, caixa, título, conteúdo, pastaAtual)
   </dialog>
   <script src="/carteiro/estático/js/carteiro.js?v=19" defer></script>
 </body>
-</html>]]
+</html>]=]
 fim
 
 local função caminhoDaPágina(pasta, busca, página)
@@ -704,8 +702,7 @@ função páginas.triagem(usuário, caixa, regras)
         linhas[1] = '<tr><td colspan="4" class="carteiro-triagem-vazia">' ..
             'Você ainda não criou regras pessoais.</td></tr>'
     fim
-    local conteúdo = [[
-<section class="carteiro-painel carteiro-regras-triagem">
+    local conteúdo = [=[<section class="carteiro-painel carteiro-regras-triagem">
   <div class="carteiro-painel-título"><div><h1>Triagem</h1>
     <p>Decida como cartas futuras de um endereço ou domínio devem ser entregues.</p>
   </div></div>
@@ -714,8 +711,8 @@ função páginas.triagem(usuário, caixa, regras)
     pontuação automática, não confia no HTML e não dispensa antivírus,
     SPF, DKIM ou DMARC. A regra de endereço prevalece sobre a de domínio.</span></div>
   <form class="carteiro-nova-regra" action="/carteiro/triagem/regras" method="POST">
-    <input type="hidden" name="csrf" value="]] ..
-        util.escapeHTML(usuário.csrf) .. [[">
+    <input type="hidden" name="csrf" value="]=] ..
+        util.escapeHTML(usuário.csrf) .. [=[">
     <label>Aplicar a
       <select name="escopo" required>
         <option value="endereço">Endereço exato</option>
@@ -736,17 +733,16 @@ função páginas.triagem(usuário, caixa, regras)
   </form>
   <div class="carteiro-tabela-regras"><table>
     <thead><tr><th>Alcance</th><th>Valor</th><th>Decisão</th><th></th></tr></thead>
-    <tbody>]] .. tabela.concatene(linhas) .. [[</tbody>
+    <tbody>]=] .. tabela.concatene(linhas) .. [=[</tbody>
   </table></div>
-</section>]]
+</section>]=]
     retorne páginas.base(usuário, caixa, "Triagem", conteúdo, "triagem")
 fim
 
 função páginas.configurador(usuário, caixa, configuração)
     local servidor = util.escapeHTML(configuração.domínioASCII)
     local endereço = util.escapeHTML(util.endereçoLegível(caixa.endereço))
-    local conteúdo = [[
-<section class="carteiro-painel carteiro-configurador">
+    local conteúdo = [=[<section class="carteiro-painel carteiro-configurador">
   <div class="carteiro-painel-título"><div><h1>Configurar este aparelho</h1>
     <p>Leve sua caixa postal ao celular, computador ou programa de correio.</p>
   </div></div>
@@ -781,7 +777,7 @@ função páginas.configurador(usuário, caixa, configuração)
     <h2>Instalação no iPhone ou iPad</h2>
     <ol><li>Toque em <strong>Baixar para iPhone/iPad</strong> e permita o download.</li>
       <li>Abra <strong>Ajustes</strong> e toque em <strong>Perfil Baixado</strong>.</li>
-      <li>Confira a conta <code>]] .. endereço .. [[</code> e toque em
+      <li>Confira a conta <code>]=] .. endereço .. [=[</code> e toque em
       <strong>Instalar</strong>.</li>
       <li>Informe a senha da sua caixa quando o sistema pedir.</li></ol>
   </section>
@@ -790,21 +786,21 @@ função páginas.configurador(usuário, caixa, configuração)
     <p>Use o endereço postal completo como nome de usuário na entrada e na saída.</p>
     <div class="carteiro-configurador-tabela"><table>
       <thead><tr><th>Serviço</th><th>Servidor</th><th>Porta</th><th>Proteção</th></tr></thead>
-      <tbody><tr><td>Receber por IMAP</td><td><code>]] .. servidor .. [[</code></td>
+      <tbody><tr><td>Receber por IMAP</td><td><code>]=] .. servidor .. [=[</code></td>
         <td>993</td><td>TLS desde o início</td></tr>
-      <tr><td>Enviar por SMTP</td><td><code>]] .. servidor .. [[</code></td>
+      <tr><td>Enviar por SMTP</td><td><code>]=] .. servidor .. [=[</code></td>
         <td>465</td><td>TLS desde o início</td></tr>
-      <tr><td>Envio alternativo</td><td><code>]] .. servidor .. [[</code></td>
+      <tr><td>Envio alternativo</td><td><code>]=] .. servidor .. [=[</code></td>
         <td>587</td><td>STARTTLS obrigatório</td></tr></tbody>
     </table></div>
-    <dl class="carteiro-configurador-identidade"><div><dt>Endereço</dt><dd><code>]] ..
-        endereço .. [[</code></dd></div><div><dt>Nome de usuário</dt><dd><code>]] ..
-        endereço .. [[</code></dd></div><div><dt>Autenticação</dt><dd>Senha normal</dd></div></dl>
+    <dl class="carteiro-configurador-identidade"><div><dt>Endereço</dt><dd><code>]=] ..
+        endereço .. [=[</code></dd></div><div><dt>Nome de usuário</dt><dd><code>]=] ..
+        endereço .. [=[</code></dd></div><div><dt>Autenticação</dt><dd>Senha normal</dd></div></dl>
   </section>
   <div class="carteiro-informação"><i class="material-icons" aria-hidden="true">travel_explore</i>
     <span>Os registros SRV do domínio também anunciam IMAP 993, SMTP 465 e
     SMTP 587. Programas compatíveis podem descobrir essas definições automaticamente.</span></div>
-</section>]]
+</section>]=]
     retorne páginas.base(usuário, caixa, "Configurar", conteúdo, "configurar")
 fim
 
@@ -829,25 +825,23 @@ função páginas.compositor(usuário, caixa, valores, aviso)
                 (quantidade .. ' anexo(s) da carta original serão incluídos automaticamente.') ou
                 'A carta original não possui anexos.') .. '</span></div>'
     fim
-    local conteúdo = [[
-<section class="carteiro-painel carteiro-compositor">
-  <div class="carteiro-painel-título"><h1>]] .. título .. [[</h1><a href="/carteiro/entrada">Fechar</a></div>
-  ]] .. anúncio .. [[
-  <form action="/carteiro/enviar" method="POST" enctype="multipart/form-data">
-    <input type="hidden" name="csrf" value="]] .. util.escapeHTML(usuário.csrf) .. [[">
-    <input type="hidden" name="respostaA" value="]] ..
-        util.escapeHTML(valores.respostaA) .. [[">
-    <input type="hidden" name="encaminharDe" value="]] ..
-        util.escapeHTML(valores.encaminharDe) .. [[">
-    <label>De<input type="text" value="]] ..
-        util.escapeHTML(util.endereçoLegível(caixa.endereço)) .. [[" readonly></label>
+    local conteúdo = [=[<section class="carteiro-painel carteiro-compositor">
+  <div class="carteiro-painel-título"><h1>]=] .. título .. [=[</h1><a href="/carteiro/entrada">Fechar</a></div>
+  ]=] .. anúncio .. [=[  <form action="/carteiro/enviar" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="]=] .. util.escapeHTML(usuário.csrf) .. [=[">
+    <input type="hidden" name="respostaA" value="]=] ..
+        util.escapeHTML(valores.respostaA) .. [=[">
+    <input type="hidden" name="encaminharDe" value="]=] ..
+        util.escapeHTML(valores.encaminharDe) .. [=[">
+    <label>De<input type="text" value="]=] ..
+        util.escapeHTML(util.endereçoLegível(caixa.endereço)) .. [=[" readonly></label>
     <label>Para<input name="para" type="text" maxlength="4000" required
-      value="]] .. util.escapeHTML(util.endereçoLegível(valores["para"])) .. [[" placeholder="ana@exemplo.org, maria@exemplo.org"></label>
+      value="]=] .. util.escapeHTML(util.endereçoLegível(valores["para"])) .. [=[" placeholder="ana@exemplo.org, maria@exemplo.org"></label>
     <details><summary>Cópia e cópia oculta</summary>
-      <label>Cópia<input name="cópia" type="text" maxlength="4000" value="]] .. util.escapeHTML(util.endereçoLegível(valores.cópia)) .. [["></label>
-      <label>Cópia oculta<input name="cópiaOculta" type="text" maxlength="4000" value="]] .. util.escapeHTML(util.endereçoLegível(valores.cópiaOculta)) .. [["></label>
+      <label>Cópia<input name="cópia" type="text" maxlength="4000" value="]=] .. util.escapeHTML(util.endereçoLegível(valores.cópia)) .. [=["></label>
+      <label>Cópia oculta<input name="cópiaOculta" type="text" maxlength="4000" value="]=] .. util.escapeHTML(util.endereçoLegível(valores.cópiaOculta)) .. [=["></label>
     </details>
-    <label>Assunto<input name="assunto" type="text" maxlength="500" value="]] .. util.escapeHTML(valores.assunto) .. [["></label>
+    <label>Assunto<input name="assunto" type="text" maxlength="500" value="]=] .. util.escapeHTML(valores.assunto) .. [=["></label>
     <fieldset class="carteiro-modo-compositor">
       <legend>Formato da mensagem</legend>
       <button class="ativo" type="button" data-modo-compositor="texto"
@@ -856,8 +850,8 @@ função páginas.compositor(usuário, caixa, valores, aviso)
         aria-pressed="false">Formatação</button>
     </fieldset>
     <label data-compositor-texto>Mensagem<textarea name="texto"
-      maxlength="2000000" required data-campo-texto>]] ..
-        util.escapeHTML(valores.texto) .. [[</textarea></label>
+      maxlength="2000000" required data-campo-texto>]=] ..
+        util.escapeHTML(valores.texto) .. [=[</textarea></label>
     <section class="carteiro-editor" data-compositor-html hidden>
       <div class="carteiro-editor-barra" role="toolbar"
         aria-label="Formatação da mensagem">
@@ -880,20 +874,19 @@ função páginas.compositor(usuário, caixa, valores, aviso)
           class="material-icons">format_clear</i></button>
       </div>
       <div class="carteiro-editor-conteúdo" contenteditable="true"
-        role="textbox" aria-multiline="true" data-editor-html>]] ..
-        htmlInicial .. [[</div>
-      <textarea name="html" maxlength="2000000" data-editor-html-campo hidden>]] ..
-        util.escapeHTML(htmlInicial) .. [[</textarea>
+        role="textbox" aria-multiline="true" data-editor-html>]=] ..
+        htmlInicial .. [=[</div>
+      <textarea name="html" maxlength="2000000" data-editor-html-campo hidden>]=] ..
+        util.escapeHTML(htmlInicial) .. [=[</textarea>
       <p class="carteiro-editor-aviso">A formatação aceita texto, títulos,
         listas, citações, negrito, itálico e sublinhado. Programas,
         formulários, estilos e imagens remotas não são inseridos.</p>
     </section>
-    ]] .. avisoDosAnexos .. [[
-    <label class="carteiro-anexo"><i class="material-icons">attach_file</i>Anexar arquivo
+    ]=] .. avisoDosAnexos .. [=[    <label class="carteiro-anexo"><i class="material-icons">attach_file</i>Anexar arquivo
       <input name="anexo" type="file"></label>
-    <div class="carteiro-ações"><button class="btn teal" type="submit"><i class="material-icons left">send</i>]] .. ação .. [[</button></div>
+    <div class="carteiro-ações"><button class="btn teal" type="submit"><i class="material-icons left">send</i>]=] .. ação .. [=[</button></div>
   </form>
-</section>]]
+</section>]=]
     retorne páginas.base(usuário, caixa, título, conteúdo)
 fim
 
@@ -1507,7 +1500,7 @@ local função textoParaImpressão(mensagem)
 fim
 
 função páginas.impressão(mensagens, título)
-    se tipo(mensagens) ~= "tabela" ou mensagens.id então
+    se tipo(mensagens) ~= "lista" e (tipo(mensagens) ~= "tabela" ou mensagens.id) então
         mensagens = { mensagens }
     fim
     mensagens = mensagens ou {}

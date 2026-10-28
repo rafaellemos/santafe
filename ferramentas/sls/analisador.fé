@@ -14,7 +14,7 @@ local função nó(tipoNó, começo, final)
     retorne { classe=tipoNó, começo=começo, final=final, filhos={} }
 fim
 
-função A.analise(texto, uri)
+função A.analise(texto, uri, dadosExperimentais)
     local tokens, falhaLéxica = depure.lexemas(texto, "@" .. (uri ou "documento"))
     local raiz = { começo=0, final=#texto, nomes={}, filhos={}, classe="raiz" }
     local resultado = { texto=texto, uri=uri, tokens=tokens, raiz=raiz,
@@ -162,6 +162,15 @@ função A.analise(texto, uri)
         senãose aceite("(") então
             local valor = expressão(); local final = exija(")")["fim"]
             n = nó("parênteses", t["início"], final); n.filhos={valor}; n.símbolo=valor.símbolo
+        senãose dadosExperimentais e aceite("[") então
+            n = nó("lista", t["início"], #texto)
+            enquanto veja().texto ~= "]" e veja().tipo ~= "fim" início
+                local antes = posição
+                acrescente(n.filhos, expressão())
+                se posição == antes então tire() fim
+                se não aceite(",") e não aceite(";") então pare fim
+            fim
+            n.final=exija("]")["fim"]
         senãose aceite("{") então
             n = nó("tabela", t["início"], #texto); n.campos={}
             enquanto veja().texto ~= "}" e veja().tipo ~= "fim" início

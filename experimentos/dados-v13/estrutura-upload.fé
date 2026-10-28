@@ -1,0 +1,79 @@
+-- Validação estrutural limitada ao tamanho do upload; não decodifica pixels.
+local função estruturaDaImagemCompleta(dados, formato)
+    local quantidade=#dados
+    local função u32(p)
+        se p+3>quantidade então retorne nulo fim
+        local a,b,c,d=dados:byte(p,p+3)
+        retorne ((a*256+b)*256+c)*256+d
+    fim
+    local função u16(p)
+        se p+1>quantidade então retorne nulo fim
+        local a,b=dados:byte(p,p+1);retorne a*256+b
+    fim
+    se formato=="png" então
+        se dados:corte(1,8)~="\137PNG\13\10\26\10" então retorne falso fim
+        local p=9;local cabeçalho=falso;local conteúdo=falso
+        local conteúdoEncerrado=falso;local octetosDeImagem=0
+        enquanto p<=quantidade início
+            local n=u32(p)
+            se não n ou p+n+11>quantidade então retorne falso fim
+            local marca=dados:corte(p+4,p+7)
+            se não marca:procure("^[A-Za-z][A-Za-z][A-Za-z][A-Za-z]$") então retorne falso fim
+            se colar.crc32(dados:corte(p+4,p+7+n))%4294967296~=u32(p+8+n) então retorne falso fim
+            se não cabeçalho e marca~="IHDR" então retorne falso fim
+            se marca=="IHDR" então
+                se cabeçalho ou n~=13 então retorne falso fim
+                cabeçalho=verdadeiro
+            senãose marca=="IDAT" então
+                se conteúdoEncerrado então retorne falso fim
+                conteúdo=verdadeiro;octetosDeImagem=octetosDeImagem+n
+            senãose marca=="IEND" então
+                retorne cabeçalho e conteúdo e octetosDeImagem>0 e n==0 e p+11==quantidade
+            senão
+                se conteúdo então conteúdoEncerrado=verdadeiro fim
+                local primeira=marca:byte(1)
+                se primeira>=65 e primeira<=90 e marca~="PLTE" então retorne falso fim
+                se marca=="PLTE" e (conteúdo ou n==0 ou n%3~=0 ou n>768) então retorne falso fim
+            fim
+            p=p+n+12
+        fim
+        retorne falso
+    fim
+    se formato~="jpeg" ou dados:corte(1,2)~="\255\216" então retorne falso fim
+    local p=3;local quadro=falso;local varredura=falso
+    enquanto p<=quantidade início
+        se dados:byte(p)~=255 então retorne falso fim
+        enquanto p<=quantidade e dados:byte(p)==255 início p=p+1 fim
+        local marca=dados:byte(p);p=p+1
+        se não marca ou marca==0 ou marca==216 então retorne falso fim
+        se marca==217 então retorne quadro e varredura e p==quantidade+1 fim
+        se marca==1 então -- TEM não tem segmento.
+        senão
+            se marca>=208 e marca<=215 então retorne falso fim
+            local n=u16(p)
+            se não n ou n<2 ou p+n-1>quantidade então retorne falso fim
+            se marca>=192 e marca<=207 e marca~=196 e marca~=200 e marca~=204 então
+                se n<8 então retorne falso fim
+                local canais=dados:byte(p+7)
+                se canais<1 ou n~=8+3*canais então retorne falso fim
+                quadro=verdadeiro
+            fim
+            p=p+n
+            se marca==218 então
+                se não quadro ou n<6 então retorne falso fim
+                varredura=verdadeiro
+                enquanto p<=quantidade início
+                    se dados:byte(p)~=255 então p=p+1
+                    senão
+                        local próximo=dados:byte(p+1)
+                        se próximo==0 ou (próximo e próximo>=208 e próximo<=215) então p=p+2
+                        senãose próximo==255 então p=p+1
+                        senão pare fim
+                    fim
+                fim
+            fim
+        fim
+    fim
+    retorne falso
+fim
+retorne estruturaDaImagemCompleta

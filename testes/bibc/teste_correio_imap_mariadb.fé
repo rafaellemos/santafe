@@ -84,9 +84,8 @@ mariadb.criePiscinaAssíncrona({
 }, função(novaPiscina, falhaDaPiscina)
     se não novaPiscina então encerre(falhaDaPiscina); retorne fim
     piscina = novaPiscina
-    piscina:executePreparadoAssíncrono([[
-INSERT INTO usuarios (nome,usuario,email,senha_hash,papel,estado)
-VALUES (?,?,?,?,?,?)]], {
+    piscina:executePreparadoAssíncrono([=[INSERT INTO usuarios (nome,usuario,email,senha_hash,papel,estado)
+VALUES (?,?,?,?,?,?)]=], {
         "Ensaio IMAP", nomeDoUsuário,
         nomeDoUsuário .. "@santafé.dev.br", senhaProtegida,
         "usuário", "ativo"

@@ -733,6 +733,12 @@ static void constructor (LexState *ls, expdesc *t) {
      sep -> ',' | ';' */
   FuncState *fs = ls->fs;
   int line = ls->linenumber;
+#ifdef SANTAFE_DADOS_V3
+  int islist = ls->t.token == '[';
+  int opening = islist ? '[' : '{', closing = islist ? ']' : '}';
+#else
+  int opening = '{', closing = '}';
+#endif
   int pc = luaK_codeABC(fs, OP_NEWTABLE, 0, 0, 0);
   struct ConsControl cc;
   cc.na = cc.nh = cc.tostore = 0;
@@ -740,17 +746,24 @@ static void constructor (LexState *ls, expdesc *t) {
   init_exp(t, VRELOCABLE, pc);
   init_exp(&cc.v, VVOID, 0);  /* no value (yet) */
   luaK_exp2nextreg(ls->fs, t);  /* fix it at stack top */
-  checknext(ls, '{');
+  checknext(ls, opening);
   do {
     lua_assert(cc.v.k == VVOID || cc.tostore > 0);
-    if (ls->t.token == '}') break;
+    if (ls->t.token == closing) break;
     closelistfield(fs, &cc);
+#ifdef SANTAFE_DADOS_V3
+    if (islist) listfield(ls, &cc);
+    else
+#endif
     field(ls, &cc);
   } while (testnext(ls, ',') || testnext(ls, ';'));
-  check_match(ls, '}', '{', line);
+  check_match(ls, closing, opening, line);
   lastlistfield(fs, &cc);
   SETARG_B(fs->f->code[pc], luaO_int2fb(cc.na)); /* set initial array size */
   SETARG_C(fs->f->code[pc], luaO_int2fb(cc.nh));  /* set initial table size */
+#ifdef SANTAFE_DADOS_V3
+  if (islist) SETARG_C(fs->f->code[pc], MAXARG_C);
+#endif
 }
 
 /* }====================================================================== */
@@ -972,6 +985,9 @@ static void simpleexp (LexState *ls, expdesc *v) {
       init_exp(v, VVARARG, luaK_codeABC(fs, OP_VARARG, 0, 1, 0));
       break;
     }
+#ifdef SANTAFE_DADOS_V3
+    case '[':
+#endif
     case '{': {  /* constructor */
       constructor(ls, v);
       return;

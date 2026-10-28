@@ -10,7 +10,19 @@ Operations), the local telemetry foundation planned for the future Forte.
 
 [Versão em português → README.md](README.md)
 
-## Joint 2.1.0 delivery
+## Santafé 3.0
+
+Santafé 3.0.0 was published and independently verified on 2026-10-27. It
+introduces native lists (`[]`), stored null values, ONFÉ data files, IBA 3,
+SLS 1.1.0, library manager 1.1.0, and editor extensions 2.0.0. Native Windows
+x64 packages join the macOS and Debian distributions. The Windows installer is
+currently unsigned; verify its origin and SHA-256 on the official portal.
+
+See the [change log](CHANGELOG.md) before migrating a 2.1 project. Lists and
+tables are now distinct, and 2.1 bytecode/native modules are intentionally
+rejected by the 3.0 runtime.
+
+## Historical joint 2.1.0 delivery
 
 Core 2.1.0, SLS 1.0.0, the project library manager 1.0.0, and editor extensions
 1.1.0 were **published on the official portal and verified on 2026-10-21**.
@@ -26,7 +38,7 @@ does not imply publication of these extensions in third-party catalogs.
 
 ## Supported platforms
 
-The 2.0 line targets macOS with Clang and Debian GNU/Linux with GCC.
+The historical 2.0 line targeted macOS with Clang and Debian GNU/Linux with GCC.
 Revision 2.0.2 passed the macOS Intel and Debian suites, including isolated
 MariaDB integration. VS Code 1.0.6 and Sublime 1.0.13 were published and checked
 in the actual editors, including concatenated HTML/JS and the optional muted

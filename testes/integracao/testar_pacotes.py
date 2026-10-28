@@ -13,7 +13,8 @@ from sls.cliente import Cliente
 
 ROOT = Path(__file__).resolve().parents[2]
 SF = ROOT / 'src/santafé'
-ENV = {**os.environ, 'LUA_PATH': str(ROOT / 'ferramentas/?.fé')+';;'}
+ENV = {k:os.environ[k] for k in ('PATH','TMPDIR','LANG','LC_ALL') if k in os.environ}
+ENV.update(LUA_PATH=str(ROOT/'ferramentas/?.fé'), LUA_CPATH=str(ROOT/'ferramentas/?/?.so'),GSETTINGS_BACKEND='memory')
 INIT = ('local N=garanta(módulo.carregarBib('+json.dumps(str(ROOT/'ferramentas/pacotes/nativo.so'),ensure_ascii=False)+',"luaopen_pacotes_nativo"))(); '
         'local F=(importe "pacotes.formatos")(N); local C=(importe "pacotes.cliente")(N,F); '
         'local A=(importe "pacotes.administracao")(N,F); ')
@@ -36,7 +37,7 @@ def fixture(root, name='exemplo', version='1.0.0', native=False):
               'autores':['Homologação Santafé'], 'fonte':'https://example.invalid/fonte',
               'dependencias':{}, 'modulos':{'exemplo':'bibf/exemplo.fé'},'arquivos':list(files)}
     if native:
-        files['src/soma.c']='#include "lua.h"\n#include "lauxlib.h"\nstatic int f(lua_State*L){lua_pushinteger(L,luaL_checkinteger(L,1)+luaL_checkinteger(L,2));return 1;}\nint luaopen_soma(lua_State*L){lua_pushcfunction(L,f);return 1;}\n'
+        files['src/soma.c']='#include "lua.h"\n#include "lauxlib.h"\n#ifdef SANTAFE_DADOS_V3\nSANTAFE_MODULE_ABI;\n#endif\nstatic int f(lua_State*L){lua_pushinteger(L,luaL_checkinteger(L,1)+luaL_checkinteger(L,2));return 1;}\nint luaopen_soma(lua_State*L){luaL_checkversion(L);lua_pushcfunction(L,f);return 1;}\n'
         manifest['nativos']={'soma':{'fontes':['src/soma.c']}}
         manifest['arquivos']=list(files)
     for path,content in files.items():

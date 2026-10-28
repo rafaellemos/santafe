@@ -1,0 +1,58 @@
+{
+  "candidato": "dados.14",
+  "iba": "santafe-3",
+  "producao_instalada": false,
+  "producao_alterada": false,
+  "apto_para_homologacao": true,
+  "apto_para_promocao_estavel": false,
+  "estado": "homologacao_conjunta_concluida",
+  "base_fontes_sha256": "dfed0891450d6b0465c2c2db3fc9013029c948a385a17ae6c11885bb807ece52",
+  "regressoes": {
+    "sistemas": [
+      "macOS x86_64",
+      "Debian x86_64"
+    ],
+    "etapas": 10,
+    "subetapas": 11,
+    "iba_grupos": 14,
+    "instalacao_grupos": 5,
+    "reversao_grupos": 7,
+    "wasm_casos": 18,
+    "gerenciador": "PASSOU",
+    "nova_inspecao_visual": false
+  },
+  "mailjet": {
+    "candidato_testado": "dados.13",
+    "complemento": true,
+    "envios": 1,
+    "recebimento_e_acentos_confirmados_pelo_usuario": true,
+    "novos_envios_dados14": 0
+  },
+  "pendencias": [
+    {
+      "codigo": "ACME_PUBLICO",
+      "estado": "nao_homologado",
+      "descricao": "Usuário não dispõe de subdomínio exclusivo; emissão pública não foi executada."
+    },
+    {
+      "codigo": "PLATAFORMAS",
+      "estado": "escopo_a_definir",
+      "descricao": "Sem Windows/ARM, perda elétrica real ou nova inspeção visual nesta revisão."
+    }
+  ],
+  "conjunto": {
+    "resultado": "PASSOU",
+    "grupos": 21,
+    "imagens_reversao_grupos": 6,
+    "segundos": 3600.42,
+    "operacoes_http": 43176,
+    "p95_ms": 53.64,
+    "amostras": 718,
+    "rss_max_kib": 1079228,
+    "disco_livre_min_mib": 2437,
+    "renovacao_acme": "CA local durante carga",
+    "rede_externa": false,
+    "producao_versao": "2.1.0",
+    "processos_producao_inalterados": 7
+  }
+}

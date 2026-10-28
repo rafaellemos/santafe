@@ -1,0 +1,8 @@
+{
+  "nucleo": "3.0.0",
+  "sls": "1.1.0",
+  "bibliotecas": "1.1.0",
+  "iba": 3,
+  "fonte_compilada_sha256": "5bf259822c334ee5f548cac8ac75ac61e88258445b83bcf43f57a064d84a0e28",
+  "publicacao_executada": false
+}

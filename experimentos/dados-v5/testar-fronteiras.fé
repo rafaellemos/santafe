@@ -1,0 +1,16 @@
+local T=importe "correio.transporte"
+local conteúdo="From: José <josé@santafé.dev.br>\r\nTo: Teste <teste@exemplo.test>\r\n\r\ncorpo íntegro"
+para _,destinatários em ipares([["teste@exemplo.test"],{"teste@exemplo.test"}]) início
+    local r,f=T.prepareRetransmissor(conteúdo,"josé@santafé.dev.br",destinatários)
+    garanta(r,f)
+    garanta(tipo(r.destinatários)=="lista" e r.destinatários[1]=="teste@exemplo.test")
+    garanta(r.remetente=="josé@xn--santaf-gva.dev.br" e r.smtpUTF8)
+fim
+para _,inválido em ipares([[],{},nulo,"x",{[3]="x@exemplo.test"},{[1]="x@exemplo.test",extra="não perder"},[nulo]]) início
+    local ok,r,f=proteja(T.prepareRetransmissor,conteúdo,"josé@santafé.dev.br",inválido)
+    garanta(ok e r==nulo e tipo(f)=="colar")
+fim
+local P=executeArquivo("aplicativos/carteiro/fonte/carteiro/páginas.fé")
+local html=P.impressão([{id=1,remetente="origem@exemplo.test",destinatários={['para']=["José <josé@exemplo.test>"]},assunto="teste",texto="corpo",criadaEm=1,anexos=[]}],"ensaio")
+garanta(html:procure("josé@exemplo.test",1,verdadeiro),"destinatário em lista deve aparecer na impressão")
+mostre("Fronteiras dos aplicativos: listas, tabelas densas, inválidos e destinatário visível: ok")

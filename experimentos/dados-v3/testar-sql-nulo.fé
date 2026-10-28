@@ -1,0 +1,49 @@
+local banco = importe "mariadb"
+local rede = importe "rede"
+local terminou = falso
+local conexão
+local falhaFinal
+local função encerre(falha)
+    falhaFinal = falha; terminou = verdadeiro
+    se conexão então conexão:feche() fim
+    rede.pareLaço()
+fim
+garanta(so.obterVariável("SANTAFE_DADOS3_BANCO") == "isolado",
+    "teste exige banco temporário criado pelo laboratório")
+local função confira(linha)
+    garanta(tipo(linha) == "lista" e #linha == 4)
+    garanta(tabela.temChave(linha,1) e linha[1] == nulo)
+    garanta(linha[2] == "José" e linha[3] == "a\0b")
+    garanta(tabela.temChave(linha,4) e linha[4] == nulo)
+    garanta(json.cod(linha) == '[null,"José","a\\u0000b",null]')
+fim
+local função protejaRetorno(f)
+    retorne função(...)
+        local ok, falha = proteja(f, ...)
+        se não ok então encerre(falha) fim
+    fim
+fim
+banco.conecteAssíncrono("127.0.0.1", "ensaio", "somente-laboratorio",
+    "dados3", paraNúmero(so.obterVariável("SANTAFE_MARIADB_PORTA")),
+    protejaRetorno(função(con, falha)
+        garanta(con, falha); conexão = con
+        con:executeAssíncrono("SELECT NULL, 'José', CONCAT('a',CHAR(0),'b'), NULL",
+            protejaRetorno(função(_, resultado, erroSQL)
+                garanta(resultado, erroSQL)
+                confira(resultado:obterLinha())
+                garanta(resultado:obterLinha() == nulo)
+                resultado:feche()
+                con:executePreparadoAssíncrono("SELECT ?,?,?,?",
+                    [nulo,"José","a\0b",nulo],
+                    protejaRetorno(função(_, preparado, erroPreparado)
+                        garanta(preparado, erroPreparado)
+                        confira(preparado:obterLinha())
+                        garanta(preparado:obterLinha() == nulo)
+                        preparado:feche(); encerre()
+                    fim))
+            fim))
+    fim))
+rede.agende(10000, função() se não terminou então encerre("tempo limite SQL") fim fim)
+rede.laço()
+garanta(terminou e não falhaFinal, falhaFinal ou "SQL não terminou")
+mostre("SQL: NULL inicial/final, lista de parâmetros, UTF-8 e NUL binário: ok")

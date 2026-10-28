@@ -141,11 +141,17 @@ macosx:
 	SYSLDFLAGS="$(if $(READLINE_PREFIX),-L$(READLINE_PREFIX)/lib)" \
 	SYSLIBS="-lreadline"
 
-mingw:
-	$(MAKE) "LUA_A=libsantafe.a" "LUA_T=santafe.exe" \
-	"AR=$(AR) rcu" "RANLIB=$(RANLIB)" \
-	"SYSCFLAGS=-DLUA_USE_WINDOWS" "SYSLIBS=-lws2_32" "SYSLDFLAGS=-static" santafe.exe
-	$(MAKE) "LUAC_T=santafec.exe" santafec.exe
+# Interpretador e compilador usam a mesma biblioteca, opções e IBA.
+# AR já contém suas opções; não acrescentar outro "rcu".
+WINDRES ?= windres
+santafe-windows.o: santafe.rc santafe.manifest
+	$(WINDRES) -i santafe.rc -o $@
+
+mingw: santafe-windows.o
+	$(MAKE) "LUA_A=libsantafe.a" "LUA_T=santafe.exe" "LUAC_T=santafec.exe" \
+	"AR=$(AR)" "RANLIB=$(RANLIB)" \
+	"SYSCFLAGS=-DLUA_USE_WINDOWS" "SYSLIBS=-lws2_32" "SYSLDFLAGS=-static" \
+	"MYLDFLAGS=$(MYLDFLAGS) santafe-windows.o" all
 
 posix:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX"

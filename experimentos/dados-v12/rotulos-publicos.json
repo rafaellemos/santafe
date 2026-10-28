@@ -1,0 +1,59 @@
+{
+  "dados10-regressao.json": [
+    "colares",
+    "fontes",
+    "sls-incremental",
+    "regressao",
+    "kits",
+    "cores",
+    "editores25",
+    "editores45",
+    "sublime17",
+    "sublime7"
+  ],
+  "dados7-regressao.json": [
+    "persistencia",
+    "nucleo",
+    "onfe",
+    "fronteiras",
+    "arquivo-legado",
+    "abi",
+    "sls",
+    "sls-onfe",
+    "sls-carga",
+    "manual",
+    "instalacao"
+  ],
+  "iba10.json": [
+    "módulo atual: carga, repetição e símbolos globais",
+    "módulo sem_checkversion: carga, repetição e símbolos globais",
+    "módulo legado_sem_checkversion: carga, repetição e símbolos globais",
+    "módulo legado_com_checkversion: carga, repetição e símbolos globais",
+    "módulo epoca_errada: carga, repetição e símbolos globais",
+    "módulo numero_errado: carga, repetição e símbolos globais",
+    "módulo descritor_curto: carga, repetição e símbolos globais",
+    "descritor exportado mesmo com visibilidade oculta",
+    "SDK instalado C: pkg-config, IBA3, lista e nulo",
+    "SDK instalado C++: pkg-config, IBA3, lista e nulo",
+    "bytecode normal e sem depuração: listas/nulo/gabarito bruto preservados",
+    "36 cabeçalhos antigos/corrompidos/truncados recusados sem sinal",
+    "bytecode 2.1 e IBA3 recusados reciprocamente",
+    "identidade nativa do gerenciador inclui IBA e bytecode"
+  ],
+  "instalacao5.json": [
+    "candidato bloqueia instalador público e Makefile estável antes de efeitos",
+    "instalação completa em prefixo com espaços; núcleo, 5 bibC, Fé, CLI, SLS e ONFÉ",
+    "reinstalação/atualização idempotente sem remover arquivos alheios",
+    "rollback exato após 6 etapas, cópia ausente e falha de saúde do SLS",
+    "desinstalação remove suporte SLS/ONFÉ e preserva arquivo do usuário"
+  ],
+  "operacao6.json": [
+    "300 leituras concorrentes; 20 trocas atômicas",
+    "recuperação após término abrupto antes",
+    "recuperação após término abrupto depois",
+    "rollback pós-saúde",
+    "segundo escritor bloqueado",
+    "manifesto interno de biblioteca também coberto pela integridade",
+    "integridade recusada; estável e dados preservados"
+  ]
+}

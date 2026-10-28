@@ -1,0 +1,13 @@
+-- Delimitadores novos e negativos no executor real WebAssembly.
+local O=executeArquivo("/onfé.fé")
+garanta([==[a]=]b]==]=="a]=]b")
+garanta([=[
+primeira
+segunda]=]=="primeira\nsegunda")
+garanta([=[`` ®nome Ⓡ{erro()} \n]=]=="`` ®nome Ⓡ{erro()} \\n")
+garanta(tipo([[nulo],[1]])=="lista")
+garanta(O.decod([==[{texto=[=[ação]=],lista=[[nulo]]}]==]).texto=="ação")
+garanta(não proteja(O.decod,"``"))
+garanta(carregue("local x=``texto``")==nulo)
+garanta(carregue("local x=[==[fim]=]")==nulo)
+garanta(carregue("local x=[==[fim]==]"))

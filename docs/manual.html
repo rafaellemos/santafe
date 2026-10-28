@@ -5,7 +5,7 @@
 #  Nome= Santafé - Manual
 #  Autor= Rafael Alves Lemos
 #  Linguagem=Santafé
-#  Versao=2.0
+#  Versao=3.0.0
 #
 ================================================================================ -->
 <head>
@@ -22,7 +22,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="#00695c">
     <link rel="apple-touch-icon-precomposed" href="/estático/fotos/santafe.ico">
 
-    <title> Santafé | Manual </title>
+    <title>Santafé 3.0 | Manual</title>
 
     <link href="/estático/css/materialize.css" type="text/css" rel="stylesheet" media="screen,projection">
     <link href="/estático/css/perfect-scrollbar.css" type="text/css" rel="stylesheet" media="screen,projection">
@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="/estático/css/prism-monokai.css?v=20260910-1">
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
     <script src="/estático/js/prism-santafé.js"></script>
+    <script src="/estático/js/prism-dados8.js"></script>
 
     <style>
         :root{
@@ -494,7 +495,15 @@
         }
 
     </style>
-</head>
+<style>
+@media (max-width:600px) {
+  #ManualConteúdo table.sf-tabela-fn { min-width:0; width:100%; table-layout:fixed; }
+  #ManualConteúdo .sf-tabela-fn th,
+  #ManualConteúdo .sf-tabela-fn td,
+  #ManualConteúdo .sf-tabela-fn td:first-child,
+  #ManualConteúdo .sf-tabela-fn code { white-space:normal; overflow-wrap:anywhere; }
+}
+</style></head>
 <body class="menubranco">
 
     <header id="Cabeçalho" style="display: flex; flex-direction: column;">
@@ -728,12 +737,80 @@ mostre(saudação("mundo"))
 -- saída: Olá, mundo!</code></pre>
                 </div>
 
-                <h3 id="guia-tipos">Tipos e valores</h3>
+                <section id="contrato-dados6" aria-labelledby="titulo-dados6">
+<h3 id="titulo-dados6">Santafé 3.0 — listas, nulo armazenável e ONFÉ</h3>
+<p class="sf-nota"><strong>Santafé 3.0.0 — contrato de dados e IBA 3.</strong> A distribuição reúne o núcleo 3.0.0, o SLS 1.1.0 e o gerenciador de bibliotecas 1.1.0. Os módulos usam o diretório <code>santafé/3.0</code>. A atualização da geração 2 exige migração dos fontes e recompilação das bibliotecas C; não misture bibliotecas ou bytecode das duas gerações.</p>
+<p>Listas usam <code>[]</code>; tabelas continuam usando <code>{}</code>. Nulo passa a ser armazenável. A leitura de chave ausente também retorna nulo; presença e valor são conceitos separados. Não existem tipos novos indefinido ou removido, nem função temVar.</p>
+<table class="sf-tabela-fn">
+<tr><th>API</th><th>Contrato</th></tr>
+<tr><td><code>tabela.temChave(t, chave)</code></td><td>Consulta a chave própria, inclusive com nulo; não chama __índice.</td></tr>
+<tr><td><code>tabela.apague(t, chave)</code></td><td>Remove explicitamente e retorna um lógico. Em lista, compacta os índices seguintes.</td></tr>
+</table>
+<p><code>local x</code> inicializa x com nulo; x continua declarado. <code>se x então</code> não executa o ramo quando x é nulo. Nulo presente bloqueia __índice; __novoÍndice só atende chaves ausentes. Listas não admitem metatabelas nesta versão, por decisão de contrato. Objetos com comportamento podem ser tabelas que contêm listas.</p>
+<div class="sf-code" style="border-radius:14px;overflow:hidden;border:1px solid #cfd8dc;margin:16px 0"><div class="sf-codebar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#edf5f3"><button class="sf-run btn-flat teal-text" data-run-target="#code-dados6-presenca" type="button">Executar</button><button class="sf-copy btn-flat teal-text" data-copy-target="#code-dados6-presenca" type="button">Copiar</button></div>
+<pre class="language-santafé" style="margin:0;min-height:240px"><code id="code-dados6-presenca" class="language-santafé">local t={telefone=nulo}
+garanta(tabela.temChave(t,"telefone"))
+garanta(não tabela.temChave(t,"ausente"))
+garanta(não t.telefone)
+garanta(tabela.apague(t,"telefone"))
+garanta(não tabela.temChave(t,"telefone"))
+mostre("presença e exclusão: ok")</code></pre></div>
+<p><code>#lista</code> e <code>tamanho(lista)</code> incluem posições nulas e têm custo constante. Escrever em n+1 acrescenta; além disso dá erro sem preencher buracos. Ler um inteiro positivo além do fim retorna nulo. Índices inválidos são recusados. Tabelas numéricas esparsas continuam existindo e seu # não é contador de chaves.</p>
+<div class="sf-code" style="border-radius:14px;overflow:hidden;border:1px solid #cfd8dc;margin:16px 0"><div class="sf-codebar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#edf5f3"><button class="sf-run btn-flat teal-text" data-run-target="#code-dados6-listas" type="button">Executar</button><button class="sf-copy btn-flat teal-text" data-copy-target="#code-dados6-listas" type="button">Copiar</button></div>
+<pre class="language-santafé" style="margin:0;min-height:240px"><code id="code-dados6-listas" class="language-santafé">local itens=["ler",nulo,"testar"]
+garanta(#itens==3 e tamanho(itens)==3)
+local contagem=0
+para i,v em ipares(itens) início contagem=contagem+1 fim
+garanta(contagem==3)
+itens[2]=nulo
+garanta(#itens==3)
+garanta(tabela.apague(itens,2))
+garanta(#itens==2 e itens[2]=="testar")
+garanta(json.cod([])=="[]" e json.cod({})=="{}")
+mostre("listas e JSON: ok")</code></pre></div>
+<h4>Colares e dados ONFÉ</h4>
+<p>Colares brutos usam [=[...]=], [==[...]==] e níveis maiores com a mesma quantidade de =. Um acento grave delimita gabaritos ® e Ⓡ. A primeira quebra imediatamente após a abertura do colar bruto é descartada, como na sintaxe antiga; CRLF e CR são normalizados para LF. Dois acentos graves juntos voltam a representar apenas um gabarito vazio, não um delimitador bruto. Os comentários -- e --[[...]] não mudam. Colares brutos não interpretam \n nem interpolam. JSON representa quebras reais como \n e uma barra literal como \\.</p>
+<div class="sf-code" style="border-radius:14px;overflow:hidden;border:1px solid #cfd8dc;margin:16px 0"><div class="sf-codebar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#edf5f3"><button class="sf-run btn-flat teal-text" data-run-target="#code-dados6-colares" type="button">Executar</button><button class="sf-copy btn-flat teal-text" data-copy-target="#code-dados6-colares" type="button">Copiar</button></div>
+<pre class="language-santafé" style="margin:0;min-height:240px"><code id="code-dados6-colares" class="language-santafé">local bruto=[=[Primeira linha
+®nome e \n literais]=]
+garanta(json.decod(json.cod(bruto))==bruto)
+local nome="José"
+garanta(`Olá, Ⓡnome`=="Olá, José")
+mostre("colares e JSON: ok")</code></pre></div>
+<p>ONFÉ é dado, nunca programa: use <code>onfé.decod</code>, <code>onfé.cod</code> e <code>onfé.carregue</code>, nunca executeArquivo sobre dados. O módulo integra a biblioteca padrão instalada em bibf e é carregado por <code>importe "onfé"</code>. <code>onfé.paraJSON</code> e <code>onfé.deJSON</code> preservam nulos e listas. Chaves numéricas/lógicas de tabelas são preservadas em ONFÉ e recusadas em JSON comum. "1" e 1 permanecem distintos.</p>
+<p>Limites ONFÉ: 4 MiB, profundidade 64, 200 mil lexemas; código, gabaritos, duplicatas, ciclos e valores executáveis são recusados. A persistência usa onfé.grave e onfé.graveAssíncrono, descritas abaixo. Não prometa gravação atômica usando um arquivo aberto diretamente para escrita.</p>
+<h4 id="onfe-persistencia7">Gravação atômica de ONFÉ</h4>
+<table class="sf-tabela-fn"><tr><th>Função</th><th>Contrato</th></tr>
+<tr><td><code>onfé.cod(dado)</code></td><td>Serializa dados ONFÉ, sem execução; até 4 MiB.</td></tr>
+<tr><td><code>onfé.decod(texto)</code></td><td>Analisa dados ONFÉ, sem executar código.</td></tr>
+<tr><td><code>onfé.carregue(caminho)</code></td><td>Lê arquivo de dados controlado pela aplicação e decodifica.</td></tr>
+<tr><td><code>onfé.paraJSON(dado)</code></td><td>Gera JSON comum; recusa chaves de tabela não textuais.</td></tr>
+<tr><td><code>onfé.deJSON(texto)</code></td><td>Lê JSON mantendo listas e nulos.</td></tr>
+<tr><td><code>onfé.grave(caminho, dado)</code></td><td>Grava ONFÉ atomicamente, de forma síncrona.</td></tr>
+<tr><td><code>onfé.graveAssíncrono(caminho, dado, tratador [, contexto])</code></td><td>Serializa e agenda a gravação ONFÉ.</td></tr>
+<tr><td><code>arquivo.graveAtômico(caminho, conteúdo)</code></td><td>Primitiva síncrona de bytes; retorna ok, falha, estado.</td></tr>
+<tr><td><code>arquivo.graveAtômicoAssíncrono(caminho, conteúdo, tratador [, contexto])</code></td><td>Primitiva assíncrona de bytes; tratador recebe ok, falha, estado, contexto.</td></tr></table>
+<p><code>onfé.grave(caminho, dado)</code> serializa antes de alterar o destino e retorna <code>ok, falha, estado</code>. Erros de dados geram exceção; erros de E/S retornam nulo e diagnóstico. O sucesso retorna verdadeiro, nulo, "durável".</p>
+<p><code>onfé.graveAssíncrono(caminho, dado, tratador [, contexto])</code> serializa antes de agendar, devolve verdadeiro ao agendar e chama <code>tratador(ok, falha, estado, contexto)</code> no laço principal. Mantenha a VM e o laço vivos até terminar. A serialização é síncrona e limitada a 4 MiB; a E/S é feita na piscina GIO. Use a forma assíncrona em servidores.</p>
+<table class="sf-tabela-fn"><tr><th>Estado</th><th>Garantia da tentativa</th></tr>
+<tr><td>inalterado</td><td>Esta tentativa não trocou o destino; outro escritor ainda pode alterá-lo.</td></tr>
+<tr><td>publicado</td><td>O novo arquivo já está visível, mas houve falha ao confirmar a durabilidade. Não significa reversão; não repita cegamente.</td></tr>
+<tr><td>durável</td><td>Arquivo e diretório sincronizados conforme as garantias do sistema de arquivos.</td></tr></table>
+<p>O diretório pai deve existir e ser confiável. Temporário exclusivo, modo 0600, escrita completa, sincronização e troca atômica preservam leituras completas. O destino existente deve ser arquivo regular. Não há sandbox de caminhos, preservação de ACL/xattrs, transação entre arquivos nem trava de leitura-modificação-gravação: o último escritor vence. Término abrupto pode deixar temporário órfão; não o carregue nem o apague automaticamente. Restaurar o programa antigo não converte dados novos.</p>
+<p>As primitivas de bytes <code>arquivo.graveAtômico</code> e <code>arquivo.graveAtômicoAssíncrono</code> usam os mesmos retornos e tratador. O módulo nativo é necessário; não há promessa de persistência durável no WebAssembly. A homologação atual limita-se a POSIX macOS/Linux, não a perda elétrica real ou volumes de rede.</p>
+
+<h4>Migração operacional</h4>
+<p>Não basta recompilar: [[1]] antes era colar e agora pode ser lista. O migrador usa o lexer estável para converter colares; atribuições nulas e construtores {} exigem revisão de intenção. Não transforme todos os {} em []. Recompile bibliotecas C para a IBA 3 (Interface Binária de Aplicação), com os cabeçalhos 3.0 e a declaração SANTAFE_MODULE_ABI em uma unidade de tradução. A IBA 3 é o contrato padrão dos cabeçalhos; não exige opção experimental. <code>pkg-config santafe</code> fornece os caminhos e a versão do SDK instalado. Bibliotecas de gerações anteriores devem ser recompiladas. O carregador confere a identidade santafe-3 antes de chamar o inicializador, mesmo se a biblioteca não usar luaL_checkversion. Isso não isola código nativo: construtores podem executar durante a carga. Bytecode usa assinatura ESC SF3 e formato 0x30; versões anteriores são recusadas. Distribua fontes e não carregue bytecode ou bibliotecas de origem não confiável. Os relatórios de homologação registram separadamente testes de núcleo, aplicativos, integrações externas e editores. O suporte de cada biblioteca depende da plataforma; testes do núcleo Windows não implicam suporte Windows para todos os serviços de servidor.</p>
+<p>A migração de serviços usa um conjunto conferido de fontes, bibliotecas e configurações, preservando a instalação anterior para reversão. O publicador verifica a instalação atual, prepara a cópia de segurança antes de pausar consumidores e registra cada troca para recuperar interrupções. Banco, depósito e dados do usuário ficam fora da troca. Restaurar binários não reverte dados produzidos pela versão nova; não faça downgrade de dados sem uma migração explícita. Comandos de homologação não publicam serviços; a publicação exige o roteiro operacional correspondente à instalação.</p>
+</section>
+
+<h3 id="guia-tipos">Tipos e valores</h3>
                 <p>Todo valor tem um tipo. Saber qual dado está em suas mãos ajuda a escolher as operações corretas.</p>
                 <table class="sf-tabela-fn">
                     <tr><th>Tipo</th><th>Exemplo e finalidade</th></tr>
-                    <tr><td><code>nulo</code></td><td>Ausência de valor.</td></tr>
-                    <tr><td><code>lógico</code></td><td><code>verdadeiro</code> ou <code>falso</code>.</td></tr>
+                    <tr><td><code>nulo</code></td><td>Valor nulo armazenável; falso em decisões. Ausência de chave é consultada separadamente.</td></tr>
+                    <tr><td><code>lista</code></td><td><code>[1,nulo,3]</code>: sequência densa com comprimento próprio.</td></tr>
+<tr><td><code>lógico</code></td><td><code>verdadeiro</code> ou <code>falso</code>.</td></tr>
                     <tr><td><code>número</code></td><td>Inteiro ou flutuante, como <code>42</code> e <code>3.14</code>.</td></tr>
                     <tr><td><code>colar</code></td><td>Sequência de bytes, como <code>"Olá"</code>.</td></tr>
                     <tr><td><code>tabela</code></td><td>Reúne valores por índice ou chave.</td></tr>
@@ -823,7 +900,7 @@ mostre(idade &gt;= 18 ou temAutorização)
 -- saída: verdadeiro</code></pre>
                 </div>
                 <div class="sf-nota"><code>#tabela</code> e <code>tamanho(tabela)</code> usam a mesma medida estrutural: são confiáveis para uma sequência contígua iniciada em 1. Se houver buracos nos índices, não os interprete como quantidade total de elementos; percorra com <code>pares</code> ou use <code>tabela.maiorÍndice</code> quando precisar do maior índice numérico. Em tabelas com <code>__tamanho</code>, a função <code>tamanho</code> exige resultado inteiro.</div>
-                <div class="sf-nota"><strong>Contrato Unicode 2.0:</strong> a contagem de grafemas usa as propriedades oficiais Unicode 17.0.0 e as regras de agrupamento estendido UAX #29. Grafemas não são largura em pixels nem colunas de terminal. <code>tamanho</code> aceita colares e tabelas; para medir a representação de um número, use <code>tamanho(paraColar(256))</code>. <code>colar.tamanho</code> conserva a coerção numérica das funções de colar. <code>octetos</code> aceita somente colares. Dados binários devem usar <code>#dados</code> ou <code>octetos(dados)</code>.</div>
+                <div class="sf-nota"><strong>Contrato Unicode 2.0:</strong> a contagem de grafemas usa as propriedades oficiais Unicode 17.0.0 e as regras de agrupamento estendido UAX #29. Grafemas não são largura em pixels nem colunas de terminal. <code>tamanho</code> aceita colares, tabelas e listas; para medir a representação de um número, use <code>tamanho(paraColar(256))</code>. <code>colar.tamanho</code> conserva a coerção numérica das funções de colar. <code>octetos</code> aceita somente colares. Dados binários devem usar <code>#dados</code> ou <code>octetos(dados)</code>.</div>
 
                 <h3 id="guia-custos">Custos e limites</h3>
                 <p>O núcleo não esconde o custo de operações que precisam examinar, copiar ou transformar dados. Em código cotidiano, escolha a operação que responde exatamente à pergunta feita.</p>
@@ -913,13 +990,13 @@ mostre(acumulador.total)
                 </div>
                 <div class="sf-nota"><strong>Ponto e dois-pontos:</strong> <code>objeto:método(valor)</code> é uma forma curta de <code>objeto.método(objeto, valor)</code>. Ao declarar uma função com dois-pontos, o objeto chega automaticamente no parâmetro <code>este</code>. Por isso os métodos de arquivos, respostas e tomadas usam <code>:</code>.</div>
 
-                <h3 id="guia-tabelas">Tabelas</h3>
-                <p>A tabela é a estrutura central de Santafé: representa listas, registros, mapas e objetos. O primeiro índice de uma lista é <code>1</code>.</p>
+                <h3 id="guia-tabelas">Tabelas e listas</h3>
+                <p>Tabelas <code>{}</code> representam registros, mapas e objetos, incluindo chaves numéricas esparsas. Listas <code>[]</code> são sequências densas de tipo próprio; o primeiro índice é <code>1</code>.</p>
                 <div class="sf-code" style="border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.10);">
                     <div class="sf-codebar" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(0,0,0,.22);border-bottom:1px solid rgba(255,255,255,.08);"><svg width="37" height="9" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="none" fill-rule="evenodd"><circle fill="#FF6461" cx="4.5" cy="4.5" r="4.5"></circle><circle fill="#FFC500" cx="18.5" cy="4.5" r="4.5"></circle><circle fill="#00D23D" cx="32.5" cy="4.5" r="4.5"></circle></g></svg><span style="opacity:.75;font-size:12px;font-family:monospace;">tabelas.fé</span><div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-run btn-flat teal-text" type="button" style="font-weight:800;" data-run-target="#code-guia-tabelas">Executar</button><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-guia-tabelas">Copiar</button></div></div>
                     <pre class="language-santafé" style="margin:0;min-height:215px"><code id="code-guia-tabelas" class="language-santafé">local pessoa = {
     nome = "Ana",
-    linguagens = { "Santafé", "C" }
+    linguagens = [ "Santafé", "C" ]
 }
 
 mostre(pessoa.nome)
@@ -932,7 +1009,7 @@ fim</code></pre>
                 </div>
 
                 <h3 id="guia-colares">Colares, bytes e UTF-8</h3>
-                <p>Um colar é uma sequência de bytes, como um colar de miçangas. Letras acentuadas e emojis podem ocupar mais de um byte. Use <code>tamanho</code> para contar grafemas visíveis, <code>utf8.tamanho</code> para pontos de código e <code>octetos</code> para medir o armazenamento. O operador <code>#</code> preserva sua medida estrutural nativa para colares e tabelas.</p>
+                <p>Um colar é uma sequência de bytes, como um colar de miçangas. Letras acentuadas e emojis podem ocupar mais de um byte. Use <code>tamanho</code> para contar grafemas visíveis, <code>utf8.tamanho</code> para pontos de código e <code>octetos</code> para medir o armazenamento. O operador <code>#</code> preserva sua medida estrutural nativa para colares, tabelas e listas.</p>
                 <div class="sf-nota"><strong>Vocabulário em transição:</strong> por enquanto, o manual mantém <button class="sf-sigla" type="button" data-sigla="BYTE" aria-haspopup="dialog" aria-label="Explicar byte e taco">byte</button> e <button class="sf-sigla" type="button" data-sigla="BIT" aria-haspopup="dialog" aria-label="Explicar bit e tico">bit</button> como termos técnicos principais. O fonte também oferece as variantes portuguesas <code>taco</code> e <code>tico</code>. Elas poderão se tornar os termos principais quando estiverem naturalmente reconhecidas pela comunidade.</div>
                 <div class="sf-code" style="border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.10);">
                     <div class="sf-codebar" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(0,0,0,.22);border-bottom:1px solid rgba(255,255,255,.08);"><svg width="37" height="9" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="none" fill-rule="evenodd"><circle fill="#FF6461" cx="4.5" cy="4.5" r="4.5"></circle><circle fill="#FFC500" cx="18.5" cy="4.5" r="4.5"></circle><circle fill="#00D23D" cx="32.5" cy="4.5" r="4.5"></circle></g></svg><span style="opacity:.75;font-size:12px;font-family:monospace;">colar-e-utf8.fé</span><div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-run btn-flat teal-text" type="button" style="font-weight:800;" data-run-target="#code-guia-colares">Executar</button><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-guia-colares">Copiar</button></div></div>
@@ -1101,15 +1178,15 @@ mostre(`Marca literal: \®`)
                 <div class="sf-nota">Se uma expressão aberta com <code>®{</code> não tiver o <code>}</code> final, o compilador informa <code>gabarito não finalizado</code>.</div>
 
                 <h3 id="notas-sls">Servidor de Linguagem (SLS)</h3>
-                <p>Nos pacotes de editor VS Code 1.1.0 e Sublime 1.1.0, os gabaritos realçam <code>®var</code> e <code>Ⓡvar</code> por inteiro, incluindo o curinga, em laranja e sem itálico. Em <code>®{expressão}</code> ou <code>Ⓡ{expressão}</code>, o curinga e as chaves recebem esse estilo, preservando o realce do código interno. Também há realce HTML/JavaScript em colares: HTML é reconhecido pela marcação na linha de abertura, inclusive após texto e com <code>&lt;!doctype&gt;</code> minúsculo; JavaScript pelo comentário inicial <code>/* javascript */</code> ou <code>/* js */</code>. Para indicar explicitamente o conteúdo, inclusive na linha seguinte, escreva <code>local página = --[[html]] [[</code> ou <code>local código = --[[javascript]] [[</code>. A anotação é um comentário Santafé e não altera o núcleo; <code>--[[js]]</code> não é uma anotação reconhecida nesta versão. Esse recurso é visual; não acrescenta análise semântica HTML/JS ao SLS nem interpolação a colares comuns. Ambos os editores preservam o contexto de atributos HTML e comentários JS entre fragmentos de uma mesma concatenação, mantendo as expressões intermediárias em Santafé. O VS Code usa tokens semânticos, habilitados por padrão para Santafé. O Sublime usa regiões de primeiro plano com gramáticas nativas; os cinco esquemas de cores nativos são preparados automaticamente, e esquemas personalizados precisam da regra de fundo transparente documentada no pacote. Sem essa camada, conserva-se o realce básico dos colares e seus delimitadores. Expressões dinâmicas são espaços reservados, não HTML/JS avaliado. Não há execução do código. Os limites de tamanho e tempo do realce estão documentados no pacote de cada editor.</p>
+                <p>Nos kits dos editores VS Code e Sublime compatíveis com a Santafé 3.0, os gabaritos realçam <code>®var</code> e <code>Ⓡvar</code> por inteiro, incluindo o curinga, em laranja e sem itálico. Em <code>®{expressão}</code> ou <code>Ⓡ{expressão}</code>, o curinga e as chaves recebem esse estilo, preservando o realce do código interno. Também há realce HTML/JavaScript em colares: HTML é reconhecido pela marcação na linha de abertura, inclusive após texto e com <code>&lt;!doctype&gt;</code> minúsculo; JavaScript pelo comentário inicial <code>/* javascript */</code> ou <code>/* js */</code>. Para indicar explicitamente o conteúdo, inclusive na linha seguinte, escreva <code>local página = --[[html]] [=[</code> ou <code>local código = --[[javascript]] [=[</code>. A anotação é um comentário Santafé e não altera o núcleo; <code>--[[js]]</code> também é reconhecida como JavaScript. A inspeção visual nativa é um critério separado dos testes de gramática; consulte o relatório da distribuição para distinguir verificações novas de evidências herdadas. Esse recurso é visual; não acrescenta análise semântica HTML/JS ao SLS nem interpolação a colares comuns. Ambos os editores preservam o contexto de atributos HTML e comentários JS entre fragmentos de uma mesma concatenação, mantendo as expressões intermediárias em Santafé. O VS Code usa tokens semânticos, habilitados por padrão para Santafé. O Sublime usa regiões de primeiro plano com gramáticas nativas; os cinco esquemas de cores nativos são preparados automaticamente, e esquemas personalizados precisam da regra de fundo transparente documentada no pacote. Sem essa camada, conserva-se o realce básico dos colares e seus delimitadores. Expressões dinâmicas são espaços reservados, não HTML/JS avaliado. Não há execução do código. Os limites de tamanho e tempo do realce estão documentados no pacote de cada editor.</p>
                 <p>Na paleta de comandos dos dois editores, <strong>Santafé: Paleta de HTML e JavaScript embutidos → Paleta suave</strong> aplica cores mais suaves apenas ao código embutido. O padrão acompanha o tema; arquivos HTML e JavaScript independentes não são alterados. No Monokai, <code>função</code> recebe ciano e itálico.</p>
                 <p>O <code>santafé-sls</code> é iniciado localmente pelo editor e conversa por entrada e saída padrão usando LSP (JSON-RPC 2.0). Ele não abre porta de rede, não transmite o fonte a terceiros e não executa o programa que está sendo editado.</p>
-                <div class="sf-nota">O SLS 1.0.0 foi homologado e publicado junto da Santafé 2.1.0. Exige núcleo Santafé 2.1.0 com <code>depure.analise</code>, <code>depure.lexemas</code> e suporte privado POSIX. Núcleo e SLS devem ser atualizados juntos. As extensões 1.1.0 distribuídas pelo portal encaminham os recursos semânticos e mantêm fallback local quando o servidor não está disponível. O iniciador usa <code>-E -P</code> para ignorar inicialização Lua do ambiente e não executar o carregador de dependências do projeto.</div>
-                <p>Recursos do SLS 1.0.0: sincronização incremental UTF-16, diagnósticos precisos e recuperação limitada de erros, conclusões/ajuda/assinaturas, definição/referências/símbolos, renomeação por escopo, recuo conservador, dobramento, seleção estrutural e tokens semânticos. O servidor analisa importações literais sem executá-las e lê bibliotecas instaladas no projeto sem instalar ou compilar nada. A sincronização é incremental; o parser continua analisando o documento completo. Não há inferência completa de tipos, refatoração de destinos dinâmicos, depurador com breakpoints nem servidor semântico de HTML/JS.</p>
+                <div class="sf-nota">O SLS 1.1.0 acompanha o núcleo Santafé 3.0.0 e analisa listas, nulo armazenável, colares brutos e dados ONFÉ. Usa <code>depure.analise</code>, <code>depure.lexemas</code> e o suporte nativo da plataforma. Núcleo, SLS e extensões devem pertencer à mesma geração. As extensões compatíveis encaminham os recursos semânticos e mantêm alternativa local quando o servidor não está disponível. O iniciador usa <code>-E -P</code> para ignorar inicialização Lua do ambiente e não executar o carregador de dependências do projeto.</div>
+                <p>Recursos do SLS 1.1.0: sincronização incremental UTF-16, diagnósticos precisos e recuperação limitada de erros, conclusões/ajuda/assinaturas, definição/referências/símbolos, renomeação por escopo, recuo conservador, dobramento, seleção estrutural e tokens semânticos. O servidor analisa importações literais sem executá-las e lê bibliotecas instaladas no projeto sem instalar ou compilar nada. A sincronização é incremental; o parser continua analisando o documento completo. Não há inferência completa de tipos, refatoração de destinos dinâmicos, depurador com breakpoints nem servidor semântico de HTML/JS.</p>
                 <p>O SLS não grava fontes. Renomeações ambíguas, colisões, índices incompletos e edições em bibliotecas imutáveis são recusadas. Cancelamento é cooperativo; cada pedido semântico tem orçamento de 2 segundos de CPU. Há limites de 4 MiB por documento, 64 documentos abertos, 16 MiB de texto aberto, 512 arquivos/16 MiB no índice e 16 raízes. O limite de 256 MiB de objetos vivos após coleta não é um teto rígido de memória do processo. macOS e Linux são os alvos nativos; Windows não está homologado.</p>
 
                 <h3 id="bibliotecas-projeto">Instalar bibliotecas no projeto</h3>
-                <div class="sf-nota">O gerenciador de bibliotecas 1.0.0 está disponível na distribuição completa Santafé 2.1.0. O <a href="/est%C3%A1tico/bibliotecas/v1/">catálogo oficial</a> já está publicado: é estático, curado e servido por HTTPS, separado dos catálogos das extensões dos editores. O pacote inicial é <code>semver 1.0.0</code>.</div>
+                <div class="sf-nota">O gerenciador de bibliotecas 1.1.0 integra a distribuição Santafé 3.0.0. O <a href="/est%C3%A1tico/bibliotecas/v1/">catálogo oficial</a> já está publicado: é estático, curado e servido por HTTPS, separado dos catálogos das extensões dos editores. O pacote inicial é <code>semver 1.0.0</code>.</div>
                 <p>Na pasta do projeto, <code>santafé instale semver '^1.0.0'</code> resolve dependências transitivas, verifica hashes e instala uma geração privada em <code>.santafe/</code>. Gera <code>santafe.json</code> e <code>santafe.lock</code>; mantenha ambos no controle de versão e ignore <code>.santafe/</code>. Ao executar nesse mesmo diretório, <code>importe "semver"</code> usa o módulo resolvido. Não há instalação global implícita nem busca automática do projeto em diretórios-pai.</p>
                 <table class="sf-tabela-fn"><tr><th>Comando</th><th>Contrato</th></tr>
                     <tr><td><code>santafé instale nome [intervalo]</code></td><td>Acrescenta dependência. Preserva versões já travadas compatíveis; pacote novo escolhe versão compatível de forma determinística.</td></tr>
@@ -1162,7 +1239,7 @@ mostre(`Marca literal: \®`)
                     <tr><td><code>paraColar(v)</code></td><td>Converte qualquer valor para texto.</td></tr>
                     <tr><td><code>paraNúmero(v [, base])</code></td><td>Converte texto para número; aceita base numérica opcional.</td></tr>
                     <tr><td><code>pares(t)</code></td><td>Iterador para percorrer todas as chaves/valores de uma tabela (ordem não garantida).</td></tr>
-                    <tr><td><code>ipares(t)</code></td><td>Iterador para percorrer a parte de lista (índices 1..n) de uma tabela.</td></tr>
+                    <tr><td><code>ipares(t)</code></td><td>Percorre todas as posições de uma lista, inclusive nulas. Em tabelas, percorre a sequência até o primeiro valor nulo; use pares para todas as chaves.</td></tr>
                     <tr><td><code>próximo(t [, chave])</code></td><td>Devolve a próxima chave/valor de <code>t</code> após <code>chave</code>. Base do <code>pares</code>.</td></tr>
                     <tr><td><code>selecione(n, ...)</code></td><td>Com número: devolve os argumentos a partir da posição <code>n</code>. Com <code>"#"</code>: devolve a quantidade de argumentos.</td></tr>
                     <tr><td><code>obterMetatabela(t)</code> / <code>definaMetatabela(t, mt)</code></td><td>Lê/define a metatabela de <code>t</code>.</td></tr>
@@ -2294,7 +2371,7 @@ mostre(tabela.concatene(números, ","))
 
 local nomes = {"Rafael", "Ana", "Maria"}
 tabela.ordene(nomes, função(a, b)
-    retorne #a < #b
+    retorne #a &lt; #b
 fim)
 mostre(tabela.concatene(nomes, ", "))
 
@@ -3585,7 +3662,7 @@ mostre(so.data("%Y-%m-%d %H:%M", carimbo))
                         </div>
                             <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-44" class="language-santafé">local antes = so.relógio()
 para i = 1, 1000000 início fim
-mostre(so.relógio() - antes >= 0)
+mostre(so.relógio() - antes &gt;= 0)
 
 -- saída: verdadeiro</code></pre>
                             </div>
@@ -3747,7 +3824,7 @@ mostre(so.obterVariável("VARIAVEL_QUE_NAO_EXISTE_XYZ"))
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-48">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-48" class="language-santafé">mostre(so.execute("echo oi > /tmp/teste_so.txt"))
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-48" class="language-santafé">mostre(so.execute("echo oi &gt; /tmp/teste_so.txt"))
 local a = es.abra("/tmp/teste_so.txt")
 mostre(a:leia("*t"))
 a:feche()</code></pre>
@@ -4487,7 +4564,7 @@ t:busque("def", 0)
 mostre(t:leia("*tudo"))
 t:feche()
 
--- saída: dadoOpaco
+-- saída: nulo
 -- saída: dado temporário</code></pre>
                             </div>
                             <p class="sf-fn-nota">O arquivo já vem aberto pra leitura e escrita, e é apagado sozinho quando fechado ou quando o programa termina.</p>
@@ -5035,13 +5112,13 @@ fim
                 <table class="sf-tabela-fn">
                     <tr><th>JSON</th><th>Santafé</th></tr>
                     <tr><td>objeto <code>{"nome":"Ana"}</code></td><td>tabela com chaves em colar</td></tr>
-                    <tr><td>matriz <code>[1,2,3]</code></td><td>tabela sequencial iniciada em 1</td></tr>
+                    <tr><td>matriz <code>[1,2,3]</code></td><td>lista nativa iniciada em 1, inclusive vazia</td></tr>
                     <tr><td>string</td><td>colar</td></tr>
-                    <tr><td>number</td><td>número flutuante</td></tr>
+                    <tr><td>number</td><td>inteiro quando representável sem perda; flutuante nos demais casos</td></tr>
                     <tr><td>valor lógico</td><td><code>verdadeiro</code> ou <code>falso</code></td></tr>
-                    <tr><td><code>null</code></td><td><code>json.valorNulo</code>, um <code>dadoOpaco</code> especial</td></tr>
+                    <tr><td><code>null</code></td><td><code>nulo</code> armazenável</td></tr>
                 </table>
-                <div class="sf-nota"><code>nulo</code> numa tabela Santafé remove aquela chave; por isso <code>json.valorNulo</code> preserva explicitamente um valor JSON <code>null</code>. Uma tabela vazia codifica como <code>{}</code>; quando o protocolo exigir explicitamente a matriz vazia <code>[]</code>, use <code>json.matrizVazia</code>.</div>
+                <div class="sf-nota"><code>nulo</code> conserva a chave. <code>tabela.temChave</code> distingue presença; <code>tabela.apague</code> remove explicitamente. <code>[]</code> vira array JSON e <code>{}</code> vira objeto, sem adivinhar pelo primeiro índice. <code>json.valorNulo</code> e <code>json.matrizVazia</code> são formas legadas; prefira nulo e [].</div>
                 <div class="sf-tabela-fn-wrap">
                 <table class="sf-tabela-fn">
                     <tr><th style="width:38%">Função</th><th>Descrição</th></tr>
@@ -5053,12 +5130,12 @@ fim
                     <tr class="sf-fn-detail-row"><td colspan="2"><div class="sf-fn-detail-interno" hidden="until-found">
                         <div class="sf-code" style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.10);">
                             <div class="sf-codebar" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(0,0,0,.22);border-bottom:1px solid rgba(255,255,255,.08);"><svg width="37" height="9" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="none" fill-rule="evenodd"><circle fill="#FF6461" cx="4.5" cy="4.5" r="4.5"></circle><circle fill="#FFC500" cx="18.5" cy="4.5" r="4.5"></circle><circle fill="#00D23D" cx="32.5" cy="4.5" r="4.5"></circle></g></svg><span style="opacity:.75;font-size:12px;font-family:monospace;">json.fé</span><div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-run btn-flat teal-text" type="button" style="font-weight:800;" data-run-target="#code-json-null">Executar</button><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-json-null">Copiar</button></div></div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-json-null" class="language-santafé">local dado = { nome = "Ana", apelido = json.valorNulo }
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-json-null" class="language-santafé">local dado = { nome = "Ana", apelido = nulo }
 mostre(json.cod(dado))
 mostre(tipo(json.decod('{"valor":null}').valor))
 
 -- saída: {"apelido":null,"nome":"Ana"}
--- saída: dadoOpaco</code></pre>
+-- saída: nulo</code></pre>
                         </div>
                         <p class="sf-fn-nota">Use quando a diferença entre “campo ausente” e “campo presente com valor nulo” for importante. A ordem das chaves no JSON codificado não é garantida.</p>
                     </div></td></tr>
@@ -5083,11 +5160,11 @@ mostre(tipo(json.decod('{"valor":null}').valor))
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-102">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-102" class="language-santafé">mostre(json.cod({1, 2, 3}))
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-102" class="language-santafé">mostre(json.cod([1, 2, 3]))
 
 -- saída: [1,2,3]</code></pre>
                             </div>
-                            <p class="sf-fn-nota">As chaves de um objeto precisam ser colares. Tabelas sequenciais viram matrizes; tabelas com chaves em colar viram objetos. Como uma tabela vazia não revela sua intenção, ela vira <code>{}</code>; use <code>json.matrizVazia</code> para emitir <code>[]</code>, por exemplo em campos de listas vazias de protocolos. Referências circulares e estruturas acima da profundidade configurada provocam erro.</p>
+                            <p class="sf-fn-nota">Listas viram arrays e tabelas viram objetos com chaves textuais. Tabelas com chaves numéricas ou lógicas são recusadas pelo JSON comum; ONFÉ pode preservá-las. Chaves duplicadas na leitura, ciclos e profundidade excedida provocam erro. Não converta automaticamente a chave textual "1" em número.</p>
                             <div class="sf-nota">JSON não preserva metatabelas, funções, corrotinas nem dados opacos comuns. Valide a estrutura antes de codificar dados externos ou muito profundos.</div>
                         </div></td></tr>
 
@@ -5113,14 +5190,14 @@ mostre(tipo(json.decod('{"valor":null}').valor))
                         </div>
                             <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-103" class="language-santafé">mostre(json.decod('{"a":1,"b":[1,2,3]}').a)
 
--- saída: 1.0</code></pre>
+-- saída: 1</code></pre>
                             </div>
-                            <p class="sf-fn-nota">Números JSON viram sempre número de ponto flutuante Santafé (por isso <code>1.0</code>, não <code>1</code>), mesmo quando o texto original não tinha ponto decimal.</p>
+                            <p class="sf-fn-nota">Inteiros JSON na faixa de 64 bits mantêm a representação inteira. Valores decimais usam ponto flutuante. Outros consumidores, como JavaScript, podem ter uma faixa inteira exata menor.</p>
                         </div></td></tr>
 
                     <tr class="sf-fn-row" id="json-codmatrizesparsa">
                         <td><code>json.codMatrizEsparsa([converte [, razão [, seguro]]])</code><span class="material-icons sf-fn-chevron">expand_more</span></td>
-                        <td>Configura como <code>json.cod</code> lida com listas esparsas (com buracos nos índices).</td>
+                        <td>Opção legada: não permite buracos nas listas nativas nem chaves numéricas em objetos JSON.</td>
                     </tr>
                     <tr class="sf-fn-detail-row"><td colspan="2"><div class="sf-fn-detail-interno" hidden="until-found">
                             <div class="sf-code" style="border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.10);">
@@ -5144,7 +5221,7 @@ mostre(json.codMatrizEsparsa(verdadeiro, 3, 5))
 -- saída: falso	2	10
 -- saída: verdadeiro	3	5</code></pre>
                             </div>
-                            <p class="sf-fn-nota">Chamado sem argumentos, só devolve a configuração atual (o padrão: não converte, razão 2, seguro 10). <code>converte</code> liga/desliga a conversão pra objeto (em vez de dar erro); <code>razão</code> e <code>seguro</code> controlam o quão esparsa uma lista pode ser antes de contar como "esparsa demais".</p>
+                            <p class="sf-fn-nota">A configuração legada pode ser consultada, mas não relaxa o contrato estrito: para arrays use [], para objetos use chaves textuais em {}. Tabelas esparsas continuam úteis em Santafé e ONFÉ, não em JSON comum.</p>
                         </div></td></tr>
 
                     <tr class="sf-fn-row" id="json-codprofundo">
@@ -5371,7 +5448,7 @@ mostre(json.decodNúmerosInválidos(falso))
                         </div>
                             <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-109" class="language-santafé">local j2 = json.novo()
 mostre(tipo(j2))
-mostre(j2.cod({1, 2}))
+mostre(j2.cod([1, 2]))
 
 -- saída: tabela
 -- saída: [1,2]</code></pre>
@@ -5810,7 +5887,7 @@ depure.definaValorDeUsuário(arq, "meu rótulo", 1)
 mostre(depure.obterValorDeUsuário(arq, 1))
 arq:feche()
 
--- saída: dadoOpaco
+-- saída: nulo
 -- saída: meu rótulo</code></pre>
                             </div>
                             <p class="sf-fn-nota"><strong>Nesta entrada:</strong> Lê o valor de usuário associado a um dado C.</p>
@@ -5842,7 +5919,7 @@ depure.definaValorDeUsuário(arq, "meu rótulo", 1)
 mostre(depure.obterValorDeUsuário(arq, 1))
 arq:feche()
 
--- saída: dadoOpaco
+-- saída: nulo
 -- saída: meu rótulo</code></pre>
                             </div>
                             <p class="sf-fn-nota"><strong>Nesta entrada:</strong> Troca o valor de usuário associado a um dado C.</p>
@@ -6532,7 +6609,7 @@ conexão:envieAssíncrono(bruto, função() conexão:feche() fim)</code></pre>
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-126">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-126" class="language-santafé">res:definaCabeçalho("X-Versão", "1.0"):html("<h1>oi</h1>")</code></pre>
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-126" class="language-santafé">res:definaCabeçalho("X-Versão", "1.0"):html("&lt;h1&gt;oi&lt;/h1&gt;")</code></pre>
                             </div>
                             <p class="sf-fn-nota">Devolve o próprio <code>res</code> (encadeável). Nomes seguem a sintaxe de cabeçalhos HTTP; valores não aceitam caracteres de controle nem quebras de linha. <code>Content-Length</code>, <code>Connection</code> e <code>Transfer-Encoding</code> são controlados pela biblioteca e não podem ser definidos aqui. Nomes são comparados sem diferença entre maiúsculas e minúsculas, evitando duplicatas como <code>Content-Type</code>/<code>content-type</code>.</p>
                         </div></td></tr>
@@ -6581,7 +6658,7 @@ conexão:envieAssíncrono(bruto, função() conexão:feche() fim)</code></pre>
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-128">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-128" class="language-santafé">res:html("<h1>oi</h1>")           -- text/html; charset=utf-8
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-128" class="language-santafé">res:html("&lt;h1&gt;oi&lt;/h1&gt;")           -- text/html; charset=utf-8
 res:texto("oi")                   -- text/plain; charset=utf-8
 res:json(json.cod({ok=verdadeiro})) -- application/json</code></pre>
                             </div>
@@ -6608,7 +6685,7 @@ res:json(json.cod({ok=verdadeiro})) -- application/json</code></pre>
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-128-2">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-128-2" class="language-santafé">res:html("<h1>oi</h1>")           -- text/html; charset=utf-8
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-128-2" class="language-santafé">res:html("&lt;h1&gt;oi&lt;/h1&gt;")           -- text/html; charset=utf-8
 res:texto("oi")                   -- text/plain; charset=utf-8
 res:json(json.cod({ok=verdadeiro})) -- application/json</code></pre>
                             </div>
@@ -6635,7 +6712,7 @@ res:json(json.cod({ok=verdadeiro})) -- application/json</code></pre>
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-128-3">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-128-3" class="language-santafé">res:html("<h1>oi</h1>")           -- text/html; charset=utf-8
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-128-3" class="language-santafé">res:html("&lt;h1&gt;oi&lt;/h1&gt;")           -- text/html; charset=utf-8
 res:texto("oi")                   -- text/plain; charset=utf-8
 res:json(json.cod({ok=verdadeiro})) -- application/json</code></pre>
                             </div>
@@ -7681,7 +7758,7 @@ enquanto linha início
     linha = resultado:obterLinha()
 fim</code></pre>
                             </div>
-                            <p class="sf-fn-nota">Cada linha vem como uma tabela sequencial de colares, na ordem das colunas da consulta. Um <code>NULL</code> do SQL chega como <code>nulo</code>; o fim das linhas também é indicado por <code>nulo</code> retornado no lugar da tabela. A conversão de números e datas fica por conta do programa.</p>
+                            <p class="sf-fn-nota">Cada linha vem como uma lista nativa, na ordem das colunas da consulta. Colunas não nulas são colares; <code>NULL</code> do SQL ocupa uma posição com <code>nulo</code>, inclusive no meio ou no fim. O fim das linhas é indicado por <code>nulo</code> retornado no lugar da lista. A conversão de números e datas fica por conta do programa.</p>
                         </div></td></tr>
 
                     <tr class="sf-fn-row" id="mariadb-resultado-numerodelinhas">
@@ -7827,8 +7904,8 @@ mostre(operação())</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-pule">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-pule" class="language-santafé">local tomada = importe &quot;tomada&quot;
-mostre(tomada.pule(2, &quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;))</code></pre>
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-pule" class="language-santafé">local tomada = importe "tomada"
+mostre(tomada.pule(2, "a", "b", "c", "d"))</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>c	d</div>
                         <p class="sf-fn-nota"><code>quantidade</code> conta os valores que vêm depois dela. É um auxiliar de listas de argumentos; não atua sobre bytes ou tomadas.</p>
@@ -7845,7 +7922,7 @@ mostre(tomada.pule(2, &quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-obtertempo">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-obtertempo" class="language-santafé">local tomada = importe &quot;tomada&quot;
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-obtertempo" class="language-santafé">local tomada = importe "tomada"
 mostre(tipo(tomada.obterTempo()))</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>número</div>
@@ -7863,7 +7940,7 @@ mostre(tipo(tomada.obterTempo()))</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-dormir">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dormir" class="language-santafé">local tomada = importe &quot;tomada&quot;
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dormir" class="language-santafé">local tomada = importe "tomada"
 local começo = tomada.obterTempo()
 tomada.dormir(0.1)
 mostre(tomada.obterTempo() - começo &gt;= 0.1)</code></pre>
@@ -7883,7 +7960,7 @@ mostre(tomada.obterTempo() - começo &gt;= 0.1)</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-selecione">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-selecione" class="language-santafé">local tomada = importe &quot;tomada&quot;
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-selecione" class="language-santafé">local tomada = importe "tomada"
 local prontasL, prontasE, erro = tomada.selecione({}, {}, 0)
 mostre(#prontasL, #prontasE, erro)</code></pre>
                         </div>
@@ -7902,8 +7979,8 @@ mostre(#prontasL, #prontasE, erro)</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-dns-paraip">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-paraip" class="language-santafé">local tomada = importe &quot;tomada&quot;
-local ip, detalhes = tomada.dns.paraIP(&quot;localhost&quot;)
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-paraip" class="language-santafé">local tomada = importe "tomada"
+local ip, detalhes = tomada.dns.paraIP("localhost")
 mostre(ip, tipo(detalhes))</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>127.0.0.1	tabela (o endereço pode variar)</div>
@@ -7921,8 +7998,8 @@ mostre(ip, tipo(detalhes))</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-dns-consulte">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-consulte" class="language-santafé">local tomada = importe &quot;tomada&quot;
-local lista = tomada.dns.consulte(&quot;localhost&quot;)
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-consulte" class="language-santafé">local tomada = importe "tomada"
+local lista = tomada.dns.consulte("localhost")
 mostre(tipo(lista), lista[1].família, lista[1].endereço)</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>tabela	ipv4 ou ipv6	endereço resolvido</div>
@@ -7940,8 +8017,8 @@ mostre(tipo(lista), lista[1].família, lista[1].endereço)</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-dns-paranome">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-paranome" class="language-santafé">local tomada = importe &quot;tomada&quot;
-local nome, detalhes = tomada.dns.paraNomeHospedeiro(&quot;127.0.0.1&quot;)
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-paranome" class="language-santafé">local tomada = importe "tomada"
+local nome, detalhes = tomada.dns.paraNomeHospedeiro("127.0.0.1")
 mostre(nome, tipo(detalhes))</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>localhost	tabela (o nome pode variar)</div>
@@ -7959,8 +8036,8 @@ mostre(nome, tipo(detalhes))</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-dns-obterinfonome">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-obterinfonome" class="language-santafé">local tomada = importe &quot;tomada&quot;
-local nomes, serviço = tomada.dns.obterNomes(&quot;127.0.0.1&quot;, &quot;80&quot;)
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-obterinfonome" class="language-santafé">local tomada = importe "tomada"
+local nomes, serviço = tomada.dns.obterNomes("127.0.0.1", "80")
 mostre(tipo(nomes), serviço)</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>tabela	http (pode variar)</div>
@@ -7978,7 +8055,7 @@ mostre(tipo(nomes), serviço)</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-dns-obterhospedeiro">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-obterhospedeiro" class="language-santafé">local tomada = importe &quot;tomada&quot;
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-dns-obterhospedeiro" class="language-santafé">local tomada = importe "tomada"
 mostre(tomada.dns.obterNomeLocal())</code></pre>
                         </div>
                         <div class="sf-saída"><span class="sf-saída-rótulo">saída esperada</span>nome-da-máquina</div>
@@ -7996,7 +8073,7 @@ mostre(tomada.dns.obterNomeLocal())</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-tcp-obterfamilia">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-tcp-obterfamilia" class="language-santafé">local tomada = importe &quot;tomada&quot;
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-tcp-obterfamilia" class="language-santafé">local tomada = importe "tomada"
 local s = tomada.tcp4()
 mostre(s:obterFamília())
 s:feche()</code></pre>
@@ -8016,8 +8093,8 @@ s:feche()</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-tcp-obterestatisticas">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-tcp-obterestatisticas" class="language-santafé">local tomada = importe &quot;tomada&quot;
-local s, falha = tomada.conecte(&quot;example.com&quot;, 80)
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-tcp-obterestatisticas" class="language-santafé">local tomada = importe "tomada"
+local s, falha = tomada.conecte("example.com", 80)
 garanta(s, falha)
 local recebidos, enviados, idade = s:obterEstatísticas()
 mostre(recebidos, enviados, tipo(idade))
@@ -8038,8 +8115,8 @@ s:feche()</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-tcp-definaestatisticas">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-tcp-definaestatisticas" class="language-santafé">local tomada = importe &quot;tomada&quot;
-local s, falha = tomada.conecte(&quot;example.com&quot;, 80)
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-tcp-definaestatisticas" class="language-santafé">local tomada = importe "tomada"
+local s, falha = tomada.conecte("example.com", 80)
 garanta(s, falha)
 mostre(s:definaEstatísticas(10, 20, 5))
 mostre(s:obterEstatísticas())
@@ -8061,7 +8138,7 @@ s:feche()</code></pre>
                                 <span style="opacity:.75;font-size:12px;font-family:monospace;">tomada.fé</span>
                                 <div class="sf-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;"><button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-tomada-udp-obterfamilia">Copiar</button></div>
                             </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-udp-obterfamilia" class="language-santafé">local tomada = importe &quot;tomada&quot;
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-tomada-udp-obterfamilia" class="language-santafé">local tomada = importe "tomada"
 local u = tomada.udp6()
 mostre(u:obterFamília())
 u:feche()</code></pre>
@@ -11397,7 +11474,7 @@ res:definaCabeçalho("X-Versão", "1.0"):json({ válido = verdadeiro })</code></
                                 <button class="sf-copy btn-flat teal-text" type="button" style="font-weight:800;" data-copy-target="#code-fn-179">Copiar</button>
                             </div>
                         </div>
-                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-179" class="language-santafé">res:html("<h1>oi</h1>")</code></pre>
+                            <pre class="language-santafé" style="margin:0;min-height:120px"><code id="code-fn-179" class="language-santafé">res:html("&lt;h1&gt;oi&lt;/h1&gt;")</code></pre>
                             </div>
                             <p class="sf-fn-nota">Define <code>Content-Type: text/html; charset=utf-8</code>, envia o corpo e fecha a conexão ao terminar. Assim como <code>res:texto</code> e <code>res:json</code>, só pode ser chamado uma vez por resposta.</p>
                         </div></td></tr>
@@ -13141,10 +13218,10 @@ mostre(válido, motivo)</code></pre>
 <script>
 window.Module = window.Module || {};
 Module.locateFile = function (path) {
-  return "/estático/wasm/2.0.3/" + path;
+  return "/estático/wasm/3.0.0/" + path;
 };
 </script>
-<script src="/estático/wasm/2.0.3/santafe.js"></script>
+<script src="/estático/wasm/3.0.0/santafe.js"></script>
 
 <script>
 (function () {

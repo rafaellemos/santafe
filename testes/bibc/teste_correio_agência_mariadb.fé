@@ -52,10 +52,9 @@ local função encerre(falha)
 
     -- A caixa usa ON DELETE RESTRICT para o usuário. Apague-a primeiro;
     -- assim o ensaio não deixa identidades artificiais nem quando falha.
-    execute([[
-DELETE c FROM correio_caixas c
+    execute([=[DELETE c FROM correio_caixas c
 JOIN usuarios u ON u.id = c.usuario_id
-WHERE u.usuario = ?]], { nomeDoUsuário },
+WHERE u.usuario = ?]=], { nomeDoUsuário },
         função(exclusãoDaCaixa, falhaDaCaixa)
             se exclusãoDaCaixa então exclusãoDaCaixa:feche() fim
             execute("DELETE FROM usuarios WHERE usuario = ?",
@@ -89,9 +88,8 @@ mariadb.criePiscinaAssíncrona({
             segredo.protejaSenhaAssíncrono("senha de conta inexistente",
                 função(resumoIsca, falhaDaIsca)
                     se não resumoIsca então encerre(falhaDaIsca); retorne fim
-                    execute([[
-INSERT INTO usuarios (nome,usuario,email,senha_hash,papel,estado)
-VALUES (?,?,?,?,?,?)]], {
+                    execute([=[INSERT INTO usuarios (nome,usuario,email,senha_hash,papel,estado)
+VALUES (?,?,?,?,?,?)]=], {
                         "Agência SMTP", nomeDoUsuário,
                         nomeDoUsuário .. "@example.net", resumo,
                         "usuário", "ativo"

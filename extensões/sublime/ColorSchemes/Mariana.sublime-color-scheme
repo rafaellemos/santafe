@@ -188,6 +188,11 @@
       "scope": "keyword.operator.interpolation.santafe, meta.interpolation.variable.santafe variable.parameter.santafe, variable.function.method.santafe",
       "foreground": "#FD971F",
       "font_style": ""
+    },
+    {
+      "scope": "source.santafe variable.other.interpolation.santafe, source.santafe punctuation.section.interpolation",
+      "foreground": "#FD971F",
+      "font_style": ""
     }
   ]
 }

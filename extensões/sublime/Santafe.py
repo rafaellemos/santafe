@@ -201,6 +201,10 @@ class SantafeNovaLinhaCommand(sublime_plugin.TextCommand):
 
 def caminho_do_sls():
     """Devolve um iniciador instalado, sem depender do PATH do aplicativo."""
+    for nome in ("santafe-sls.exe",) if os.name == "nt" else ("santafé-sls",):
+        caminho = shutil.which(nome)
+        if caminho:
+            return caminho
     for caminho in CAMINHOS_SLS:
         if os.path.isfile(caminho) and os.access(caminho, os.X_OK):
             return caminho
@@ -217,6 +221,8 @@ class SantafeExecutarCommand(sublime_plugin.WindowCommand):
         if not cmd:
             return
         command = list(cmd)
+        if os.name == "nt" and command[0] == "santafé":
+            command[0] = "santafe.exe"
         executable = shutil.which(command[0])
         if not executable:
             for launcher in CAMINHOS_SLS:
@@ -248,10 +254,10 @@ class SantafeAtivarDiagnosticosSLSCommand(sublime_plugin.ApplicationCommand):
         configurações_lsp.set("Santafé", {
             "enabled": True,
             "command": [iniciador],
-            "selector": ESCOPO,
+            "selector": ESCOPO + " | source.onfe",
             "schemes": ["file", "buffer"],
             "diagnostics_mode": "workspace",
-            "file_watcher": {"patterns": ["**/*.fé", "**/*.fe", "**/.santafe/estado.json"]},
+            "file_watcher": {"patterns": ["**/*.fé", "**/*.fe", "**/*.onfé", "**/.santafe/estado.json"]},
         })
         sublime.save_settings(ARQUIVO_CONFIGURAÇÕES_LSP)
 

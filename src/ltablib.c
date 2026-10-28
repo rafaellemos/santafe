@@ -111,6 +111,15 @@ static int tinsert (lua_State *L) {
 static int tremove (lua_State *L) {
   lua_Integer size = aux_getn(L, 1, TAB_RW);
   lua_Integer pos = luaL_optinteger(L, 2, size);
+#ifdef SANTAFE_DADOS_V3
+  if (size == 0 && lua_gettop(L) == 1) { lua_pushnil(L); return 1; }
+  luaL_argcheck(L,1 <= pos && pos <= size,2,"posição fora dos limites");
+  if (lua_islist(L,1)) {
+    lua_geti(L,1,pos);
+    lua_pushinteger(L,pos); lua_rawdelete(L,1);
+    return 1;
+  }
+#endif
   if (pos != size)  /* validate 'pos' if given */
     luaL_argcheck(L, 1 <= pos && pos <= size + 1, 1, "posi\xC3\xA7\xC3\xA3o fora dos limites");
   lua_geti(L, 1, pos);  /* result = t[pos] */
@@ -118,8 +127,12 @@ static int tremove (lua_State *L) {
     lua_geti(L, 1, pos + 1);
     lua_seti(L, 1, pos);  /* t[pos] = t[pos + 1] */
   }
+#ifdef SANTAFE_DADOS_V3
+  lua_pushinteger(L,pos); lua_rawdelete(L,1);
+#else
   lua_pushnil(L);
   lua_seti(L, 1, pos);  /* t[pos] = nil */
+#endif
   return 1;
 }
 
@@ -428,7 +441,22 @@ static int sort (lua_State *L) {
 /* }====================================================== */
 
 
+#ifdef SANTAFE_DADOS_V3
+static int tcontains (lua_State *L) {
+  luaL_checktype(L,1,LUA_TTABLE); luaL_checkany(L,2);
+  lua_settop(L,2); lua_pushboolean(L,lua_rawpresent(L,1)); return 1;
+}
+static int tdelete (lua_State *L) {
+  luaL_checktype(L,1,LUA_TTABLE); luaL_checkany(L,2);
+  lua_settop(L,2); lua_pushboolean(L,lua_rawdelete(L,1)); return 1;
+}
+#endif
+
 static const luaL_Reg tab_funcs[] = {
+#ifdef SANTAFE_DADOS_V3
+  {"temChave", tcontains},
+  {"apague", tdelete},
+#endif
   {"concatene", tconcat},
   {"maiorÍndice", maiorindice},
   {"insira", tinsert},

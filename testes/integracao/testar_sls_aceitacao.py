@@ -51,8 +51,12 @@ def estado(perfil, resultados, parcial=False):
 
 def procedencia(comando):
     def git(*argumentos):
-        retorno = subprocess.run(["git", *argumentos], cwd=str(RAIZ), capture_output=True, timeout=10)
+        try:
+            retorno = subprocess.run(["git", *argumentos], cwd=str(RAIZ), capture_output=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
         return retorno.stdout.decode("utf-8", errors="replace").strip() if retorno.returncode == 0 else None
+    estado_git = git("status", "--porcelain")
     fonte = RAIZ / "ferramentas/sls/sls.fé"
     pasta = RAIZ / "testes/integracao"
     arquivos = [pasta / "testar_sls_aceitacao.py", pasta / "testar_sls_infraestrutura.py",
@@ -60,7 +64,8 @@ def procedencia(comando):
                 *sorted((pasta / "sls").glob("*.py")), pasta / "sls/analise_c.c"]
     return {"instante_utc": datetime.now(timezone.utc).isoformat(), "plataforma": platform.platform(),
             "python": platform.python_version(), "comando": comando, "git_commit": git("rev-parse", "HEAD"),
-            "git_modificado": bool(git("status", "--porcelain")),
+            "git_modificado": None if estado_git is None else bool(estado_git),
+            "commit_ci": os.environ.get("GITHUB_SHA"),
             "fonte_repositorio_sha256": hashlib.sha256(fonte.read_bytes()).hexdigest(),
             "bateria_sha256": {str(arquivo.relative_to(RAIZ)): hashlib.sha256(arquivo.read_bytes()).hexdigest()
                                for arquivo in arquivos},
@@ -125,7 +130,7 @@ def principal(argv=None):
             resultados.append(resultado)
             print(f"[{resultado['estado']}] {caso['id']}: {resultado['detalhe']}", flush=True)
     resumo = estado(args.perfil, resultados, bool(args.caso))
-    relatorio = {"formato": 1, "alvo": "SLS 1.0 — candidato, não publicado", "perfil": args.perfil,
+    relatorio = {"formato": 1, "alvo": "SLS 1.1 — contrato público 1.0", "perfil": args.perfil,
                  "execucao_parcial": bool(args.caso), "procedencia": origem, "resumo": resumo,
                  "casos": resultados,
                  "gates_externos": [{"id": chave, "estado": "PENDENTE", "criterio": valor}
@@ -135,7 +140,7 @@ def principal(argv=None):
         args.relatorio.write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("Resumo: " + "; ".join(f"{chave}={valor}" for chave, valor in resumo["totais"].items()))
     if args.perfil == "1.0":
-        print("SLS 1.0 NÃO liberado: o relatório não substitui os gates externos de homologação.")
+        print("Contrato SLS 1.0 aprovado; o relatório não substitui a homologação externa.")
     if args.caso:
         print("Execução parcial: não homologa o perfil completo.")
     return resumo["codigo_saida"]

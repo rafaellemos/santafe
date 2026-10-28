@@ -158,7 +158,7 @@ static unsigned int arrayindex (const TValue *key) {
 */
 static unsigned int findindex (lua_State *L, Table *t, StkId key) {
   unsigned int i;
-  if (ttisnil(key)) return 0;  /* first iteration */
+  if (ttisnull(key)) return 0;  /* first iteration */
   i = arrayindex(key);
   if (i != 0 && i <= t->sizearray)  /* is 'key' inside array part? */
     return i;  /* yes; that's the index */
@@ -421,6 +421,10 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
 Table *luaH_new (lua_State *L) {
   GCObject *o = luaC_newobj(L, LUA_TTABLE, sizeof(Table));
   Table *t = gco2t(o);
+#ifdef SANTAFE_DADOS_V3
+  t->islist = 0;
+  t->listlen = 0;
+#endif
   t->metatable = NULL;
   t->flags = cast_byte(~0);
   t->array = NULL;
@@ -428,6 +432,19 @@ Table *luaH_new (lua_State *L) {
   setnodevector(L, t, 0);
   return t;
 }
+
+#ifdef SANTAFE_DADOS_V3
+void luaH_checklist (lua_State *L, const TValue *value, const TValue *key, int write) {
+  lua_Integer i;
+  Table *t;
+  if (!ttistable(value) || !hvalue(value)->islist) return;
+  t = hvalue(value);
+  if (!ttisnumber(key) || !luaV_tointeger(key, &i, 0) || i < 1)
+    luaG_runerror(L, "índice de lista deve ser inteiro positivo");
+  if (write && ((lua_Unsigned)i > (lua_Unsigned)t->listlen + 1 || i > UINT_MAX))
+    luaG_runerror(L, "atribuição criaria buraco na lista");
+}
+#endif
 
 
 void luaH_free (lua_State *L, Table *t) {
@@ -461,7 +478,7 @@ static Node *getfreepos (Table *t) {
 TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp;
   TValue aux;
-  if (ttisnil(key)) luaG_runerror(L, "o \xC3\xADndice da tabela \xC3\xA9 nulo");
+  if (ttisnull(key)) luaG_runerror(L, "o \xC3\xADndice da tabela \xC3\xA9 nulo");
   else if (ttisfloat(key)) {
     lua_Integer k;
     if (luaV_tointeger(key, &k, 0)) {  /* does index fit in an integer? */
@@ -587,6 +604,9 @@ const TValue *luaH_getstr (Table *t, TString *key) {
 ** main search function
 */
 const TValue *luaH_get (Table *t, const TValue *key) {
+#ifdef SANTAFE_DADOS_V3
+  if (ttisnull(key)) return luaO_nilobject;
+#endif
   switch (ttype(key)) {
     case LUA_TSHRSTR: return luaH_getshortstr(t, tsvalue(key));
     case LUA_TNUMINT: return luaH_getint(t, ivalue(key));
@@ -625,7 +645,7 @@ void luaH_setint (lua_State *L, Table *t, lua_Integer key, TValue *value) {
     setivalue(&k, key);
     cell = luaH_newkey(L, t, &k);
   }
-  setobj2t(L, cell, value);
+  setstoredvalue(L, cell, value);
 }
 
 
@@ -658,6 +678,9 @@ static lua_Unsigned unbound_search (Table *t, lua_Unsigned j) {
 ** such that t[i] is non-nil and t[i+1] is nil (and 0 if t[1] is nil).
 */
 lua_Unsigned luaH_getn (Table *t) {
+#ifdef SANTAFE_DADOS_V3
+  if (t->islist) return t->listlen;
+#endif
   unsigned int j = t->sizearray;
   if (j > 0 && ttisnil(&t->array[j - 1])) {
     /* there is a boundary in the array part: (binary) search for it */

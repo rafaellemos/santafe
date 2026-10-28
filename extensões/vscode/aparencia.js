@@ -29,7 +29,11 @@ function registre(vscode, contexto, tipoDosEscopos) {
   function tipo(cor, fonte="normal") {
     const chave=cor+fonte;
     if (!tipos.has(chave)) {
-      const t=vscode.window.createTextEditorDecorationType({color:cor, fontStyle:fonte});
+      // Estilo por tema evita o caminho de métricas que oculta a decoração
+      // no renderer 1.142. Cor e normal/italic permanecem explícitos.
+      const t=vscode.window.createTextEditorDecorationType({
+        color:cor, light:{fontStyle:fonte}, dark:{fontStyle:fonte}
+      });
       tipos.set(chave,t); contexto.subscriptions.push(t);
     }
     return tipos.get(chave);

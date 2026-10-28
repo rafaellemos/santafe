@@ -1,0 +1,25 @@
+-- Regressão, não demonstração: quebra real versus barra seguida de n.
+local O=executeArquivo("experimentos/dados-v1/onfé.fé")
+local fonte='{texto=[=[primeira\nsegunda\\n®literal Ⓡ{1+1}]=]}'
+local dados=O.decod(fonte)
+garanta(dados.texto=="primeira\nsegunda\\n®literal Ⓡ{1+1}")
+local codificado=O.paraJSON(dados)
+garanta(codificado==[=[{"texto":"primeira\nsegunda\\n®literal Ⓡ{1+1}"}]=])
+garanta(O.deJSON(codificado).texto==dados.texto)
+garanta(O.decod(O.cod(O.deJSON(codificado))).texto==dados.texto)
+-- JSON admite espaço/quebra entre membros, mas não quebra crua num colar.
+garanta(O.deJSON('{\n"texto": "primeira\\nsegunda"\n}').texto=="primeira\nsegunda")
+garanta(não proteja(O.deJSON,'{"texto":"primeira\nsegunda"}'))
+para i=0,31 início
+    local c=colar.caractere(i)
+    local escape=colar.formate("\\u%04x",i)
+    garanta(não proteja(O.deJSON,'"x'..c..'y"'))
+    garanta(não proteja(O.deJSON,'{"x'..c..'y":1}'))
+    garanta(O.deJSON('"x'..escape..'y"')=="x"..c.."y")
+    garanta(O.deJSON('{"x'..escape..'y":1}')["x"..c.."y"]==1)
+    garanta(O.deJSON(O.paraJSON(c))==c)
+fim
+garanta(não proteja(O.deJSON,"true\0lixo"))
+garanta(não proteja(O.deJSON,'{"a":1}\0{"b":2}'))
+garanta(O.deJSON("\t\r\n true \t\r\n")==verdadeiro)
+mostre("ONFE_MULTILINHA_JSON_LITERAL_OK")

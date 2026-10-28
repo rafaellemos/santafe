@@ -1,0 +1,39 @@
+-- Execute com o núcleo ESTÁVEL. Não executa nem sobrescreve o fonte recebido.
+local caminho=garanta(arg[1],"uso: santafé migrar.fé arquivo.fé")
+local f,m=es.abra(caminho,"rb"); garanta(f,m)
+local texto=f:leia(4*1024*1024+1); f:feche()
+texto=texto ou ""
+garanta(#texto<=4*1024*1024,"fonte excede 4 MiB")
+local tokens,falha=depure.lexemas(texto,"@"..caminho)
+garanta(não falha,"migração exige fonte lexicalmente válido")
+local partes,último={},1
+local alterações,avisos=0,0
+para i,t em ipares(tokens) início
+    local novo
+    se t.tipo=="colar" e t.texto:corte(1,2)=="[[" então
+        local nivel=1
+        enquanto verdadeiro início
+            local iguais=("="):replique(nivel)
+            local fecha="]"..iguais.."]"
+            se (t.valor..fecha):procure(fecha,1,verdadeiro)==#t.valor+1 então
+                local prefixo=t.valor:corte(1,1)=="\n" e "\n" ou ""
+                novo="["..iguais.."["..prefixo..t.valor..fecha
+                pare
+            fim
+            nivel=nivel+1
+        fim
+    fim
+    se novo então
+        partes[#partes+1]=texto:corte(último,t["início"])
+        partes[#partes+1]=novo
+        último=t["fim"]+1; alterações=alterações+1
+    fim
+    se t.texto=="nulo" e i>1 e tokens[i-1].texto=="=" então
+        avisos=avisos+1
+        es.saídaDeErroPadrão:escreva("REVISAR atribuição nula no octeto ",t["início"],"\n")
+    fim
+fim
+partes[#partes+1]=texto:corte(último)
+es.saídaPadrão:escreva(tabela.concatene(partes))
+es.saídaDeErroPadrão:escreva("Transformações léxicas: ",alterações,"; atribuições para revisar: ",avisos,
+    ". Construtores {} não foram convertidos automaticamente.\n")

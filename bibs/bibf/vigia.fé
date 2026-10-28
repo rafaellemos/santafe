@@ -179,7 +179,7 @@ função vigia.novo(opções)
             renoveJanelas(item, instante)
             se item.ativas == 0 e item.bloqueadaAté == 0 e
                instante - item.vistaEm >= ociosidade então
-                chaves[chave] = nulo
+                tabela.apague(chaves, chave)
                 quantidadeDeChaves = quantidadeDeChaves - 1
                 removidas = removidas + 1
             fim
@@ -200,7 +200,7 @@ função vigia.novo(opções)
             fim
         fim
         se não chaveMaisAntiga então retorne falso fim
-        chaves[chaveMaisAntiga] = nulo
+        tabela.apague(chaves, chaveMaisAntiga)
         quantidadeDeChaves = quantidadeDeChaves - 1
         contadores.removidas = contadores.removidas + 1
         capacidadeSinalizada = falso

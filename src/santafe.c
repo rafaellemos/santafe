@@ -17,11 +17,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if (defined(__linux__) || defined(__APPLE__)) && !defined(__EMSCRIPTEN__)
+#if (defined(__linux__) || defined(__APPLE__) || defined(_WIN32)) && !defined(__EMSCRIPTEN__)
 #define SANTAFE_PROJECT_TOOLS 1
 #include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef _WIN32
+#include <windows.h>
+#include "lwinconsole.h"
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+#endif
+#define lstat stat
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -31,6 +39,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lwininput.h"
 
 
 
@@ -135,8 +144,17 @@ static void lstop (lua_State *L, lua_Debug *ar) {
 ** interpreter.
 */
 static void laction (int i) {
+#if defined(_WIN32)
+  sf_console_evaluation(0); /* um segundo sinal pede encerramento normal CRT */
+#endif
   signal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
+#if defined(LUA_USE_WINDOWS)
+  /* Publicar o gancho antes de acordar a leitura. No Windows o tratador
+   * roda em outra thread; acordar primeiro permite que o próximo comando
+   * receba, por engano, o sinal destinado ao comando anterior. */
+  sf_input_interrupt();
+#endif
 }
 
 
@@ -215,9 +233,22 @@ static int docall (lua_State *L, int narg, int nres) {
   lua_pushcfunction(L, msghandler);  /* push message handler */
   lua_insert(L, base);  /* put it under function and args */
   globalL = L;  /* to be available to 'laction' */
+#if defined(LUA_USE_WINDOWS)
+  if (!sf_input_evaluation(1))
+    return luaL_error(L, "falha ao preparar leitura interrompivel do console");
+#endif
   signal(SIGINT, laction);  /* set C-signal handler */
+#if defined(_WIN32)
+  sf_console_evaluation(1);
+#endif
   status = lua_pcall(L, narg, nres, base);
+#if defined(_WIN32)
+  sf_console_evaluation(0);
+#endif
   signal(SIGINT, SIG_DFL); /* reset C-signal handler */
+#if defined(LUA_USE_WINDOWS)
+  sf_input_evaluation(0);
+#endif
   lua_remove(L, base);  /* remove message handler from the stack */
   return status;
 }
@@ -334,6 +365,31 @@ static int pushline (lua_State *L, int firstline) {
   char *b = buffer;
   size_t l;
   const char *prmt = get_prompt(L, firstline);
+#if defined(LUA_USE_WINDOWS)
+  if (sf_input_is_console(stdin)) {
+    luaL_Buffer input;
+    int ch, prompt_index = lua_gettop(L);
+    fputs(prmt, stdout); fflush(stdout);
+    sf_input_clear(stdin);
+    luaL_buffinit(L, &input);
+    /* Uma linha do console não pode ser dividida em comandos de 511 bytes. */
+    while ((ch = sf_input_getc(stdin)) != EOF && ch != '\n')
+      luaL_addchar(&input, ch);
+    luaL_pushresult(&input);
+    if (sf_input_error(stdin))
+      return luaL_error(L, "falha na leitura do console: %s", strerror(errno));
+    b = (char *)lua_tolstring(L, -1, &l);
+    if (ch == EOF && !l) return 0;
+    if (memchr(b, '\0', l) != NULL)
+      return luaL_error(L, "entrada do console contem caractere NUL");
+    lua_remove(L, prompt_index);
+    if (firstline && b[0] == '=') {
+      lua_pushfstring(L, "retorne %s", b + 1);
+      lua_remove(L, -2);
+    }
+    return 1;
+  }
+#endif
   int readstatus = lua_readline(L, b, prmt);
   if (readstatus == 0)
     return 0;  /* no input (prompt will be popped by caller) */
@@ -581,7 +637,10 @@ static int handle_luainit (lua_State *L) {
 #if defined(SANTAFE_PROJECT_TOOLS)
 static int project_tool_paths(char directory[PATH_MAX],char prefix[PATH_MAX]) {
   char raw[PATH_MAX],exe[PATH_MAX],*slash; struct stat st; int n;
-#ifdef __APPLE__
+#if defined(_WIN32)
+  wchar_t wide[PATH_MAX]; DWORD size=GetModuleFileNameW(NULL,wide,PATH_MAX);
+  if(!size || size>=PATH_MAX || !WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,wide,-1,raw,sizeof(raw),NULL,NULL)) return 0;
+#elif defined(__APPLE__)
   uint32_t size=sizeof(raw);
   if(_NSGetExecutablePath(raw,&size)) return 0;
 #else
@@ -589,7 +648,11 @@ static int project_tool_paths(char directory[PATH_MAX],char prefix[PATH_MAX]) {
   if(size<0 || (size_t)size>=sizeof(raw)-1) return 0;
   raw[size]=0;
 #endif
+  #ifdef _WIN32
+  strcpy(exe,raw); {char *p;for(p=exe;*p;p++)if(*p=='\\')*p='/';}
+#else
   if(!realpath(raw,exe)) return 0;
+#endif
   slash=strrchr(exe,'/'); if(!slash) return 0; *slash=0;
   slash=strrchr(exe,'/'); if(!slash) return 0;
   if(!strcmp(slash+1,"src")) {
@@ -597,7 +660,7 @@ static int project_tool_paths(char directory[PATH_MAX],char prefix[PATH_MAX]) {
     n=snprintf(directory,PATH_MAX,"%s/ferramentas/pacotes",prefix);
   } else {
     *slash=0; strcpy(prefix,exe);
-    n=snprintf(directory,PATH_MAX,"%s/share/santaf\xc3\xa9/1.0/ferramentas/pacotes",prefix);
+    n=snprintf(directory,PATH_MAX,"%s/share/santaf\xc3\xa9/3.0/ferramentas/pacotes",prefix);
   }
   return n>0 && n<PATH_MAX && !stat(directory,&st) && S_ISDIR(st.st_mode);
 }
@@ -677,6 +740,18 @@ static int pmain (lua_State *L) {
 
 
 int main (int argc, char **argv) {
+#if defined(_WIN32)
+  /* Do not search the current project directory for implicit DLL dependencies. */
+  if (!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)) {
+    fputs("Santafe: pesquisa segura de DLL indisponivel\n", stderr); return EXIT_FAILURE;
+  }
+#endif
+#if defined(_WIN32)
+  if (atexit(sf_input_shutdown) != 0 || !sf_console_prepare()) {
+    fputs("Santafe: nao foi possivel preparar o console UTF-8\n", stderr);
+    return EXIT_FAILURE;
+  }
+#endif
   int status, result;
   lua_State *L = luaL_newstate();  /* create state */
   if (L == NULL) {

@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "luaconf.h"
 #include "fpconv.h"
 
 /* Lua CJSON assumes the locale is the same for all threads within a
@@ -154,7 +155,11 @@ static void set_number_format(char *fmt, int precision)
 {
     int d1, d2, i;
 
+#ifdef SANTAFE_DADOS_V3
+    assert(1 <= precision && precision <= 17);
+#else
     assert(1 <= precision && precision <= 14);
+#endif
 
     /* Create printf format (%.14g) from precision */
     d1 = precision / 10;

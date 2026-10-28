@@ -1,0 +1,74 @@
+local total = 0
+local função confira(condição, nome)
+    garanta(condição, nome)
+    total = total + 1
+fim
+local função recuse(f)
+    local ok = proteja(f)
+    confira(não ok, "operação deveria falhar")
+fim
+local t = {nome = "Ana", telefone = nulo}
+confira(tabela.temChave(t,"telefone"), "nulo preserva presença")
+confira(não tabela.temChave(t,"ausente"), "ausência")
+confira(t.telefone == nulo e t.ausente == nulo, "leitura nula")
+confira(não t.telefone, "nulo falso em condições")
+t.telefone = nulo
+local campos = 0
+para k,v em pares(t) início campos = campos+1 fim
+confira(campos == 2, "pares inclui nulo")
+confira(tabela.apague(t,"telefone"), "exclusão explícita")
+confira(não tabela.temChave(t,"telefone"), "apagado não existe")
+confira(não tabela.apague(t,"telefone"), "exclusão idempotente")
+local herança = definaMetatabela({a=nulo}, {__índice={a=1,b=2}})
+confira(herança.a == nulo e herança.b == 2, "nulo bloqueia herança")
+local chamadas = 0
+local escrita = definaMetatabela({a=nulo}, {__novoÍndice=função(o,k,v)
+    chamadas=chamadas+1; defina(o,k,v)
+fim})
+escrita.a=1; escrita.b=nulo
+confira(chamadas == 1 e tabela.temChave(escrita,"b"), "novo índice distingue ausência")
+local l = ["a", nulo, "c"]
+confira(tipo(l)=="lista" e tipo({})=="tabela", "tipos separados")
+confira(#l==3 e tamanho(l)==3, "comprimento inclui nulo")
+confira(l[2]==nulo e tabela.temChave(l,2), "posição nula")
+confira(l[99]==nulo e não tabela.temChave(l,99), "leitura fora")
+local n=0
+para i,v em ipares(l) início n=n+1 fim
+confira(n==3,"ipares não para no nulo")
+l[2]=nulo
+confira(#l==3,"atribuir nulo não remove")
+l[4]="d"
+confira(#l==4,"acréscimo contíguo")
+recuse(função() l[6]="f" fim)
+confira(#l==4,"recusa sem alteração")
+recuse(função() l[0]="f" fim)
+recuse(função() retorne l["1"] fim)
+recuse(função() retorne l[0] fim)
+recuse(função() l[1.5]="x" fim)
+recuse(função() defina(l,8,"x") fim)
+confira(tabela.remova(l,2)==nulo e #l==3 e l[2]=="c", "remoção compacta")
+tabela.insira(l,2,nulo)
+confira(#l==4 e l[2]==nulo e l[3]=="c", "inserção nula")
+confira(tabela.apague(l,2) e #l==3,"exclusão compacta")
+local aninhada=[[1,2],[3,nulo],[]]
+confira(tipo(aninhada[1])=="lista" e #aninhada[3]==0,"listas aninhadas")
+local bruto=[=[linha \n ®nome Ⓡ{1+1}
+segunda]=]
+confira(bruto=="linha \\n ®nome Ⓡ{1+1}\nsegunda","colar bruto")
+confira([=[]=]=="", "colar bruto vazio")
+local variável="ação"
+confira(`®variável Ⓡvariável`=="ação ação","gabaritos preservados")
+confira(json.cod([])=="[]" e json.cod({})=="{}","JSON vazio")
+confira(tipo(json.decod("[]"))=="lista","JSON lista nativa")
+local j=json.decod('{"a":null,"b":[null,1]}')
+confira(tabela.temChave(j,"a") e j.a==nulo e #j.b==2,"JSON null nativo")
+confira(json.cod(j.b)=="[null,1]","JSON ida e volta")
+recuse(função() json.cod({[1]="a",["1"]="b"}) fim)
+local chaves={[1]="a",["1"]="b"}
+confira(chaves[1]~="b" e chaves["1"]=="b","chaves não se confundem")
+para i=1,1000 início
+    t[i]=nulo
+fim
+coleteLixo("colete")
+confira(tabela.temChave(t,1000),"nulos sobrevivem à coleta")
+mostre("CANDIDATO_DADOS_OK", total)

@@ -1,0 +1,20 @@
+local A=executeArquivo("ferramentas/sls/analisador.fé")
+local texto='local variável="José"; local dados = [[1,nulo], {nome=variável}]; local bruto=[=[®literal]=]; mostre(`Ⓡvariável`)'
+local a=A.analise(texto,"candidato.fé",verdadeiro)
+garanta(não a.incompleto e não a.falhaLéxica)
+garanta(#a.erros==0)
+local listas=0
+para _,n em ipares(a.nós) início se n.classe=="lista" então listas=listas+1 fim fim
+garanta(listas==2,"SLS precisa distinguir as duas listas")
+local tokens=depure.lexemas(texto)
+para _,t em ipares(tokens) início
+    garanta(texto:corte(t["início"]+1,t["fim"])==t.texto,"intervalo léxico")
+fim
+local ruim='local índice="🟢"; local x = [1,2,)]'
+local ok,erroSintático=depure.analise(ruim)
+garanta(não ok)
+garanta(ruim:corte(erroSintático["início"]+1,erroSintático["fim"])==")","intervalo do erro")
+garanta(depure.analise('local dados=[nulo]; erro("NÃO EXECUTAR")'))
+local quebrado=A.analise('local a=[1,); local b=2',"ruim.fé",verdadeiro)
+garanta(#quebrado.erros>0,"recuperação estrutural")
+mostre("SLS_DADOS_SINTAXE_INTERVALOS_OK")

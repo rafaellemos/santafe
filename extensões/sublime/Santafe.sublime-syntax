@@ -1,45 +1,71 @@
 %YAML 1.2
 ---
 name: Santafé
-file_extensions:
-  - fé
-  - fe
+file_extensions: [fé, fe]
 scope: source.santafe
 version: 2
-first_line_match: '(?i)^#!.*\bsantafé\b'
-
-variables:
-  ident_start: '[[:alpha:]_]'
-  ident_char: '[[:alnum:]\p{M}_]'
-  ident: '{{ident_start}}{{ident_char}}*'
-  ident_before: '(?<!{{ident_char}})'
-  ident_break: '(?!{{ident_char}})'
-  palavra_reservada: '{{ident_before}}(?:local|função|retorne|se|então|senão|enquanto|para|em|repita|até|início|fim|pare|vápara|nulo|verdadeiro|falso|e|ou|não){{ident_break}}'
-
 contexts:
-  prototype:
-    - include: comentários
-
   main:
-    - include: embutidos-anotados
-    - include: embutidos
-    - include: código
-
-  código:
-    - include: comentários
-    - include: declarações
-    - include: gabaritos
-    - include: colares
-    - include: números
-    - match: '{{ident_before}}função{{ident_break}}'
-      scope: storage.type.function.santafe
-    - match: '{{palavra_reservada}}'
-      scope: keyword.control.santafe
     - include: api-pública
-    - match: '(?:\.\.|//|<<|>>|==|~=|<=|>=|[+\-*/%^#=<>~&|])'
-      scope: keyword.operator.santafe
+    - match: '--\[(=*)\['
+      scope: punctuation.definition.comment.begin.santafe
+      push:
+        - meta_scope: comment.block.santafe
+        - match: '\]\1\]'
+          pop: true
+    - match: '--.*$'
+      scope: comment.line.santafe
+    - match: '\[(=+)\['
+      push:
+        - meta_scope: string.quoted.other.raw.santafe
+        - match: '\]\1\]'
+          pop: true
+    - match: '`'
+      push: gabarito
+    - match: '"'
+      push:
+        - meta_scope: string.quoted.double.santafe
+        - match: '\\.'
+          scope: constant.character.escape.santafe
+        - match: '"'
+          pop: true
+    - match: "'"
+      push:
+        - meta_scope: string.quoted.single.santafe
+        - match: '\\.'
+          scope: constant.character.escape.santafe
+        - match: "'"
+          pop: true
+    - match: '(?<![\p{L}\p{M}\p{N}_])função(?![\p{L}\p{M}\p{N}_])'
+      scope: storage.type.function.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_])(?:local|retorne|se|então|senão|senãose|para|em|início|fim|enquanto|repita|até|pare|e|ou|não)(?![\p{L}\p{M}\p{N}_])'
+      scope: keyword.control.santafe
+    - match: '(?<![\p{L}\p{M}\p{N}_])(?:nulo|verdadeiro|falso)(?![\p{L}\p{M}\p{N}_])'
+      scope: constant.language.santafe
+    - match: '\b[0-9]+(?:\.[0-9]+)?\b'
+      scope: constant.numeric.santafe
     - match: '[{}()\[\],;:]'
       scope: punctuation.separator.santafe
+  gabarito:
+    - meta_scope: string.quoted.other.gabarito.santafe
+    - match: '\\.'
+      scope: constant.character.escape.santafe
+    - match: '`'
+      pop: true
+    - match: '[®Ⓡ]\{'
+      scope: punctuation.section.interpolation.begin.santafe
+      push: expressão
+    - match: '[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*'
+      scope: variable.other.interpolation.santafe
+  expressão:
+    - clear_scopes: 1
+    - meta_scope: meta.interpolation.santafe
+    - match: '\}'
+      scope: punctuation.section.interpolation.end.santafe
+      pop: true
+    - match: '\{'
+      push: expressão
+    - include: main
 
   api-pública:
     - match: '(?<![\p{L}\p{M}\p{N}_.:])(?:definaMetatabela|carregueArquivo|obterMetatabela|executeArquivo|protejaMais|coleteLixo|paraNúmero|paraColar|selecione|carregue|garanta|importe|octetos|proteja|próximo|tamanho|defina|ipares|mostre|igual|obter|pares|erro|tipo)(?![\p{L}\p{M}\p{N}_])'
@@ -460,209 +486,3 @@ contexts:
     - match: '(?<![\p{L}\p{M}\p{N}_])[\p{L}_][\p{L}\p{M}\p{N}_]*(?=\s*\()'
       scope: entity.name.function.call.santafe
 
-  comentários:
-    - match: '--(?!\[\[(?:html|javascript)\]\][ \t]*(?:\[=*\[|["''`]))\[(=*)\['
-      scope: punctuation.definition.comment.begin.santafe
-      push:
-        - meta_scope: comment.block.santafe
-        - meta_include_prototype: false
-        - match: '\]\1\]'
-          scope: punctuation.definition.comment.end.santafe
-          pop: true
-    - match: '--(?!\[\[(?:html|javascript)\]\][ \t]*(?:\[=*\[|["''`]))'
-      scope: punctuation.definition.comment.santafe
-      push:
-        - meta_scope: comment.line.double-dash.santafe
-        - meta_include_prototype: false
-        - match: '$\n?'
-          pop: true
-
-  declarações:
-    - match: '{{ident_before}}(local\s+)?(função)\s+({{ident}})'
-      scope: meta.function.santafe
-      captures:
-        1: storage.modifier.santafe
-        2: storage.type.function.santafe
-        3: entity.name.function.santafe
-
-  embutidos-anotados:
-    - match: '(--\[\[html\]\])[ \t]*(?:\[(=*)\[)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.basic
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '\]\2\]'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[html\]\])[ \t]*(?:`)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.santafe-template
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '(?<!\\)(?:\\\\)*`'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[html\]\])[ \t]*(?:")'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.basic
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '(?<!\\)(?:\\\\)*"'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[html\]\])[ \t]*(?:'')'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.basic
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '(?<!\\)(?:\\\\)*'''
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[javascript\]\])[ \t]*(?:\[(=*)\[)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '\]\2\]'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[javascript\]\])[ \t]*(?:`)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js.santafe-template
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '(?<!\\)(?:\\\\)*`'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[javascript\]\])[ \t]*(?:")'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '(?<!\\)(?:\\\\)*"'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '(--\[\[javascript\]\])[ \t]*(?:'')'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '(?<!\\)(?:\\\\)*'''
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-
-  embutidos:
-    - match: '\[(=*)\[(?=(?:(?!\]\1\]).)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.basic
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '\]\1\]'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '`(?=(?:(?!`).)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.santafe-template
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '(?<!\\)(?:\\\\)*`'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '"(?=(?:(?!").)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.basic
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '(?<!\\)(?:\\\\)*"'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '''(?=(?:(?!'').)*?<(?:!(?i:DOCTYPE)\b|!--|/?[A-Za-z][A-Za-z0-9:-]*(?:\s|/?>)))'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:text.html.basic
-      embed_scope: meta.embedded.block.html.santafe
-      escape: '(?<!\\)(?:\\\\)*'''
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '\[(=*)\[[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '\]\1\]'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '`[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js.santafe-template
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '(?<!\\)(?:\\\\)*`'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '"[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '(?<!\\)(?:\\\\)*"'
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-    - match: '''[ \t]*(?=/\*\s*(?:javascript|js)\s*\*/)'
-      scope: punctuation.definition.string.begin.santafe
-      embed: scope:source.js
-      embed_scope: meta.embedded.block.javascript.santafe
-      escape: '(?<!\\)(?:\\\\)*'''
-      escape_captures:
-        0: punctuation.definition.string.end.santafe
-
-  escape-colar:
-    - match: '\\.'
-      scope: constant.character.escape.santafe
-
-  interpolação:
-    - match: '[®Ⓡ]\{'
-      scope: punctuation.section.interpolation.begin.santafe keyword.operator.interpolation.santafe
-      push:
-        - clear_scopes: true
-        - meta_scope: meta.interpolation.santafe meta.embedded.inline.santafe source.santafe
-        - meta_include_prototype: false
-        - match: '\}'
-          scope: punctuation.section.interpolation.end.santafe keyword.operator.interpolation.santafe
-          pop: true
-        - include: chaves-interpolação
-        - include: código
-    - match: '[®Ⓡ][\p{L}_][\p{L}\p{M}\p{N}_]*'
-      scope: meta.interpolation.variable.santafe variable.parameter.santafe
-
-  chaves-interpolação:
-    - match: '\{'
-      push:
-        - meta_include_prototype: false
-        - match: '\}'
-          pop: true
-        - include: chaves-interpolação
-        - include: código
-
-  gabaritos:
-    - match: '`'
-      scope: punctuation.definition.string.begin.santafe
-      push:
-        - meta_scope: string.quoted.other.gabarito.santafe
-        - meta_include_prototype: false
-        - match: '`'
-          scope: punctuation.definition.string.end.santafe
-          pop: true
-        - include: escape-colar
-        - include: interpolação
-
-  colares:
-    - match: '\[(=*)\['
-      push:
-        - meta_scope: string.quoted.other.long.santafe
-        - meta_include_prototype: false
-        - match: '\]\1\]'
-          pop: true
-    - match: "'"
-      push:
-        - meta_scope: string.quoted.single.santafe
-        - meta_include_prototype: false
-        - match: "'"
-          pop: true
-        - include: escape-colar
-    - match: '"'
-      push:
-        - meta_scope: string.quoted.double.santafe
-        - meta_include_prototype: false
-        - match: '"'
-          pop: true
-        - include: escape-colar
-
-  números:
-    - match: '(?<!{{ident_char}})(?:0[xX][0-9A-Fa-f]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?!{{ident_char}})'
-      scope: constant.numeric.santafe

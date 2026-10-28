@@ -1,0 +1,32 @@
+local correio=importe "correio"
+local rede=importe "rede"
+local eventos={}
+local função evento(_,nome,dados)
+    mostre("EVENTO14",nome,json.cod({código=dados.código,comandos=dados.comandos,rastro=dados.rastro,falha=dados.falha}))
+fim
+eventos.sinal=evento;eventos.leitura=evento;eventos.operação=evento
+local servidor=garanta(correio.servidor{
+    endereço="127.0.0.1",porta=12587,nome="retransmissor.ensaio.test",segurança="inícioTLS",
+    certificado="/tmp/tls-certificado.pem",chavePrivada="/tmp/tls-chave.pem",
+    exigirAutenticação=verdadeiro,pulso=eventos,
+    autentique=função(u,s) retorne u=="ensaio14" e s=="somente-ensaio14" fim,
+    autorize=função(_,d)
+        local domínio=d:separe("@([^@]+)$")
+        retorne domínio=="xn--santaf-gva.dev.br" ou domínio=="xn--podocaf-xwa4d.com.br"
+    fim,
+    receba=função(recebida,conclua)
+        mostre("RECEBE14")
+        local cliente=garanta(correio.cliente{endereço="127.0.0.1",porta=11025,
+            segurança="nenhuma",nome="retransmissor.ensaio.test",tempoLimite=10000})
+        local mensagem={remetente=recebida.remetente,smtpUTF8=verdadeiro,identificação="integracao14"}
+        função mensagem.forme() retorne recebida.conteúdo fim
+        função mensagem.destinatários() retorne recebida.destinatários fim
+        local iniciou,falha=cliente:envieAssíncrono(mensagem,função(r,f)
+            mostre("DESTINO14",r~=nulo,paraColar(f));cliente:feche()
+            se r então conclua(verdadeiro) senão conclua(nulo,{tipo="armazenamento",mensagem="destino isolado recusou"}) fim
+        fim)
+        mostre("INICIO14",iniciou,paraColar(falha))
+        se não iniciou então cliente:feche();conclua(nulo,{tipo="armazenamento",mensagem="envio isolado não iniciou"}) fim
+    fim
+})
+garanta(servidor:inicie());rede.laço()

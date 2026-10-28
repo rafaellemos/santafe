@@ -38,14 +38,14 @@ all: $(LIBNAME)
 $(LIBNAME): $(OBJS)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-arquivo.o: arquivo.c
+arquivo.o: arquivo.c atomico.h atomico-lua.h
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 clean limpar:
 	@rm -f $(OBJS) $(LIBNAME)
 
 PREFIX ?= /usr/local
-INSTALL_BIN = $(PREFIX)/lib/santafé/1.0/bibc
+INSTALL_BIN = $(PREFIX)/lib/santafé/3.0/bibc
 
 install instalar: all
 	@mkdir -p $(INSTALL_BIN)

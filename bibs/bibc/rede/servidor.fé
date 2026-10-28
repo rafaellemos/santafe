@@ -9,8 +9,7 @@ local função log(...)
 fim
 
 -- Página HTML simples
-local página_inicial = [[
-<!DOCTYPE html>
+local página_inicial = [=[<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -21,7 +20,7 @@ local página_inicial = [[
     <p>Esta página foi servida pelo servidor assíncrono Santafé + rede.</p>
   </body>
 </html>
-]]
+]=]
 
 -- Handler de leitura HTTP por conexão
 local função tratar_requisição(conexão, req, erro_leitura, dado)

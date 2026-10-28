@@ -1,0 +1,25 @@
+{
+  "estado": "preparado; publicação não executada",
+  "mudancas": [
+    {
+      "arquivo": "docs/manual.html",
+      "antes": "9a4e3b58cd30407542e6c4fbb57ffebf2f095ad977983ef7e5cba856d0137780",
+      "depois": "19a2ffc328377543a45b7a420dded0e487e872644a9f896ff8a1b58384587148"
+    },
+    {
+      "arquivo": "docs/CONTRATO-DADOS-ONFE.md",
+      "antes": "ad94493ad845afdcac877991a1b476619e730bccf51dfa99a528da38cb75c19d",
+      "depois": "3689b19585d3b4c855b8d371579780918b4aac46c30d3006f8aeedce2f3efdf9"
+    },
+    {
+      "arquivo": "ferramentas/pacotes/cli.fé",
+      "antes": "9bd8b6c45765821b327c942f3f34ac7ad8b2224bda4e1e9b13c55d925dedc7a9",
+      "depois": "56bf96597f15ff01ec4af05d25b08abddc77ae5a70a084740732ecec87169be7"
+    },
+    {
+      "arquivo": "docs/CONTRATO-DADOS-ONFE.md",
+      "antes": "3689b19585d3b4c855b8d371579780918b4aac46c30d3006f8aeedce2f3efdf9",
+      "depois": "ce8386fcebd81d16c662a04d145519bb33a014bef268eb0cc5b1b14ce5da3fe8"
+    }
+  ]
+}

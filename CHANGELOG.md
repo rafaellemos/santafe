@@ -1,5 +1,28 @@
 # Histórico de alterações
 
+## 3.0.0 — publicado em 2026-10-27
+
+A versão 3 separa listas de tabelas, preserva valores nulos armazenados e
+estabelece uma nova IBA para impedir que bytecode e módulos nativos incompatíveis
+sejam carregados silenciosamente.
+
+- listas nativas com `[]`, comprimento contíguo e operações compactadoras;
+- tabelas continuam usando `{}` e agora distinguem chave ausente de chave com
+  valor `nulo` por meio de `tabela.temChave` e exclusão explícita;
+- ONFÉ para dados nativos, com listas/tabelas vazias distintas, `nulo`, colares
+  brutos `[=[...]=]`, gravação atômica e conversão JSON;
+- SLS 1.1.0 e extensões VS Code/Sublime 2.0.0 com o contrato 3.0;
+- gerenciador de bibliotecas 1.1.0 e IBA 3 para projetos e módulos nativos;
+- distribuição nativa para Windows x64, além de macOS e Debian GNU/Linux;
+- instalação, atualização, reparação e reversão verificadas em ambiente
+  isolado, inclusive com usuário padrão do Windows;
+- o instalador Windows continua sem assinatura Authenticode pública; sua origem
+  e seu SHA-256 devem ser conferidos no portal oficial.
+
+O TAR e o ZIP publicados em 27 de outubro permanecem imutáveis. O registro Git
+inclui correções posteriores apenas nos testes e na documentação da versão;
+os fontes de execução são conferidos contra o manifesto do pacote distribuído.
+
 ## 2.1.0 — publicado em 2026-10-21
 
 Novas APIs e ferramentas justificam a versão menor 2.1; não

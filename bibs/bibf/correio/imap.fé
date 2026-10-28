@@ -639,7 +639,7 @@ função imap.servidor(opções)
         fim
         sessão.saídas = {}
         sessão.conexão:feche()
-        servidor.conexões[sessão] = nulo
+        tabela.apague(servidor.conexões, sessão)
         servidor.total = mat.máximo(0, servidor.total - 1)
         servidor.vigia:conclua(sessão.endereço)
         emita(configuração.pulso, "leitura", "correio.imapConexãoFechada", {
@@ -652,7 +652,7 @@ função imap.servidor(opções)
 
     local bombeieSaída
     bombeieSaída = função(sessão)
-        se sessão.fechada ou sessão.enviando então retorne fim
+        se sessão.fechada ou sessão.enviando ou #sessão.saídas == 0 então retorne fim
         local item = tabela.remova(sessão.saídas, 1)
         se não item então retorne fim
         sessão.enviando = verdadeiro
@@ -1965,7 +1965,7 @@ função imap.servidor(opções)
             conexão = conexão, endereço = endereçoRemoto,
             acumulado = "", estado = "nãoAutenticada", aguardando = verdadeiro,
             fechada = falso, comandos = 0, tentativas = 0,
-            saídas = {}, enviando = falso, rastro = {}, utf8Aceito = falso
+            saídas = {}, enviando = falso, rastro = [], utf8Aceito = falso
         }
         conexão:definaTempoLimite(configuração.tempoLimite)
         servidor.conexões[sessão] = verdadeiro

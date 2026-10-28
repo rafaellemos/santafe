@@ -311,7 +311,7 @@ local função verifiqueUma(conteúdo, cabeçalhos, corpo, assinatura,
                         tabela.concatene(partes), assinaturaBinária, pública)
                     se confere então
                         resultado.resultado = "passa"
-                        resultado.motivo = nulo
+                        tabela.apague(resultado, "motivo")
                         tratador(resultado)
                         retorne
                     fim

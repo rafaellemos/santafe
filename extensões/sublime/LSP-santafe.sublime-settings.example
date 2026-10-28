@@ -5,7 +5,7 @@
     "Santafé": {
         "enabled": true,
         "command": ["/usr/local/bin/santafé-sls"],
-        "selector": "source.santafe",
+        "selector": "source.santafe | source.onfe",
         "schemes": ["file", "buffer"],
         "diagnostics_mode": "workspace",
         "file_watcher": {"patterns": ["**/*.fé", "**/*.fe", "**/.santafe/estado.json"]}

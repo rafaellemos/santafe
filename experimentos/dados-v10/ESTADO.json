@@ -1,0 +1,11 @@
+{
+  "candidato": "dados.10",
+  "iba": "santafe-3",
+  "producao_alterada": false,
+  "apto_para_promocao_estavel": false,
+  "pendencias": [
+    {"codigo": "REPLICA_REAL", "estado": "aguarda_captura_sudo", "descricao": "Captura, migração e rollback da instalação completa ainda não executados; apenas restauração sintética validada."},
+    {"codigo": "HTTP503_CARGA_INTERMITENTE", "estado": "investigar", "descricao": "Um HTTP 503 na primeira carga Debian. Repetições não provam que a causa foi corrigida."},
+    {"codigo": "PLATAFORMAS_E_SOAK", "estado": "nao_executado", "descricao": "Sem aprovação Windows/ARM, ensaio prolongado de horas ou perda elétrica real."}
+  ]
+}

@@ -8,6 +8,12 @@
 #ifndef luaconf_h
 #define luaconf_h
 
+/* Santafé 3: contrato de dados e IBA3 habilitados em todo consumidor do SDK. */
+#if defined(SANTAFE_DADOS_V3) && SANTAFE_DADOS_V3 != 1
+#error "A distribuicao Santafe 3 exige SANTAFE_DADOS_V3=1"
+#endif
+#define SANTAFE_DADOS_V3 1
+
 #include <limits.h>
 #include <stddef.h>
 
@@ -179,7 +185,7 @@
 ** hierarchy or if you want to install your libraries in
 ** non-conventional directories.
 */
-#define LUA_VDIR	LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
+#define LUA_VDIR "3.0"
 #if defined(_WIN32)	/* { */
 /*
 ** In Windows, any exclamation mark ('!') in the path is replaced by the

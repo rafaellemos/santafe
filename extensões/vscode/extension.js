@@ -224,7 +224,8 @@ class ClienteSls {
       };
     }
 
-    const comando = configuração.get("command", "santafé-sls");
+    const comando = !configuraçãoExplícita && process.platform === "win32"
+      ? "santafe-sls.exe" : configuração.get("command", "santafé-sls");
     const argumentosConfigurados = configuração.get("args", []);
     if (!configuraçãoExplícita && process.platform !== "win32") {
       const caminhos = ["/usr/local/bin/santafé-sls", path.join(require("os").homedir(), ".local/bin/santafé-sls")];
@@ -243,13 +244,13 @@ class ClienteSls {
   }
 
   registre(documento) {
-    if (documento.languageId !== LINGUAGEM) return;
+    if (![LINGUAGEM,"onfe"].includes(documento.languageId)) return;
     this.documentos.set(documento.uri.toString(), documento);
     if (this.pronto) this.envieAbertura(documento);
   }
 
   atualize(documento, mudanças) {
-    if (documento.languageId !== LINGUAGEM) return;
+    if (![LINGUAGEM,"onfe"].includes(documento.languageId)) return;
     this.documentos.set(documento.uri.toString(), documento);
     if (!this.pronto) return;
     if (documento.version <= (this.versõesEnviadas.get(documento.uri.toString()) || 0)) return;
@@ -268,7 +269,7 @@ class ClienteSls {
   }
 
   salve(documento) {
-    if (documento.languageId !== LINGUAGEM || !this.pronto) return;
+    if (![LINGUAGEM,"onfe"].includes(documento.languageId) || !this.pronto) return;
     this.notifique("textDocument/didSave", {
       textDocument: { uri: documento.uri.toString() },
       text: documento.getText()
@@ -276,7 +277,7 @@ class ClienteSls {
   }
 
   feche(documento) {
-    if (documento.languageId !== LINGUAGEM) return;
+    if (![LINGUAGEM,"onfe"].includes(documento.languageId)) return;
     const uri = documento.uri.toString();
     this.documentos.delete(uri);
     this.versõesEnviadas.delete(uri);
@@ -352,6 +353,7 @@ class ClienteSls {
             semanticTokens:{requests:{full:true},formats:["relative"],
               tokenTypes:["variable","function","parameter"],tokenModifiers:["declaration"]} }
         },
+        initializationOptions: {avisosEscopo:this.configuração().get("scopeWarnings",false)},
         clientInfo: { name: "Santafé para VS Code", version: VERSÃO_EXTENSÃO }
       }
     });
@@ -390,7 +392,7 @@ class ClienteSls {
     this.notifique("textDocument/didOpen", {
       textDocument: {
         uri: documento.uri.toString(),
-        languageId: LINGUAGEM,
+        languageId: documento.languageId,
         version: documento.version,
         text: documento.getText()
       }

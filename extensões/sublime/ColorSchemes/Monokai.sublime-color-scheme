@@ -193,6 +193,11 @@
       "scope": "storage.type.function.santafe",
       "foreground": "#66D9EF",
       "font_style": "italic"
+    },
+    {
+      "scope": "source.santafe variable.other.interpolation.santafe, source.santafe punctuation.section.interpolation",
+      "foreground": "#FD971F",
+      "font_style": ""
     }
   ]
 }

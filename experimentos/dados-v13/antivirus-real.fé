@@ -1,0 +1,20 @@
+módulo.caminho="bibs/bibf/?.fé;bibs/bibf/?/?.fé"
+módulo.caminhoC="bibs/bibc/?/?.so"
+local rede=importe "rede"
+local av=garanta((importe "correio.antivírus").novo{
+    endereço="127.0.0.1",porta=paraNúmero(so.obterVariável("ENSAIO_CLAMD_PORTA")),tempoLimite=5000
+})
+local terminou=falso
+local limpa=so.obterVariável("ENSAIO_CLAMD_LIMPA")=="1"
+local f=garanta(es.abra(so.obterVariável("ENSAIO_CLAMD_ARQUIVO"),"rb"))
+local dados=f:leia("tudo");f:feche()
+garanta(av:confiraAssíncrono(função(pronto,falha)
+    garanta(pronto,falha)
+    garanta(av:examineAssíncrono(dados,função(resultado,erro)
+        garanta(resultado,erro)
+        garanta(resultado.limpa==limpa,"classificação do motor real divergente")
+        terminou=verdadeiro;rede.pareLaço()
+    fim))
+fim))
+rede.laço();garanta(terminou)
+mostre("CLAMD_REAL_OK")

@@ -304,7 +304,7 @@ função dnssec.assineZona(zona, opções)
     fim
 
     -- A chave privada não permanece no estado nem nas funções de consulta.
-    chave.privada = nulo
+    tabela.apague(chave, "privada")
     retorne estado
 fim
 

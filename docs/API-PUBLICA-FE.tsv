@@ -369,3 +369,10 @@ dnssec:formateDS|bibs/bibf/nomes/dnssec.fé
 # Turing
 turing.registrar|bibs/bibf/turing.fé
 turing.validarBilhete|bibs/bibf/turing.fé
+onfé.grave|bibs/bibf/onfé.fé
+onfé.graveAssíncrono|bibs/bibf/onfé.fé
+onfé.cod|bibs/bibf/onfé.fé
+onfé.decod|bibs/bibf/onfé.fé
+onfé.carregue|bibs/bibf/onfé.fé
+onfé.paraJSON|bibs/bibf/onfé.fé
+onfé.deJSON|bibs/bibf/onfé.fé

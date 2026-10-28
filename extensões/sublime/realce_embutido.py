@@ -7,6 +7,7 @@ import re
 import unicodedata
 
 LONGO = re.compile(r"\[(=*)\[")
+BRUTO = re.compile(r"\[(=+)\[")
 NUMERO = re.compile(r"(?:0[xX][\da-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)")
 OPERADOR = re.compile(r"(?:\.\.\.|\.\.|==|~=|<=|>=|<<|>>|//)")
 RESERVADAS = set("local função fim retorne se então senão para em início enquanto repita até pare vápara".split())
@@ -14,6 +15,7 @@ PRECEDENCIA = {"ou": 1, "e": 2, "<": 3, ">": 3, "<=": 3, ">=": 3, "~=": 3, "==":
               "|": 4, "~": 5, "&": 6, "<<": 7, ">>": 7, "..": 8, "+": 9, "-": 9,
               "*": 10, "/": 10, "//": 10, "%": 10, "^": 12}
 ESCAPES = dict(a="\a", b="\b", f="\f", n="\n", r="\r", t="\t", v="\v")
+DADOS_EXPERIMENTAIS = True  # Ligado somente no pacote isolado do laboratório.
 
 
 def fim_identificador(fonte, inicio):
@@ -49,8 +51,9 @@ def recorte(fonte):
 
     def literal(anotacao, profundidade):
         nonlocal i
-        inicio, marca, abre = i, fonte[i], LONGO.match(fonte, i)
-        fecha = "]" + abre[1] + "]" if abre else marca
+        inicio, marca = i, fonte[i]
+        abre = (BRUTO if DADOS_EXPERIMENTAIS else LONGO).match(fonte, i)
+        fecha = ("]" + abre[1] + "]") if abre else marca
         i = abre.end() if abre else i + 1
         conteudo, trecho, partes = i, i, []
         while i < total and not fonte.startswith(fecha, i):
@@ -64,7 +67,7 @@ def recorte(fonte):
                     i += 2
                 else:
                     i = min(total, i + 1)
-            elif marca == "`" and fonte[i] in "®Ⓡ":
+            elif not abre and marca == "`" and fonte[i] in "®Ⓡ":
                 fim_variavel = fim_identificador(fonte, i + 1)
                 if fonte[i+1:i+2] == "{" and profundidade < 64:
                     if i > trecho:
@@ -104,14 +107,14 @@ def recorte(fonte):
                 i += 1
                 continue
             if fonte.startswith("--", i):
-                anotado = re.fullmatch(r"--\[\[(html|javascript)\]\]", comentario())
-                anotacao = anotado[1] if anotado else None
+                anotado = re.fullmatch(r"--\[\[(html|javascript|js)\]\]", comentario())
+                anotacao = ("javascript" if anotado[1] == "js" else anotado[1]) if anotado else None
                 continue
             if expressao and fonte[i] == "}" and chaves == 0:
                 i += 1
                 break
             chaves += (fonte[i] == "{") - (fonte[i] == "}")
-            if fonte[i] in "\"'`" or LONGO.match(fonte, i):
+            if fonte[i] in "\"'`" or (BRUTO if DADOS_EXPERIMENTAIS else LONGO).match(fonte, i):
                 tokens.append(literal(anotacao, profundidade))
                 anotacao = None
                 continue

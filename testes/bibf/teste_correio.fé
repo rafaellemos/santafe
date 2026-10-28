@@ -96,7 +96,7 @@ para _, evento em ipares(memóriaPULSO.mensagens) início
         fechamento = evento
     fim
 fim
-garanta(fechamento e tipo(fechamento.dados.rastro) == "tabela",
+garanta(fechamento e tipo(fechamento.dados.rastro) == "lista",
     "fechamento SMTP não trouxe o rastro seguro")
 garanta(fechamento.dados.rastro[1] == "C:EHLO" e
         fechamento.dados.rastro[2] == "R:250",

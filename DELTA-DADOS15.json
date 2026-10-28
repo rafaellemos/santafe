@@ -1,0 +1,97 @@
+{
+  "base_sha256": "ddca28b7e058795ab5ff5d15a412ee8517962d421279df3bee20812cca47e5ce",
+  "alterados": [
+    {
+      "arquivo": "Makefile",
+      "antes": "278c13349b2d84fa0c2c566b288a2ebf38c01901e66ff4212e8d7845d0db4751",
+      "depois": "c065b34b2c8cdc26aa121d4d3c740fb15688ee280e09ac3d93ece5f275ada67a"
+    },
+    {
+      "arquivo": "docs/manual.html",
+      "antes": "8d5b4283a5b228198cc4c5300f28c7673eafc8321c9b52d026cb683679f59688",
+      "depois": "afad640731aa60a01661d0a3fe467d4637e9dbb64ab8440c13cc984574b4419c"
+    },
+    {
+      "arquivo": "experimentos/dados-v10/testar.py",
+      "antes": "6580dc0bcb5e40a82a8e84b9367fa8d7c145fc3184f9d619fd143b1a9bf8df64",
+      "depois": "8cbbcbf5f7e558fd59a41faee7a33cc19d86993d5a6f13941f119ee247205c8d"
+    },
+    {
+      "arquivo": "experimentos/dados-v2/editores.py",
+      "antes": "5d9e99a5db0fbccf8bce6d602ed3f1071af02ae4472b1594a211b1470f71d73f",
+      "depois": "3c34b7d0ef45d4cf8bed4c1ab651101b899b48ccfab8b9662d7a507516c44104"
+    },
+    {
+      "arquivo": "experimentos/dados-v2/testar-editores.js",
+      "antes": "773c3423f81caf901780b73d60e044fd965f602eaa49099e2a5433254753693a",
+      "depois": "2b48916a9d05abf3ff5a46ae2621dd8432044d1d05d66512e5b2a8e92c4431d7"
+    },
+    {
+      "arquivo": "experimentos/dados-v3/testar-wasm.js",
+      "antes": "02ffed85c591081424d2b07ad77ea3b608da65ec51d0c94a806f049132539168",
+      "depois": "88310d70318054be3e03f12a9394d898b76a004284c86ab38f551d6fd957f7b1"
+    },
+    {
+      "arquivo": "experimentos/dados-v5/testar-instalacao.py",
+      "antes": "62ed6a8ea4a179e51b651d5f207c84513d6969dd391a20b0e226a8269335e085",
+      "depois": "543dbad01062988dd6a1603295fc3f28fa8c3f0e2d489ad9c1e0dcb728cefd32"
+    },
+    {
+      "arquivo": "experimentos/dados-v6/operacao.py",
+      "antes": "6d891f1cf720becf482ee8dd76988a71c2546d40b4b5c080fd7d2ede6791f564",
+      "depois": "81d52cfb3a029b853e24a5534501c7d15cf5d260bcb14be9b76ee70e7eeec828"
+    },
+    {
+      "arquivo": "experimentos/dados-v6/testar-operacao.py",
+      "antes": "8c51ca0416f7f8d6db5ebd3ddfe9ea7d0289ec7641605599189b9f8dfab8d42c",
+      "depois": "4f4920cb9dbe8fa90cfbc4fbb99b5bb0156ded350b9632547c55349e9efffc0a"
+    },
+    {
+      "arquivo": "experimentos/dados-v8/testar-editores.js",
+      "antes": "e3b8c8d5abeacece2924fdc3b48ec37bd2a07ce4aa9ad002bef309acea5b5944",
+      "depois": "23e92cad56f2e976e8f803c18af53290bb0663938f9cebe83b47429ef5eff165"
+    },
+    {
+      "arquivo": "experimentos/dados-v8/testar-recorte-sublime.py",
+      "antes": "e7da2d9233dbf9c384cf5cb844a20db73710490f0aebc337d7a959d6251728cc",
+      "depois": "0e394b9a7d30d4a23f9aafe3398a4b8087534df1d0b4a361fd1d8c3373b50888"
+    },
+    {
+      "arquivo": "ferramentas/sls/sls.fé",
+      "antes": "b53e844a61fc2fd9c298afb8aa40333eaad561151dcdde6302468623bfed33c9",
+      "depois": "4f25eb491ddba1a2d7c25af64067a0c3b7f64aa4c81b63975abfb6400868a306"
+    },
+    {
+      "arquivo": "instalar.sh",
+      "antes": "cf98c435f8f3e8c4ac68ff2390fa3a7cc2cf2d4ead91c5f3d44da949d75d292e",
+      "depois": "99464e59854d1470a2bc7ea9e155546cf145a4a7fa9034e4116e5fb95bbb1a6c"
+    },
+    {
+      "arquivo": "src/lua.h",
+      "antes": "2cab945cbb65773cc6b237dcf3575dbbd843fec9bdbc0961c828f52b19be20b5",
+      "depois": "2822058bd9deb4561484051603a875efd755983009519c52fbbc67c49197caf8"
+    }
+  ],
+  "adicionados": [
+    ".laboratorio-dados15",
+    "experimentos/dados-v15/ESTADO.json",
+    "experimentos/dados-v15/LEIA-ME.md",
+    "experimentos/dados-v15/RELATORIO.md",
+    "experimentos/dados-v15/acme-publico.py",
+    "experimentos/dados-v15/conferir-producao.py",
+    "experimentos/dados-v15/empacotar.py",
+    "experimentos/dados-v15/exportar.py",
+    "experimentos/dados-v15/gramaticas-vscode/LICENCAS.txt",
+    "experimentos/dados-v15/gramaticas-vscode/ORIGEM.json",
+    "experimentos/dados-v15/gramaticas-vscode/extensions/css/syntaxes/css.tmLanguage.json",
+    "experimentos/dados-v15/gramaticas-vscode/extensions/html/syntaxes/html.tmLanguage.json",
+    "experimentos/dados-v15/gramaticas-vscode/extensions/javascript/syntaxes/JavaScript.tmLanguage.json",
+    "experimentos/dados-v15/preparar.py",
+    "experimentos/dados-v15/selar.py",
+    "experimentos/dados-v15/testar-acme-integrado.py",
+    "experimentos/dados-v15/testar-acme-publico.py"
+  ],
+  "retirados": [
+    "DELTA-DADOS14.json"
+  ]
+}

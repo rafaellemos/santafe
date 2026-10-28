@@ -104,7 +104,7 @@ função R.resolva(catálogo,pedidos,travado,opções)
                 para _,alvo em ipares(chaves(seleção[nome].dados.dependencias ou {})) início
                     local ok,falha=visite(alvo); se não ok então retorne nulo,falha fim
                 fim
-                visitando[nome]=nulo; visitados[nome]=verdadeiro; ordem[#ordem+1]=nome
+                tabela.apague(visitando,nome); visitados[nome]=verdadeiro; ordem[#ordem+1]=nome
                 retorne verdadeiro
             fim
             para _,nome em ipares(chaves(seleção)) início
@@ -117,7 +117,7 @@ função R.resolva(catálogo,pedidos,travado,opções)
         para _,item em ipares(candidatos) início
             seleção[próximo]=item
             local resultado,falha=busque(seleção,profundidade+1)
-            seleção[próximo]=nulo
+            tabela.apague(seleção,próximo)
             se resultado então retorne resultado fim
             últimaFalha=falha
         fim

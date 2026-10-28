@@ -11,7 +11,7 @@ exports.run=async()=>{
   const ext=v.extensions.getExtension("santafe.santafe"),api=await ext.activate();
   for(let i=0;i<150&&!api.estadoSLS().pronto;i++) await pause(100);
   assert(api.estadoSLS().pronto,"SLS não iniciou");
-  assert.equal(api.estadoSLS().informação.version,"1.0.0");
+  assert.equal(api.estadoSLS().informação.version,"1.1.0");
   const p=(s,last=false,delta=0)=>doc.positionAt((last?source.lastIndexOf(s):source.indexOf(s))+delta);
   const def=await v.commands.executeCommand("vscode.executeDefinitionProvider",doc.uri,p("somar",true));
   assert.equal(def.length,1); assert.equal(def[0].range.start.line,0);

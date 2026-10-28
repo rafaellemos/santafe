@@ -1,0 +1,27 @@
+-- Executar com o candidato dados.7. Apenas transforma texto; não o executa.
+local f=garanta(es.abra(garanta(arg[1]),"rb"))
+local texto=f:leia("*tudo"); f:feche()
+local tokens,falha=depure.lexemas(texto,"@"..arg[1],1000000)
+garanta(não falha,"fonte não é lexicalmente válido no candidato anterior")
+local partes,ultimo,quantidade={},1,0
+local função bruto(valor)
+    local nivel=1
+    enquanto verdadeiro início
+        local iguais=("="):replique(nivel)
+        local fecha="]"..iguais.."]"
+        se (valor..fecha):procure(fecha,1,verdadeiro)==#valor+1 então
+            local prefixo=valor:corte(1,1)=="\n" e "\n" ou ""
+            retorne "["..iguais.."["..prefixo..valor..fecha
+        fim
+        nivel=nivel+1
+    fim
+fim
+para _,t em ipares(tokens) início
+    se t.tipo=="colar" e t.texto:corte(1,2)=="``" então
+        partes[#partes+1]=texto:corte(ultimo,t["início"])
+        partes[#partes+1]=bruto(t.valor)
+        ultimo=t["fim"]+1; quantidade=quantidade+1
+    fim
+fim
+partes[#partes+1]=texto:corte(ultimo)
+mostre(json.cod({texto=tabela.concatene(partes),alterações=quantidade}))

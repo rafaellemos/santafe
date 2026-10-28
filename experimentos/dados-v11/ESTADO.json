@@ -1,0 +1,36 @@
+{
+  "candidato": "dados.11",
+  "iba": "santafe-3",
+  "producao_alterada": false,
+  "apto_para_homologacao": true,
+  "apto_para_promocao_estavel": false,
+  "replica": {
+    "resultado": "PASSOU",
+    "grupos": 23,
+    "arquivos_capturados": 1841,
+    "fontes_capturados_analisados": 73,
+    "fontes_finais_compilados": 77,
+    "objetos_postais_iniciais": 247,
+    "bancos": 2,
+    "originais_iniciais": 105,
+    "anexos_iniciais": 16,
+    "originais_apos_rollback": 141,
+    "anexos_apos_rollback": 22,
+    "carga_segundos": 60.07,
+    "operacoes_http": 9280,
+    "clientes": 6,
+    "novas_escritas_preservadas": true,
+    "dados_privados_exportados": false
+  },
+  "incidente_de_recurso_compartilhado": {
+    "tipo": "esgotamento temporario de disco por copias de ensaio",
+    "mitigacao": "copias encerradas removidas; estaticos montados em leitura; reserva minima de 2 GiB",
+    "limite_da_evidencia": "servicos ativos e quatro respostas HTTPS 200 apos limpeza; nao prova ausencia de falha transitoria durante o incidente"
+  },
+  "pendencias": [
+    {"codigo": "HTTP503_CARGA_INTERMITENTE", "estado": "investigar", "descricao": "Causa do 503 isolado em dados.10 ainda desconhecida. As duas cargas de replica passaram, sem demonstrar a causa."},
+    {"codigo": "SOAK_PROLONGADO", "estado": "nao_executado", "descricao": "Cargas da replica de 60 segundos; falta ensaio prolongado e estrategia de falha operacional."},
+    {"codigo": "INTEGRACOES_EXTERNAS", "estado": "nao_executado_nesta_replica", "descricao": "Certificados publicos/renovacao, relay externo, antimalware, triagem e autenticacao DNS externa nao exercitados. Upload de comunidade nao exercitado."},
+    {"codigo": "PLATAFORMAS", "estado": "escopo_a_definir", "descricao": "macOS e Debian x86_64 ensaiados. Sem homologacao Windows/ARM ou perda eletrica real."}
+  ]
+}

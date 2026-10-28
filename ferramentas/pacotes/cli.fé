@@ -1,13 +1,15 @@
+local Windows = módulo.configuração:corte(1,1)=="\\"
+local extensãoNativa=Windows e ".dll" ou ".so"
 -- Cliente distribuído junto do núcleo. Não exige Python, npm nem sudo.
 local diretório,prefixo=...
 local caminhoAntigo=módulo.caminho
 módulo.caminho=diretório.."/../?.fé;"..caminhoAntigo
-local N=garanta(módulo.carregarBib(diretório.."/nativo.so","luaopen_pacotes_nativo"))()
+local N=garanta(módulo.carregarBib(diretório.."/nativo"..extensãoNativa,"luaopen_pacotes_nativo"))()
 local F=(importe "pacotes.formatos")(N)
 local C=(importe "pacotes.cliente")(N,F)
 local A=(importe "pacotes.administracao")(N,F)
-local opções={cabeçalhos=prefixo.."/include"}
-se diretório:separe("/ferramentas/pacotes$") e não diretório:procure("/share/",1,verdadeiro) então opções.cabeçalhos=prefixo.."/src" fim
+local opções={cabeçalhos=prefixo.."/include",importação=prefixo.."/lib/libsantafe-3.dll.a"}
+se diretório:separe("/ferramentas/pacotes$") e não diretório:procure("/share/",1,verdadeiro) então opções.cabeçalhos=prefixo.."/src"; opções.importação=prefixo.."/src/libsantafe-3.dll.a" fim
 local comando=arg[0]
 local posicionais={}
 local i=1
@@ -23,7 +25,7 @@ enquanto arg[i] início
         senãose a=="--repositorio-local" então opções.repositórioLocal=arg[i]
         senão opções.autoridadeCertificadora=arg[i] fim
     senãose a=="--ajuda" então
-        mostre([[Santafé Bibliotecas 1.0.0
+        mostre([=[Santafé Bibliotecas 1.1.0
   santafé instale nome [intervalo] [--repositorio HTTPS]
   santafé instale --travado | --sem-rede
   santafé instale --atualizar
@@ -32,7 +34,8 @@ enquanto arg[i] início
 Instalação por projeto; C exige --permitir-nativo. Sem sudo ou pós-instalação.
 --repositorio-local DIRETORIO: somente para curadoria/ensaios locais.
 Catálogo oficial: https://xn--santaf-gva.dev.br/est%C3%A1tico/bibliotecas/v1/
-Disponível na distribuição Santafé 2.1.0; pacote inicial: semver 1.0.0.]])
+Distribuição Santafé 3.0.0; pacote inicial: semver 1.0.0.]=])
+        se Windows então mostre("Windows nativo: instalação por usuário ou distribuição portátil.\nC requer GCC UCRT64 absoluto em SANTAFE_CC e --permitir-nativo.") fim
         retorne
     senão
         F.exija(a:corte(1,1)~="-","opção desconhecida: "..a)
@@ -43,7 +46,7 @@ fim
 F.exija(não (opções.repositório e opções.repositórioLocal),"escolha uma origem")
 local atual=N.diretorioAtual()
 local função separe(caminho)
-    local pasta,nome=caminho:separe("^(.*)/([^/]+)$")
+    local pasta,nome=caminho:troque("\\","/"):separe("^(.*)/([^/]+)$")
     retorne pasta ou ".",nome ou caminho
 fim
 se comando=="instale" então

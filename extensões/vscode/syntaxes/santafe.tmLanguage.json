@@ -10,25 +10,25 @@
       "include": "#comentário"
     },
     {
-      "include": "#gabarito"
+      "include": "#bruto"
     },
     {
-      "include": "#colar-longo"
+      "include": "#gabarito"
     },
     {
       "include": "#colar-simples"
     },
     {
-      "include": "#função"
-    },
-    {
       "include": "#colar"
     },
     {
-      "include": "#número"
+      "include": "#função"
     },
     {
       "include": "#declaração-anônima"
+    },
+    {
+      "include": "#número"
     },
     {
       "include": "#palavra-reservada"
@@ -41,6 +41,10 @@
     },
     {
       "include": "#operador"
+    },
+    {
+      "name": "punctuation.section.list.santafe",
+      "match": "[\\[\\]]"
     }
   ],
   "repository": {
@@ -1295,29 +1299,25 @@
           "name": "meta.interpolation.santafe",
           "begin": "[®Ⓡ]\\{",
           "end": "\\}",
-          "contentName": "meta.embedded.inline.santafe",
           "beginCaptures": {
             "0": {
-              "name": "punctuation.section.interpolation.begin.santafe keyword.operator.interpolation.santafe"
+              "name": "punctuation.section.interpolation.begin.santafe"
             }
           },
           "endCaptures": {
             "0": {
-              "name": "punctuation.section.interpolation.end.santafe keyword.operator.interpolation.santafe"
+              "name": "punctuation.section.interpolation.end.santafe"
             }
           },
           "patterns": [
             {
-              "include": "#chaves"
-            },
-            {
-              "include": "$self"
+              "include": "#expressão-gabarito"
             }
           ]
         },
         {
-          "match": "[®Ⓡ][\\p{L}_][\\p{L}\\p{M}\\p{N}_]*",
-          "name": "meta.interpolation.variable.santafe variable.parameter.santafe"
+          "name": "variable.other.interpolation.santafe",
+          "match": "[®Ⓡ][\\p{L}_][\\p{L}\\p{M}\\p{N}_]*"
         }
       ]
     },
@@ -1336,6 +1336,27 @@
     "declaração-anônima": {
       "match": "(?<![\\p{L}\\p{M}\\p{N}_.:])função(?![\\p{L}\\p{M}\\p{N}_])",
       "name": "storage.type.function.santafe"
+    },
+    "bruto": {
+      "name": "string.quoted.other.raw.santafe",
+      "begin": "\\[(=+)\\[",
+      "end": "\\]\\1\\]"
+    },
+    "expressão-gabarito": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            {
+              "include": "#expressão-gabarito"
+            }
+          ]
+        },
+        {
+          "include": "$self"
+        }
+      ]
     }
   }
 }

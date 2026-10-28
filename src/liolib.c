@@ -21,6 +21,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lwininput.h"
 
 
 
@@ -87,7 +88,7 @@ static int l_checkmode (const char *mode) {
 #define l_lockfile(f)		flockfile(f)
 #define l_unlockfile(f)		funlockfile(f)
 #else
-#define l_getc(f)		getc(f)
+#define l_getc(f)		sf_input_getc(f)
 #define l_lockfile(f)		((void)0)
 #define l_unlockfile(f)		((void)0)
 #endif
@@ -509,7 +510,7 @@ static int read_number (lua_State *L, FILE *f) {
     test2(&rn, "-+");  /* exponent signal */
     readdigits(&rn, 0);  /* exponent digits */
   }
-  ungetc(rn.c, rn.f);  /* unread look-ahead char */
+  sf_input_ungetc(rn.c, rn.f);  /* unread look-ahead char */
   l_unlockfile(rn.f);
   rn.buff[rn.n] = '\0';  /* finish string */
   if (lua_stringtonumber(L, rn.buff))  /* is this a valid number? */
@@ -522,8 +523,8 @@ static int read_number (lua_State *L, FILE *f) {
 
 
 static int test_eof (lua_State *L, FILE *f) {
-  int c = getc(f);
-  ungetc(c, f);  /* no-op when c == EOF */
+  int c = sf_input_getc(f);
+  sf_input_ungetc(c, f);  /* no-op when c == EOF */
   lua_pushliteral(L, "");
   return (c != EOF);
 }
@@ -556,7 +557,7 @@ static void read_all (lua_State *L, FILE *f) {
   luaL_buffinit(L, &b);
   do {  /* read file in chunks of LUAL_BUFFERSIZE bytes */
     char *p = luaL_prepbuffer(&b);
-    nr = fread(p, sizeof(char), LUAL_BUFFERSIZE, f);
+    nr = sf_input_read(p, LUAL_BUFFERSIZE, f);
     luaL_addsize(&b, nr);
   } while (nr == LUAL_BUFFERSIZE);
   luaL_pushresult(&b);  /* close buffer */
@@ -569,7 +570,7 @@ static int read_chars (lua_State *L, FILE *f, size_t n) {
   luaL_Buffer b;
   luaL_buffinit(L, &b);
   p = luaL_prepbuffsize(&b, n);  /* prepare buffer to read whole block */
-  nr = fread(p, sizeof(char), n, f);  /* try to read 'n' chars */
+  nr = sf_input_read(p, n, f);  /* try to read 'n' chars */
   luaL_addsize(&b, nr);
   luaL_pushresult(&b);  /* close buffer */
   return (nr > 0);  /* true iff read something */
@@ -580,7 +581,7 @@ static int g_read (lua_State *L, FILE *f, int first) {
   int nargs = lua_gettop(L) - 1;
   int success;
   int n;
-  clearerr(f);
+  sf_input_clear(f);
   if (nargs == 0) {  /* nenhum argumento? padrão é ler fio */
     success = read_line(L, f, 1);
     n = first+1;  /* para retornar 1 resultado */
@@ -619,7 +620,7 @@ static int g_read (lua_State *L, FILE *f, int first) {
       }
     }
   }
-  if (ferror(f))
+  if (sf_input_error(f))
     return luaL_fileresult(L, 0, NULL);
   if (!success) {
     lua_pop(L, 1);  /* remove last result */

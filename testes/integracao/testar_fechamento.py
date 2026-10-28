@@ -69,8 +69,8 @@ with tempfile.TemporaryDirectory(prefix="santafe-fechamento-teste-") as temporar
     (source / "operação").mkdir()
     shutil.copyfile(ROOT / "operação/preparar-editores-portal.py", source / "operação/preparar-editores-portal.py")
     for rel in ("bin/santafé", "bin/santafec", "bin/santafé-sls", "lib/liblua.a",
-                "lib/pkgconfig/santafe.pc", "share/santafé/1.0/ferramentas/sls.fé",
-                "share/santafé/1.0/bibf/rpdf_unicode.fé", "share/santafé/1.0/bibf/rpdf/LEIA-ME.md",
+                "lib/pkgconfig/santafe.pc", "share/santafé/3.0/ferramentas/sls.fé",
+                "share/santafé/3.0/bibf/rpdf_unicode.fé", "share/santafé/3.0/bibf/rpdf/LEIA-ME.md",
                 *["include/" + n for n in ("lua.h", "luaconf.h", "lauxlib.h", "lualib.h", "lua.hpp")]):
         write(prefix / rel, "fixture")
     write(prefix / 'lib/pkgconfig/santafe.pc', f'prefix={prefix}\nVersion: {m.VERSION}\n')
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix="santafe-fechamento-teste-") as temporar
     old_wasm = public / 'wasm/2.0.2/santafe.wasm'
     for old in (old_download, old_wasm):
         write(old, 'histórico imutável')
-    rpdf = system / 'share/santafé/1.0/bibf/rpdf_unicode.fé'
+    rpdf = system / 'share/santafé/3.0/bibf/rpdf_unicode.fé'
     write(rpdf, 'biblioteca anterior')
     write(public / "wasm/index.html", cache)
     for ext in ("tar.gz", "zip"):
@@ -95,7 +95,7 @@ with tempfile.TemporaryDirectory(prefix="santafe-fechamento-teste-") as temporar
     assert (out / 'santafe.pc').read_text().splitlines()[0] == f'prefix={system}'
     plan = out / "plan.json"
     entries = json.loads(plan.read_text())
-    libraries = [e['target'] for e in entries if '/share/santafé/1.0/bibf/' in e['target']]
+    libraries = [e['target'] for e in entries if '/share/santafé/3.0/bibf/' in e['target']]
     assert set(libraries) == {str(rpdf), str(rpdf.parent / 'rpdf/LEIA-ME.md')}
     user = pwd.getpwuid(os.getuid()).pw_name
     group = grp.getgrgid(os.getgid()).gr_name

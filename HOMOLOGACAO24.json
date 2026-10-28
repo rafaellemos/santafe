@@ -1,0 +1,35 @@
+{
+  "candidato": "dados.24",
+  "nucleo": "3.0.0-rc.1",
+  "sls": "1.1.0-rc.1",
+  "gerenciador": "1.1.0-rc.1",
+  "iba": 3,
+  "fonte_base23": "17480441b23708d53b3e6c421498eb92bebdf632f857a4a235c5296ca0fd0b65",
+  "fontes_c_h_inalterados": 138,
+  "resultado_replica": "PASSOU",
+  "grupos_operacionais": 22,
+  "carga": {
+    "segundos": 60.08,
+    "operacoes": 5933,
+    "clientes": 6
+  },
+  "transacoes": {
+    "arquivos_por_troca": 86,
+    "reversao_explicita": true,
+    "falha_saude_apos_mensagens": true,
+    "dados_preservados": true
+  },
+  "testes_transacao": 15,
+  "teste_destinos_dns": 1,
+  "preparador_negativos": 2,
+  "publicado": false,
+  "producao_alterada": false,
+  "windows_reexecutado": false,
+  "visual_editores_reexecutado": false,
+  "pendencias": [
+    "captura operacional atualizada e adaptador de systemd do publicador",
+    "Windows: reconstruir pacotes com caminhos3.0 e testar",
+    "editores: consolidar identidade oficial e associação com SLS3",
+    "assinatura pública Windows pendente; auditiva adiada"
+  ]
+}

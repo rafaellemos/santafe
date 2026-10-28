@@ -23,11 +23,11 @@ gere(caminhoJPEG, caminho("jpeg.pdf"))
 gere(caminhoPNG, caminho("png-alfa.pdf"))
 
 local arquivo = garanta(es.abra(caminhoSVG, "escrita"))
-arquivo:escreva([[<svg width="160" height="90" viewBox="0 0 160 90">
+arquivo:escreva([=[<svg width="160" height="90" viewBox="0 0 160 90">
   <rect x="2" y="2" width="156" height="86" fill="#35bf9b" stroke="#102a43" stroke-width="4"/>
   <circle cx="45" cy="45" r="25" fill="#ffc500"/>
   <path d="M85 70 Q115 5 150 70 Z" fill="#ff6461" stroke="#ffffff" stroke-width="3"/>
-</svg>]])
+</svg>]=])
 arquivo:feche()
 gere(caminhoSVG, caminho("svg.pdf"))
 mostre("RPDF PNG, JPEG e SVG gerados")

@@ -90,7 +90,7 @@ função entrega.espera(tentativas, intervalos)
         retorne nulo, "tentativas deve ser um inteiro não negativo"
     fim
     intervalos = intervalos ou entrega.intervalosPadrão
-    se tipo(intervalos) ~= "tabela" ou #intervalos == 0 então
+    se (tipo(intervalos) ~= "tabela" e tipo(intervalos) ~= "lista") ou #intervalos == 0 então
         retorne nulo, "intervalos precisa ser uma lista não vazia"
     fim
     local índice = mat.mínimo(tentativas + 1, #intervalos)
@@ -116,7 +116,7 @@ função entrega.formeAviso(opções)
         retorne nulo, "destinatário, domínio e nome do servidor são obrigatórios"
     fim
     local destinatários = opções.destinatários
-    se tipo(destinatários) ~= "tabela" ou #destinatários == 0 então
+    se (tipo(destinatários) ~= "tabela" e tipo(destinatários) ~= "lista") ou #destinatários == 0 então
         retorne nulo, "o aviso precisa de ao menos um destinatário original"
     fim
 

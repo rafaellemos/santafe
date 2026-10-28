@@ -286,7 +286,7 @@ fim
 local função codifiqueTexto(valor)
     local partes = {}
     se tipo(valor) == "colar" então valor = { valor } fim
-    se tipo(valor) ~= "tabela" então erro("TXT deve ser colar ou lista de colares", 3) fim
+    se tipo(valor) ~= "tabela" e tipo(valor) ~= "lista" então erro("TXT deve ser colar ou lista de colares", 3) fim
     para _, trecho em ipares(valor) início
         se tipo(trecho) ~= "colar" ou #trecho > 255 então
             erro("cada trecho TXT deve ter até 255 tacos", 3)

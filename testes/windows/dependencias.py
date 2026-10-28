@@ -1,0 +1,142 @@
+"""Lock de DLLs e fontes correspondentes; nenhum fonte é executado."""
+from pathlib import Path, PurePosixPath
+import hashlib,io,json,os,re,shutil,subprocess,sys,tarfile,urllib.request,urllib.parse
+HERE=Path(__file__).resolve().parent
+DIRECTORY='FONTES-TERCEIROS'
+def sha(data):return hashlib.sha256(data).hexdigest()
+def load_lock():
+ lock=json.loads((HERE/'DEPENDENCIAS.lock.json').read_text(encoding='utf-8'))
+ entries=lock['binarios'];names=[x['arquivo'] for x in entries]
+ if len(entries)!=4 or len(set(names))!=4:raise ValueError('Lock incompleto ou duplicado')
+ for e in entries:
+  if not re.fullmatch(r'bin/[a-zA-Z0-9_.+-]+\.dll',e['arquivo']):raise ValueError('Caminho da DLL recusado')
+  if not e['identidade'].startswith(e['pacote']+' '):raise ValueError('Dono incoerente')
+  for k in ('fonte','assinatura'):
+   a=e[k]
+   if a['url']!='https://repo.msys2.org/mingw/sources/'+a['arquivo'] or '/' in a['arquivo'] or not re.fullmatch(r'[a-zA-Z0-9_.+-]+',a['arquivo']):raise ValueError('Origem de fonte recusada')
+   if not re.fullmatch(r'[0-9a-f]{64}',a['sha256']) or not 0<a['bytes']<=40_000_000:raise ValueError('Limite inválido')
+  for n in e['conteudos']:
+   p=PurePosixPath(n)
+   if p.is_absolute() or '..' in p.parts or '\\' in n or ':' in n or len(p.parts)!=2:raise ValueError('Membro de fonte recusado')
+ return lock
+
+def verify_data(data,entry):
+ if len(data)!=entry['bytes'] or sha(data)!=entry['sha256']:raise ValueError('Fonte ou assinatura divergente: '+entry['arquivo'])
+
+class OfficialRedirect(urllib.request.HTTPRedirectHandler):
+ def redirect_request(self,req,fp,code,msg,headers,newurl):
+  u=urllib.parse.urlsplit(newurl)
+  if u.scheme!='https' or u.hostname!='repo.msys2.org' or u.username or u.password:raise ValueError('Redirecionamento recusado')
+  return super().redirect_request(req,fp,code,msg,headers,newurl)
+
+def fetch(entry,cache):
+ path=cache/entry['arquivo']
+ if path.is_symlink():raise ValueError('Vínculo recusado')
+ if path.exists():verify_data(path.read_bytes(),entry);return path
+ op=urllib.request.build_opener(OfficialRedirect())
+ with op.open(entry['url'],timeout=40) as r:
+  data=r.read(entry['bytes']+1)
+ verify_data(data,entry)
+ path.write_bytes(data)
+ return path
+
+def verify_source(path,entry):
+ verify_data(path.read_bytes(),entry['fonte'])
+ # Read once, without GNU tar's remote-path handling or spawning decompressors
+ # for every member. Build Windows uses CPython 3.14 with native zstd support.
+ if sys.version_info >= (3,14):
+  archive=tarfile.open(path,'r:zst')
+ else:
+  decoded=subprocess.check_output(['zstd','--decompress','--stdout','--memory=256MB',str(path)],timeout=30)
+  if len(decoded)>40_000_000:raise ValueError('Fonte descompactado excede limite')
+  archive=tarfile.open(fileobj=io.BytesIO(decoded),mode='r:')
+ with archive:
+  seen=set();files={}
+  for member in archive:
+   n=member.name
+   if n in seen or len(seen)>=100:raise ValueError('Membro repetido ou limite de membros excedido')
+   seen.add(n)
+   if member.isdir():continue
+   if not member.isfile() or n not in entry['conteudos'] or not 0<=member.size<=40_000_000:raise ValueError('Membro de fonte recusado')
+   data=archive.extractfile(member).read()
+   if sha(data)!=entry['conteudos'][n]:raise ValueError('Fonte interno divergente: '+n)
+   files[n]=True
+   if n.endswith('/.SRCINFO'):
+    text=data.decode('utf-8')
+    v=entry['identidade'].split(' ',1)[1].rsplit('-',1)
+    if not all(re.search(r'^\s*'+k+r' = '+re.escape(val)+r'\s*$',text,re.M) for k,val in [('pkgver',v[0]),('pkgrel',v[1]),('pkgname',entry['pacote'])]):raise ValueError('Versão/família do fonte divergente')
+  if set(files)!=set(entry['conteudos']):raise ValueError('Conteúdo do fonte divergente')
+ return len(files)
+
+def verify_runtime(read,metadata,lock):
+ byname={x['arquivo']:x for x in metadata['binarios']}
+ if len(byname)!=len(metadata['binarios']) or set(byname)!={x['arquivo'] for x in lock['binarios']}:raise ValueError('Conjunto de DLLs divergente')
+ for expected in lock['binarios']:
+  e=byname[expected['arquivo']]
+  if any(e[k]!=expected[k] for k in ('sha256','pacote','identidade')):raise ValueError('Dependência não homologada: '+expected['arquivo'])
+  if sha(read(e['arquivo']))!=expected['sha256']:raise ValueError('DLL alterada: '+e['arquivo'])
+ return len(byname)
+
+def verify_signature(signature,source):
+ # Read the MSYS2 pacman keyring without changing its permissions or trust.
+ # pacman-key assumes Unix uid 0 or a lock-never config; Windows runners have
+ # neither. Use its GPG verification rule directly, including full trust.
+ pacman=shutil.which('pacman')
+ if not pacman:raise ValueError('pacman ausente')
+ bindir=Path(pacman).resolve().parent
+ suffix='.exe' if os.name=='nt' else ''
+ gpg=bindir/('gpg'+suffix)
+ keyring=bindir.parent.parent/'etc/pacman.d/gnupg'
+ if not gpg.is_file() or not (keyring/'pubring.gpg').is_file() or not (keyring/'trustdb.gpg').is_file():raise ValueError('Chaveiro MSYS2 incompleto')
+ paths=[keyring,signature.resolve(),source.resolve()]
+ if os.name=='nt':
+  cygpath=bindir/'cygpath.exe'
+  if not cygpath.is_file():raise ValueError('Conversor de caminhos MSYS2 ausente')
+  args=[subprocess.check_output([str(cygpath),'-u',str(p)],text=True,timeout=10).strip() for p in paths]
+ else:args=[str(p) for p in paths]
+ return subprocess.run([str(gpg),'--no-options','--homedir',args[0],'--batch','--no-auto-key-retrieve','--no-auto-check-trustdb','--lock-never','--trust-model','pgp','--status-fd','1','--verify',args[1],args[2]],capture_output=True,timeout=45)
+
+def signature_valid(result):
+ return result.returncode==0 and re.search(rb'^\[GNUPG:\] VALIDSIG ',result.stdout,re.M) is not None and re.search(rb'^\[GNUPG:\] TRUST_(FULLY|ULTIMATE)(?: |$)',result.stdout,re.M) is not None
+
+def prepare(destination):
+ lock=load_lock();metadata=json.loads((destination/'DEPENDENCIAS-MSYS2.json').read_text(encoding='utf-8'))
+ verify_runtime(lambda n:(destination/n).read_bytes(),metadata,lock)
+ target=destination/DIRECTORY;target.mkdir()
+ cache=HERE/'cache-fontes';cache.mkdir(exist_ok=True)
+ evidence=[]
+ for e in lock['binarios']:
+  source=fetch(e['fonte'],cache);sig=fetch(e['assinatura'],cache)
+  p=verify_signature(sig,source)
+  if not signature_valid(p):raise ValueError('Assinatura MSYS2 recusada: '+e['fonte']['arquivo']+' '+p.stderr.decode('utf-8','replace')[-1000:])
+  corrupted=cache/('controle-corrompido-'+source.name)
+  data=bytearray(source.read_bytes());data[len(data)//2]^=1
+  try:
+   corrupted.write_bytes(data)
+   negative=verify_signature(sig,corrupted)
+   if negative.returncode==0 or signature_valid(negative):raise ValueError('Verificador aceitou fonte adulterado')
+  finally:corrupted.unlink(missing_ok=True)
+  count=verify_source(source,e)
+  for path in (source,sig):shutil.copyfile(path,target/path.name)
+  evidence.append({'arquivo':source.name,'sha256':sha(source.read_bytes()),'membros_conferidos':count,'assinatura_msys2_verificada':True,'controle_corrompido_recusado':True,'verificador':'GPG: VALIDSIG + TRUST_FULLY/ULTIMATE no chaveiro pacman (somente leitura)','resultado_publico':(p.stdout+p.stderr).decode('utf-8','replace')})
+ shutil.copyfile(HERE/'DEPENDENCIAS.lock.json',target/'DEPENDENCIAS.lock.json')
+ shutil.copyfile(HERE/'FONTES-TERCEIROS.md',target/'LEIA-ME.md')
+ (target/'VERIFICACAO.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+ metadata.update(resolucao_runtime_fixada=True,resolucao_fixada=False,fontes_correspondentes_incluidas=True,observacao='Quatro DLLs com versão/hash fixos e respectivos fontes completos MSYS2 incluídos. Toolchain completo ainda não fixado; não atesta reprodução byte a byte.')
+ (destination/'DEPENDENCIAS-MSYS2.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+ # Keep the complete tool inventory as evidence, without copying unrelated licenses into the runtime.
+ inventory=subprocess.check_output(['pacman','-Q'],text=True)
+ (target/'AMBIENTE-CONSTRUCAO.txt').write_text(inventory,encoding='utf-8')
+ return evidence
+
+def verify_package(read):
+ lock=load_lock()
+ if json.loads(read(DIRECTORY+'/DEPENDENCIAS.lock.json'))!=lock:raise ValueError('Lock do pacote divergente')
+ metadata=json.loads(read('DEPENDENCIAS-MSYS2.json'))
+ verify_runtime(read,metadata,lock)
+ for e in lock['binarios']:
+  for k in ('fonte','assinatura'):verify_data(read(DIRECTORY+'/'+e[k]['arquivo']),e[k])
+ proof=json.loads(read(DIRECTORY+'/VERIFICACAO.json'))
+ if {x['arquivo'] for x in proof}!={e['fonte']['arquivo'] for e in lock['binarios']} or len(proof)!=4 or not all(x['assinatura_msys2_verificada'] and x.get('controle_corrompido_recusado') for x in proof):raise ValueError('Verificação de fontes incompleta')
+ if not metadata.get('fontes_correspondentes_incluidas') or not metadata.get('resolucao_runtime_fixada'):raise ValueError('Metadados incompletos')
+ return 4

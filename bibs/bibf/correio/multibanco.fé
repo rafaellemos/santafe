@@ -79,7 +79,7 @@ função multibanco.novo(especificações)
         local limpa = {}
         para nome, valor em pares(caixa) início limpa[nome] = valor fim
         limpa.id = id
-        limpa.bancoPostal = nulo
+        tabela.apague(limpa, "bancoPostal")
         retorne banco, limpa
     fim
 

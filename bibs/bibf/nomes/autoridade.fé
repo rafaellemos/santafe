@@ -244,7 +244,7 @@ local função nova(opções)
         se estado.fechada então retorne fim
         estado.fechada = verdadeiro
         estado.conexão:feche()
-        este.conexões[estado] = nulo
+        tabela.apague(este.conexões, estado)
         este.estatísticasDNS.tcpAtivas = mat.máximo(
             0, este.estatísticasDNS.tcpAtivas - 1
         )

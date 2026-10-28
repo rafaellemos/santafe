@@ -1,0 +1,17 @@
+-- Candidato dados.2 — documento público de homologação, sem efeitos externos
+local função saudação(nome)
+    retorne `Olá, ®nome! Ⓡ{1 + 2}`
+fim
+
+local variável = "José"
+local variável = "Ana"
+local pessoa = {nome = variável, telefone = nulo}
+local lista = [pessoa, nulo, [1, 2], []]
+local bruto = [=[®variável permanece texto; \n também.
+    [1, 2] não é código aqui.]=]
+local mensagem = `®variável / Ⓡvariável / Ⓡ{saudação(variável)}`
+
+local html = --[[html]] [=[<a title="prefixo-]=] .. variável .. [=[-final">Olá</a>]=]
+local js = --[[js]] [=[/* comentário interrompido ]=] .. variável .. [=[ retomado */ const x = 1;]=]
+local automático = [=[<strong class="leve">HTML sem etiqueta</strong>]=]
+mostre(saudação(variável), #lista, html, js, automático)

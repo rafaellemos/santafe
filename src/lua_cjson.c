@@ -69,6 +69,10 @@
 #define DEFAULT_DECODE_INVALID_NUMBERS 1
 #define DEFAULT_ENCODE_KEEP_BUFFER 1
 #define DEFAULT_ENCODE_NUMBER_PRECISION 14
+#ifdef SANTAFE_DADOS_V3
+#undef DEFAULT_ENCODE_NUMBER_PRECISION
+#define DEFAULT_ENCODE_NUMBER_PRECISION 17
+#endif
 
 #ifdef DISABLE_INVALID_NUMBERS
 #undef DEFAULT_DECODE_INVALID_NUMBERS
@@ -307,7 +311,7 @@ static int json_cfg_encode_number_precision(lua_State *l)
 {
     json_config_t *cfg = json_arg_init(l, 1);
 
-    return json_integer_option(l, 1, &cfg->encode_number_precision, 1, 14);
+    return json_integer_option(l, 1, &cfg->encode_number_precision, 1, DEFAULT_ENCODE_NUMBER_PRECISION);
 }
 
 /* Configures JSON encoding buffer persistence */
@@ -596,6 +600,17 @@ static void json_append_array(lua_State *l, json_config_t *cfg, int current_dept
 static void json_append_number(lua_State *l, json_config_t *cfg,
                                strbuf_t *json, int lindex)
 {
+#ifdef SANTAFE_DADOS_V3
+    if (lua_isinteger(l,lindex)) {
+        size_t bytes;
+        const char *s;
+        lua_pushvalue(l,lindex);
+        s=lua_tolstring(l,-1,&bytes);
+        strbuf_append_mem(json,s,bytes);
+        lua_pop(l,1);
+        return;
+    }
+#endif
     double num = lua_tonumber(l, lindex);
     int len;
 
@@ -642,6 +657,10 @@ static void json_append_object(lua_State *l, json_config_t *cfg,
 
         /* table, key, value */
         keytype = lua_type(l, -2);
+#ifdef SANTAFE_DADOS_V3
+        if (keytype != LUA_TSTRING)
+            json_encode_exception(l,cfg,json,-2,"JSON comum exige chaves textuais; use ONFÉ para chaves nativas");
+#endif
         if (keytype == LUA_TNUMBER) {
             strbuf_append_char(json, '"');
             json_append_number(l, cfg, json, -2);
@@ -686,8 +705,13 @@ static void json_append_data(lua_State *l, json_config_t *cfg,
     case LUA_TTABLE:
         current_depth++;
         json_check_encode_depth(l, cfg, current_depth, json);
+#ifdef SANTAFE_DADOS_V3
+        len = (int)lua_rawlen(l,-1);
+        if (lua_islist(l,-1))
+#else
         len = lua_array_length(l, cfg, json);
         if (len > 0)
+#endif
             json_append_array(l, cfg, current_depth, json, len);
         else
             json_append_object(l, cfg, current_depth, json);
@@ -918,6 +942,15 @@ static void json_next_string_token(json_parse_t *json, json_token_t *token)
             json_set_token_error(token, json, "fim inesperado do colar");
             return;
         }
+
+#ifdef SANTAFE_DADOS_V3
+        /* JSON text must escape U+0000..U+001F inside strings. Check the
+         * original byte, not the result of a valid escape such as \\n. */
+        if ((unsigned char)ch < 0x20) {
+            json_set_token_error(token, json, "controle sem escape no colar");
+            return;
+        }
+#endif
 
         /* Handle escapes */
         if (ch == '\\') {
@@ -1169,6 +1202,11 @@ static void json_parse_object_context(lua_State *l, json_parse_t *json)
 
         /* Push key */
         lua_pushlstring(l, token.value.string, token.string_len);
+#ifdef SANTAFE_DADOS_V3
+        lua_pushvalue(l,-1);
+        if (lua_rawpresent(l,-3))
+            json_throw_parse_error(l,json,"chave única",&token);
+#endif
 
         json_next_token(json, &token);
         if (token.type != T_COLON)
@@ -1205,7 +1243,11 @@ static void json_parse_array_context(lua_State *l, json_parse_t *json)
      * .., table, value */
     json_decode_descend(l, json, 2);
 
+#ifdef SANTAFE_DADOS_V3
+    lua_createlist(l,0);
+#else
     lua_newtable(l);
+#endif
 
     json_next_token(json, &token);
 
@@ -1242,7 +1284,20 @@ static void json_process_value(lua_State *l, json_parse_t *json,
         lua_pushlstring(l, token->value.string, token->string_len);
         break;;
     case T_NUMBER:
+#ifdef SANTAFE_DADOS_V3
+        {
+            const char *s;
+            lua_pushlstring(l,json->data+token->index,json->ptr-(json->data+token->index));
+            s=lua_tostring(l,-1);
+            if (!lua_stringtonumber(l,s)) {
+                lua_pop(l,1);
+                json_throw_parse_error(l,json,"número representável",token);
+            }
+            lua_remove(l,-2);
+        }
+#else
         lua_pushnumber(l, token->value.number);
+#endif
         break;;
     case T_BOOLEAN:
         lua_pushboolean(l, token->value.boolean);
@@ -1256,7 +1311,11 @@ static void json_process_value(lua_State *l, json_parse_t *json,
     case T_NULL:
         /* In Lua, setting "t[k] = nil" will delete k from the table.
          * Hence a NULL pointer lightuserdata object is used instead */
+#ifdef SANTAFE_DADOS_V3
+        lua_pushnil(l);
+#else
         lua_pushlightuserdata(l, NULL);
+#endif
         break;;
     default:
         json_throw_parse_error(l, json, "valor", token);
@@ -1283,6 +1342,14 @@ static int json_decode(lua_State *l)
      * still enough to detect whether the wrong encoding is in use. */
     if (json_len >= 2 && (!json.data[0] || !json.data[1]))
         luaL_error(l, "o analisador JSON n\xC3\xA3o aceita UTF-16 nem UTF-32");
+
+#ifdef SANTAFE_DADOS_V3
+    /* The tokenizer uses NUL as its sentinel. A NUL supplied within the
+     * input must not silently hide the remaining bytes (e.g. true\\0junk).
+     * Escaped \\u0000 remains valid and is decoded later inside strings. */
+    if (memchr(json.data, '\0', json_len) != NULL)
+        luaL_error(l, "JSON possui octeto nulo sem escape");
+#endif
 
     /* Ensure the temporary buffer can hold the entire string.
      * This means we no longer need to do length checks since the decoded

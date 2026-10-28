@@ -197,7 +197,12 @@ static int list_directory(lua_State *L) {
     else { parent=parent_fd(root->fd,p,leaf,0); if(parent<0) return failure(L,"listar"); fd=openat(parent,leaf,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC); close(parent); }
     if(fd<0) return failure(L,"listar");
     d->p=fdopendir(fd); if(!d->p) { close(fd); return failure(L,"listar"); }
-    lua_newtable(L); output=lua_gettop(L);
+#ifdef SANTAFE_DADOS_V3
+    lua_createlist(L,0);
+#else
+    lua_newtable(L);
+#endif
+    output=lua_gettop(L);
     while(1) {
         struct stat st; errno=0; entry=readdir(d->p);
         if(!entry) { int e=errno; closedir(d->p); d->p=NULL; if(e) { errno=e; return failure(L,"listar"); } return 1; }
@@ -289,6 +294,11 @@ static int platform(lua_State *L) {
     lua_newtable(L); lua_pushstring(L,u.sysname); lua_setfield(L,-2,"sistema");
     lua_pushstring(L,u.machine); lua_setfield(L,-2,"maquina");
     lua_pushinteger(L,LUA_VERSION_NUM); lua_setfield(L,-2,"abi");
+#ifdef SANTAFE_DADOS_V3
+    lua_pushinteger(L,LUAL_NUMSIZES); lua_setfield(L,-2,"abiDados");
+    lua_pushstring(L,SANTAFE_ABI_ID); lua_setfield(L,-2,"iba");
+    lua_pushinteger(L,SANTAFE_BYTECODE_VERSION); lua_setfield(L,-2,"bytecode");
+#endif
     lua_pushinteger(L,sizeof(void*)*8); lua_setfield(L,-2,"ponteiros"); return 1;
 }
 static int nonce(lua_State *L) {
@@ -301,9 +311,14 @@ static const luaL_Reg methods[]={
     {"leia",read_file},{"grave",write_file},{"diretorio",make_directory},{"subraiz",open_relative},
     {"existe",exists},{"liste",list_directory},{"trave",lock_root},{"execute",run},{"removaArquivo",remove_file},{"feche",gc_handle},{NULL,NULL}};
 LUAMOD_API int luaopen_pacotes_nativo(lua_State *L) {
+    luaL_checkversion(L);
     luaL_newmetatable(L,HANDLE); lua_pushcfunction(L,gc_handle); lua_setfield(L,-2,LUA_MM_FINALIZE); lua_newtable(L); luaL_setfuncs(L,methods,0); lua_setfield(L,-2,LUA_MM_INDICE); lua_pop(L,1);
     luaL_newmetatable(L,MEMORY); lua_pushcfunction(L,gc_memory); lua_setfield(L,-2,LUA_MM_FINALIZE); lua_pop(L,1);
     luaL_newmetatable(L,DIRECTORY); lua_pushcfunction(L,gc_directory); lua_setfield(L,-2,LUA_MM_FINALIZE); lua_pop(L,1);
     { const luaL_Reg api[]={{"raiz",open_root},{"sha256",digest},{"base64",base64},{"decodBase64",unbase64},{"chaveCaminho",path_key},{"diretorioAtual",cwd},{"plataforma",platform},{"nonce",nonce},{NULL,NULL}}; luaL_newlib(L,api); }
     return 1;
 }
+
+#if defined(SANTAFE_DADOS_V3)
+SANTAFE_MODULE_ABI;
+#endif

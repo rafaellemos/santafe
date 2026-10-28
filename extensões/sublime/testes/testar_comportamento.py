@@ -192,7 +192,12 @@ def principal() -> None:
         iniciador.write_text("#!/bin/sh\n", encoding="utf-8")
         iniciador.chmod(0o755)
         módulo.CAMINHOS_SLS = (str(iniciador),)
-        módulo.SantafeAtivarDiagnosticosSLSCommand().run()
+        original_which = módulo.shutil.which
+        módulo.shutil.which = lambda _: None
+        try:
+            módulo.SantafeAtivarDiagnosticosSLSCommand().run()
+        finally:
+            módulo.shutil.which = original_which
         executable = pathlib.Path(diretório) / 'santafé'
         executable.write_text('#!/bin/sh\n')
         executable.chmod(0o755)

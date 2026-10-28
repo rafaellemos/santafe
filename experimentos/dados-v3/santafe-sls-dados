@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+base=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+test -f "$base/.laboratorio-dados3"
+exec "$base/src/santafé" -E -P "$base/ferramentas/sls/sls.fé" "$@"

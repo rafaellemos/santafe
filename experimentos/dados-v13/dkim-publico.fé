@@ -1,0 +1,29 @@
+módulo.caminho="bibs/bibf/?.fé;bibs/bibf/?/?.fé"
+módulo.caminhoC="bibs/bibc/?/?.so"
+local rede=importe "rede"
+local DKIM=importe "correio.dkim"
+local caminho=garanta(so.obterVariável("ENSAIO_MENSAGEM_PRIVADA"))
+local f=garanta(es.abra(caminho,"rb"));local bruto=f:leia("tudo");f:feche()
+local função verifique(texto)
+    local concluído=falso
+    local estado="erro"
+    garanta(DKIM.verifiqueAssíncrono(texto,{tempoLimite=10000},função(r)
+        se r então estado=r.resultado fim
+        concluído=verdadeiro;rede.pareLaço()
+    fim))
+    se não concluído então rede.laço() fim
+    garanta(concluído)
+    retorne estado
+fim
+local original=verifique(bruto)
+se original=="passa" então
+    -- Inserir no início do corpo também testa assinaturas que limitam o corpo (l=).
+    local posição,final=bruto:procure("\r\n\r\n",1,verdadeiro)
+    se não posição então posição,final=bruto:procure("\n\n",1,verdadeiro) fim
+    garanta(final)
+    local alterada=bruto:corte(1,final).."ALTERACAO SINTETICA DKIM\r\n"..bruto:corte(final+1)
+    garanta(verifique(alterada)=="falha","adulteração não recusada")
+    mostre("DKIM_PUBLICO_PASSA_ADULTERACAO_FALHA")
+senãose original=="falha" então mostre("DKIM_PUBLICO_FALHA")
+senãose original=="temporário" então mostre("DKIM_PUBLICO_TEMPORARIO")
+senão mostre("DKIM_PUBLICO_INCONCLUSIVO") fim
