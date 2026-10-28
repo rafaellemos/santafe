@@ -91,7 +91,12 @@ def build(archive,version,out,guard,fault=False):
   ca=[('RestoreDir',51,'INSTALLDIR','[OLDINSTALLDIR]'),('ValidateTarget',1,'Guard','ValidateTarget'),('RejectUnsupportedMode',19,None,'Esta distribuição aceita instalação por usuário. Imagem administrativa não é suportada.')]
   if fault:ca += [('SetFaultData',51,'AbortAfterFiles','[INSTALLDIR]|'+version),('AbortAfterFiles',1025,'Guard','AbortAfterFiles')]
   add('CustomAction',ca)
-  prefix=[('FindRelatedProducts',None,200),('AppSearch',None,400),('LaunchConditions',None,500),('RestoreDir','OLDINSTALLDIR AND NOT INSTALLDIR',600),('CostInitialize',None,800),('FileCost',None,900),('CostFinalize',None,1000),('ValidateTarget',None,1100)]
+  # Um produto apenas anunciado tem ProductState=1 e nenhum payload para
+  # proteger. Permitir sua remoção evita que o diretório padrão, ainda não
+  # pertencente ao pacote, seja confundido com uma instalação real. Todas as
+  # instalações, atualizações, reparos e remoções locais continuam validadas.
+  validar_alvo='NOT (REMOVE~="ALL" AND ProductState=1)'
+  prefix=[('FindRelatedProducts',None,200),('AppSearch',None,400),('LaunchConditions',None,500),('RestoreDir','OLDINSTALLDIR AND NOT INSTALLDIR',600),('CostInitialize',None,800),('FileCost',None,900),('CostFinalize',None,1000),('ValidateTarget',validar_alvo,1100)]
   execute=prefix+[('InstallValidate',None,1400),('InstallInitialize',None,1500),('RemoveExistingProducts','OLDERPRODUCTS',1510),('ProcessComponents',None,1600),('UnpublishFeatures',None,1800),('RemoveRegistryValues',None,2600),('RemoveShortcuts',None,3200),('RemoveEnvironmentStrings',None,3300),('RemoveFiles',None,3500),('RemoveFolders',None,3600),('CreateFolders',None,3700),('InstallFiles',None,4000),('CreateShortcuts',None,4500),('WriteRegistryValues',None,5000),('WriteEnvironmentStrings',None,5200),('RegisterUser',None,6000),('RegisterProduct',None,6100),('PublishFeatures',None,6300),('PublishProduct',None,6400),('InstallFinalize',None,6600)]
   if fault:execute += [('SetFaultData','NOT REMOVE',4010),('AbortAfterFiles','NOT REMOVE',4020)]
   add('InstallExecuteSequence',execute)
