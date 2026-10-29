@@ -7,7 +7,7 @@ from collections import defaultdict
 import time
 import sublime
 import sublime_plugin
-from .realce_embutido import documentos_embutidos
+from .bibliotecas.realce_embutido import documentos_embutidos
 
 PREFIXO = "santafe_realce_"
 PAINEL = "santafe_realce_virtual"

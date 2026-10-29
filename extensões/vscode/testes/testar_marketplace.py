@@ -30,11 +30,15 @@ def confira_vsix(caminho):
         assert pacote.read("extension/LICENSE.txt") == (RAIZ.parents[1] / "LICENSE").read_bytes()
         manifesto = json.loads(pacote.read("extension/package.json"))
         leia_me = pacote.read("extension/readme.md").decode("utf-8")
-        assert f"Extensão Santafé {manifesto['version']}" in leia_me
+        assert f"Santafé — extensão {manifesto['version']}" in leia_me
         assert "Compatível com o núcleo Santafé 3.0.0 e SLS 1.1.0" in leia_me
         assert "análise semântica futura do SLS" not in leia_me
         for chave, valor in original.items():
             assert manifesto[chave] == valor, chave
+        onfe = next(x for x in manifesto["contributes"]["languages"] if x["id"] == "onfe")
+        assert onfe["extensions"] == [".onfé"]
+        assert "extension/onfe-configuration.json" in nomes
+        assert "extension/syntaxes/onfe.tmLanguage.json" in nomes
         ns = {"v": "http://schemas.microsoft.com/developer/vsx-schema/2011"}
         xml = ET.fromstring(pacote.read("extension.vsixmanifest"))
         identidade = xml.find("v:Metadata/v:Identity", ns)

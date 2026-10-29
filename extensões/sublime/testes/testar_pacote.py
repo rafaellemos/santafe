@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
+import plistlib
 import re
 import stat
 import subprocess
@@ -18,7 +20,7 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 def principal() -> None:
     metadados = json.loads((RAIZ / "package-metadata.json").read_text(encoding="utf-8"))
     assert metadados["name"] == "Santafe"
-    assert metadados["version"] == "2.0.0"
+    assert metadados["version"] == "2.0.1"
     leia_me = (RAIZ / "README.md").read_text(encoding="utf-8")
     assert f"Santafé — extensão {metadados['version']}" in leia_me
     assert "Compatível com o núcleo Santafé 3.0.0 e SLS 1.1.0" in leia_me
@@ -55,7 +57,7 @@ def principal() -> None:
         ".python-version", "Indentation Rules.tmPreferences", "Santafe.py", "Santafe.sublime-syntax", "Santafe.sublime-build", "Santafe.sublime-commands", "Default.sublime-keymap",
         "Santafe.sublime-settings", "api-publica.json", "package-metadata.json",
         "HTML-Santafe.sublime-syntax", "JavaScript-Santafe.sublime-syntax",
-        "Realce.py", "realce_embutido.py",
+        "Realce.py", "bibliotecas/__init__.py", "bibliotecas/realce_embutido.py", "ONFE.tmLanguage",
         "snippets/funcao.sublime-snippet", "snippets/se.sublime-snippet",
     }
     assert esperados <= nomes, esperados - nomes
@@ -72,6 +74,11 @@ def principal() -> None:
         assert all(stat.S_ISREG(i.external_attr >> 16) for i in arquivo.infolist())
         nomes = set(arquivo.namelist())
     assert "package-metadata.json" not in nomes
+    assert "realce_embutido.py" not in nomes
+    assert "ONFE.tmLanguage" in nomes
+    onfe = plistlib.loads((RAIZ / "ONFE.tmLanguage").read_bytes())
+    assert onfe["fileTypes"] == ["onfé"] and onfe["scopeName"] == "source.onfe"
+    assert "from .bibliotecas.realce_embutido import" in (RAIZ / "Realce.py").read_text()
     assert ".python-version" in nomes
     assert "Indentation Rules.tmPreferences" in nomes
     assert all(arquivo.isascii() for arquivo in nomes)
@@ -80,6 +87,9 @@ def principal() -> None:
     lançamento = catálogo["packages"][0]["releases"][0]
     assert catálogo["packages"][0]["name"] == "Santafe"
     assert lançamento["version"] == metadados["version"]
+    assert lançamento["sha256"] == hashlib.sha256(controle.read_bytes()).hexdigest()
+    assert lançamento["sublime_text"] == ">=4171"
+    assert lançamento["platforms"] == ["*"]
     assert lançamento["url"].endswith(f"/Santafe-{metadados['version']}.sublime-package")
     assert lançamento["url"].isascii()
     assert lançamento["python_versions"] == ["3.8", "3.14"]
@@ -100,6 +110,12 @@ def principal() -> None:
     }
     menu = json.loads((exportação / "Main.sublime-menu").read_text())
     assert menu[0]["id"] == "preferences"
+    assert all(x["caption"].startswith("Preferences: Santafe") for x in comandos)
+    entries = menu[0]["children"][0]["children"][0]
+    assert entries["caption"] == "Santafe"
+    for entries_to_check in (comandos, entries["children"]):
+        keys = next(x for x in entries_to_check if x["args"]["base_file"].endswith(".sublime-keymap"))
+        assert keys["args"]["user_file"] == "${packages}/User/Default (${platform}).sublime-keymap"
     for arquivo in nomes:
         assert (exportação / arquivo).read_bytes() == (RAIZ / arquivo).read_bytes()
     assert (exportação / "README.md").read_text() == (RAIZ / "README.md").read_text()

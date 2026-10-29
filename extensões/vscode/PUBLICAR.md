@@ -1,8 +1,8 @@
 # Publicação no Visual Studio Marketplace
 
 Identidade da extensão: `santafe.santafe`. A versão do editor é independente da
-versão do núcleo. A versão **1.1.1** corrige o README da 1.1.0, que integra
-SLS 1.0.0 e gabaritos Unicode,
+versão do núcleo. A versão **2.0.0** acompanha Santafé 3, ONFÉ, listas, nulo armazenável
+e SLS 1.1.0,
 preservando o cordeiro oficial introduzido em 1.0.7. A marca e sua origem estão
 registradas em [MARCA.md](MARCA.md).
 
@@ -26,10 +26,10 @@ python3 extensões/vscode/preparar_marketplace.py "$area_marketplace/extensao"
 (
     cd "$area_marketplace/extensao"
     vsce package --no-dependencies --githubBranch desenvolvimento \
-        --out "$area_marketplace/santafe-marketplace-1.1.1.vsix"
+        --out "$area_marketplace/santafe-marketplace-2.0.0.vsix"
 )
 python3 extensões/vscode/testes/testar_marketplace.py \
-    --vsix "$area_marketplace/santafe-marketplace-1.1.1.vsix"
+    --vsix "$area_marketplace/santafe-marketplace-2.0.0.vsix"
 ```
 
 `--no-dependencies` é intencional: os runtimes TextMate/Oniguruma e suas licenças

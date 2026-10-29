@@ -3,7 +3,7 @@ import time
 import json
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from realce_embutido import documentos_embutidos, recorte
+from bibliotecas.realce_embutido import documentos_embutidos, recorte
 from casos_concatenacoes import casos
 
 nomes = json.loads((Path(__file__).resolve().parents[2] / 'testes/identificadores-unicode.json').read_text(encoding='utf-8'))

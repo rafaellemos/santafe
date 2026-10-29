@@ -9,8 +9,7 @@
    Repository** com a URL de `packages.json`. Depois instala e atualiza
    **Santafe** pela interface normal do Package Control.
 
-Essa opção não depende da aprovação do catálogo geral. A versão publicada
-no portal é 1.1.0. Não substitua arquivos de uma versão já distribuída.
+Essa opção não depende da aprovação do catálogo geral. A revisão atual é 2.0.1, para Santafé 3 e ONFÉ. Não substitua arquivos de uma versão já distribuída.
 
 ## Catálogo público do Package Control
 
@@ -28,13 +27,13 @@ testes, fontes do núcleo nem artefatos de trabalho.
 Para sincronizar uma versão:
 
 1. Execute `python3 extensões/sublime/testes/testar_pacote.py` na raiz.
-2. Compare os arquivos exportados com a etiqueta anterior. Na 1.1.1,
-   o código permanece idêntico à 1.1.0; o README corrige a descrição do SLS.
+2. Compare os arquivos exportados com a etiqueta anterior. Na 2.0.1,
+   confira ONFÉ, o subpacote `bibliotecas/`, as conclusões da API e os atalhos de preferências.
    LICENSE, CHANGELOG e atalhos de preferências
    são os arquivos adicionais da distribuição GitHub. Não reenvie esses bytes
    como substituição do pacote imutável do portal.
 3. Sincronize a exportação com o repositório independente, preservando `.git`.
-4. Confira o diff, registre um commit e crie a etiqueta `v1.1.1`, somente se
+4. Confira o diff, registre um commit e crie a etiqueta `v2.0.1`, somente se
    ela ainda não existir. Nunca mova uma etiqueta de versão publicada.
 5. Atualize a entrada existente em `repository/s.json` no ramo da submissão
    com `dist/package-control-entrada.json`. Não abra uma submissão duplicada.
@@ -50,7 +49,7 @@ não modifica silenciosamente os pacotes já publicados no portal.
 O pacote contém uma tecla Enter restrita ao escopo Santafé e complementos de
 cores também restritos aos escopos Santafé. Declare esses recursos na revisão,
 sem afirmar que não há atalhos nem regras de cores. As preferências e os atalhos
-ficam acessíveis pelo menu **Preferences → Package Settings → Santafé** e pela
+ficam acessíveis pelo menu **Preferences → Package Settings → Santafe** e pela
 Paleta de Comandos; a paleta suave de HTML/JS continua opcional.
 
 ## Registro do envio 1.1.0 — 21/10/2026

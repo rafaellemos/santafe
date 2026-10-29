@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import shutil
@@ -33,7 +34,7 @@ def catálogo() -> dict:
             {
                 "name": NOME,
                 "description": (
-                    "Suporte oficial à linguagem Santafé: sintaxe, trechos, "
+                    "Suporte oficial à linguagem Santafé 3 e ONFÉ: sintaxe, trechos, "
                     "conclusões da API e integração opcional ao SLS."
                 ),
                 "author": "Rafael Alves Lemos",
@@ -43,7 +44,9 @@ def catálogo() -> dict:
                     {
                         "version": VERSAO,
                         "url": f"{ESTATICO_PUBLICO}/sublime/{SAÍDA_CONTROLE.name}",
-                        "date": "2026-10-18 19:00:00",
+                        "date": "2026-10-29 00:00:00",
+                        "sha256": hashlib.sha256(SAÍDA_CONTROLE.read_bytes()).hexdigest(),
+                        "platforms": ["*"],
                         "sublime_text": METADADOS["sublime_text"],
                         # O arquivo .python-version no pacote evita um defeito
                         # do Package Control 4.2.8 ao avaliar esta lista em ST 4215.

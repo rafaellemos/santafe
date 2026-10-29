@@ -10,7 +10,7 @@ if not __debug__:
     raise RuntimeError('Execute com compile(..., optimize=0): o plugin_host usa Python -O.')
 
 R = importlib.import_module('Santafe.Realce')
-recorte = importlib.import_module('Santafe.realce_embutido').recorte
+recorte = importlib.import_module('Santafe.bibliotecas.realce_embutido').recorte
 casos = runpy.run_path(str(Path(__file__).with_name('casos_concatenacoes.py')))['casos']()
 janela = sublime.active_window()
 view = janela.new_file()

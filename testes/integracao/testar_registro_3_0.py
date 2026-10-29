@@ -27,6 +27,7 @@ for name in ('lua.h', 'luaconf.h', 'lauxlib.h', 'lualib.h', 'lua.hpp'):
 version = subprocess.run([str(ROOT/'src/santafé'), '-v'], capture_output=True, check=True)
 assert b'3.0.0' in version.stdout + version.stderr
 assert json.loads((ROOT/'extensões/vscode/package.json').read_text())['version'] == '2.0.0'
-assert json.loads((ROOT/'extensões/sublime/package-metadata.json').read_text())['version'] == '2.0.0'
+# Revisão independente do editor; os fontes de execução 3.0 acima continuam imutáveis.
+assert json.loads((ROOT/'extensões/sublime/package-metadata.json').read_text())['version'] == '2.0.1'
 assert hashlib.sha256((ROOT/'testes/windows/baseline-dados16.zip').read_bytes()).hexdigest() == '84be8651b8e41787524f4be13ce27a6d3a9be185a3f12537891e2108773a26a4'
 print(f'Registro 3.0: {checked} fontes de execução idênticos à distribuição; SDK e editores coerentes')

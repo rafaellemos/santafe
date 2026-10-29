@@ -31,8 +31,10 @@ ARQUIVOS = (
     "api-publica.json",
     "icon.png",
     "language-configuration.json",
+    "onfe-configuration.json",
     "README.md",
     "syntaxes/santafe.tmLanguage.json",
+    "syntaxes/onfe.tmLanguage.json",
     "snippets/santafe.code-snippets",
 )
 

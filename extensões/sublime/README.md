@@ -1,4 +1,4 @@
-# Santafé — extensão 2.0.0
+# Santafé — extensão 2.0.1
 
 Compatível com o núcleo Santafé 3.0.0 e SLS 1.1.0. Migre projetos2.1 antes
 de editar e executar usando este contrato. Listas usam `[]`; colares brutos

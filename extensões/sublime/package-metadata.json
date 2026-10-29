@@ -1,6 +1,6 @@
 {
   "name": "Santafe",
   "description": "Santafé 3: listas, nulo armazenável, ONFÉ e integração com SLS 1.1.",
-  "version": "2.0.0",
-  "sublime_text": ">=4107"
+  "version": "2.0.1",
+  "sublime_text": ">=4171"
 }

@@ -143,6 +143,20 @@
       "documentação": "Consulta a existência de um caminho."
     },
     {
+      "rótulo": "arquivo.graveAtômico",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.graveAtômico(caminho, conteúdo)",
+      "documentação": "Primitiva síncrona de bytes; retorna ok, falha, estado."
+    },
+    {
+      "rótulo": "arquivo.graveAtômicoAssíncrono",
+      "origem": "bibs/bibc/arquivo/arquivo.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "arquivo.graveAtômicoAssíncrono(caminho, conteúdo, tratador [, contexto])",
+      "documentação": "Primitiva assíncrona de bytes; tratador recebe ok, falha, estado, contexto."
+    },
+    {
       "rótulo": "arquivo.graveDurávelAssíncrono",
       "origem": "bibs/bibc/arquivo/arquivo.c",
       "categoria": "API C / núcleo",
@@ -1829,7 +1843,7 @@
       "origem": "src/lbaselib.c",
       "categoria": "API C / núcleo",
       "assinatura": "ipares(t)",
-      "documentação": "Iterador para percorrer a parte de lista (índices 1..n) de uma tabela."
+      "documentação": "Percorre todas as posições de uma lista, inclusive nulas. Em tabelas, percorre a sequência até o primeiro valor nulo; use pares para todas as chaves."
     },
     {
       "rótulo": "json._NOME",
@@ -1860,7 +1874,7 @@
       "origem": "src/lua_cjson.c",
       "categoria": "API C / núcleo",
       "assinatura": "json.codMatrizEsparsa([converte [, razão [, seguro]]])",
-      "documentação": "Configura como json.cod lida com listas esparsas (com buracos nos índices)."
+      "documentação": "Opção legada: não permite buracos nas listas nativas nem chaves numéricas em objetos JSON."
     },
     {
       "rótulo": "json.codNúmeroPrecisão",
@@ -2460,6 +2474,55 @@
       "categoria": "API C / núcleo",
       "assinatura": "octetos(s)",
       "documentação": "Conta todos os octetos armazenados no colar s, inclusive zeros; atende a dados binários. A consulta é constante e não converte números implicitamente."
+    },
+    {
+      "rótulo": "onfé.carregue",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.carregue(caminho)",
+      "documentação": "Lê arquivo de dados controlado pela aplicação e decodifica."
+    },
+    {
+      "rótulo": "onfé.cod",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.cod(dado)",
+      "documentação": "Serializa dados ONFÉ, sem execução; até 4 MiB."
+    },
+    {
+      "rótulo": "onfé.decod",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.decod(texto)",
+      "documentação": "Analisa dados ONFÉ, sem executar código."
+    },
+    {
+      "rótulo": "onfé.deJSON",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.deJSON(texto)",
+      "documentação": "Lê JSON mantendo listas e nulos."
+    },
+    {
+      "rótulo": "onfé.grave",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.grave(caminho, dado)",
+      "documentação": "Grava ONFÉ atomicamente, de forma síncrona."
+    },
+    {
+      "rótulo": "onfé.graveAssíncrono",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.graveAssíncrono(caminho, dado, tratador [, contexto])",
+      "documentação": "Serializa e agenda a gravação ONFÉ."
+    },
+    {
+      "rótulo": "onfé.paraJSON",
+      "origem": "bibs/bibf/onfé.fé",
+      "categoria": "Turing",
+      "assinatura": "onfé.paraJSON(dado)",
+      "documentação": "Gera JSON comum; recusa chaves de tabela não textuais."
     },
     {
       "rótulo": "paraColar",
@@ -3860,6 +3923,13 @@
       "documentação": "Autoriza a origem pelo envelope SMTP."
     },
     {
+      "rótulo": "tabela.apague",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.apague(t, chave)",
+      "documentação": "Remove explicitamente e retorna um lógico. Em lista, compacta os índices seguintes."
+    },
+    {
       "rótulo": "tabela.concatene",
       "origem": "src/ltablib.c",
       "categoria": "API C / núcleo",
@@ -3914,6 +3984,13 @@
       "categoria": "API C / núcleo",
       "assinatura": "tabela.remova(t [, pos])",
       "documentação": "Remove e devolve um valor."
+    },
+    {
+      "rótulo": "tabela.temChave",
+      "origem": "src/ltablib.c",
+      "categoria": "API C / núcleo",
+      "assinatura": "tabela.temChave(t, chave)",
+      "documentação": "Consulta a chave própria, inclusive com nulo; não chama __índice."
     },
     {
       "rótulo": "tamanho",
