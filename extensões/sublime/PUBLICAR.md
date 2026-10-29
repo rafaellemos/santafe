@@ -83,6 +83,30 @@ mantenedor; o pedido segue aberto, não integrado ao catálogo oficial.
 
 SHA-256 do pacote versionado local gerado para a distribuição HTTPS:
 `faefbb1bdba0966155fe31097f68ec84aa865df3266313226109505e16baa54c`.
-O portal não foi alterado nesta publicação dos catálogos externos: seus
+O portal não foi alterado naquela publicação dos catálogos externos: seus
 downloads 1.1.0 continuam preservados. A distribuição GitHub inclui licença,
 histórico e atalhos de preferências, conforme a exportação descrita acima.
+
+## Registro do envio 2.0.1 — 29/10/2026
+
+O repositório independente recebeu `v2.0.1`, no commit `2cb7c5f`.
+A submissão #9622 foi atualizada pelo commit `2acea4e`, com as correções
+da revisão: módulo Python compartilhado em subpacote, caminhos das
+preferências e nomes dos menus iguais ao pacote. Os testes de ONFÉ,
+comportamento, recorte Unicode/HTML/JS e distribuição passaram.
+Os workflows do canal central aguardam autorização de um mantenedor
+(`action_required`); isso ainda não é aprovação no catálogo central.
+
+O publicador `operação/publicar-sublime-2.0.1.fé` usa um manifesto ONFÉ
+com SHA-256 dos pacotes, catálogo, somas e página. Preserva versões
+anteriores e `SHA256SUMS-3.0.0`. O pacote manual tem URL versionada;
+o atributo HTML `download` sugere `Santafe.sublime-package`.
+O roteiro confere o estado anterior, cria cópia privada, oferece
+`--reverter` e reinicia somente `sfdev.service`.
+
+Doze ensaios isolados passaram no Mac e no Debian, incluindo publicação,
+repetição, metadados, cópia, reversão explícita, falhas parciais, falha
+de conferência pública, trava, alteração concorrente e ligação simbólica.
+Use `testes/integracao/testar_publicador_sublime.fé` com os argumentos:
+SDK, intérprete, publicador, pasta do pacote, página anterior e catálogo
+anterior. Esses ensaios não publicam em produção.

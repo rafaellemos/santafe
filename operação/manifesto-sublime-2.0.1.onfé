@@ -1,0 +1,7 @@
+{versão="2.0.1",arquivos=[
+{nome="controle.sublime-package",destino="/var/www/santafé.dev.br/estático/sublime/Santafe-2.0.1.sublime-package",sha256="a5d32862526c37bd9da5985e247c6daa1f46760a45f858da5e7d6692986a7546",anterior=nulo},
+{nome="manual.sublime-package",destino="/var/www/santafé.dev.br/estático/sublime/Santafe-manual-2.0.1.sublime-package",sha256="5d5100929f046f78772d04789de27c670fa05cc8e0a19d8b1e0541fa226b7745",anterior=nulo},
+{nome="packages.json",destino="/var/www/santafé.dev.br/estático/sublime/packages.json",sha256="ded27ae44ccb9adc09c6ff36981f99f79f13c6c3c03a1f4d31f3d47fc47afe52",anterior="321a6714d9d511b3625b1c3df06ae13513d37cefa0adfe9933509db96ace065e"},
+{nome="portal.fé",destino="/opt/sfdev.fé",sha256="c7bc978324e0939662b8eeb743cf150532ff7d49a8dcd4515a7f31bfa2f2ce36",anterior="242869d667c20d11bf919d1043b7a41a6181395ed4be81e850707ae8d17b1778"},
+{nome="SHA256SUMS-2.0.1",destino="/var/www/santafé.dev.br/estático/sublime/SHA256SUMS-2.0.1",sha256="d289765ec2402cbb96bc1625c06f26238948f316b35b00754f62c2af67a2de92",anterior=nulo},
+]}

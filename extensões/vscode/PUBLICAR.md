@@ -120,3 +120,19 @@ automáticas passaram em Ubuntu 24.04 e macOS 14:
 e [SLS e bibliotecas](https://github.com/rafaellemos/santafe/actions/runs/39598962271).
 Isso não equivale à aprovação da submissão do Sublime no Package Control,
 que continua dependendo dos mantenedores daquele catálogo.
+
+## Registro do envio 2.0.0 — 29/10/2026
+
+O Marketplace liberou a extensão 2.0.0 com suporte a Santafé 3, ONFÉ
+e SLS 1.1. O VSIX de galeria foi gerado com vsce 4.0.0, com licença
+e ícone oficiais. SHA-256 do arquivo enviado:
+`7c7a983b70903581eb3ce1b8ec85ff75b58e048cf64940f5319b77fde5850475`.
+
+A página pública confirmou 2.0.0. A instalação diretamente da galeria
+em perfil temporário também passou e listou `santafe.santafe@2.0.0`.
+Os testes de exportação e do VSIX conferiram registro e inclusão de ONFÉ
+e igualdade dos arquivos de execução com os fontes 2.0.0. Passaram os
+ensaios de comportamento, cliente SLS, API/paletas e quarenta casos
+de concatenação HTML/JS. Os casos de colares brutos agora exercitam os
+delimitadores do contrato 3.0. O download histórico 2.0.0 do portal
+não foi substituído pelo arquivo da galeria.

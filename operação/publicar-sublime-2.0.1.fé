@@ -1,0 +1,180 @@
+-- Atualiza somente os pacotes Sublime, o catálogo e a página de downloads.
+local P={}
+local função exija(v,m) se não v então erro(m,2) fim; retorne v fim
+função P.ambiente(sdk,binário)
+    módulo.caminho=sdk.."/bibs/bibf/?.fé;"..sdk.."/bibf/?.fé"
+    local O=importe "onfé"
+    local N=garanta(módulo.carregarBib(sdk.."/ferramentas/pacotes/nativo.so","luaopen_pacotes_nativo"))()
+    local R={N=N,O=O,binário=binário,compilador=binário:troque("santafé$","santafec"),mac=N.plataforma().sistema=="Darwin"}
+    função R.raiz(caminho)
+        exija(caminho:corte(1,1)=="/" e caminho~="/","raiz absoluta específica exigida")
+        local r=garanta(N.raiz("/")); local d,falha=r:subraiz(caminho:corte(2)); r:feche(); retorne garanta(d,falha)
+    fim
+    função R.existe(r,nome)
+        local tipo,falha=r:existe(nome); exija(não falha,falha); retorne tipo
+    fim
+    função R.leia(caminho,limite)
+        local pai,nome=caminho:separe("^(.*)/([^/]+)$")
+        local r=R.raiz(pai); local v,falha=r:leia(nome,limite ou 1048576); r:feche(); retorne garanta(v,falha)
+    fim
+    função R.execute(args)
+        local r=garanta(N.raiz("/")); local t={}
+        para i,v em ipares(args) início t[i]=v fim
+        local c,s=r:execute(t,20,1048576); r:feche()
+        exija(c==0,"comando de apoio falhou: "..args[1]..": "..paraColar(s)); retorne s
+    fim
+    função R.meta(caminho)
+        -- A abertura ancorada recusa ligações antes da consulta de metadados.
+        local pai,nome=caminho:separe("^(.*)/([^/]+)$"); local r=R.raiz(pai)
+        exija(R.existe(r,nome),"caminho ausente"); r:feche()
+        local args=R.mac e ["/usr/bin/stat","-f","%u:%g:%Lp",caminho] ou ["/usr/bin/stat","-c","%u:%g:%a",caminho]
+        local u,g,m=R.execute(args):separe("^(%d+):(%d+):([0-7]+)\n$")
+        exija(u e g e m,"metadados inválidos"); retorne {uid=u,gid=g,modo=m}
+    fim
+    função R.permissões(caminho,modo,gid)
+        se gid então R.execute(["/usr/bin/chgrp",gid,caminho]) fim
+        R.execute(["/bin/chmod",modo,caminho])
+    fim
+    função R.copie(origem,destino)
+        local antes=R.leia(origem)
+        R.execute(R.mac e ["/bin/cp","-p",origem,destino] ou ["/bin/cp","--preserve=all",origem,destino])
+        exija(R.leia(destino)==antes,"cópia divergente")
+        local a,b=R.meta(origem),R.meta(destino)
+        exija(a.uid==b.uid e a.gid==b.gid e a.modo==b.modo,"metadados não preservados")
+    fim
+    função R.sincronize() R.execute(["/bin/sync"]) fim
+    retorne R
+fim
+P.soma="e73d4980c2f5c645a4631c108473a620894f43de079216b9eb20e34150cee7db"
+P.destinos=[
+"/var/www/santafé.dev.br/estático/sublime/Santafe-2.0.1.sublime-package",
+"/var/www/santafé.dev.br/estático/sublime/Santafe-manual-2.0.1.sublime-package",
+"/var/www/santafé.dev.br/estático/sublime/packages.json",
+"/opt/sfdev.fé",
+"/var/www/santafé.dev.br/estático/sublime/SHA256SUMS-2.0.1"]
+local função atual(R,p)
+    local pai,n=p:separe("^(.*)/([^/]+)$"); local r=R.raiz(pai)
+    local existe=R.existe(r,n); r:feche()
+    se não existe então retorne nulo fim
+    exija(existe=="arquivo","destino não é arquivo: "..p)
+    retorne R.N.sha256(R.leia(p))
+fim
+local função grave(R,p,s)
+    local pai,n=p:separe("^(.*)/([^/]+)$"); local r=R.raiz(pai)
+    local ok,falhaLocal=r:grave(n,s,falso); r:feche(); garanta(ok,falhaLocal)
+fim
+local função instale(R,p,s,m)
+    local t=p..".novo-"..R.N.nonce()
+    grave(R,t,s)
+    R.execute([R.mac e "/usr/sbin/chown" ou "/usr/bin/chown",m.uid..":"..m.gid,t])
+    R.permissões(t,m.modo)
+    garanta(so.renomeie(t,p))
+    exija(R.leia(p)==s,"arquivo instalado divergente")
+fim
+função P.pacote(R,c)
+    local texto=R.leia(c.pacote.."/manifesto.onfé")
+    exija(R.N.sha256(texto)==P.soma,"manifesto divergente")
+    local p=R.O.decod(texto); exija(p.versão=="2.0.1" e #p.arquivos==5,"manifesto inválido")
+    para i,x em ipares(p.arquivos) início
+        exija(x.destino==P.destinos[i] e não x.nome:procure("/",1,verdadeiro),"destino inválido")
+        x.conteúdo=R.leia(c.pacote.."/"..x.nome)
+        exija(R.N.sha256(x.conteúdo)==x.sha256,"pacote divergente: "..x.nome)
+        x.destino=c.prefixo..x.destino
+    fim
+    retorne p
+fim
+local função revertaEstado(R,c,b,estado)
+    -- Recusa alterações posteriores; não apaga um arquivo de outro publicador.
+    para i,x em ipares(estado.arquivos) início
+        exija(x.destino==c.prefixo..P.destinos[i],"destino da cópia inválido")
+        local h=atual(R,x.destino)
+        exija(h==x.sha256 ou h==x.anterior,"arquivo alterado após publicação: "..x.destino)
+        se x.anterior~=nulo então
+            exija(R.N.sha256(R.leia(b.."/anterior-"..i))==x.anterior,"cópia divergente")
+        fim
+    fim
+    para i,x em ipares(estado.arquivos) início
+        se atual(R,x.destino)~=x.anterior então
+            se x.anterior~=nulo então
+                local t=x.destino..".reversao-"..R.N.nonce(); R.copie(b.."/anterior-"..i,t)
+                garanta(so.renomeie(t,x.destino))
+            senão
+                local pai,n=x.destino:separe("^(.*)/([^/]+)$"); local r=R.raiz(pai)
+                garanta(r:removaArquivo(n)); r:feche()
+            fim
+        fim
+        exija(atual(R,x.destino)==x.anterior,"reversão divergente")
+    fim
+    se c.controle então c.controle() fim
+    R.sincronize()
+fim
+função P.publique(R,c)
+    local p=P.pacote(R,c)
+    local lock=R.raiz(c.prefixo.."/var/www/santafé.dev.br/estático/sublime")
+    local ok,resultado=proteja(função()
+        garanta(lock:trave())
+        local completo=verdadeiro
+        para _,x em ipares(p.arquivos) início se atual(R,x.destino)~=x.sha256 então completo=falso fim fim
+        se completo então retorne {resultado="SUBLIME201_JA_PUBLICADO"} fim
+        para _,x em ipares(p.arquivos) início exija(atual(R,x.destino)==x.anterior,"instalação mudou: "..x.destino) fim
+        R.execute([R.compilador,"-p",c.pacote.."/portal.fé"])
+        local metaPública=R.meta(c.prefixo..P.destinos[3])
+        local nome="santafe-sublime201-"..R.N.nonce(); local cópia=c.cópias.."/"..nome
+        local backups=R.raiz(c.cópias); garanta(backups:diretorio(nome)); backups:feche()
+        local estado={formato=1,arquivos=[]}
+        para i,x em ipares(p.arquivos) início
+            local m=x.anterior~=nulo e R.meta(x.destino) ou metaPública
+            estado.arquivos[i]={destino=x.destino,sha256=x.sha256,anterior=x.anterior,meta=m}
+            se x.anterior~=nulo então R.copie(x.destino,cópia.."/anterior-"..i) fim
+        fim
+        grave(R,cópia.."/estado.onfé",R.O.cod(estado))
+        grave(R,cópia.."/publicar.fé",R.leia(c.publicador))
+        grave(R,cópia.."/LEIA-ME.txt","Reversão: sudo /usr/local/bin/santafé -E -P "..cópia.."/publicar.fé --reverter "..cópia.."\n")
+        R.sincronize()
+        local passou,falha=proteja(função()
+            para i,x em ipares(p.arquivos) início
+                exija(atual(R,x.destino)==x.anterior,"alteração concorrente")
+                instale(R,x.destino,x.conteúdo,estado.arquivos[i].meta)
+                se c.falha==i então erro("falha injetada") fim
+            fim
+            se c.controle então c.controle() fim
+            se c.verifique então c.verifique(p) fim
+            R.sincronize()
+        fim)
+        se não passou então
+            local revertido,falhaReversão=proteja(revertaEstado,R,c,cópia,estado)
+            exija(revertido,"REVERSAO_INCOMPLETA: "..cópia..": "..paraColar(falhaReversão))
+            erro("Publicação revertida: "..cópia..": "..paraColar(falha))
+        fim
+        retorne {resultado="SUBLIME201_PUBLICADO",cópia=cópia,versão="2.0.1",reiniciouPortal=c.controle~=nulo}
+    fim)
+    lock:feche(); exija(ok,resultado); retorne resultado
+fim
+função P.reverta(R,c,b)
+    local nome=b:separe("([^/]+)$"); local id=nome e nome:separe("^santafe%-sublime201%-([0-9a-f]+)$")
+    exija(id e #id==32 e b==c.cópias.."/"..nome,"caminho de cópia inválido")
+    local m=R.meta(b); exija(m.uid==R.meta(c.cópias).uid e m.modo=="700","cópia não privada")
+    local estado=R.O.decod(R.leia(b.."/estado.onfé"))
+    exija(estado.formato==1 e #estado.arquivos==5,"estado inválido")
+    local lock=R.raiz(c.prefixo.."/var/www/santafé.dev.br/estático/sublime")
+    local ok,falhaLocal=proteja(função() garanta(lock:trave()); revertaEstado(R,c,b,estado) fim)
+    lock:feche(); exija(ok,falhaLocal); retorne {resultado="SUBLIME201_REVERTIDO",cópia=b}
+fim
+se ...=="biblioteca" então retorne P fim
+exija((arg[1]=="--publicar" e #arg==1) ou (arg[1]=="--reverter" e #arg==2),"Uso: --publicar | --reverter /var/backups/santafe-sublime201-...")
+local R=P.ambiente("/usr/local/share/santafé/3.0","/usr/local/bin/santafé")
+exija(R.execute(["/usr/bin/id","-u"])=="0\n","execute com sudo")
+local c={prefixo="",cópias="/var/backups",pacote="/tmp/santafe-sublime-2.0.1-publicacao",publicador=arg[0]}
+c.controle=função() R.execute(["/usr/bin/systemctl","restart","sfdev.service"]); R.execute(["/usr/bin/systemctl","is-active","--quiet","sfdev.service"]) fim
+c.verifique=função(p)
+    para i,x em ipares(p.arquivos) início
+        se i~=4 então
+            local url="https://xn--santaf-gva.dev.br/est%C3%A1tico/sublime/"..x.destino:separe("([^/]+)$").."?revisao=201"
+            local corpo=R.execute(["/usr/bin/curl","-fsSL","--max-time","15",url])
+            exija(R.N.sha256(corpo)==x.sha256,"download público divergente")
+        fim
+    fim
+    local página=R.execute(["/usr/bin/curl","-fsSL","--max-time","15","https://xn--santaf-gva.dev.br/baixar?revisao=sublime201"])
+    exija(página:procure("Sublime Text — pacote manual 2.0.1",1,verdadeiro),"página pública desatualizada")
+fim
+mostre(R.O.cod(arg[1]=="--publicar" e P.publique(R,c) ou P.reverta(R,c,arg[2])))

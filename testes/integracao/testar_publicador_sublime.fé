@@ -1,0 +1,62 @@
+local sdk,binário,publicador,pacote,portalAntigo,catálogoAntigo=arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]
+local função leia(p) local a=garanta(es.abra(p,"leiturabin")); local s=a:leia("*t"); a:feche(); retorne s fim
+local P=garanta(carregue(leia(publicador),publicador))("biblioteca")
+local R=P.ambiente(sdk,binário)
+local tmp=R.mac e "/private/tmp" ou "/tmp"; local raiz=R.raiz(tmp); local nome="teste-sublime201-"..R.N.nonce()
+garanta(raiz:diretorio(nome)); raiz:feche(); local base=tmp.."/"..nome; local r=R.raiz(base); local n=0
+local função grave(p,s)
+ local pai,nomeArquivo=p:separe("^(.*)/([^/]+)$"); local pasta=R.raiz(pai); garanta(pasta:grave(nomeArquivo,s,verdadeiro)); pasta:feche()
+fim
+local função caso()
+ n=n+1; local nomeCaso="c"..n
+ garanta(r:diretorio(nomeCaso.."/opt")); garanta(r:diretorio(nomeCaso.."/var/www/santafé.dev.br/estático/sublime")); garanta(r:diretorio(nomeCaso.."/copias"))
+ local c={prefixo=base.."/"..nomeCaso,cópias=base.."/"..nomeCaso.."/copias",pacote=pacote,publicador=publicador}
+ grave(c.prefixo..P.destinos[3],leia(catálogoAntigo)); grave(c.prefixo..P.destinos[4],leia(portalAntigo))
+ R.permissões(c.prefixo..P.destinos[3],"644"); R.permissões(c.prefixo..P.destinos[4],"755")
+ retorne c
+fim
+local função recuse(f)
+ local ok,falha=proteja(f); garanta(não ok,"esperava recusa"); retorne paraColar(falha)
+fim
+local função antes(c)
+ garanta(R.leia(c.prefixo..P.destinos[3])==leia(catálogoAntigo)); garanta(R.leia(c.prefixo..P.destinos[4])==leia(portalAntigo))
+ garanta(R.meta(c.prefixo..P.destinos[3]).modo=="644"); garanta(R.meta(c.prefixo..P.destinos[4]).modo=="755")
+ local d=R.raiz(c.prefixo.."/var/www/santafé.dev.br/estático/sublime")
+ para _,i em ipares([1,2,5]) início garanta(não R.existe(d,P.destinos[i]:separe("([^/]+)$"))) fim; d:feche()
+fim
+local passou=0
+local função teste(nomeTeste,f) f(); passou=passou+1; mostre("OK",nomeTeste) fim
+local resultado,c
+ teste("publicação, metadados e cópia",função()
+  c=caso();resultado=P.publique(R,c);garanta(resultado.resultado=="SUBLIME201_PUBLICADO")
+  garanta(R.meta(resultado.cópia).modo=="700")
+  garanta(R.meta(c.prefixo..P.destinos[4]).modo=="755")
+  garanta(R.leia(resultado.cópia.."/anterior-4")==leia(portalAntigo))
+ fim)
+ teste("repetição sem alterações",função() garanta(P.publique(R,c).resultado=="SUBLIME201_JA_PUBLICADO") fim)
+ teste("reversão completa",função() P.reverta(R,c,resultado.cópia); antes(c) fim)
+ para _,i em ipares([1,3,4,5]) início
+  teste("reversão automática após arquivo "..i,função() local x=caso();x.falha=i; recuse(função() P.publique(R,x) fim);antes(x) fim)
+ fim
+ teste("falha de conferência pública reverte",função()
+  local x=caso();x.verifique=função() erro("falha HTTP injetada") fim
+  recuse(função() P.publique(R,x) fim);antes(x)
+ fim)
+ teste("alteração concorrente anterior recusada",função()
+  local x=caso();grave(x.prefixo..P.destinos[3],"alterado")
+  recuse(função() P.publique(R,x) fim);garanta(R.leia(x.prefixo..P.destinos[3])=="alterado")
+ fim)
+ teste("trava recusa publicação simultânea",função()
+  local x=caso();local d=R.raiz(x.prefixo.."/var/www/santafé.dev.br/estático/sublime");garanta(d:trave())
+  recuse(função() P.publique(R,x) fim);d:feche();antes(x)
+ fim)
+ teste("reversão não sobrescreve conteúdo posterior",função()
+  local x=caso();local z=P.publique(R,x);grave(x.prefixo..P.destinos[3],"posterior")
+  recuse(função() P.reverta(R,x,z.cópia) fim);garanta(R.leia(x.prefixo..P.destinos[3])=="posterior")
+ fim)
+ teste("ligação simbólica recusada",função()
+  local x=caso();local d=R.raiz(x.prefixo.."/opt");garanta(d:removaArquivo("sfdev.fé"));d:feche()
+  R.execute(["/bin/ln","-s",portalAntigo,x.prefixo..P.destinos[4]])
+  recuse(função() P.publique(R,x) fim)
+ fim)
+ r:feche();mostre("PUBLICADOR_SUBLIME201_TESTES_OK",passou,base,"produção inalterada")
